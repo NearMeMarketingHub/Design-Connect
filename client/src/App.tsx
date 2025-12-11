@@ -11,6 +11,9 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import Estimator from "@/pages/estimator";
 import ProjectDetails from "@/pages/project-details";
 import TimelinePage from "@/pages/timeline";
+import SalesDashboard from "@/pages/sales-dashboard";
+import AccountingDashboard from "@/pages/accounting-dashboard";
+import CreateInvoice from "@/pages/create-invoice";
 
 function Router() {
   const [location] = useLocation();
@@ -24,7 +27,16 @@ function Router() {
       <Switch>
         <Route path="/dashboard" component={ClientDashboard} />
         <Route path="/admin-dashboard" component={AdminDashboard} />
+        
+        {/* Sales & Estimating */}
+        <Route path="/sales" component={SalesDashboard} />
         <Route path="/estimates" component={Estimator} />
+        
+        {/* Accounting & Invoicing */}
+        <Route path="/accounting" component={AccountingDashboard} />
+        <Route path="/create-invoice" component={CreateInvoice} />
+
+        {/* Projects & Operations */}
         <Route path="/project/:id" component={ProjectDetails} />
         <Route path="/timeline" component={TimelinePage} />
         <Route path="/schedule" component={TimelinePage} />

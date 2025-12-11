@@ -11,7 +11,9 @@ import {
   Menu,
   X,
   HardHat,
-  User
+  User,
+  DollarSign,
+  Briefcase
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -43,10 +45,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const adminLinks = [
     { href: "/admin-dashboard", label: "Overview", icon: LayoutDashboard },
-    { href: "/projects", label: "Active Projects", icon: FolderOpen },
-    { href: "/estimates", label: "Estimating", icon: Calculator },
-    { href: "/schedule", label: "Master Schedule", icon: Calendar },
-    { href: "/admin-docs", label: "Contracts", icon: FileText },
+    { href: "/sales", label: "Sales", icon: Briefcase },
+    { href: "/accounting", label: "Accounting", icon: DollarSign },
+    { href: "/projects", label: "Projects", icon: FolderOpen },
+    { href: "/schedule", label: "Schedule", icon: Calendar },
   ];
 
   const links = userRole === 'client' ? clientLinks : adminLinks;
