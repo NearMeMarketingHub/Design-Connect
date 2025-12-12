@@ -41,6 +41,18 @@ const PROJECTS = {
     nextMilestone: "Permit Approval",
     image: blueprintImage,
     description: "Architectural drawings are under review by the city. Final material selections for the exterior are needed."
+  },
+  loft: {
+    id: "loft",
+    name: "Downtown Loft",
+    address: "450 Main St, Unit 4B",
+    status: "Completed",
+    phase: "Phase 6: Handover",
+    progress: 100,
+    budgetStatus: "Closed",
+    nextMilestone: "Warranty Period",
+    image: projectImage, // Using same image for mock
+    description: "Project completed on Jan 15, 2025. Final walkthrough signed off."
   }
 };
 
@@ -48,12 +60,17 @@ export default function ClientDashboard() {
   const [selectedProject, setSelectedProject] = useState<keyof typeof PROJECTS>("jenkins");
   const project = PROJECTS[selectedProject];
 
+  // Filter out completed projects for the switcher
+  const activeProjects = Object.entries(PROJECTS).filter(
+    ([_, p]) => p.status !== "Completed"
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground">Welcome Home, Sarah</h1>
-          <p className="text-muted-foreground mt-1">Here's what's happening with your projects.</p>
+          <p className="text-muted-foreground mt-1">Here's what's happening with your active projects.</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="w-full md:w-64">
@@ -65,14 +82,12 @@ export default function ClientDashboard() {
                 <SelectValue placeholder="Select Project" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="jenkins">
-                  <span className="font-medium">Jenkins Residence</span> 
-                  <span className="ml-2 text-xs text-muted-foreground">(Active)</span>
-                </SelectItem>
-                <SelectItem value="lakehouse">
-                  <span className="font-medium">Lake House Retreat</span>
-                  <span className="ml-2 text-xs text-muted-foreground">(Planning)</span>
-                </SelectItem>
+                {activeProjects.map(([key, p]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className="font-medium">{p.name}</span> 
+                    <span className="ml-2 text-xs text-muted-foreground">({p.status})</span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
