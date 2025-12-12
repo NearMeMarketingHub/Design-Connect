@@ -10,10 +10,10 @@ import {
   AlertCircle, 
   CalendarDays,
   DollarSign,
-  FileText,
   MapPin
 } from "lucide-react";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth-context";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
@@ -59,6 +59,10 @@ const PROJECTS = {
 export default function ClientDashboard() {
   const [selectedProject, setSelectedProject] = useState<keyof typeof PROJECTS>("jenkins");
   const project = PROJECTS[selectedProject];
+  const { user } = useAuth();
+
+  // Get first name from user's full name
+  const firstName = user?.name?.split(' ')[0] || 'there';
 
   // Filter out completed projects for the switcher
   const activeProjects = Object.entries(PROJECTS).filter(
@@ -69,7 +73,7 @@ export default function ClientDashboard() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Welcome Home, Sarah</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Welcome Home, {firstName}</h1>
           <p className="text-muted-foreground mt-1">Here's what's happening with your active projects.</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -91,10 +95,6 @@ export default function ClientDashboard() {
               </SelectContent>
             </Select>
           </div>
-          <Button className="shrink-0">
-            <FileText className="w-4 h-4 mr-2" />
-            Contract
-          </Button>
         </div>
       </div>
 

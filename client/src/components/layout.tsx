@@ -122,30 +122,67 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </div>
   );
 
+  // Hide sidebar on dashboard page
+  const isDashboard = location === "/dashboard";
+
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:block w-64 shrink-0">
-        <SidebarContent />
-      </aside>
-
-      {/* Mobile Sidebar */}
-      <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-        <SheetContent side="left" className="p-0 w-64 bg-sidebar border-r-sidebar-border">
+      {/* Desktop Sidebar - hidden on dashboard */}
+      {!isDashboard && (
+        <aside className="hidden md:block w-64 shrink-0">
           <SidebarContent />
-        </SheetContent>
-      </Sheet>
+        </aside>
+      )}
+
+      {/* Mobile Sidebar - hidden on dashboard */}
+      {!isDashboard && (
+        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+          <SheetContent side="left" className="p-0 w-64 bg-sidebar border-r-sidebar-border">
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between md:justify-end">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMobileOpen(true)}>
-            <Menu className="w-5 h-5" />
-          </Button>
+        <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between">
+          {/* Left side - Logo on dashboard, menu button on other pages */}
+          {isDashboard ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+                <HardHat className="w-6 h-6" />
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="font-heading font-bold text-xl tracking-tight">BuildVision</h1>
+              </div>
+            </div>
+          ) : (
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMobileOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </Button>
+          )}
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {/* My Projects button - only on dashboard */}
+            {isDashboard && (
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <Link href="/my-projects">
+                  <FolderOpen className="w-4 h-4" />
+                  My Projects
+                </Link>
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="text-muted-foreground">
               <Settings className="w-5 h-5" />
+            </Button>
+            {/* Logout button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-muted-foreground"
+              onClick={() => window.location.href = '/'}
+            >
+              <LogOut className="w-5 h-5" />
             </Button>
           </div>
         </header>
