@@ -15,6 +15,8 @@ import SalesDashboard from "@/pages/sales-dashboard";
 import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
 
+import ClientProjects from "@/pages/client-projects";
+
 function Router() {
   const [location] = useLocation();
 
@@ -26,6 +28,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/dashboard" component={ClientDashboard} />
+        <Route path="/my-projects" component={ClientProjects} />
         <Route path="/admin-dashboard" component={AdminDashboard} />
         
         {/* Sales & Estimating */}

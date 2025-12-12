@@ -37,8 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const clientLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/project/1", label: "My Project", icon: FolderOpen },
-    { href: "/inspiration", label: "Inspiration", icon: Lightbulb },
+    { href: "/my-projects", label: "My Projects", icon: FolderOpen },
     { href: "/timeline", label: "Timeline", icon: Calendar },
     { href: "/documents", label: "Documents", icon: FileText },
   ];
