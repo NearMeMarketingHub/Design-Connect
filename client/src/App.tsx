@@ -14,8 +14,8 @@ import TimelinePage from "@/pages/timeline";
 import SalesDashboard from "@/pages/sales-dashboard";
 import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
-
 import ClientProjects from "@/pages/client-projects";
+import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
   const [location] = useLocation();
@@ -67,10 +67,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

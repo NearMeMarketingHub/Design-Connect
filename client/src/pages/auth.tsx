@@ -6,18 +6,103 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import heroImage from "@assets/generated_images/construction_site_frame_with_sunset.png";
 
 export default function AuthPage() {
   const [_, setLocation] = useLocation();
   const [isLogin, setIsLogin] = useState(true);
+  const [activeTab, setActiveTab] = useState("client");
+  const [loading, setLoading] = useState(false);
+  const { login, register } = useAuth();
+  const { toast } = useToast();
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleClientAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Simulate auth delay
-    setTimeout(() => {
-      setLocation('/dashboard');
-    }, 500);
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      if (isLogin) {
+        await login(email, password);
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        setLocation("/dashboard");
+      } else {
+        const firstName = formData.get("first-name") as string;
+        const lastName = formData.get("last-name") as string;
+        const confirmPassword = formData.get("confirm-password") as string;
+
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match");
+        }
+
+        await register(email, password, "client", `${firstName} ${lastName}`);
+        toast({
+          title: "Account created!",
+          description: "Welcome to BuildVision.",
+        });
+        setLocation("/dashboard");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Authentication failed",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContractorAuth = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("admin-email") as string;
+    const password = formData.get("admin-password") as string;
+
+    try {
+      if (isLogin) {
+        await login(email, password);
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        setLocation("/admin-dashboard");
+      } else {
+        const companyName = formData.get("company-name") as string;
+        const firstName = formData.get("admin-first-name") as string;
+        const lastName = formData.get("admin-last-name") as string;
+        const confirmPassword = formData.get("admin-confirm-password") as string;
+
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match");
+        }
+
+        await register(email, password, "contractor", `${firstName} ${lastName} - ${companyName}`);
+        toast({
+          title: "Account created!",
+          description: "Welcome to BuildVision.",
+        });
+        setLocation("/admin-dashboard");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Authentication failed",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleMode = () => setIsLogin(!isLogin);
@@ -36,10 +121,10 @@ export default function AuthPage() {
             </div>
           </div>
 
-          <Tabs defaultValue="client" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="client">Client Portal</TabsTrigger>
-              <TabsTrigger value="contractor">Contractor Login</TabsTrigger>
+              <TabsTrigger value="client" data-testid="tab-client">Client Portal</TabsTrigger>
+              <TabsTrigger value="contractor" data-testid="tab-contractor">Contractor Login</TabsTrigger>
             </TabsList>
             
             <TabsContent value="client">
@@ -52,38 +137,75 @@ export default function AuthPage() {
                       : "Register to view your project details and progress."}
                   </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleAuth}>
+                <form onSubmit={handleClientAuth}>
                   <CardContent className="space-y-4">
                     {!isLogin && (
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="client-first-name">First Name</Label>
-                          <Input id="client-first-name" placeholder="Jane" required />
+                          <Input 
+                            id="client-first-name" 
+                            name="first-name"
+                            placeholder="Jane" 
+                            required 
+                            data-testid="input-first-name"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="client-last-name">Last Name</Label>
-                          <Input id="client-last-name" placeholder="Doe" required />
+                          <Input 
+                            id="client-last-name" 
+                            name="last-name"
+                            placeholder="Doe" 
+                            required 
+                            data-testid="input-last-name"
+                          />
                         </div>
                       </div>
                     )}
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="client@example.com" required />
+                      <Input 
+                        id="email" 
+                        name="email"
+                        type="email" 
+                        placeholder="client@example.com" 
+                        required 
+                        data-testid="input-email"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password">Password</Label>
-                      <Input id="password" type="password" required />
+                      <Input 
+                        id="password" 
+                        name="password"
+                        type="password" 
+                        required 
+                        data-testid="input-password"
+                      />
                     </div>
                     {!isLogin && (
                       <div className="space-y-2">
                         <Label htmlFor="confirm-password">Confirm Password</Label>
-                        <Input id="confirm-password" type="password" required />
+                        <Input 
+                          id="confirm-password" 
+                          name="confirm-password"
+                          type="password" 
+                          required 
+                          data-testid="input-confirm-password"
+                        />
                       </div>
                     )}
                   </CardContent>
                   <CardFooter>
-                    <Button type="submit" className="w-full font-medium">
-                      {isLogin ? "Sign In" : "Create Account"} <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button 
+                      type="submit" 
+                      className="w-full font-medium" 
+                      disabled={loading}
+                      data-testid="button-submit"
+                    >
+                      {loading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"} 
+                      {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                     </Button>
                   </CardFooter>
                 </form>
@@ -100,44 +222,88 @@ export default function AuthPage() {
                       : "Join the network of certified contractors."}
                   </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleAuth}>
+                <form onSubmit={handleContractorAuth}>
                   <CardContent className="space-y-4">
                     {!isLogin && (
                       <>
                         <div className="space-y-2">
                           <Label htmlFor="company-name">Company Name</Label>
-                          <Input id="company-name" placeholder="Acme Construction" required />
+                          <Input 
+                            id="company-name" 
+                            name="company-name"
+                            placeholder="Acme Construction" 
+                            required 
+                            data-testid="input-company-name"
+                          />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="admin-first-name">First Name</Label>
-                            <Input id="admin-first-name" placeholder="Mike" required />
+                            <Input 
+                              id="admin-first-name" 
+                              name="admin-first-name"
+                              placeholder="Mike" 
+                              required 
+                              data-testid="input-admin-first-name"
+                            />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="admin-last-name">Last Name</Label>
-                            <Input id="admin-last-name" placeholder="Builder" required />
+                            <Input 
+                              id="admin-last-name" 
+                              name="admin-last-name"
+                              placeholder="Builder" 
+                              required 
+                              data-testid="input-admin-last-name"
+                            />
                           </div>
                         </div>
                       </>
                     )}
                     <div className="space-y-2">
                       <Label htmlFor="admin-email">Work Email</Label>
-                      <Input id="admin-email" type="email" placeholder="admin@buildvision.com" required />
+                      <Input 
+                        id="admin-email" 
+                        name="admin-email"
+                        type="email" 
+                        placeholder="admin@buildvision.com" 
+                        required 
+                        data-testid="input-admin-email"
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="admin-password">Password</Label>
-                      <Input id="admin-password" type="password" required />
+                      <Input 
+                        id="admin-password" 
+                        name="admin-password"
+                        type="password" 
+                        required 
+                        data-testid="input-admin-password"
+                      />
                     </div>
                     {!isLogin && (
                       <div className="space-y-2">
                         <Label htmlFor="admin-confirm-password">Confirm Password</Label>
-                        <Input id="admin-confirm-password" type="password" required />
+                        <Input 
+                          id="admin-confirm-password" 
+                          name="admin-confirm-password"
+                          type="password" 
+                          required 
+                          data-testid="input-admin-confirm-password"
+                        />
                       </div>
                     )}
                   </CardContent>
                   <CardFooter>
-                    <Button type="submit" className="w-full font-medium" variant="default">
-                      {isLogin ? "Access Dashboard" : "Register Company"} <ArrowRight className="w-4 h-4 ml-2" />
+                    <Button 
+                      type="submit" 
+                      className="w-full font-medium" 
+                      variant="default" 
+                      disabled={loading}
+                      data-testid="button-contractor-submit"
+                    >
+                      {loading ? "Please wait..." : isLogin ? "Access Dashboard" : "Register Company"} 
+                      {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                     </Button>
                   </CardFooter>
                 </form>
@@ -149,7 +315,12 @@ export default function AuthPage() {
             <p className="text-sm text-muted-foreground">
               {isLogin ? "Don't have an account?" : "Already have an account?"}
             </p>
-            <Button variant="link" onClick={toggleMode} className="p-0 h-auto font-semibold">
+            <Button 
+              variant="link" 
+              onClick={toggleMode} 
+              className="p-0 h-auto font-semibold"
+              data-testid="button-toggle-mode"
+            >
               {isLogin ? "Sign up for a new account" : "Sign in to your account"}
             </Button>
           </div>
