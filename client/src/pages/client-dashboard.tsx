@@ -1,31 +1,86 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   CheckCircle2, 
   Clock, 
   AlertCircle, 
-  ArrowRight, 
   CalendarDays,
   DollarSign,
-  FileText
+  FileText,
+  MapPin
 } from "lucide-react";
 import { Link } from "wouter";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
+import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
+
+const PROJECTS = {
+  jenkins: {
+    id: "jenkins",
+    name: "The Jenkins Residence",
+    address: "123 Maple Avenue",
+    status: "Active",
+    phase: "Phase 3: Rough-in",
+    progress: 45,
+    budgetStatus: "On Track",
+    nextMilestone: "Drywall",
+    image: projectImage,
+    description: "Current progress is on schedule. Plumbing and electrical rough-ins are 80% complete. Next inspection scheduled for Friday."
+  },
+  lakehouse: {
+    id: "lakehouse",
+    name: "Lake House Retreat",
+    address: "889 Shoreline Drive",
+    status: "Planning",
+    phase: "Phase 1: Design",
+    progress: 15,
+    budgetStatus: "Pending",
+    nextMilestone: "Permit Approval",
+    image: blueprintImage,
+    description: "Architectural drawings are under review by the city. Final material selections for the exterior are needed."
+  }
+};
 
 export default function ClientDashboard() {
+  const [selectedProject, setSelectedProject] = useState<keyof typeof PROJECTS>("jenkins");
+  const project = PROJECTS[selectedProject];
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground">Welcome Home, Sarah</h1>
-          <p className="text-muted-foreground mt-1">Here's what's happening with your project today.</p>
+          <p className="text-muted-foreground mt-1">Here's what's happening with your projects.</p>
         </div>
-        <Button className="md:w-auto w-full">
-          <FileText className="w-4 h-4 mr-2" />
-          View Contract
-        </Button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="w-full md:w-64">
+            <Select 
+              value={selectedProject} 
+              onValueChange={(v) => setSelectedProject(v as keyof typeof PROJECTS)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="jenkins">
+                  <span className="font-medium">Jenkins Residence</span> 
+                  <span className="ml-2 text-xs text-muted-foreground">(Active)</span>
+                </SelectItem>
+                <SelectItem value="lakehouse">
+                  <span className="font-medium">Lake House Retreat</span>
+                  <span className="ml-2 text-xs text-muted-foreground">(Planning)</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button className="shrink-0">
+            <FileText className="w-4 h-4 mr-2" />
+            Contract
+          </Button>
+        </div>
       </div>
 
       {/* Project Hero Card */}
@@ -33,51 +88,86 @@ export default function ClientDashboard() {
         <Card className="md:col-span-2 overflow-hidden relative group border-0 shadow-lg">
           <div className="absolute inset-0">
             <img 
-              src={projectImage} 
+              src={project.image} 
               alt="Project Render" 
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
           </div>
-          <div className="relative h-full flex flex-col justify-end p-6 text-white min-h-[300px]">
-            <Badge className="w-fit mb-3 bg-accent text-accent-foreground border-none">Phase 3: Rough-in</Badge>
-            <h2 className="text-3xl font-heading font-bold mb-2">The Jenkins Residence</h2>
-            <p className="text-white/80 max-w-xl mb-6">
-              Current progress is on schedule. Plumbing and electrical rough-ins are 80% complete. Next inspection scheduled for Friday.
+          <div className="relative h-full flex flex-col justify-end p-6 text-white min-h-[350px]">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className="bg-accent text-accent-foreground border-none hover:bg-accent/90">
+                {project.phase}
+              </Badge>
+              {project.status === "Active" && (
+                <Badge variant="outline" className="border-white/30 text-white bg-green-500/20 backdrop-blur-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-2 animate-pulse" />
+                  Live Updates
+                </Badge>
+              )}
+            </div>
+            
+            <h2 className="text-3xl font-heading font-bold mb-1">{project.name}</h2>
+            <div className="flex items-center text-white/70 text-sm mb-4">
+              <MapPin className="w-4 h-4 mr-1" />
+              {project.address}
+            </div>
+            
+            <p className="text-white/80 max-w-xl mb-6 leading-relaxed">
+              {project.description}
             </p>
-            <div className="flex items-center gap-4">
-              <div className="flex-1 max-w-xs">
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Overall Progress</span>
-                  <span>45%</span>
+            
+            <div className="flex items-center gap-6 p-4 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
+              <div className="flex-1">
+                <div className="flex justify-between text-sm mb-2 font-medium">
+                  <span>Completion</span>
+                  <span>{project.progress}%</span>
                 </div>
-                <Progress value={45} className="h-2 bg-white/20 [&>div]:bg-accent" />
+                <Progress value={project.progress} className="h-2 bg-white/20 [&>div]:bg-accent" />
+              </div>
+              <div className="h-8 w-px bg-white/20" />
+              <div>
+                <span className="text-xs text-white/60 block uppercase tracking-wider">Status</span>
+                <span className="font-medium">{project.status}</span>
               </div>
             </div>
           </div>
         </Card>
 
         <div className="space-y-6">
-          <Card className="h-full border-l-4 border-l-accent">
+          <Card className="h-full border-l-4 border-l-accent flex flex-col">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertCircle className="w-5 h-5 text-accent" />
                 Action Required
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                <h4 className="font-medium text-sm">Approve Change Order #03</h4>
-                <p className="text-xs text-muted-foreground mt-1">Master bath tile upgrade request pending approval.</p>
-                <Button size="sm" variant="outline" className="mt-3 w-full">Review & Sign</Button>
-              </div>
-              <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                <h4 className="font-medium text-sm">Select Lighting Fixtures</h4>
-                <p className="text-xs text-muted-foreground mt-1">Kitchen island pendant selection needed by Friday.</p>
-                <Link href="/inspiration">
-                  <Button size="sm" variant="outline" className="mt-3 w-full">Go to Selections</Button>
-                </Link>
-              </div>
+            <CardContent className="space-y-4 flex-1">
+              {selectedProject === 'jenkins' ? (
+                <>
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer group">
+                    <div className="flex justify-between items-start mb-1">
+                      <h4 className="font-medium text-sm group-hover:text-primary transition-colors">Approve Change Order #03</h4>
+                      <Badge variant="outline" className="text-[10px] h-5">Urgent</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Master bath tile upgrade request pending approval.</p>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">Review & Sign</Button>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer group">
+                    <h4 className="font-medium text-sm group-hover:text-primary transition-colors">Select Lighting Fixtures</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Kitchen island pendant selection needed by Friday.</p>
+                    <Link href="/inspiration">
+                      <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">Go to Selections</Button>
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                  <h4 className="font-medium text-sm">Review Initial Concepts</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Architect has uploaded 3 variations for the front elevation.</p>
+                  <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">View Concepts</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -92,7 +182,7 @@ export default function ClientDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Days Remaining</p>
-              <h3 className="text-2xl font-bold">45</h3>
+              <h3 className="text-2xl font-bold">{selectedProject === 'jenkins' ? '45' : '120'}</h3>
             </div>
           </CardContent>
         </Card>
@@ -103,7 +193,7 @@ export default function ClientDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Budget Status</p>
-              <h3 className="text-2xl font-bold">On Track</h3>
+              <h3 className="text-2xl font-bold">{project.budgetStatus}</h3>
             </div>
           </CardContent>
         </Card>
@@ -114,7 +204,7 @@ export default function ClientDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
-              <h3 className="text-2xl font-bold">24/58</h3>
+              <h3 className="text-2xl font-bold">{selectedProject === 'jenkins' ? '24/58' : '3/45'}</h3>
             </div>
           </CardContent>
         </Card>
@@ -125,7 +215,7 @@ export default function ClientDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Next Milestone</p>
-              <h3 className="text-lg font-bold">Drywall</h3>
+              <h3 className="text-lg font-bold">{project.nextMilestone}</h3>
             </div>
           </CardContent>
         </Card>
@@ -145,11 +235,17 @@ export default function ClientDashboard() {
                   Today, 9:00 AM
                 </div>
                 <div>
-                  <h4 className="font-medium text-foreground">Electrical Rough-in Inspection Passed</h4>
+                  <h4 className="font-medium text-foreground">
+                    {selectedProject === 'jenkins' 
+                      ? "Electrical Rough-in Inspection Passed" 
+                      : "Survey Team on Site"}
+                  </h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    The city inspector signed off on all electrical work this morning. The crew is now proceeding with insulation installation.
+                    {selectedProject === 'jenkins'
+                      ? "The city inspector signed off on all electrical work this morning. The crew is now proceeding with insulation installation."
+                      : "Topographical survey completed. Data is being processed for the architect."}
                   </p>
-                  {i === 1 && (
+                  {i === 1 && selectedProject === 'jenkins' && (
                     <div className="mt-3 flex gap-2">
                       <div className="w-20 h-20 rounded-md bg-muted border border-border" />
                       <div className="w-20 h-20 rounded-md bg-muted border border-border" />
