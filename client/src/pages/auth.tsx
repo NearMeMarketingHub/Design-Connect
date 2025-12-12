@@ -23,12 +23,12 @@ export default function AuthPage() {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     try {
       if (isLogin) {
-        await login(email, password);
+        const loginId = formData.get("email") as string;
+        await login(loginId, password);
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
@@ -37,13 +37,15 @@ export default function AuthPage() {
       } else {
         const firstName = formData.get("first-name") as string;
         const lastName = formData.get("last-name") as string;
+        const username = formData.get("username") as string;
+        const email = formData.get("signup-email") as string;
         const confirmPassword = formData.get("confirm-password") as string;
 
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match");
         }
 
-        await register(email, password, "client", `${firstName} ${lastName}`);
+        await register(username, email, password, "client", `${firstName} ${lastName}`);
         toast({
           title: "Account created!",
           description: "Welcome to BuildVision.",
@@ -66,12 +68,12 @@ export default function AuthPage() {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("admin-email") as string;
     const password = formData.get("admin-password") as string;
 
     try {
       if (isLogin) {
-        await login(email, password);
+        const loginId = formData.get("admin-email") as string;
+        await login(loginId, password);
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
@@ -81,13 +83,15 @@ export default function AuthPage() {
         const companyName = formData.get("company-name") as string;
         const firstName = formData.get("admin-first-name") as string;
         const lastName = formData.get("admin-last-name") as string;
+        const username = formData.get("admin-username") as string;
+        const email = formData.get("admin-signup-email") as string;
         const confirmPassword = formData.get("admin-confirm-password") as string;
 
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match");
         }
 
-        await register(email, password, "contractor", `${firstName} ${lastName} - ${companyName}`);
+        await register(username, email, password, "contractor", `${firstName} ${lastName} - ${companyName}`);
         toast({
           title: "Account created!",
           description: "Welcome to BuildVision.",
@@ -140,40 +144,65 @@ export default function AuthPage() {
                 <form onSubmit={handleClientAuth}>
                   <CardContent className="space-y-4">
                     {!isLogin && (
-                      <div className="grid grid-cols-2 gap-4">
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="client-first-name">First Name</Label>
+                            <Input 
+                              id="client-first-name" 
+                              name="first-name"
+                              placeholder="Jane" 
+                              required 
+                              data-testid="input-first-name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="client-last-name">Last Name</Label>
+                            <Input 
+                              id="client-last-name" 
+                              name="last-name"
+                              placeholder="Doe" 
+                              required 
+                              data-testid="input-last-name"
+                            />
+                          </div>
+                        </div>
                         <div className="space-y-2">
-                          <Label htmlFor="client-first-name">First Name</Label>
+                          <Label htmlFor="client-username">Username</Label>
                           <Input 
-                            id="client-first-name" 
-                            name="first-name"
-                            placeholder="Jane" 
+                            id="client-username" 
+                            name="username"
+                            placeholder="janedoe" 
                             required 
-                            data-testid="input-first-name"
+                            data-testid="input-username"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="client-last-name">Last Name</Label>
+                          <Label htmlFor="client-email">Email</Label>
                           <Input 
-                            id="client-last-name" 
-                            name="last-name"
-                            placeholder="Doe" 
+                            id="client-email" 
+                            name="signup-email"
+                            type="email"
+                            placeholder="jane@example.com"
                             required 
-                            data-testid="input-last-name"
+                            data-testid="input-signup-email"
                           />
                         </div>
+                      </>
+                    )}
+                    {isLogin && (
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email or Username</Label>
+                        <Input 
+                          id="email" 
+                          name="email"
+                          type="text"
+                          placeholder="email or username"
+                          required 
+                          data-testid="input-email"
+                        />
                       </div>
                     )}
-                    <div className="space-y-2">
-                      <Label htmlFor="email">{isLogin ? "Email or Username" : "Email"}</Label>
-                      <Input 
-                        id="email" 
-                        name="email"
-                        type={isLogin ? "text" : "email"}
-                        placeholder={isLogin ? "email or username" : "client@example.com"}
-                        required 
-                        data-testid="input-email"
-                      />
-                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="password">Password</Label>
                       <Input 
@@ -258,19 +287,42 @@ export default function AuthPage() {
                             />
                           </div>
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="admin-username">Username</Label>
+                          <Input 
+                            id="admin-username" 
+                            name="admin-username"
+                            placeholder="mikebuilder" 
+                            required 
+                            data-testid="input-admin-username"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="admin-signup-email">Work Email</Label>
+                          <Input 
+                            id="admin-signup-email" 
+                            name="admin-signup-email"
+                            type="email"
+                            placeholder="admin@buildvision.com"
+                            required 
+                            data-testid="input-admin-signup-email"
+                          />
+                        </div>
                       </>
                     )}
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-email">{isLogin ? "Email or Username" : "Work Email"}</Label>
-                      <Input 
-                        id="admin-email" 
-                        name="admin-email"
-                        type={isLogin ? "text" : "email"}
-                        placeholder={isLogin ? "email or username" : "admin@buildvision.com"}
-                        required 
-                        data-testid="input-admin-email"
-                      />
-                    </div>
+                    {isLogin && (
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-email">Email or Username</Label>
+                        <Input 
+                          id="admin-email" 
+                          name="admin-email"
+                          type="text"
+                          placeholder="email or username"
+                          required 
+                          data-testid="input-admin-email"
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="admin-password">Password</Label>
                       <Input 

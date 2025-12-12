@@ -84,7 +84,7 @@ export async function registerRoutes(
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {
-      const { username, password, role, name } = req.body;
+      const { username, email, password, role, name } = req.body;
       
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
@@ -94,6 +94,7 @@ export async function registerRoutes(
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({
         username,
+        email,
         password: hashedPassword,
         role: role || "client",
         name,
