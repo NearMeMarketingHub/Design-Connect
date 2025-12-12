@@ -172,8 +172,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <Settings className="w-5 h-5" />
+            <Button variant="ghost" size="icon" className="text-muted-foreground" asChild>
+              <Link href="/settings">
+                <Settings className="w-5 h-5" />
+              </Link>
             </Button>
             {/* Logout button */}
             <Button 
