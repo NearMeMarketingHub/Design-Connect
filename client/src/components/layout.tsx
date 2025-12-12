@@ -71,8 +71,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             const Icon = link.icon;
             const isActive = location === link.href || location.startsWith(link.href + '/');
             return (
-              <Link key={link.href} href={link.href}>
-                <a className={cn(
+              <Link key={link.href} href={link.href} className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                   isActive 
                     ? "bg-sidebar-accent text-white" 
@@ -80,7 +79,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 )}>
                   <Icon className="w-4 h-4" />
                   {link.label}
-                </a>
               </Link>
             );
           })}
@@ -142,11 +140,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between md:justify-end">
-          <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon">
-              <Menu className="w-5 h-5" />
-            </Button>
-          </SheetTrigger>
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMobileOpen(true)}>
+            <Menu className="w-5 h-5" />
+          </Button>
           
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="text-muted-foreground">
