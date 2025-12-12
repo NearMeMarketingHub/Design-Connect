@@ -45,9 +45,9 @@ export async function registerRoutes(
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username);
+        const user = await storage.getUserByUsernameOrEmail(username);
         if (!user) {
-          return done(null, false, { message: "Incorrect username." });
+          return done(null, false, { message: "Incorrect username or email." });
         }
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
