@@ -84,9 +84,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsernameOrEmail(identifier: string): Promise<User | undefined> {
+    console.log(`[Auth] Looking up user by identifier: ${identifier}`);
     let user = await this.getUserByUsername(identifier);
+    console.log(`[Auth] Username lookup result: ${user ? 'found' : 'not found'}`);
     if (!user) {
       user = await this.getUserByEmail(identifier);
+      console.log(`[Auth] Email lookup result: ${user ? 'found' : 'not found'}`);
     }
     return user;
   }
