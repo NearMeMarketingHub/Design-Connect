@@ -164,12 +164,12 @@ export default function AuthPage() {
                       </div>
                     )}
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
+                      <Label htmlFor="email">{isLogin ? "Email or Username" : "Email"}</Label>
                       <Input 
                         id="email" 
                         name="email"
-                        type="email" 
-                        placeholder="client@example.com" 
+                        type={isLogin ? "text" : "email"}
+                        placeholder={isLogin ? "email or username" : "client@example.com"}
                         required 
                         data-testid="input-email"
                       />
@@ -261,12 +261,12 @@ export default function AuthPage() {
                       </>
                     )}
                     <div className="space-y-2">
-                      <Label htmlFor="admin-email">Work Email</Label>
+                      <Label htmlFor="admin-email">{isLogin ? "Email or Username" : "Work Email"}</Label>
                       <Input 
                         id="admin-email" 
                         name="admin-email"
-                        type="email" 
-                        placeholder="admin@buildvision.com" 
+                        type={isLogin ? "text" : "email"}
+                        placeholder={isLogin ? "email or username" : "admin@buildvision.com"}
                         required 
                         data-testid="input-admin-email"
                       />
