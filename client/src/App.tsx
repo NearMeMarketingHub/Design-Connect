@@ -16,6 +16,8 @@ import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
 import ClientProjects from "@/pages/client-projects";
 import SettingsPage from "@/pages/settings";
+import AdminLogin from "@/pages/admin-login";
+import SuperAdminDashboard from "@/pages/super-admin-dashboard";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -23,6 +25,10 @@ function Router() {
 
   if (location === "/") {
     return <AuthPage />;
+  }
+  
+  if (location === "/admin-login") {
+    return <AdminLogin />;
   }
 
   return (
@@ -32,6 +38,7 @@ function Router() {
         <Route path="/my-projects" component={ClientProjects} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/admin-dashboard" component={AdminDashboard} />
+        <Route path="/super-admin" component={SuperAdminDashboard} />
         
         {/* Sales & Estimating */}
         <Route path="/sales" component={SalesDashboard} />

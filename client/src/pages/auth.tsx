@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, ArrowRight } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import heroImage from "@assets/generated_images/construction_site_frame_with_sunset.png";
@@ -375,6 +375,18 @@ export default function AuthPage() {
             >
               {isLogin ? "Sign up for a new account" : "Sign in to your account"}
             </Button>
+          </div>
+
+          <div className="pt-6 border-t border-border mt-6">
+            <Link href="/admin-login">
+              <Button 
+                variant="ghost" 
+                className="w-full text-xs text-muted-foreground hover:text-foreground"
+                data-testid="link-admin-login"
+              >
+                Admins log in here
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
