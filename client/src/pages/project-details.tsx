@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ImageViewerModal from "@/components/image-viewer-modal";
 import { 
   ArrowLeft,
@@ -25,7 +26,9 @@ import {
   Camera,
   Milestone,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Phone,
+  Mail
 } from "lucide-react";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -130,6 +133,12 @@ const INSPIRATION_IMAGES = [
   { id: 4, title: "Hardwood Flooring", category: "Flooring", status: "approved" },
   { id: 5, title: "Cabinet Hardware", category: "Kitchen", status: "reviewing" },
   { id: 6, title: "Paint Colors", category: "General", status: "approved" }
+];
+
+const TEAM_MEMBERS = [
+  { id: 1, name: "Mike Builder", role: "Project Manager", initials: "MB", email: "mike@buildvision.com", phone: "(555) 123-4567" },
+  { id: 2, name: "Jane Design", role: "Lead Designer", initials: "JD", email: "jane@buildvision.com", phone: "(555) 234-5678" },
+  { id: 3, name: "Tom Electric", role: "Electrician", initials: "TE", email: "tom@buildvision.com", phone: "(555) 345-6789" }
 ];
 
 export default function ProjectDetails() {
@@ -378,34 +387,61 @@ export default function ProjectDetails() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>MB</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">Mike Builder</p>
-                        <p className="text-xs text-muted-foreground">Project Manager</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>JD</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">Jane Design</p>
-                        <p className="text-xs text-muted-foreground">Lead Designer</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>TE</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">Tom Electric</p>
-                        <p className="text-xs text-muted-foreground">Electrician</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="w-full mt-2" data-testid="button-contact-team">
+                    {TEAM_MEMBERS.map((member) => (
+                      <Popover key={member.id}>
+                        <PopoverTrigger asChild>
+                          <div 
+                            className="flex items-center gap-3 p-2 -m-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                            data-testid={`button-team-member-${member.id}`}
+                          >
+                            <Avatar>
+                              <AvatarFallback>{member.initials}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm">{member.name}</p>
+                              <p className="text-xs text-muted-foreground">{member.role}</p>
+                            </div>
+                          </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64" align="start">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback>{member.initials}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-semibold">{member.name}</p>
+                                <p className="text-sm text-muted-foreground">{member.role}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2 pt-2 border-t">
+                              <a 
+                                href={`mailto:${member.email}`} 
+                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                data-testid={`link-email-${member.id}`}
+                              >
+                                <Mail className="h-4 w-4" />
+                                {member.email}
+                              </a>
+                              <a 
+                                href={`tel:${member.phone}`} 
+                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                data-testid={`link-phone-${member.id}`}
+                              >
+                                <Phone className="h-4 w-4" />
+                                {member.phone}
+                              </a>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ))}
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-2" 
+                      data-testid="button-contact-team"
+                      onClick={() => setActiveTab("messages")}
+                    >
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Team
                     </Button>
