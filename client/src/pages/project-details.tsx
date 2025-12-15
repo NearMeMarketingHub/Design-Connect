@@ -508,27 +508,24 @@ export default function ProjectDetails() {
                     alt={img.title}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button size="icon" variant="secondary" data-testid={`button-comment-inspiration-${img.id}`}>
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Button 
+                      size="icon" 
+                      variant="secondary" 
+                      data-testid={`button-comment-inspiration-${img.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMessageText(`Regarding "${img.title}" (${img.category}): `);
+                        setActiveTab("messages");
+                      }}
+                    >
                       <MessageSquare className="w-4 h-4" />
-                    </Button>
-                    <Button size="icon" variant="secondary" data-testid={`button-approve-inspiration-${img.id}`}>
-                      <CheckCircle2 className="w-4 h-4" />
                     </Button>
                   </div>
                   <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-white text-sm font-medium">{img.title}</p>
-                        <p className="text-white/70 text-xs">{img.category}</p>
-                      </div>
-                      <Badge 
-                        className={`text-xs ${
-                          img.status === 'approved' ? 'bg-green-500' : 'bg-yellow-500'
-                        } border-0`}
-                      >
-                        {img.status === 'approved' ? 'Approved' : 'In Review'}
-                      </Badge>
+                    <div>
+                      <p className="text-white text-sm font-medium">{img.title}</p>
+                      <p className="text-white/70 text-xs">{img.category}</p>
                     </div>
                   </div>
                 </div>
