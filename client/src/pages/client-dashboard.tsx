@@ -168,12 +168,14 @@ export default function ClientDashboard() {
                       <Badge variant="outline" className="text-[10px] h-5">Urgent</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">Master bath tile upgrade request pending approval.</p>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">Review & Sign</Button>
+                    <Link href="/project/jenkins?tab=documents">
+                      <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-review-sign">Review & Sign</Button>
+                    </Link>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer group">
                     <h4 className="font-medium text-sm group-hover:text-primary transition-colors">Select Lighting Fixtures</h4>
                     <p className="text-xs text-muted-foreground mt-1">Kitchen island pendant selection needed by Friday.</p>
-                    <Link href="/inspiration">
+                    <Link href={`/project/${selectedProject}?tab=inspiration`}>
                       <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">Go to Selections</Button>
                     </Link>
                   </div>
@@ -182,7 +184,9 @@ export default function ClientDashboard() {
                 <div className="p-4 bg-muted/50 rounded-lg border border-border">
                   <h4 className="font-medium text-sm">Review Initial Concepts</h4>
                   <p className="text-xs text-muted-foreground mt-1">Architect has uploaded 3 variations for the front elevation.</p>
-                  <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">View Concepts</Button>
+                  <Link href={`/project/${selectedProject}?tab=documents`}>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-view-concepts">View Concepts</Button>
+                  </Link>
                 </div>
               )}
             </CardContent>

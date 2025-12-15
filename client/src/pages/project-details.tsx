@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -203,11 +203,22 @@ const TEAM_MEMBERS = [
 
 export default function ProjectDetails() {
   const params = useParams<{ id: string }>();
+  const [location] = useLocation();
   const projectId = params.id || "";
   const project = PROJECTS_DATA[projectId];
   const queryClient = useQueryClient();
   
-  const [activeTab, setActiveTab] = useState("overview");
+  // Parse tab from URL query parameter
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const tabFromUrl = urlParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "overview");
+  
+  // Update tab when URL changes
+  useEffect(() => {
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
   const [messageText, setMessageText] = useState("");
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<{ src: string; title?: string; description?: string }[]>([]);
@@ -1693,38 +1704,6 @@ export default function ProjectDetails() {
                 </CardContent>
               </Card>
 
-              {/* Photos & Media */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-pink-500/10 rounded-lg">
-                      <ImageIcon className="w-5 h-5 text-pink-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">Photos & Media</CardTitle>
-                      <p className="text-xs text-muted-foreground">Project imagery</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-photo-1">
-                      <div className="flex items-center gap-2">
-                        <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Before Photos.zip</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-photo-2">
-                      <div className="flex items-center gap-2">
-                        <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Progress Week 4.zip</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
         </div>
