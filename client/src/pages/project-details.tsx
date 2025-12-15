@@ -386,7 +386,7 @@ export default function ProjectDetails() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div>
       {/* Header with Back Navigation */}
       <div className="flex items-center gap-4">
         <Link href="/my-projects">
@@ -413,7 +413,7 @@ export default function ProjectDetails() {
       </div>
 
       {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 mt-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
         <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none h-auto overflow-x-auto flex-nowrap">
           <TabsTrigger 
             value="overview"
@@ -850,7 +850,7 @@ export default function ProjectDetails() {
           </TabsContent>
 
           {/* MESSAGES TAB */}
-          <TabsContent value="messages" className="flex-1 flex flex-col overflow-hidden mt-6">
+          <TabsContent value="messages" className="mt-6">
             <input 
               type="file" 
               ref={messageAttachmentInputRef}
@@ -858,12 +858,12 @@ export default function ProjectDetails() {
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
               onChange={handleMessageFileUpload}
             />
-            <Card className="flex-1 flex flex-col overflow-hidden">
+            <Card className="flex flex-col" style={{ height: 'calc(100vh - 240px)' }}>
               <CardHeader className="border-b border-border py-4">
                 <CardTitle className="text-lg">Project Communication</CardTitle>
                 <CardDescription>Chat with your project team</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden p-0">
+              <CardContent className="flex-1 overflow-auto p-0">
                 <div ref={messagesContainerRef} className="h-full overflow-y-auto flex flex-col-reverse p-4">
                   <div className="space-y-4">
                     {messages.map((msg) => (

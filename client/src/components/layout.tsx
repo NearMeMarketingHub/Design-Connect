@@ -68,8 +68,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
       
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden p-4 md:p-8">
-        <div className="max-w-7xl mx-auto h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="flex-1 overflow-auto p-4 md:p-8">
+        <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
           {children}
         </div>
       </main>
