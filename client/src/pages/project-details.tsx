@@ -229,35 +229,35 @@ export default function ProjectDetails() {
         <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none h-auto overflow-x-auto flex-nowrap">
           <TabsTrigger 
             value="overview"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
             data-testid="tab-overview"
           >
             Overview
           </TabsTrigger>
           <TabsTrigger 
             value="inspiration"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
             data-testid="tab-inspiration"
           >
             Inspiration & Selections
           </TabsTrigger>
           <TabsTrigger 
             value="timeline"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
             data-testid="tab-timeline"
           >
             Timeline
           </TabsTrigger>
           <TabsTrigger 
             value="messages"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
             data-testid="tab-messages"
           >
             Messages
           </TabsTrigger>
           <TabsTrigger 
             value="progress"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
             data-testid="tab-progress"
           >
             Progress Photos
@@ -438,7 +438,7 @@ export default function ProjectDetails() {
                     ))}
                     <Button 
                       variant="outline" 
-                      className="w-full mt-2" 
+                      className="w-full mt-2 hover:bg-muted transition-colors" 
                       data-testid="button-contact-team"
                       onClick={() => setActiveTab("messages")}
                     >
