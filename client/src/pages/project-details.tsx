@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ImageViewerModal from "@/components/image-viewer-modal";
+import DocumentViewerModal from "@/components/document-viewer-modal";
 import { 
   ArrowLeft,
   Calendar,
@@ -180,6 +181,8 @@ export default function ProjectDetails() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<{ src: string; title?: string; description?: string }[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [documentToView, setDocumentToView] = useState<{ src: string; name: string; type: 'image' | 'file' } | null>(null);
   const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
   const [inspirationImages, setInspirationImages] = useState(INITIAL_INSPIRATION_IMAGES);
   const [expandedMilestones, setExpandedMilestones] = useState<number[]>([]);
@@ -214,7 +217,7 @@ export default function ProjectDetails() {
     avatar: msg.senderAvatar || msg.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
     message: msg.content,
     time: new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-    isOwn: msg.senderName === 'You',
+    isOwn: msg.senderName === 'You' || msg.senderId === 'current-user' || msg.isOwn,
     isSystem: msg.isSystem,
     ...(msg.attachmentUrl && {
       attachment: {
@@ -932,18 +935,18 @@ export default function ProjectDetails() {
                                     onClick={() => openImageViewer([{ src: msg.attachment!.src, title: msg.attachment!.name }], 0)}
                                   />
                                 ) : (
-                                  <a 
-                                    href={msg.attachment.src} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    download={msg.attachment.name}
+                                  <div 
                                     className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:opacity-80 transition-opacity ${
                                       msg.isOwn ? 'bg-primary-foreground/10' : 'bg-background'
                                     }`}
+                                    onClick={() => {
+                                      setDocumentToView({ src: msg.attachment!.src, name: msg.attachment!.name, type: msg.attachment!.type });
+                                      setDocumentViewerOpen(true);
+                                    }}
                                   >
                                     <File className="w-4 h-4" />
                                     <span className="text-sm truncate underline">{msg.attachment.name}</span>
-                                  </a>
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -1207,6 +1210,13 @@ export default function ProjectDetails() {
         initialIndex={viewerInitialIndex}
         isOpen={viewerOpen}
         onClose={() => setViewerOpen(false)}
+      />
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        document={documentToView}
+        isOpen={documentViewerOpen}
+        onClose={() => setDocumentViewerOpen(false)}
       />
     </div>
   );

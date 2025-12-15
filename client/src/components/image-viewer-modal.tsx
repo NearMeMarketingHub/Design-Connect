@@ -152,7 +152,7 @@ export default function ImageViewerModal({
             </p>
           </div>
 
-          {/* Zoom Controls */}
+          {/* Zoom Controls & Download */}
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -176,6 +176,22 @@ export default function ImageViewerModal({
               data-testid="button-zoom-in"
             >
               <ZoomIn className="h-5 w-5" />
+            </Button>
+            <div className="w-px h-6 bg-white/30 mx-2" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 gap-2"
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = currentImage.src;
+                link.download = currentImage.title || 'image';
+                link.click();
+              }}
+              data-testid="button-download-image"
+            >
+              <Download className="h-4 w-4" />
+              Download
             </Button>
           </div>
         </div>

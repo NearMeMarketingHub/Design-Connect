@@ -380,8 +380,15 @@ export async function registerRoutes(
   // Message routes - allow without strict auth for demo
   app.get("/api/projects/:projectId/messages", async (req, res, next) => {
     try {
+      const user = req.user as User | undefined;
+      const currentUserId = user?.id;
       const messages = await storage.getMessages(req.params.projectId);
-      res.json(messages);
+      // Add isOwn flag to each message
+      const messagesWithOwnership = messages.map(msg => ({
+        ...msg,
+        isOwn: currentUserId ? msg.senderId === currentUserId : msg.senderId === 'current-user'
+      }));
+      res.json(messagesWithOwnership);
     } catch (error) {
       next(error);
     }
