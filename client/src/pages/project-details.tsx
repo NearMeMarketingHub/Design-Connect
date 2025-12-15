@@ -29,7 +29,8 @@ import {
   AlertCircle,
   Phone,
   Mail,
-  X
+  X,
+  ChevronDown
 } from "lucide-react";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -101,14 +102,30 @@ const PROJECTS_DATA: Record<string, {
 };
 
 const MILESTONES = [
-  { id: 1, name: "Project Kickoff", date: "Oct 1, 2025", status: "completed", description: "Initial meeting and project scope finalized" },
-  { id: 2, name: "Demolition Complete", date: "Oct 15, 2025", status: "completed", description: "All demo work finished, site cleared" },
-  { id: 3, name: "Framing Inspection", date: "Nov 8, 2025", status: "completed", description: "Structural framing passed inspection" },
-  { id: 4, name: "Rough-in Complete", date: "Dec 20, 2025", status: "in_progress", description: "Electrical, plumbing, and HVAC rough-ins" },
-  { id: 5, name: "Drywall Installation", date: "Jan 10, 2026", status: "upcoming", description: "Drywall hanging and mudding" },
-  { id: 6, name: "Finish Work Begins", date: "Feb 1, 2026", status: "upcoming", description: "Cabinets, trim, and fixtures" },
-  { id: 7, name: "Final Inspection", date: "Mar 1, 2026", status: "upcoming", description: "Final city inspection" },
-  { id: 8, name: "Project Handover", date: "Mar 15, 2026", status: "upcoming", description: "Keys delivered, warranty begins" }
+  { id: 1, name: "Project Kickoff", date: "Oct 1, 2025", status: "completed", description: "Initial meeting and project scope finalized", 
+    details: "Met with homeowners to review final plans and material selections. Discussed timeline expectations and communication preferences. Site access arranged and temporary utilities confirmed.", 
+    tasks: ["Contract signed", "Deposit received", "Permits submitted"] },
+  { id: 2, name: "Demolition Complete", date: "Oct 15, 2025", status: "completed", description: "All demo work finished, site cleared",
+    details: "Removed existing kitchen cabinets, flooring, and non-load-bearing wall between kitchen and dining room. Debris hauled and site cleaned for framing crew.",
+    tasks: ["Kitchen demo complete", "Wall removal done", "Debris removed", "Site cleaned"] },
+  { id: 3, name: "Framing Inspection", date: "Nov 8, 2025", status: "completed", description: "Structural framing passed inspection",
+    details: "City inspector approved all structural framing including the new header for the open floor plan. Minor corrections made to one joist hanger.",
+    tasks: ["Headers installed", "Joists secured", "Inspection passed"] },
+  { id: 4, name: "Rough-in Complete", date: "Dec 20, 2025", status: "in_progress", description: "Electrical, plumbing, and HVAC rough-ins",
+    details: "Electrical panel upgraded to 200A. New circuits run for kitchen appliances. Plumbing relocated for island sink. HVAC ductwork modified for open floor plan.",
+    tasks: ["Electrical 80% complete", "Plumbing 90% complete", "HVAC modifications done", "Awaiting inspection"] },
+  { id: 5, name: "Drywall Installation", date: "Jan 10, 2026", status: "upcoming", description: "Drywall hanging and mudding",
+    details: "Drywall crew scheduled for 5-day install. Includes hanging, taping, mudding, and sanding. Ceiling texture to match existing areas.",
+    tasks: ["Schedule drywall crew", "Order materials", "Hang drywall", "Tape and mud", "Sand and prep"] },
+  { id: 6, name: "Finish Work Begins", date: "Feb 1, 2026", status: "upcoming", description: "Cabinets, trim, and fixtures",
+    details: "Cabinet installation followed by countertop templating. Trim carpentry includes baseboards, crown molding, and window casings. Light fixtures and plumbing fixtures installed.",
+    tasks: ["Install cabinets", "Template countertops", "Install trim", "Paint walls", "Install fixtures"] },
+  { id: 7, name: "Final Inspection", date: "Mar 1, 2026", status: "upcoming", description: "Final city inspection",
+    details: "City inspector will verify all permitted work meets code. Includes electrical, plumbing, mechanical, and structural sign-offs.",
+    tasks: ["Schedule inspection", "Prep checklist", "Address any corrections"] },
+  { id: 8, name: "Project Handover", date: "Mar 15, 2026", status: "upcoming", description: "Keys delivered, warranty begins",
+    details: "Final walkthrough with homeowners to review all completed work. Warranty documentation provided. Maintenance instructions for new systems and finishes.",
+    tasks: ["Final cleaning", "Walkthrough scheduled", "Warranty docs prepared", "Keys delivered"] }
 ];
 
 const MESSAGES = [
@@ -154,7 +171,14 @@ export default function ProjectDetails() {
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
   const [inspirationImages, setInspirationImages] = useState(INITIAL_INSPIRATION_IMAGES);
+  const [expandedMilestones, setExpandedMilestones] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleMilestone = (id: number) => {
+    setExpandedMilestones(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -596,52 +620,92 @@ export default function ProjectDetails() {
             <Card>
               <CardContent className="p-6">
                 <div className="relative">
-                  {MILESTONES.map((milestone, index) => (
-                    <div key={milestone.id} className="flex gap-4 pb-8 last:pb-0" data-testid={`milestone-${milestone.id}`}>
-                      {/* Timeline line and dot */}
-                      <div className="flex flex-col items-center">
-                        <div className={`w-4 h-4 rounded-full border-2 ${
-                          milestone.status === 'completed' ? 'bg-green-500 border-green-500' :
-                          milestone.status === 'in_progress' ? 'bg-primary border-primary animate-pulse' :
-                          'bg-muted border-muted-foreground/30'
-                        }`}>
-                          {milestone.status === 'completed' && (
-                            <CheckCircle2 className="w-3 h-3 text-white m-auto" style={{ marginTop: '-1px' }} />
+                  {MILESTONES.map((milestone, index) => {
+                    const isExpanded = expandedMilestones.includes(milestone.id);
+                    return (
+                      <div key={milestone.id} className="flex gap-4 pb-8 last:pb-0" data-testid={`milestone-${milestone.id}`}>
+                        {/* Timeline line and dot */}
+                        <div className="flex flex-col items-center">
+                          <div className={`w-4 h-4 rounded-full border-2 ${
+                            milestone.status === 'completed' ? 'bg-green-500 border-green-500' :
+                            milestone.status === 'in_progress' ? 'bg-primary border-primary animate-pulse' :
+                            'bg-muted border-muted-foreground/30'
+                          }`}>
+                            {milestone.status === 'completed' && (
+                              <CheckCircle2 className="w-3 h-3 text-white m-auto" style={{ marginTop: '-1px' }} />
+                            )}
+                          </div>
+                          {index < MILESTONES.length - 1 && (
+                            <div className={`w-0.5 flex-1 mt-2 ${
+                              milestone.status === 'completed' ? 'bg-green-500' : 'bg-muted-foreground/20'
+                            }`} />
                           )}
                         </div>
-                        {index < MILESTONES.length - 1 && (
-                          <div className={`w-0.5 flex-1 mt-2 ${
-                            milestone.status === 'completed' ? 'bg-green-500' : 'bg-muted-foreground/20'
-                          }`} />
-                        )}
-                      </div>
-                      
-                      {/* Milestone content */}
-                      <div className="flex-1 pb-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-medium">{milestone.name}</h4>
-                            <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                        
+                        {/* Milestone content */}
+                        <div className="flex-1 pb-4">
+                          <div 
+                            className="flex items-start justify-between cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1 rounded-lg transition-colors"
+                            onClick={() => toggleMilestone(milestone.id)}
+                            data-testid={`button-expand-milestone-${milestone.id}`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <ChevronDown 
+                                className={`w-4 h-4 mt-1 text-muted-foreground transition-transform duration-200 ${
+                                  isExpanded ? 'rotate-180' : ''
+                                }`} 
+                              />
+                              <div>
+                                <h4 className="font-medium">{milestone.name}</h4>
+                                <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-4">
+                              <p className="text-sm font-medium">{milestone.date}</p>
+                              <Badge 
+                                variant={milestone.status === 'completed' ? 'default' : 'outline'}
+                                className={`text-xs mt-1 ${
+                                  milestone.status === 'completed' ? 'bg-green-500' :
+                                  milestone.status === 'in_progress' ? 'border-primary text-primary' :
+                                  ''
+                                }`}
+                                data-testid={`badge-milestone-status-${milestone.id}`}
+                              >
+                                {milestone.status === 'completed' ? 'Complete' :
+                                 milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">{milestone.date}</p>
-                            <Badge 
-                              variant={milestone.status === 'completed' ? 'default' : 'outline'}
-                              className={`text-xs mt-1 ${
-                                milestone.status === 'completed' ? 'bg-green-500' :
-                                milestone.status === 'in_progress' ? 'border-primary text-primary' :
-                                ''
-                              }`}
-                              data-testid={`badge-milestone-status-${milestone.id}`}
-                            >
-                              {milestone.status === 'completed' ? 'Complete' :
-                               milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
-                            </Badge>
+                          
+                          {/* Expanded content */}
+                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                            isExpanded ? 'max-h-96 opacity-100 mt-3' : 'max-h-0 opacity-0'
+                          }`}>
+                            <div className="ml-6 pl-4 border-l-2 border-muted space-y-3">
+                              <p className="text-sm text-muted-foreground">{milestone.details}</p>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-2">Tasks:</p>
+                                <div className="space-y-1">
+                                  {milestone.tasks.map((task, taskIndex) => (
+                                    <div key={taskIndex} className="flex items-center gap-2 text-sm">
+                                      <CheckCircle2 className={`w-3.5 h-3.5 ${
+                                        milestone.status === 'completed' ? 'text-green-500' : 
+                                        milestone.status === 'in_progress' && taskIndex < 2 ? 'text-green-500' :
+                                        'text-muted-foreground/40'
+                                      }`} />
+                                      <span className={milestone.status === 'completed' || (milestone.status === 'in_progress' && taskIndex < 2) ? '' : 'text-muted-foreground'}>
+                                        {task}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
