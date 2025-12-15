@@ -198,6 +198,7 @@ export default function ProjectDetails() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch messages from API
   const { data: apiMessages = [], isLoading: messagesLoading } = useQuery({
@@ -259,11 +260,9 @@ export default function ProjectDetails() {
 
   // Scroll to bottom when messages load or change
   useEffect(() => {
-    if (messages.length > 0) {
-      // Use setTimeout to ensure DOM is fully rendered
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-      }, 50);
+    if (messages.length > 0 && messagesContainerRef.current) {
+      // Instantly set scroll position to bottom (no animation = no flash)
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages.length, activeTab]);
 
@@ -875,7 +874,7 @@ export default function ProjectDetails() {
                 <CardTitle className="text-lg">Project Communication</CardTitle>
                 <CardDescription>Chat with your project team</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+              <CardContent ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((msg) => (
                   <div 
                     key={msg.id} 
