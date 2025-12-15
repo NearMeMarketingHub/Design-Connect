@@ -1,100 +1,376 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
+import { useParams, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import SignatureCanvas from 'react-signature-canvas';
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
 import { 
-  FileText, 
-  Download, 
-  MessageSquare, 
-  Send, 
-  Paperclip,
+  ArrowLeft,
+  Calendar,
   CheckCircle2,
+  Clock,
+  DollarSign,
   Image as ImageIcon,
-  PenTool,
-  ZoomIn,
-  Eye,
-  Plus
+  MapPin,
+  MessageSquare,
+  Paperclip,
+  Plus,
+  Send,
+  TrendingUp,
+  Users,
+  Camera,
+  Milestone,
+  FileText,
+  AlertCircle
 } from "lucide-react";
-import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
+import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
+
+const PROJECTS_DATA: Record<string, {
+  id: string;
+  name: string;
+  address: string;
+  status: string;
+  phase: string;
+  progress: number;
+  image: string;
+  nextMilestone: string;
+  dueDate: string;
+  budget: number;
+  spent: number;
+  startDate: string;
+  endDate: string;
+  description: string;
+}> = {
+  jenkins: {
+    id: "jenkins",
+    name: "The Jenkins Residence",
+    address: "123 Maple Avenue",
+    status: "Active",
+    phase: "Phase 3: Rough-in",
+    progress: 45,
+    image: projectImage,
+    nextMilestone: "Drywall Inspection",
+    dueDate: "Jan 15, 2026",
+    budget: 145000,
+    spent: 62350,
+    startDate: "Oct 1, 2025",
+    endDate: "Mar 15, 2026",
+    description: "Complete home renovation including kitchen remodel, bathroom upgrades, and open floor plan conversion."
+  },
+  lakehouse: {
+    id: "lakehouse",
+    name: "Lake House Retreat",
+    address: "889 Shoreline Drive",
+    status: "Planning",
+    phase: "Phase 1: Design",
+    progress: 15,
+    image: blueprintImage,
+    nextMilestone: "Permit Approval",
+    dueDate: "Mar 01, 2026",
+    budget: 285000,
+    spent: 15200,
+    startDate: "Jan 15, 2026",
+    endDate: "Aug 30, 2026",
+    description: "New construction lakefront property with modern design and sustainable features."
+  },
+  loft: {
+    id: "loft",
+    name: "Downtown Loft",
+    address: "450 Main St, Unit 4B",
+    status: "Completed",
+    phase: "Handover",
+    progress: 100,
+    image: projectImage,
+    nextMilestone: "Warranty Check",
+    dueDate: "Completed",
+    budget: 78500,
+    spent: 76200,
+    startDate: "Jun 1, 2025",
+    endDate: "Sep 30, 2025",
+    description: "Industrial loft conversion with exposed brick, modern kitchen, and custom built-ins."
+  }
+};
+
+const MILESTONES = [
+  { id: 1, name: "Project Kickoff", date: "Oct 1, 2025", status: "completed", description: "Initial meeting and project scope finalized" },
+  { id: 2, name: "Demolition Complete", date: "Oct 15, 2025", status: "completed", description: "All demo work finished, site cleared" },
+  { id: 3, name: "Framing Inspection", date: "Nov 8, 2025", status: "completed", description: "Structural framing passed inspection" },
+  { id: 4, name: "Rough-in Complete", date: "Dec 20, 2025", status: "in_progress", description: "Electrical, plumbing, and HVAC rough-ins" },
+  { id: 5, name: "Drywall Installation", date: "Jan 10, 2026", status: "upcoming", description: "Drywall hanging and mudding" },
+  { id: 6, name: "Finish Work Begins", date: "Feb 1, 2026", status: "upcoming", description: "Cabinets, trim, and fixtures" },
+  { id: 7, name: "Final Inspection", date: "Mar 1, 2026", status: "upcoming", description: "Final city inspection" },
+  { id: 8, name: "Project Handover", date: "Mar 15, 2026", status: "upcoming", description: "Keys delivered, warranty begins" }
+];
+
+const MESSAGES = [
+  { id: 1, sender: "Mike Builder", role: "Project Manager", avatar: "MB", message: "Hi Sarah, just wanted to let you know the tile samples arrived. I'll leave them on the counter for you to check out this weekend.", time: "10:30 AM", isOwn: false },
+  { id: 2, sender: "You", role: "", avatar: "SJ", message: "Thanks Mike! We'll swing by Saturday morning. Are the new lighting fixtures there too?", time: "10:45 AM", isOwn: true },
+  { id: 3, sender: "Mike Builder", role: "Project Manager", avatar: "MB", message: "Yes, the pendant lights are in box 4 in the garage. Let me know if you want to open them up.", time: "10:48 AM", isOwn: false },
+  { id: 4, sender: "System", role: "", avatar: "SYS", message: "New plan uploaded: A2.1 - Elevations (Rev 2). Please review and approve.", time: "Yesterday", isOwn: false, isSystem: true }
+];
+
+const PROGRESS_PHOTOS = [
+  { id: 1, date: "Dec 10, 2025", title: "Kitchen Framing", description: "Island framing complete", category: "Framing" },
+  { id: 2, date: "Dec 8, 2025", title: "Electrical Rough-in", description: "Panel installed, main runs complete", category: "Electrical" },
+  { id: 3, date: "Dec 5, 2025", title: "Plumbing Rough-in", description: "Supply lines to all fixtures", category: "Plumbing" },
+  { id: 4, date: "Nov 28, 2025", title: "HVAC Ductwork", description: "Main trunk and branch lines", category: "HVAC" },
+  { id: 5, date: "Nov 15, 2025", title: "Framing Complete", description: "All walls and ceiling joists done", category: "Framing" },
+  { id: 6, date: "Nov 8, 2025", title: "Inspection Passed", description: "Structural inspection approved", category: "Inspection" }
+];
+
+const INSPIRATION_IMAGES = [
+  { id: 1, title: "Kitchen Backsplash", category: "Kitchen", status: "approved" },
+  { id: 2, title: "Island Pendant Lights", category: "Kitchen", status: "approved" },
+  { id: 3, title: "Master Bath Tile", category: "Bathroom", status: "reviewing" },
+  { id: 4, title: "Hardwood Flooring", category: "Flooring", status: "approved" },
+  { id: 5, title: "Cabinet Hardware", category: "Kitchen", status: "reviewing" },
+  { id: 6, title: "Paint Colors", category: "General", status: "approved" }
+];
 
 export default function ProjectDetails() {
-  const sigPad = useRef<any>(null);
+  const params = useParams<{ id: string }>();
+  const projectId = params.id || "";
+  const project = PROJECTS_DATA[projectId];
+  
   const [activeTab, setActiveTab] = useState("overview");
+  const [messageText, setMessageText] = useState("");
 
-  const clearSignature = () => {
-    sigPad.current?.clear();
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   };
+
+  const getPhaseName = (phase: string) => {
+    if (phase.includes(':')) {
+      const parts = phase.split(':');
+      return parts[1]?.trim() || phase;
+    }
+    return phase;
+  };
+
+  if (!project) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/my-projects">
+            <Button variant="ghost" size="icon" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-heading font-bold">Project Not Found</h1>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Project Not Found</h2>
+            <p className="text-muted-foreground mb-4">
+              The project you're looking for doesn't exist or you don't have access to it.
+            </p>
+            <Link href="/my-projects">
+              <Button data-testid="button-back-to-projects">Back to My Projects</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Jenkins Residence</h1>
-          <p className="text-muted-foreground">123 Maple Avenue • Renovation</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">View Schedule</Button>
-          <Button>Contact Team</Button>
+      {/* Header with Back Navigation */}
+      <div className="flex items-center gap-4">
+        <Link href="/my-projects">
+          <Button variant="ghost" size="icon" data-testid="button-back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-heading font-bold" data-testid="text-project-name">{project.name}</h1>
+            <Badge className={`${
+              project.status === 'Active' ? 'bg-green-500 hover:bg-green-600' :
+              project.status === 'Planning' ? 'bg-blue-500 hover:bg-blue-600' :
+              'bg-slate-500 hover:bg-slate-600'
+            } border-0`} data-testid="badge-project-status">
+              {project.status}
+            </Badge>
+          </div>
+          <div className="flex items-center text-muted-foreground text-sm mt-1">
+            <MapPin className="w-4 h-4 mr-1" />
+            <span data-testid="text-project-address">{project.address}</span>
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none h-auto overflow-x-auto">
-          {["Overview", "Inspiration & Selections", "Plans & Drawings", "Contracts", "Messages"].map((tab) => (
-            <TabsTrigger 
-              key={tab} 
-              value={tab.toLowerCase().split(' ')[0]}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
-            >
-              {tab}
-            </TabsTrigger>
-          ))}
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none h-auto overflow-x-auto flex-nowrap">
+          <TabsTrigger 
+            value="overview"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            data-testid="tab-overview"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="inspiration"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            data-testid="tab-inspiration"
+          >
+            Inspiration & Selections
+          </TabsTrigger>
+          <TabsTrigger 
+            value="timeline"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            data-testid="tab-timeline"
+          >
+            Timeline
+          </TabsTrigger>
+          <TabsTrigger 
+            value="messages"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            data-testid="tab-messages"
+          >
+            Messages
+          </TabsTrigger>
+          <TabsTrigger 
+            value="progress"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 whitespace-nowrap"
+            data-testid="tab-progress"
+          >
+            Progress Photos
+          </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
-          <TabsContent value="overview">
+          {/* OVERVIEW TAB */}
+          <TabsContent value="overview" className="space-y-6">
+            {/* Progress and Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card data-testid="card-stat-progress">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Progress</p>
+                      <p className="text-xl font-bold" data-testid="text-progress">{project.progress}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card data-testid="card-stat-budget">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Budget</p>
+                      <p className="text-xl font-bold" data-testid="text-budget">{formatCurrency(project.budget)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card data-testid="card-stat-spent">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-500/10 rounded-lg">
+                      <Clock className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Spent</p>
+                      <p className="text-xl font-bold" data-testid="text-spent">{formatCurrency(project.spent)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card data-testid="card-stat-completion">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <Calendar className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Est. Complete</p>
+                      <p className="text-xl font-bold" data-testid="text-end-date">{project.endDate}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Content Grid */}
             <div className="grid md:grid-cols-3 gap-6">
+              {/* Left Column - Main Info */}
               <div className="md:col-span-2 space-y-6">
+                {/* Current Phase Card */}
+                <Card data-testid="card-current-phase">
+                  <CardHeader>
+                    <CardTitle>Current Phase: {getPhaseName(project.phase)}</CardTitle>
+                    <CardDescription>{project.phase}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <img 
+                      src={project.image} 
+                      alt="Project Progress" 
+                      className="w-full h-48 md:h-64 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                      data-testid="img-project-hero"
+                    />
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-muted-foreground">Overall Progress</span>
+                        <span className="font-medium">{project.progress}%</span>
+                      </div>
+                      <Progress value={project.progress} className="h-2" />
+                    </div>
+                    <p className="text-sm text-muted-foreground" data-testid="text-description">
+                      {project.description}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Next Milestone */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Current Phase: Rough-in</CardTitle>
-                    <CardDescription>Week 6 of 24</CardDescription>
+                    <CardTitle className="flex items-center gap-2">
+                      <Milestone className="h-5 w-5" />
+                      Next Milestone
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <img 
-                      src={projectImage} 
-                      alt="Project Progress" 
-                      className="w-full h-64 object-cover rounded-md mb-4"
-                    />
-                    <div className="prose prose-sm text-muted-foreground max-w-none">
-                      <p>
-                        The framing is complete and inspections have been passed. The team is currently working on electrical and plumbing rough-ins throughout the main floor. 
-                      </p>
-                      <ul>
-                        <li>HVAC ductwork installation - 60% complete</li>
-                        <li>Plumbing top-out - 80% complete</li>
-                        <li>Electrical wiring - 40% complete</li>
-                      </ul>
+                    <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-6 w-6 text-primary" />
+                        <div>
+                          <p className="font-medium" data-testid="text-next-milestone">{project.nextMilestone}</p>
+                          <p className="text-sm text-muted-foreground">Target: {project.dueDate}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline">Upcoming</Badge>
                     </div>
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Right Column - Team and Quick Links */}
               <div className="space-y-6">
+                {/* Team Card */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Team</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Your Team
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src="https://github.com/shadcn.png" />
-                        <AvatarFallback>PM</AvatarFallback>
+                        <AvatarFallback>MB</AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium text-sm">Mike Builder</p>
@@ -110,263 +386,286 @@ export default function ProjectDetails() {
                         <p className="text-xs text-muted-foreground">Lead Designer</p>
                       </div>
                     </div>
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarFallback>TE</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm">Tom Electric</p>
+                        <p className="text-xs text-muted-foreground">Electrician</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" className="w-full mt-2" data-testid="button-contact-team">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Contact Team
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Project Dates */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5" />
+                      Project Schedule
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Start Date</span>
+                      <span className="font-medium" data-testid="text-start-date">{project.startDate}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Target End</span>
+                      <span className="font-medium">{project.endDate}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Duration</span>
+                      <span className="font-medium">24 weeks</span>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="inspiration">
+          {/* INSPIRATION & SELECTIONS TAB */}
+          <TabsContent value="inspiration" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">Inspiration & Selections</h3>
+                <p className="text-sm text-muted-foreground">Upload inspiration photos and track material selections</p>
+              </div>
+              <Button data-testid="button-upload-inspiration">
+                <Plus className="h-4 w-4 mr-2" />
+                Upload Image
+              </Button>
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {/* Mock Inspiration Images */}
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border">
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button size="icon" variant="secondary"><MessageSquare className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="secondary"><CheckCircle2 className="w-4 h-4" /></Button>
-                  </div>
+              {INSPIRATION_IMAGES.map((img) => (
+                <div 
+                  key={img.id} 
+                  className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary transition-colors"
+                  data-testid={`card-inspiration-${img.id}`}
+                >
                   <img 
-                    src={`https://picsum.photos/seed/${i * 123}/400/400`} 
-                    alt="Inspiration" 
+                    src={`https://picsum.photos/seed/${img.id * 123}/400/400`} 
+                    alt={img.title}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent text-white text-xs font-medium">
-                    Kitchen Idea #{i}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button size="icon" variant="secondary" data-testid={`button-comment-inspiration-${img.id}`}>
+                      <MessageSquare className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="secondary" data-testid={`button-approve-inspiration-${img.id}`}>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-white text-sm font-medium">{img.title}</p>
+                        <p className="text-white/70 text-xs">{img.category}</p>
+                      </div>
+                      <Badge 
+                        className={`text-xs ${
+                          img.status === 'approved' ? 'bg-green-500' : 'bg-yellow-500'
+                        } border-0`}
+                      >
+                        {img.status === 'approved' ? 'Approved' : 'In Review'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ))}
-              <div className="aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 cursor-pointer transition-colors">
-                <Plus className="w-8 h-8 mb-2" />
-                <span className="text-sm font-medium">Upload Image</span>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="plans">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Approved Drawings</h3>
-                <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Upload New Version
-                </Button>
-              </div>
               
-              <div className="grid md:grid-cols-3 gap-6">
-                 {/* Blueprint Card 1 */}
-                 <Card className="group cursor-pointer hover:border-primary transition-colors">
-                   <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                     <img 
-                       src={blueprintImage} 
-                       alt="Floor Plan Level 1" 
-                       className="w-full h-full object-cover opacity-80 grayscale group-hover:grayscale-0 transition-all"
-                     />
-                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                       <Button variant="secondary" size="sm">
-                         <ZoomIn className="w-4 h-4 mr-2" />
-                         View Detail
-                       </Button>
-                     </div>
-                   </div>
-                   <CardContent className="p-4">
-                     <div className="flex justify-between items-start">
-                       <div>
-                         <h4 className="font-bold text-sm">A1.0 - First Floor Plan</h4>
-                         <p className="text-xs text-muted-foreground mt-1">Rev 3 • Approved 10/12/2025</p>
-                       </div>
-                       <Badge variant="outline">Approved</Badge>
-                     </div>
-                   </CardContent>
-                 </Card>
-
-                 {/* Blueprint Card 2 */}
-                 <Card className="group cursor-pointer hover:border-primary transition-colors">
-                   <div className="aspect-[4/3] bg-muted relative overflow-hidden flex items-center justify-center bg-slate-100">
-                     <FileText className="w-16 h-16 text-slate-300" />
-                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                       <Button variant="secondary" size="sm">
-                         <Eye className="w-4 h-4 mr-2" />
-                         Preview
-                       </Button>
-                     </div>
-                   </div>
-                   <CardContent className="p-4">
-                     <div className="flex justify-between items-start">
-                       <div>
-                         <h4 className="font-bold text-sm">A2.1 - Elevations</h4>
-                         <p className="text-xs text-muted-foreground mt-1">Rev 1 • Draft</p>
-                       </div>
-                       <Badge variant="secondary">In Review</Badge>
-                     </div>
-                   </CardContent>
-                 </Card>
-
-                  {/* Blueprint Card 3 */}
-                 <Card className="group cursor-pointer hover:border-primary transition-colors">
-                   <div className="aspect-[4/3] bg-muted relative overflow-hidden flex items-center justify-center bg-slate-100">
-                     <FileText className="w-16 h-16 text-slate-300" />
-                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                       <Button variant="secondary" size="sm">
-                         <Eye className="w-4 h-4 mr-2" />
-                         Preview
-                       </Button>
-                     </div>
-                   </div>
-                   <CardContent className="p-4">
-                     <div className="flex justify-between items-start">
-                       <div>
-                         <h4 className="font-bold text-sm">E1.0 - Electrical Plan</h4>
-                         <p className="text-xs text-muted-foreground mt-1">Rev 2 • Approved 10/15/2025</p>
-                       </div>
-                       <Badge variant="outline">Approved</Badge>
-                     </div>
-                   </CardContent>
-                 </Card>
+              {/* Upload Placeholder */}
+              <div 
+                className="aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 cursor-pointer transition-colors"
+                data-testid="button-add-inspiration"
+              >
+                <Plus className="w-8 h-8 mb-2" />
+                <span className="text-sm font-medium">Add Image</span>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Comments on Plans</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex gap-3 text-sm border-b border-border pb-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">A1.0</div>
-                      <div>
-                        <p className="font-medium">Kitchen Island Outlet</p>
-                        <p className="text-muted-foreground">"Can we move the outlet on the island to the side panel?"</p>
-                        <p className="text-xs text-muted-foreground mt-1">Sarah Jenkins • Yesterday</p>
-                      </div>
-                    </div>
-                     <div className="flex gap-3 text-sm pb-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">E1.0</div>
-                      <div>
-                        <p className="font-medium">Sconces Height</p>
-                        <p className="text-muted-foreground">"Confirming 66 inches AFF for the master bath sconces."</p>
-                        <p className="text-xs text-muted-foreground mt-1">Mike Builder • 2 days ago</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="contracts">
-            <div className="grid md:grid-cols-2 gap-8">
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle>Contract Document</CardTitle>
-                  <CardDescription>Residential Construction Agreement v2.1</CardDescription>
-                </CardHeader>
-                <CardContent className="h-[500px] overflow-y-auto bg-muted/20 p-6 rounded-md border border-border text-sm leading-relaxed">
-                  <h3 className="font-bold text-lg mb-4">CONSTRUCTION AGREEMENT</h3>
-                  <p className="mb-4">This Agreement is made this 11th day of December, 2025, between BuildVision Construction ("Contractor") and Sarah Jenkins ("Client").</p>
-                  <p className="mb-4"><strong>1. SCOPE OF WORK.</strong> Contractor shall provide all labor and materials to construct the improvements described in the attached Plans and Specifications.</p>
-                  <p className="mb-4"><strong>2. CONTRACT PRICE.</strong> Client agrees to pay Contractor the fixed sum of $145,000.00. Payment shall be made according to the Payment Schedule attached hereto.</p>
-                  <p className="mb-4"><strong>3. TIMELINE.</strong> Work shall commence on October 1st, 2025 and is estimated to be substantially complete by January 15th, 2026.</p>
-                  <p className="mb-4"><strong>4. CHANGE ORDERS.</strong> Any deviation from the Plans and Specifications involving extra cost must be executed in writing (Change Order) and signed by both parties.</p>
-                  <p className="mb-4"><strong>5. WARRANTY.</strong> Contractor warrants all work for a period of 12 months from the date of substantial completion.</p>
-                  <div className="h-32"></div> {/* Spacer */}
-                </CardContent>
-                <div className="p-4 border-t border-border flex justify-between items-center bg-muted/10">
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF
-                  </Button>
-                  <span className="text-xs text-muted-foreground">Last updated: 2 days ago</span>
+          {/* TIMELINE TAB */}
+          <TabsContent value="timeline" className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold">Project Timeline</h3>
+              <p className="text-sm text-muted-foreground">Track milestones and project phases</p>
+            </div>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="relative">
+                  {MILESTONES.map((milestone, index) => (
+                    <div key={milestone.id} className="flex gap-4 pb-8 last:pb-0" data-testid={`milestone-${milestone.id}`}>
+                      {/* Timeline line and dot */}
+                      <div className="flex flex-col items-center">
+                        <div className={`w-4 h-4 rounded-full border-2 ${
+                          milestone.status === 'completed' ? 'bg-green-500 border-green-500' :
+                          milestone.status === 'in_progress' ? 'bg-primary border-primary animate-pulse' :
+                          'bg-muted border-muted-foreground/30'
+                        }`}>
+                          {milestone.status === 'completed' && (
+                            <CheckCircle2 className="w-3 h-3 text-white m-auto" style={{ marginTop: '-1px' }} />
+                          )}
+                        </div>
+                        {index < MILESTONES.length - 1 && (
+                          <div className={`w-0.5 flex-1 mt-2 ${
+                            milestone.status === 'completed' ? 'bg-green-500' : 'bg-muted-foreground/20'
+                          }`} />
+                        )}
+                      </div>
+                      
+                      {/* Milestone content */}
+                      <div className="flex-1 pb-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-medium">{milestone.name}</h4>
+                            <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium">{milestone.date}</p>
+                            <Badge 
+                              variant={milestone.status === 'completed' ? 'default' : 'outline'}
+                              className={`text-xs mt-1 ${
+                                milestone.status === 'completed' ? 'bg-green-500' :
+                                milestone.status === 'in_progress' ? 'border-primary text-primary' :
+                                ''
+                              }`}
+                              data-testid={`badge-milestone-status-${milestone.id}`}
+                            >
+                              {milestone.status === 'completed' ? 'Complete' :
+                               milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Electronic Signature</CardTitle>
-                  <CardDescription>Please sign below to accept the terms.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Full Name</label>
-                    <input type="text" className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" placeholder="Sarah Jenkins" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Draw Signature</label>
-                    <div className="border border-input rounded-md overflow-hidden bg-white">
-                      <SignatureCanvas 
-                        ref={sigPad}
-                        penColor="black"
-                        canvasProps={{width: 500, height: 200, className: 'w-full h-48'}} 
-                      />
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={clearSignature} className="text-xs text-muted-foreground">
-                      Clear Signature
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="terms" className="rounded border-gray-300" />
-                    <label htmlFor="terms" className="text-sm text-muted-foreground">
-                      I agree to be legally bound by this electronic signature.
-                    </label>
-                  </div>
-                  
-                  <Button className="w-full">Sign & Accept Contract</Button>
-                </CardContent>
-              </Card>
-            </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="messages">
+          {/* MESSAGES TAB */}
+          <TabsContent value="messages" className="space-y-6">
             <Card className="h-[600px] flex flex-col">
               <CardHeader className="border-b border-border py-4">
                 <CardTitle className="text-lg">Project Communication</CardTitle>
+                <CardDescription>Chat with your project team</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                <div className="flex gap-3">
-                  <Avatar>
-                    <AvatarImage src="https://github.com/shadcn.png" />
-                  </Avatar>
-                  <div className="bg-muted p-3 rounded-lg rounded-tl-none max-w-[80%]">
-                    <p className="text-sm">Hi Sarah, just wanted to let you know the tile samples arrived. I'll leave them on the counter for you to check out this weekend.</p>
-                    <span className="text-xs text-muted-foreground mt-1 block">Mike • 10:30 AM</span>
+                {MESSAGES.map((msg) => (
+                  <div 
+                    key={msg.id} 
+                    className={`flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}
+                    data-testid={`message-${msg.id}`}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className={msg.isSystem ? 'bg-primary/20 text-primary' : ''}>
+                        {msg.avatar}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className={`max-w-[80%] ${
+                      msg.isSystem ? 'w-full' : ''
+                    }`}>
+                      {msg.isSystem ? (
+                        <div className="bg-primary/10 border border-primary/20 p-3 rounded-lg flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-primary flex-shrink-0" />
+                          <div>
+                            <p className="text-sm">{msg.message}</p>
+                            <span className="text-xs text-muted-foreground mt-1 block">{msg.time}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`p-3 rounded-lg ${
+                          msg.isOwn 
+                            ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                            : 'bg-muted rounded-tl-none'
+                        }`}>
+                          <p className="text-sm">{msg.message}</p>
+                          <span className={`text-xs mt-1 block ${
+                            msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}>
+                            {msg.sender} • {msg.time}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex gap-3 flex-row-reverse">
-                  <Avatar>
-                    <AvatarImage src="https://github.com/shadcn.png" />
-                  </Avatar>
-                  <div className="bg-primary text-primary-foreground p-3 rounded-lg rounded-tr-none max-w-[80%]">
-                    <p className="text-sm">Thanks Mike! We'll swing by Saturday morning. Are the new lighting fixtures there too?</p>
-                    <span className="text-xs text-primary-foreground/70 mt-1 block">You • 10:45 AM</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Avatar>
-                    <AvatarImage src="https://github.com/shadcn.png" />
-                  </Avatar>
-                  <div className="bg-muted p-3 rounded-lg rounded-tl-none max-w-[80%]">
-                    <p className="text-sm">Yes, the pendant lights are in box 4 in the garage. Let me know if you want to open them up.</p>
-                    <span className="text-xs text-muted-foreground mt-1 block">Mike • 10:48 AM</span>
-                  </div>
-                </div>
+                ))}
               </CardContent>
               <div className="p-4 border-t border-border bg-muted/10">
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" data-testid="button-attach-file">
                     <Paperclip className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" data-testid="button-attach-image">
                     <ImageIcon className="w-4 h-4" />
                   </Button>
-                  <Textarea placeholder="Type a message..." className="min-h-[40px] resize-none py-2" />
-                  <Button size="icon">
+                  <Textarea 
+                    placeholder="Type a message..." 
+                    className="min-h-[40px] resize-none py-2"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    data-testid="input-message"
+                  />
+                  <Button size="icon" data-testid="button-send-message">
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             </Card>
+          </TabsContent>
+
+          {/* PROGRESS PHOTOS TAB */}
+          <TabsContent value="progress" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">Progress Photos</h3>
+                <p className="text-sm text-muted-foreground">Build documentation and site photos from your contractor</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {PROGRESS_PHOTOS.map((photo) => (
+                <Card 
+                  key={photo.id} 
+                  className="group overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                  data-testid={`card-progress-photo-${photo.id}`}
+                >
+                  <div className="aspect-video relative overflow-hidden bg-muted">
+                    <img 
+                      src={`https://picsum.photos/seed/${photo.id * 456}/600/400`}
+                      alt={photo.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button variant="secondary" size="sm">
+                        <Camera className="w-4 h-4 mr-2" />
+                        View Photo
+                      </Button>
+                    </div>
+                    <Badge className="absolute top-2 right-2 bg-black/60 border-0">
+                      {photo.category}
+                    </Badge>
+                  </div>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium">{photo.title}</h4>
+                    <p className="text-sm text-muted-foreground">{photo.description}</p>
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {photo.date}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </TabsContent>
         </div>
       </Tabs>
