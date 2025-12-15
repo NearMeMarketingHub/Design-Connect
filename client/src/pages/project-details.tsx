@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -127,13 +127,13 @@ const PROGRESS_PHOTOS = [
   { id: 6, date: "Nov 8, 2025", title: "Inspection Passed", description: "Structural inspection approved", category: "Inspection" }
 ];
 
-const INSPIRATION_IMAGES = [
-  { id: 1, title: "Kitchen Backsplash", category: "Kitchen", status: "approved" },
-  { id: 2, title: "Island Pendant Lights", category: "Kitchen", status: "approved" },
-  { id: 3, title: "Master Bath Tile", category: "Bathroom", status: "reviewing" },
-  { id: 4, title: "Hardwood Flooring", category: "Flooring", status: "approved" },
-  { id: 5, title: "Cabinet Hardware", category: "Kitchen", status: "reviewing" },
-  { id: 6, title: "Paint Colors", category: "General", status: "approved" }
+const INITIAL_INSPIRATION_IMAGES = [
+  { id: 1, title: "Kitchen Backsplash", category: "Kitchen", src: `https://picsum.photos/seed/${1 * 123}/400/400` },
+  { id: 2, title: "Island Pendant Lights", category: "Kitchen", src: `https://picsum.photos/seed/${2 * 123}/400/400` },
+  { id: 3, title: "Master Bath Tile", category: "Bathroom", src: `https://picsum.photos/seed/${3 * 123}/400/400` },
+  { id: 4, title: "Hardwood Flooring", category: "Flooring", src: `https://picsum.photos/seed/${4 * 123}/400/400` },
+  { id: 5, title: "Cabinet Hardware", category: "Kitchen", src: `https://picsum.photos/seed/${5 * 123}/400/400` },
+  { id: 6, title: "Paint Colors", category: "General", src: `https://picsum.photos/seed/${6 * 123}/400/400` }
 ];
 
 const TEAM_MEMBERS = [
@@ -153,6 +153,30 @@ export default function ProjectDetails() {
   const [viewerImages, setViewerImages] = useState<{ src: string; title?: string; description?: string }[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
+  const [inspirationImages, setInspirationImages] = useState(INITIAL_INSPIRATION_IMAGES);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const newImages = Array.from(files).map((file, index) => {
+      const id = Date.now() + index;
+      const fileName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+      const title = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+      return {
+        id,
+        title,
+        category: "Uploaded",
+        src: URL.createObjectURL(file)
+      };
+    });
+    
+    setInspirationImages(prev => [...prev, ...newImages]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const openImageViewer = (images: { src: string; title?: string; description?: string }[], startIndex = 0) => {
     setViewerImages(images);
@@ -479,26 +503,38 @@ export default function ProjectDetails() {
 
           {/* INSPIRATION & SELECTIONS TAB */}
           <TabsContent value="inspiration" className="space-y-6">
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
+              data-testid="input-file-upload"
+            />
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold">Inspiration & Selections</h3>
                 <p className="text-sm text-muted-foreground">Upload inspiration photos and track material selections</p>
               </div>
-              <Button data-testid="button-upload-inspiration">
+              <Button 
+                data-testid="button-upload-inspiration"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Upload Image
               </Button>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {INSPIRATION_IMAGES.map((img, index) => (
+              {inspirationImages.map((img, index) => (
                 <div 
                   key={img.id} 
                   className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary transition-colors"
                   data-testid={`card-inspiration-${img.id}`}
                   onClick={() => openImageViewer(
-                    INSPIRATION_IMAGES.map(i => ({
-                      src: `https://picsum.photos/seed/${i.id * 123}/400/400`,
+                    inspirationImages.map(i => ({
+                      src: i.src,
                       title: i.title,
                       description: i.category
                     })),
@@ -506,7 +542,7 @@ export default function ProjectDetails() {
                   )}
                 >
                   <img 
-                    src={`https://picsum.photos/seed/${img.id * 123}/400/400`} 
+                    src={img.src} 
                     alt={img.title}
                     className="w-full h-full object-cover"
                   />
@@ -518,7 +554,7 @@ export default function ProjectDetails() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setReplyingToImage({
-                          src: `https://picsum.photos/seed/${img.id * 123}/400/400`,
+                          src: img.src,
                           title: img.title,
                           category: img.category
                         });
@@ -541,6 +577,7 @@ export default function ProjectDetails() {
               <div 
                 className="aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 cursor-pointer transition-colors"
                 data-testid="button-add-inspiration"
+                onClick={() => fileInputRef.current?.click()}
               >
                 <Plus className="w-8 h-8 mb-2" />
                 <span className="text-sm font-medium">Add Image</span>
