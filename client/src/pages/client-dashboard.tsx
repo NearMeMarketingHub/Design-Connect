@@ -100,54 +100,56 @@ export default function ClientDashboard() {
 
       {/* Project Hero Card */}
       <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 overflow-hidden relative group border-0 shadow-lg">
-          <div className="absolute inset-0">
-            <img 
-              src={project.image} 
-              alt="Project Render" 
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-          </div>
-          <div className="relative h-full flex flex-col justify-end p-6 text-white min-h-[350px]">
-            <div className="flex items-center gap-2 mb-3">
-              <Badge className="bg-accent text-accent-foreground border-none hover:bg-accent/90">
-                {project.phase}
-              </Badge>
-              {project.status === "Active" && (
-                <Badge variant="outline" className="border-white/30 text-white bg-green-500/20 backdrop-blur-sm">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-2 animate-pulse" />
-                  Live Updates
+        <Link href={`/project/${project.id}`} className="md:col-span-2" data-testid={`link-project-hero-${project.id}`}>
+          <Card className="h-full overflow-hidden relative group border-0 shadow-lg cursor-pointer">
+            <div className="absolute inset-0">
+              <img 
+                src={project.image} 
+                alt="Project Render" 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+            </div>
+            <div className="relative h-full flex flex-col justify-end p-6 text-white min-h-[350px]">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge className="bg-accent text-accent-foreground border-none hover:bg-accent/90">
+                  {project.phase}
                 </Badge>
-              )}
-            </div>
-            
-            <h2 className="text-3xl font-heading font-bold mb-1">{project.name}</h2>
-            <div className="flex items-center text-white/70 text-sm mb-4">
-              <MapPin className="w-4 h-4 mr-1" />
-              {project.address}
-            </div>
-            
-            <p className="text-white/80 max-w-xl mb-6 leading-relaxed">
-              {project.description}
-            </p>
-            
-            <div className="flex items-center gap-6 p-4 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-2 font-medium">
-                  <span>Completion</span>
-                  <span>{project.progress}%</span>
+                {project.status === "Active" && (
+                  <Badge variant="outline" className="border-white/30 text-white bg-green-500/20 backdrop-blur-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-2 animate-pulse" />
+                    Live Updates
+                  </Badge>
+                )}
+              </div>
+              
+              <h2 className="text-3xl font-heading font-bold mb-1">{project.name}</h2>
+              <div className="flex items-center text-white/70 text-sm mb-4">
+                <MapPin className="w-4 h-4 mr-1" />
+                {project.address}
+              </div>
+              
+              <p className="text-white/80 max-w-xl mb-6 leading-relaxed">
+                {project.description}
+              </p>
+              
+              <div className="flex items-center gap-6 p-4 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm mb-2 font-medium">
+                    <span>Completion</span>
+                    <span>{project.progress}%</span>
+                  </div>
+                  <Progress value={project.progress} className="h-2 bg-white/20 [&>div]:bg-accent" />
                 </div>
-                <Progress value={project.progress} className="h-2 bg-white/20 [&>div]:bg-accent" />
-              </div>
-              <div className="h-8 w-px bg-white/20" />
-              <div>
-                <span className="text-xs text-white/60 block uppercase tracking-wider">Status</span>
-                <span className="font-medium">{project.status}</span>
+                <div className="h-8 w-px bg-white/20" />
+                <div>
+                  <span className="text-xs text-white/60 block uppercase tracking-wider">Status</span>
+                  <span className="font-medium">{project.status}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </Link>
 
         <div className="space-y-6">
           <Card className="h-full border-l-4 border-l-accent flex flex-col">
