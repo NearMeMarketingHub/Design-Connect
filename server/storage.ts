@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, not, isNull } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -64,6 +64,10 @@ export interface IStorage {
   // Message methods
   getMessages(projectId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
+  updateMessage(id: string, content: string): Promise<Message | undefined>;
+  deleteMessage(id: string): Promise<Message | undefined>;
+  markMessageAsRead(id: string): Promise<Message | undefined>;
+  markProjectMessagesAsRead(projectId: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -221,6 +225,42 @@ export class DatabaseStorage implements IStorage {
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     const [message] = await db.insert(schema.messages).values(insertMessage).returning();
     return message;
+  }
+
+  async updateMessage(id: string, content: string): Promise<Message | undefined> {
+    const [message] = await db.update(schema.messages)
+      .set({ content, editedAt: new Date() })
+      .where(eq(schema.messages.id, id))
+      .returning();
+    return message;
+  }
+
+  async deleteMessage(id: string): Promise<Message | undefined> {
+    const [message] = await db.update(schema.messages)
+      .set({ isDeleted: true })
+      .where(eq(schema.messages.id, id))
+      .returning();
+    return message;
+  }
+
+  async markMessageAsRead(id: string): Promise<Message | undefined> {
+    const [message] = await db.update(schema.messages)
+      .set({ readAt: new Date() })
+      .where(eq(schema.messages.id, id))
+      .returning();
+    return message;
+  }
+
+  async markProjectMessagesAsRead(projectId: string, userId: string): Promise<void> {
+    await db.update(schema.messages)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(schema.messages.projectId, projectId),
+          not(eq(schema.messages.senderId, userId)),
+          isNull(schema.messages.readAt)
+        )
+      );
   }
 }
 

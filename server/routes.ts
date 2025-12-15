@@ -410,5 +410,47 @@ export async function registerRoutes(
     }
   });
 
+  // Update message (edit)
+  app.put("/api/messages/:messageId", async (req, res, next) => {
+    try {
+      const { content } = req.body;
+      if (!content) {
+        return res.status(400).json({ message: "Content is required" });
+      }
+      const message = await storage.updateMessage(req.params.messageId, content);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      res.json(message);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Delete message (soft delete)
+  app.delete("/api/messages/:messageId", async (req, res, next) => {
+    try {
+      const message = await storage.deleteMessage(req.params.messageId);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      res.json(message);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Mark messages as read
+  app.post("/api/projects/:projectId/messages/read", async (req, res, next) => {
+    try {
+      const user = req.user as User | undefined;
+      const userId = user?.id || 'demo-user';
+      await storage.markProjectMessagesAsRead(req.params.projectId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }
