@@ -520,6 +520,7 @@ export default function ProjectDetails() {
               <Button 
                 data-testid="button-upload-inspiration"
                 onClick={() => fileInputRef.current?.click()}
+                className="hover:bg-primary/90 transition-colors"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Upload Image
