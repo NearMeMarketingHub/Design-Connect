@@ -36,8 +36,28 @@ import {
   Reply,
   File,
   Upload,
-  FolderOpen
+  FolderOpen,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Check,
+  CheckCheck
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
@@ -142,6 +162,8 @@ type LocalMessage = {
   time: string;
   isOwn: boolean;
   isSystem?: boolean;
+  isRead?: boolean;
+  isEdited?: boolean;
   attachment?: { type: 'image' | 'file'; src: string; name: string };
   replyTo?: { id: string; sender: string; message: string; image?: { src: string; title: string } };
 };
@@ -195,6 +217,9 @@ export default function ProjectDetails() {
     { type: 'image', src: 'https://picsum.photos/seed/upload2/200/200', name: 'Cabinet_Reference.png' },
   ]);
   const [attachmentPopoverOpen, setAttachmentPopoverOpen] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editContent, setEditContent] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -210,33 +235,37 @@ export default function ProjectDetails() {
     enabled: !!projectId,
   });
 
-  // Transform API messages to local format
-  const messages: LocalMessage[] = apiMessages.map((msg: any) => ({
-    id: msg.id,
-    sender: msg.senderName,
-    avatar: msg.senderAvatar || msg.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
-    message: msg.content,
-    time: new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-    isOwn: msg.senderName === 'You' || msg.senderId === 'current-user' || msg.isOwn,
-    isSystem: msg.isSystem,
-    ...(msg.attachmentUrl && {
-      attachment: {
-        type: msg.attachmentType as 'image' | 'file',
-        src: msg.attachmentUrl,
-        name: msg.attachmentName || 'Attachment'
-      }
-    }),
-    ...((msg.replyToId || msg.replyToImageUrl) && {
-      replyTo: {
-        id: msg.replyToId || '',
-        sender: msg.replyToSender || '',
-        message: msg.replyToContent || '',
-        ...(msg.replyToImageUrl && {
-          image: { src: msg.replyToImageUrl, title: msg.replyToImageTitle || '' }
-        })
-      }
-    })
-  }));
+  // Transform API messages to local format (filter out deleted messages)
+  const messages: LocalMessage[] = apiMessages
+    .filter((msg: any) => !msg.isDeleted)
+    .map((msg: any) => ({
+      id: msg.id,
+      sender: msg.senderName,
+      avatar: msg.senderAvatar || msg.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+      message: msg.content,
+      time: new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+      isOwn: msg.senderName === 'You' || msg.senderId === 'current-user' || msg.isOwn,
+      isSystem: msg.isSystem,
+      isRead: !!msg.readAt,
+      isEdited: !!msg.editedAt,
+      ...(msg.attachmentUrl && {
+        attachment: {
+          type: msg.attachmentType as 'image' | 'file',
+          src: msg.attachmentUrl,
+          name: msg.attachmentName || 'Attachment'
+        }
+      }),
+      ...((msg.replyToId || msg.replyToImageUrl) && {
+        replyTo: {
+          id: msg.replyToId || '',
+          sender: msg.replyToSender || '',
+          message: msg.replyToContent || '',
+          ...(msg.replyToImageUrl && {
+            image: { src: msg.replyToImageUrl, title: msg.replyToImageTitle || '' }
+          })
+        }
+      })
+    }));
 
   // Send message mutation
   const sendMessageMutation = useMutation({
@@ -254,6 +283,62 @@ export default function ProjectDetails() {
     }
   });
 
+  // Edit message mutation
+  const editMessageMutation = useMutation({
+    mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+      if (!res.ok) throw new Error('Failed to edit message');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'messages'] });
+      setEditDialogOpen(false);
+      setEditingMessage(null);
+      setEditContent("");
+    }
+  });
+
+  // Delete message mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Failed to delete message');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'messages'] });
+    }
+  });
+
+  const handleEditMessage = (msg: LocalMessage) => {
+    setEditingMessage({ id: msg.id, content: msg.message });
+    setEditContent(msg.message);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    if (confirm('Are you sure you want to delete this message?')) {
+      deleteMessageMutation.mutate(messageId);
+    }
+  };
+
+  // Mark messages as read when viewing chat
+  useEffect(() => {
+    if (activeTab === 'messages' && projectId && messages.length > 0) {
+      fetch(`/api/projects/${projectId}/messages/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'messages'] });
+      }).catch(() => {});
+    }
+  }, [activeTab, projectId, messages.length]);
 
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
@@ -944,14 +1029,26 @@ export default function ProjectDetails() {
                                   </div>
                                 )}
                                 {msg.message && <p className="text-sm">{msg.message}</p>}
-                                <span className={`text-xs mt-1 block ${
+                                <div className={`flex items-center gap-1 mt-1 ${
                                   msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
                                 }`}>
-                                  {msg.sender} • {msg.time}
-                                </span>
+                                  <span className="text-xs">
+                                    {msg.sender} • {msg.time}
+                                    {msg.isEdited && <span className="italic"> (edited)</span>}
+                                  </span>
+                                  {msg.isOwn && (
+                                    <span className="ml-1">
+                                      {msg.isRead ? (
+                                        <CheckCheck className="w-3 h-3 text-blue-400" />
+                                      ) : (
+                                        <Check className="w-3 h-3" />
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               
-                              {/* Reply button */}
+                              {/* Reply button for others' messages */}
                               {!msg.isSystem && !msg.isOwn && (
                                 <Button
                                   variant="ghost"
@@ -962,6 +1059,36 @@ export default function ProjectDetails() {
                                 >
                                   <Reply className="w-4 h-4" />
                                 </Button>
+                              )}
+                              
+                              {/* Edit/Delete menu for own messages */}
+                              {!msg.isSystem && msg.isOwn && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute -left-10 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      data-testid={`button-message-menu-${msg.id}`}
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start">
+                                    <DropdownMenuItem onClick={() => handleEditMessage(msg)} data-testid={`button-edit-${msg.id}`}>
+                                      <Pencil className="w-4 h-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeleteMessage(msg.id)} 
+                                      className="text-destructive"
+                                      data-testid={`button-delete-${msg.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                             </div>
                           )}
@@ -1230,6 +1357,45 @@ export default function ProjectDetails() {
         isOpen={documentViewerOpen}
         onClose={() => setDocumentViewerOpen(false)}
       />
+
+      {/* Edit Message Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Message</DialogTitle>
+            <DialogDescription>
+              Make changes to your message below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="Type your message..."
+              data-testid="input-edit-message"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editingMessage && editContent.trim()) {
+                  editMessageMutation.mutate({ 
+                    messageId: editingMessage.id, 
+                    content: editContent.trim() 
+                  });
+                }
+              }}
+              disabled={editMessageMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {editMessageMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
