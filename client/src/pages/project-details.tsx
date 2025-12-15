@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import ImageViewerModal from "@/components/image-viewer-modal";
 import { 
   ArrowLeft,
   Calendar,
@@ -138,6 +139,15 @@ export default function ProjectDetails() {
   
   const [activeTab, setActiveTab] = useState("overview");
   const [messageText, setMessageText] = useState("");
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerImages, setViewerImages] = useState<{ src: string; title?: string; description?: string }[]>([]);
+  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
+
+  const openImageViewer = (images: { src: string; title?: string; description?: string }[], startIndex = 0) => {
+    setViewerImages(images);
+    setViewerInitialIndex(startIndex);
+    setViewerOpen(true);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
@@ -443,11 +453,19 @@ export default function ProjectDetails() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {INSPIRATION_IMAGES.map((img) => (
+              {INSPIRATION_IMAGES.map((img, index) => (
                 <div 
                   key={img.id} 
                   className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary transition-colors"
                   data-testid={`card-inspiration-${img.id}`}
+                  onClick={() => openImageViewer(
+                    INSPIRATION_IMAGES.map(i => ({
+                      src: `https://picsum.photos/seed/${i.id * 123}/400/400`,
+                      title: i.title,
+                      description: i.category
+                    })),
+                    index
+                  )}
                 >
                   <img 
                     src={`https://picsum.photos/seed/${img.id * 123}/400/400`} 
@@ -633,11 +651,19 @@ export default function ProjectDetails() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {PROGRESS_PHOTOS.map((photo) => (
+              {PROGRESS_PHOTOS.map((photo, index) => (
                 <Card 
                   key={photo.id} 
                   className="group overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
                   data-testid={`card-progress-photo-${photo.id}`}
+                  onClick={() => openImageViewer(
+                    PROGRESS_PHOTOS.map(p => ({
+                      src: `https://picsum.photos/seed/${p.id * 456}/600/400`,
+                      title: p.title,
+                      description: `${p.description} - ${p.date}`
+                    })),
+                    index
+                  )}
                 >
                   <div className="aspect-video relative overflow-hidden bg-muted">
                     <img 
@@ -669,6 +695,14 @@ export default function ProjectDetails() {
           </TabsContent>
         </div>
       </Tabs>
+
+      {/* Image Viewer Modal */}
+      <ImageViewerModal
+        images={viewerImages}
+        initialIndex={viewerInitialIndex}
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
     </div>
   );
 }
