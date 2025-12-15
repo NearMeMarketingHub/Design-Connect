@@ -244,7 +244,7 @@ export default function ProjectDetails() {
       avatar: msg.senderAvatar || msg.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
       message: msg.content,
       time: new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-      isOwn: msg.senderName === 'You' || msg.senderId === 'current-user' || msg.isOwn,
+      isOwn: msg.isOwn === true || msg.senderName === 'You' || msg.senderId === 'current-user',
       isSystem: msg.isSystem,
       isRead: !!msg.readAt,
       isEdited: !!msg.editedAt,
