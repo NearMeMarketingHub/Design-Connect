@@ -12,7 +12,10 @@ import type {
   ProjectPhase, InsertProjectPhase,
   ActionItem, InsertActionItem,
   InspirationImage, InsertInspirationImage,
-  Message, InsertMessage
+  Message, InsertMessage,
+  ProgressPost, InsertProgressPost,
+  PostComment, InsertPostComment,
+  PostReaction, InsertPostReaction
 } from "@shared/schema";
 
 export interface IStorage {
@@ -68,6 +71,23 @@ export interface IStorage {
   deleteMessage(id: string): Promise<Message | undefined>;
   markMessageAsRead(id: string): Promise<Message | undefined>;
   markProjectMessagesAsRead(projectId: string, userId: string): Promise<void>;
+
+  // Progress post methods
+  getProgressPosts(projectId: string): Promise<ProgressPost[]>;
+  getProgressPost(id: string): Promise<ProgressPost | undefined>;
+  createProgressPost(post: InsertProgressPost): Promise<ProgressPost>;
+  deleteProgressPost(id: string): Promise<void>;
+
+  // Post comment methods
+  getPostComments(postId: string): Promise<PostComment[]>;
+  createPostComment(comment: InsertPostComment): Promise<PostComment>;
+  deletePostComment(id: string): Promise<void>;
+
+  // Post reaction methods
+  getPostReactions(postId: string): Promise<PostReaction[]>;
+  createPostReaction(reaction: InsertPostReaction): Promise<PostReaction>;
+  deletePostReaction(postId: string, userId: string): Promise<void>;
+  getPostReactionByUser(postId: string, userId: string): Promise<PostReaction | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -261,6 +281,68 @@ export class DatabaseStorage implements IStorage {
           isNull(schema.messages.readAt)
         )
       );
+  }
+
+  // Progress post methods
+  async getProgressPosts(projectId: string): Promise<ProgressPost[]> {
+    return await db.select().from(schema.progressPosts).where(eq(schema.progressPosts.projectId, projectId));
+  }
+
+  async getProgressPost(id: string): Promise<ProgressPost | undefined> {
+    const [post] = await db.select().from(schema.progressPosts).where(eq(schema.progressPosts.id, id));
+    return post;
+  }
+
+  async createProgressPost(insertPost: InsertProgressPost): Promise<ProgressPost> {
+    const [post] = await db.insert(schema.progressPosts).values(insertPost).returning();
+    return post;
+  }
+
+  async deleteProgressPost(id: string): Promise<void> {
+    await db.delete(schema.progressPosts).where(eq(schema.progressPosts.id, id));
+  }
+
+  // Post comment methods
+  async getPostComments(postId: string): Promise<PostComment[]> {
+    return await db.select().from(schema.postComments).where(eq(schema.postComments.postId, postId));
+  }
+
+  async createPostComment(insertComment: InsertPostComment): Promise<PostComment> {
+    const [comment] = await db.insert(schema.postComments).values(insertComment).returning();
+    return comment;
+  }
+
+  async deletePostComment(id: string): Promise<void> {
+    await db.delete(schema.postComments).where(eq(schema.postComments.id, id));
+  }
+
+  // Post reaction methods
+  async getPostReactions(postId: string): Promise<PostReaction[]> {
+    return await db.select().from(schema.postReactions).where(eq(schema.postReactions.postId, postId));
+  }
+
+  async createPostReaction(insertReaction: InsertPostReaction): Promise<PostReaction> {
+    const [reaction] = await db.insert(schema.postReactions).values(insertReaction).returning();
+    return reaction;
+  }
+
+  async deletePostReaction(postId: string, userId: string): Promise<void> {
+    await db.delete(schema.postReactions).where(
+      and(
+        eq(schema.postReactions.postId, postId),
+        eq(schema.postReactions.userId, userId)
+      )
+    );
+  }
+
+  async getPostReactionByUser(postId: string, userId: string): Promise<PostReaction | undefined> {
+    const [reaction] = await db.select().from(schema.postReactions).where(
+      and(
+        eq(schema.postReactions.postId, postId),
+        eq(schema.postReactions.userId, userId)
+      )
+    );
+    return reaction;
   }
 }
 

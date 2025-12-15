@@ -452,5 +452,123 @@ export async function registerRoutes(
     }
   });
 
+  // Progress Post routes
+  app.get("/api/projects/:projectId/posts", async (req, res, next) => {
+    try {
+      const posts = await storage.getProgressPosts(req.params.projectId);
+      res.json(posts);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/posts/:postId", async (req, res, next) => {
+    try {
+      const post = await storage.getProgressPost(req.params.postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      res.json(post);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/posts", async (req, res, next) => {
+    try {
+      const user = req.user as User | undefined;
+      const post = await storage.createProgressPost({
+        ...req.body,
+        projectId: req.params.projectId,
+        creatorId: user?.id || 'demo-contractor',
+        creatorName: user?.name || req.body.creatorName || 'Contractor',
+      });
+      res.json(post);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/posts/:postId", async (req, res, next) => {
+    try {
+      await storage.deleteProgressPost(req.params.postId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Post Comment routes
+  app.get("/api/posts/:postId/comments", async (req, res, next) => {
+    try {
+      const comments = await storage.getPostComments(req.params.postId);
+      res.json(comments);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/posts/:postId/comments", async (req, res, next) => {
+    try {
+      const user = req.user as User | undefined;
+      const comment = await storage.createPostComment({
+        ...req.body,
+        postId: req.params.postId,
+        userId: user?.id || 'demo-user',
+        userName: user?.name || req.body.userName || 'User',
+        userAvatar: req.body.userAvatar || (user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'),
+      });
+      res.json(comment);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/comments/:commentId", async (req, res, next) => {
+    try {
+      await storage.deletePostComment(req.params.commentId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Post Reaction routes
+  app.get("/api/posts/:postId/reactions", async (req, res, next) => {
+    try {
+      const reactions = await storage.getPostReactions(req.params.postId);
+      res.json(reactions);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/posts/:postId/reactions", async (req, res, next) => {
+    try {
+      const user = req.user as User | undefined;
+      const userId = user?.id || 'demo-user';
+      const userName = user?.name || req.body.userName || 'User';
+      
+      // Check if user already reacted
+      const existing = await storage.getPostReactionByUser(req.params.postId, userId);
+      if (existing) {
+        // Toggle off - remove reaction
+        await storage.deletePostReaction(req.params.postId, userId);
+        return res.json({ action: 'removed' });
+      }
+      
+      // Add new reaction
+      const reaction = await storage.createPostReaction({
+        postId: req.params.postId,
+        userId,
+        userName,
+        reactionType: req.body.reactionType || 'like',
+      });
+      res.json({ action: 'added', reaction });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }
