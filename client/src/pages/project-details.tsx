@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -258,13 +258,13 @@ export default function ProjectDetails() {
     }
   });
 
-  // Scroll to bottom when messages load or change
-  useEffect(() => {
+  // Scroll to bottom when messages load or change - use layoutEffect for immediate scroll before paint
+  useLayoutEffect(() => {
     if (messages.length > 0 && messagesContainerRef.current) {
-      // Instantly set scroll position to bottom (no animation = no flash)
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      const container = messagesContainerRef.current;
+      container.scrollTop = container.scrollHeight;
     }
-  }, [messages.length, activeTab]);
+  }, [messages, activeTab]);
 
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
