@@ -88,6 +88,10 @@ export interface IStorage {
   createPostReaction(reaction: InsertPostReaction): Promise<PostReaction>;
   deletePostReaction(postId: string, userId: string): Promise<void>;
   getPostReactionByUser(postId: string, userId: string): Promise<PostReaction | undefined>;
+
+  // Admin methods
+  getUsersByRole(role: string): Promise<User[]>;
+  getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -343,6 +347,34 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return reaction;
+  }
+
+  // Admin methods
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(schema.users).where(eq(schema.users.role, role));
+  }
+
+  async getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string })[]> {
+    const projects = await db.select().from(schema.projects);
+    const projectsWithDetails = await Promise.all(
+      projects.map(async (project) => {
+        let clientName: string | undefined;
+        let contractorName: string | undefined;
+        
+        if (project.clientId) {
+          const client = await this.getUser(project.clientId);
+          clientName = client?.name || client?.username;
+        }
+        
+        if (project.contractorId) {
+          const contractor = await this.getUser(project.contractorId);
+          contractorName = contractor?.name || contractor?.username;
+        }
+        
+        return { ...project, clientName, contractorName };
+      })
+    );
+    return projectsWithDetails;
   }
 }
 

@@ -167,6 +167,26 @@ class ApiClient {
       body: JSON.stringify({ content }),
     });
   }
+
+  // Admin methods
+  async getAdminProjects() {
+    return this.fetch<(Project & { clientName?: string; contractorName?: string })[]>("/admin/projects");
+  }
+
+  async getContractors() {
+    return this.fetch<Omit<User, "password">[]>("/admin/contractors");
+  }
+
+  async getClients() {
+    return this.fetch<Omit<User, "password">[]>("/admin/clients");
+  }
+
+  async assignContractor(projectId: string, contractorId: string) {
+    return this.fetch<Project>(`/admin/projects/${projectId}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ contractorId }),
+    });
+  }
 }
 
 export const api = new ApiClient();

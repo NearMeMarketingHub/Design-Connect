@@ -533,6 +533,55 @@ export async function registerRoutes(
     }
   });
 
+  // Admin routes
+  const requireAdmin = (req: any, res: any, next: any) => {
+    const user = req.user as User | undefined;
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    next();
+  };
+
+  app.get("/api/admin/projects", requireAdmin, async (req, res, next) => {
+    try {
+      const projects = await storage.getAllProjectsWithDetails();
+      res.json(projects);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/admin/contractors", requireAdmin, async (req, res, next) => {
+    try {
+      const contractors = await storage.getUsersByRole("contractor");
+      res.json(contractors.map(c => ({ ...c, password: undefined })));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/admin/clients", requireAdmin, async (req, res, next) => {
+    try {
+      const clients = await storage.getUsersByRole("client");
+      res.json(clients.map(c => ({ ...c, password: undefined })));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/projects/:projectId/assign", requireAdmin, async (req, res, next) => {
+    try {
+      const { contractorId } = req.body;
+      const updated = await storage.updateProject(req.params.projectId, { contractorId });
+      if (!updated) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Reaction routes
   app.get("/api/posts/:postId/reactions", async (req, res, next) => {
     try {

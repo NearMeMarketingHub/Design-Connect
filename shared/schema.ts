@@ -31,6 +31,7 @@ export const projects = pgTable("projects", {
   type: text("type"),
   budget: numeric("budget"),
   clientId: varchar("client_id").references(() => users.id),
+  contractorId: varchar("contractor_id").references(() => users.id),
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });

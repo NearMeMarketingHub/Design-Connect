@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function AdminLogin() {
   const [_, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const { toast } = useToast();
 
   const handleAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -23,7 +23,18 @@ export default function AdminLogin() {
     const password = formData.get("admin-password") as string;
 
     try {
-      await login(loginId, password);
+      const user = await login(loginId, password);
+      
+      if (user.role !== "admin") {
+        await logout();
+        toast({
+          title: "Access Denied",
+          description: "This portal is for administrators only.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       toast({
         title: "Welcome, Administrator",
         description: "You have successfully logged in.",
