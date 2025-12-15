@@ -45,7 +45,12 @@ import {
   Heart,
   MessageCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download,
+  Layers,
+  Shield,
+  Receipt,
+  BookOpen
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -620,6 +625,13 @@ export default function ProjectDetails() {
             data-testid="tab-progress"
           >
             Progress Photos
+          </TabsTrigger>
+          <TabsTrigger 
+            value="documents"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+            data-testid="tab-documents"
+          >
+            Documents
           </TabsTrigger>
         </TabsList>
 
@@ -1470,6 +1482,249 @@ export default function ProjectDetails() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </TabsContent>
+
+          {/* DOCUMENTS TAB */}
+          <TabsContent value="documents" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">Project Documents</h3>
+                <p className="text-sm text-muted-foreground">Contracts, permits, plans, and other important files</p>
+              </div>
+            </div>
+
+            {/* DocuSign Section - Coming Soon */}
+            <Card className="border-dashed border-2 bg-muted/30">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <FileText className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-lg">Digital Signatures</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Sign contracts and documents electronically - coming soon
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Document Categories */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Contracts */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Contracts</CardTitle>
+                      <p className="text-xs text-muted-foreground">Agreements & proposals</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-contract-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Project Contract.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-contract-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Change Order #1.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Plans & Drawings */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                      <Layers className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Plans & Drawings</CardTitle>
+                      <p className="text-xs text-muted-foreground">Blueprints & designs</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-plan-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Floor Plan v3.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-plan-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Electrical Layout.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-plan-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Kitchen Design.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Permits & Approvals */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <Shield className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Permits & Approvals</CardTitle>
+                      <p className="text-xs text-muted-foreground">Official documents</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-permit-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Building Permit.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-permit-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Electrical Inspection.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Invoices & Payments */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <Receipt className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Invoices & Payments</CardTitle>
+                      <p className="text-xs text-muted-foreground">Billing records</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-invoice-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Invoice #1001.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-invoice-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Invoice #1002.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-invoice-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Payment Receipt.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Warranties & Manuals */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-cyan-500/10 rounded-lg">
+                      <BookOpen className="w-5 h-5 text-cyan-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Warranties & Manuals</CardTitle>
+                      <p className="text-xs text-muted-foreground">Product documentation</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-warranty-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Appliance Warranty.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-warranty-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">HVAC Manual.pdf</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Photos & Media */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-pink-500/10 rounded-lg">
+                      <ImageIcon className="w-5 h-5 text-pink-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Photos & Media</CardTitle>
+                      <p className="text-xs text-muted-foreground">Project imagery</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-photo-1">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Before Photos.zip</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-photo-2">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">Progress Week 4.zip</span>
+                      </div>
+                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </div>
