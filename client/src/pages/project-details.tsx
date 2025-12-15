@@ -874,7 +874,8 @@ export default function ProjectDetails() {
                 <CardTitle className="text-lg">Project Communication</CardTitle>
                 <CardDescription>Chat with your project team</CardDescription>
               </CardHeader>
-              <CardContent ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+              <CardContent className="flex-1 overflow-hidden p-0">
+                <div ref={messagesContainerRef} className="h-full overflow-y-auto p-4 space-y-4">
                 {messages.map((msg) => (
                   <div 
                     key={msg.id} 
@@ -978,6 +979,7 @@ export default function ProjectDetails() {
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
+                </div>
               </CardContent>
               <div className="p-4 border-t border-border bg-muted/10">
                 {/* Replying to message preview */}
