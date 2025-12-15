@@ -174,3 +174,46 @@ export const messages = pgTable("messages", {
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, timestamp: true });
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
+
+export const progressPosts = pgTable("progress_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull(),
+  title: text("title").notNull(),
+  caption: text("caption"),
+  coverImage: text("cover_image").notNull(),
+  images: text("images").array().notNull(),
+  creatorId: varchar("creator_id"),
+  creatorName: text("creator_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProgressPostSchema = createInsertSchema(progressPosts).omit({ id: true, createdAt: true });
+export type InsertProgressPost = z.infer<typeof insertProgressPostSchema>;
+export type ProgressPost = typeof progressPosts.$inferSelect;
+
+export const postComments = pgTable("post_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull(),
+  userId: varchar("user_id"),
+  userName: text("user_name").notNull(),
+  userAvatar: text("user_avatar"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPostCommentSchema = createInsertSchema(postComments).omit({ id: true, createdAt: true });
+export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
+export type PostComment = typeof postComments.$inferSelect;
+
+export const postReactions = pgTable("post_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull(),
+  userId: varchar("user_id"),
+  userName: text("user_name").notNull(),
+  reactionType: text("reaction_type").notNull().default("like"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPostReactionSchema = createInsertSchema(postReactions).omit({ id: true, createdAt: true });
+export type InsertPostReaction = z.infer<typeof insertPostReactionSchema>;
+export type PostReaction = typeof postReactions.$inferSelect;
