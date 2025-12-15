@@ -28,7 +28,8 @@ import {
   FileText,
   AlertCircle,
   Phone,
-  Mail
+  Mail,
+  X
 } from "lucide-react";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -151,6 +152,7 @@ export default function ProjectDetails() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<{ src: string; title?: string; description?: string }[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
+  const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
 
   const openImageViewer = (images: { src: string; title?: string; description?: string }[], startIndex = 0) => {
     setViewerImages(images);
@@ -515,7 +517,11 @@ export default function ProjectDetails() {
                       data-testid={`button-comment-inspiration-${img.id}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setMessageText(`Regarding "${img.title}" (${img.category}): `);
+                        setReplyingToImage({
+                          src: `https://picsum.photos/seed/${img.id * 123}/400/400`,
+                          title: img.title,
+                          category: img.category
+                        });
                         setActiveTab("messages");
                       }}
                     >
@@ -652,6 +658,34 @@ export default function ProjectDetails() {
                 ))}
               </CardContent>
               <div className="p-4 border-t border-border bg-muted/10">
+                {replyingToImage && (
+                  <div className="mb-3 flex items-start gap-3 p-2 bg-muted rounded-lg border border-border">
+                    <img 
+                      src={replyingToImage.src} 
+                      alt={replyingToImage.title}
+                      className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => openImageViewer([{ 
+                        src: replyingToImage.src, 
+                        title: replyingToImage.title, 
+                        description: replyingToImage.category 
+                      }], 0)}
+                      data-testid="img-reply-preview"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{replyingToImage.title}</p>
+                      <p className="text-xs text-muted-foreground">{replyingToImage.category}</p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => setReplyingToImage(null)}
+                      data-testid="button-clear-reply"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button variant="ghost" size="icon" data-testid="button-attach-file">
                     <Paperclip className="w-4 h-4" />
@@ -660,7 +694,7 @@ export default function ProjectDetails() {
                     <ImageIcon className="w-4 h-4" />
                   </Button>
                   <Textarea 
-                    placeholder="Type a message..." 
+                    placeholder={replyingToImage ? `Comment on "${replyingToImage.title}"...` : "Type a message..."} 
                     className="min-h-[60px] flex-1 resize-none py-3"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
