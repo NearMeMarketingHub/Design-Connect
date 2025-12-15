@@ -43,7 +43,16 @@ class ApiClient {
   }
 
   async getCurrentUser() {
-    return this.fetch<{ user: Omit<User, "password"> }>("/auth/user");
+    const response = await fetch(`${this.baseUrl}/auth/user`, {
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      // Return null user for unauthenticated state instead of throwing
+      return { user: null as Omit<User, "password"> | null };
+    }
+    
+    return response.json() as Promise<{ user: Omit<User, "password"> }>;
   }
 
   // Project methods
