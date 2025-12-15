@@ -411,30 +411,6 @@ export default function SuperAdminDashboard() {
                         Client Dashboard
                       </Button>
                     </Link>
-                    <Link href={`/sandbox/project/${sandboxData.project.id}`}>
-                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-project">
-                        <Eye className="w-4 h-4 mr-2" />
-                        Project Details
-                      </Button>
-                    </Link>
-                    <Link href={`/sandbox/project/${sandboxData.project.id}/messages`}>
-                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-messages">
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        Messages
-                      </Button>
-                    </Link>
-                    <Link href={`/sandbox/project/${sandboxData.project.id}/documents`}>
-                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-documents">
-                        <FileText className="w-4 h-4 mr-2" />
-                        Documents
-                      </Button>
-                    </Link>
-                    <Link href={`/sandbox/project/${sandboxData.project.id}/photos`}>
-                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-photos">
-                        <Image className="w-4 h-4 mr-2" />
-                        Progress Photos
-                      </Button>
-                    </Link>
                   </div>
                   
                   <div className="space-y-2 pt-4 border-t">
