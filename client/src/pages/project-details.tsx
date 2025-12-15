@@ -197,9 +197,7 @@ export default function ProjectDetails() {
   const [attachmentPopoverOpen, setAttachmentPopoverOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const hasScrolledToBottom = useRef(false);
 
   // Fetch messages from API
   const { data: apiMessages = [], isLoading: messagesLoading } = useQuery({
@@ -253,25 +251,9 @@ export default function ProjectDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'messages'] });
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
     }
   });
 
-  // Scroll to bottom when messages load or tab changes
-  useEffect(() => {
-    if (messages.length > 0 && messagesContainerRef.current && activeTab === 'messages') {
-      // Use requestAnimationFrame to ensure layout is complete
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-          }
-        });
-      });
-    }
-  }, [messages, activeTab]);
 
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
@@ -882,110 +864,111 @@ export default function ProjectDetails() {
                 <CardDescription>Chat with your project team</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 overflow-hidden p-0">
-                <div ref={messagesContainerRef} className="h-full overflow-y-auto p-4 space-y-4">
-                {messages.map((msg) => (
-                  <div 
-                    key={msg.id} 
-                    className={`group flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}
-                    data-testid={`message-${msg.id}`}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className={msg.isSystem ? 'bg-primary/20 text-primary' : ''}>
-                        {msg.avatar}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className={`max-w-[80%] ${msg.isSystem ? 'w-full' : ''}`}>
-                      {msg.isSystem ? (
-                        <div className="bg-primary/10 border border-primary/20 p-3 rounded-lg flex items-center gap-3">
-                          <AlertCircle className="h-5 w-5 text-primary flex-shrink-0" />
-                          <div>
-                            <p className="text-sm">{msg.message}</p>
-                            <span className="text-xs text-muted-foreground mt-1 block">{msg.time}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          {/* Reply to preview */}
-                          {msg.replyTo && (
-                            <div className={`mb-1 p-2 rounded-t-lg border-l-2 border-primary/50 ${
-                              msg.isOwn ? 'bg-primary/20' : 'bg-muted/80'
-                            }`}>
-                              {msg.replyTo.image ? (
-                                <div className="flex items-center gap-2">
-                                  <img 
-                                    src={msg.replyTo.image.src} 
-                                    alt={msg.replyTo.image.title}
-                                    className="w-10 h-10 object-cover rounded cursor-pointer"
-                                    onClick={() => openImageViewer([{ src: msg.replyTo!.image!.src, title: msg.replyTo!.image!.title }], 0)}
-                                  />
-                                  <span className="text-xs text-muted-foreground">{msg.replyTo.image.title}</span>
+                <div ref={messagesContainerRef} className="h-full overflow-y-auto flex flex-col-reverse p-4">
+                  <div className="space-y-4">
+                    {messages.map((msg) => (
+                      <div 
+                        key={msg.id} 
+                        className={`group flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}
+                        data-testid={`message-${msg.id}`}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className={msg.isSystem ? 'bg-primary/20 text-primary' : ''}>
+                            {msg.avatar}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className={`max-w-[80%] ${msg.isSystem ? 'w-full' : ''}`}>
+                          {msg.isSystem ? (
+                            <div className="bg-primary/10 border border-primary/20 p-3 rounded-lg flex items-center gap-3">
+                              <AlertCircle className="h-5 w-5 text-primary flex-shrink-0" />
+                              <div>
+                                <p className="text-sm">{msg.message}</p>
+                                <span className="text-xs text-muted-foreground mt-1 block">{msg.time}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              {/* Reply to preview */}
+                              {msg.replyTo && (
+                                <div className={`mb-1 p-2 rounded-t-lg border-l-2 border-primary/50 ${
+                                  msg.isOwn ? 'bg-primary/20' : 'bg-muted/80'
+                                }`}>
+                                  {msg.replyTo.image ? (
+                                    <div className="flex items-center gap-2">
+                                      <img 
+                                        src={msg.replyTo.image.src} 
+                                        alt={msg.replyTo.image.title}
+                                        className="w-10 h-10 object-cover rounded cursor-pointer"
+                                        onClick={() => openImageViewer([{ src: msg.replyTo!.image!.src, title: msg.replyTo!.image!.title }], 0)}
+                                      />
+                                      <span className="text-xs text-muted-foreground">{msg.replyTo.image.title}</span>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-xs font-medium text-primary">{msg.replyTo.sender}</p>
+                                      <p className="text-xs text-muted-foreground truncate">{msg.replyTo.message}</p>
+                                    </>
+                                  )}
                                 </div>
-                              ) : (
-                                <>
-                                  <p className="text-xs font-medium text-primary">{msg.replyTo.sender}</p>
-                                  <p className="text-xs text-muted-foreground truncate">{msg.replyTo.message}</p>
-                                </>
+                              )}
+                              
+                              <div className={`p-3 rounded-lg ${
+                                msg.isOwn 
+                                  ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                                  : 'bg-muted rounded-tl-none'
+                              } ${msg.replyTo ? 'rounded-t-none' : ''}`}>
+                                {/* Attachment preview */}
+                                {msg.attachment && (
+                                  <div className="mb-2">
+                                    {msg.attachment.type === 'image' ? (
+                                      <img 
+                                        src={msg.attachment.src} 
+                                        alt={msg.attachment.name}
+                                        className="max-w-full max-h-48 rounded cursor-pointer hover:opacity-90"
+                                        onClick={() => openImageViewer([{ src: msg.attachment!.src, title: msg.attachment!.name }], 0)}
+                                      />
+                                    ) : (
+                                      <div 
+                                        className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:opacity-80 transition-opacity ${
+                                          msg.isOwn ? 'bg-primary-foreground/10' : 'bg-background'
+                                        }`}
+                                        onClick={() => {
+                                          setDocumentToView({ src: msg.attachment!.src, name: msg.attachment!.name, type: msg.attachment!.type });
+                                          setDocumentViewerOpen(true);
+                                        }}
+                                      >
+                                        <File className="w-4 h-4" />
+                                        <span className="text-sm truncate underline">{msg.attachment.name}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {msg.message && <p className="text-sm">{msg.message}</p>}
+                                <span className={`text-xs mt-1 block ${
+                                  msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                }`}>
+                                  {msg.sender} • {msg.time}
+                                </span>
+                              </div>
+                              
+                              {/* Reply button */}
+                              {!msg.isSystem && !msg.isOwn && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute -right-10 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => setReplyingToMessage({ id: msg.id, sender: msg.sender, message: msg.message })}
+                                  data-testid={`button-reply-${msg.id}`}
+                                >
+                                  <Reply className="w-4 h-4" />
+                                </Button>
                               )}
                             </div>
                           )}
-                          
-                          <div className={`p-3 rounded-lg ${
-                            msg.isOwn 
-                              ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                              : 'bg-muted rounded-tl-none'
-                          } ${msg.replyTo ? 'rounded-t-none' : ''}`}>
-                            {/* Attachment preview */}
-                            {msg.attachment && (
-                              <div className="mb-2">
-                                {msg.attachment.type === 'image' ? (
-                                  <img 
-                                    src={msg.attachment.src} 
-                                    alt={msg.attachment.name}
-                                    className="max-w-full max-h-48 rounded cursor-pointer hover:opacity-90"
-                                    onClick={() => openImageViewer([{ src: msg.attachment!.src, title: msg.attachment!.name }], 0)}
-                                  />
-                                ) : (
-                                  <div 
-                                    className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:opacity-80 transition-opacity ${
-                                      msg.isOwn ? 'bg-primary-foreground/10' : 'bg-background'
-                                    }`}
-                                    onClick={() => {
-                                      setDocumentToView({ src: msg.attachment!.src, name: msg.attachment!.name, type: msg.attachment!.type });
-                                      setDocumentViewerOpen(true);
-                                    }}
-                                  >
-                                    <File className="w-4 h-4" />
-                                    <span className="text-sm truncate underline">{msg.attachment.name}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {msg.message && <p className="text-sm">{msg.message}</p>}
-                            <span className={`text-xs mt-1 block ${
-                              msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                            }`}>
-                              {msg.sender} • {msg.time}
-                            </span>
-                          </div>
-                          
-                          {/* Reply button */}
-                          {!msg.isSystem && !msg.isOwn && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="absolute -right-10 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => setReplyingToMessage({ id: msg.id, sender: msg.sender, message: msg.message })}
-                              data-testid={`button-reply-${msg.id}`}
-                            >
-                              <Reply className="w-4 h-4" />
-                            </Button>
-                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
                 </div>
               </CardContent>
               <div className="p-4 border-t border-border bg-muted/10">
