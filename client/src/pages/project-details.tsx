@@ -32,7 +32,9 @@ import {
   X,
   ChevronDown,
   Reply,
-  File
+  File,
+  Upload,
+  FolderOpen
 } from "lucide-react";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -190,9 +192,15 @@ export default function ProjectDetails() {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [replyingToMessage, setReplyingToMessage] = useState<{ id: number; sender: string; message: string } | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{ type: 'image' | 'file'; src: string; name: string } | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ type: 'image' | 'file'; src: string; name: string }[]>([
+    { type: 'file', src: '#', name: 'Kitchen_Plans_v2.pdf' },
+    { type: 'file', src: '#', name: 'Material_Selections.xlsx' },
+    { type: 'image', src: 'https://picsum.photos/seed/upload1/200/200', name: 'Tile_Sample_1.jpg' },
+    { type: 'image', src: 'https://picsum.photos/seed/upload2/200/200', name: 'Cabinet_Reference.png' },
+  ]);
+  const [attachmentPopoverOpen, setAttachmentPopoverOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const messageFileInputRef = useRef<HTMLInputElement>(null);
-  const messageImageInputRef = useRef<HTMLInputElement>(null);
+  const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const toggleMilestone = (id: number) => {
@@ -233,21 +241,29 @@ export default function ProjectDetails() {
     }, 100);
   };
 
-  const handleMessageFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
+  const handleMessageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    setPendingAttachment({
-      type,
+    const isImage = file.type.startsWith('image/');
+    const newFile = {
+      type: isImage ? 'image' as const : 'file' as const,
       src: URL.createObjectURL(file),
       name: file.name
-    });
+    };
     
-    if (type === 'image' && messageImageInputRef.current) {
-      messageImageInputRef.current.value = "";
-    } else if (type === 'file' && messageFileInputRef.current) {
-      messageFileInputRef.current.value = "";
+    setPendingAttachment(newFile);
+    setUploadedFiles(prev => [...prev, newFile]);
+    setAttachmentPopoverOpen(false);
+    
+    if (messageAttachmentInputRef.current) {
+      messageAttachmentInputRef.current.value = "";
     }
+  };
+  
+  const selectExistingFile = (file: { type: 'image' | 'file'; src: string; name: string }) => {
+    setPendingAttachment(file);
+    setAttachmentPopoverOpen(false);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -785,16 +801,10 @@ export default function ProjectDetails() {
           <TabsContent value="messages" className="space-y-6">
             <input 
               type="file" 
-              ref={messageFileInputRef}
+              ref={messageAttachmentInputRef}
               className="hidden"
-              onChange={(e) => handleMessageFileUpload(e, 'file')}
-            />
-            <input 
-              type="file" 
-              ref={messageImageInputRef}
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleMessageFileUpload(e, 'image')}
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+              onChange={handleMessageFileUpload}
             />
             <Card className="h-[calc(100vh-200px)] min-h-[500px] flex flex-col">
               <CardHeader className="border-b border-border py-4">
@@ -979,24 +989,68 @@ export default function ProjectDetails() {
                 )}
                 
                 <div className="flex gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    data-testid="button-attach-file"
-                    onClick={() => messageFileInputRef.current?.click()}
-                    className="hover:bg-muted transition-colors"
-                  >
-                    <Paperclip className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    data-testid="button-attach-image"
-                    onClick={() => messageImageInputRef.current?.click()}
-                    className="hover:bg-muted transition-colors"
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                  </Button>
+                  <Popover open={attachmentPopoverOpen} onOpenChange={setAttachmentPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        data-testid="button-attach"
+                        className="hover:bg-muted transition-colors"
+                      >
+                        <Paperclip className="w-4 h-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-0" align="start" side="top">
+                      <div className="p-3 border-b border-border">
+                        <p className="text-sm font-medium">Add Attachment</p>
+                      </div>
+                      <div className="p-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 h-10"
+                          onClick={() => messageAttachmentInputRef.current?.click()}
+                          data-testid="button-upload-new"
+                        >
+                          <Upload className="w-4 h-4" />
+                          Upload New File
+                        </Button>
+                      </div>
+                      {uploadedFiles.length > 0 && (
+                        <>
+                          <div className="px-3 py-2 border-t border-border">
+                            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                              <FolderOpen className="w-3 h-3" />
+                              Recent Uploads
+                            </p>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                            {uploadedFiles.map((file, index) => (
+                              <Button
+                                key={index}
+                                variant="ghost"
+                                className="w-full justify-start gap-2 h-auto py-2"
+                                onClick={() => selectExistingFile(file)}
+                                data-testid={`button-select-file-${index}`}
+                              >
+                                {file.type === 'image' ? (
+                                  <img 
+                                    src={file.src} 
+                                    alt={file.name}
+                                    className="w-8 h-8 object-cover rounded"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                                    <File className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <span className="text-sm truncate flex-1 text-left">{file.name}</span>
+                              </Button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </PopoverContent>
+                  </Popover>
                   <Textarea 
                     placeholder={
                       replyingToImage ? `Comment on "${replyingToImage.title}"...` : 
