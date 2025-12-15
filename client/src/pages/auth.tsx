@@ -383,14 +383,11 @@ export default function AuthPage() {
                 variant="ghost" 
                 className="w-full text-xs text-muted-foreground hover:text-foreground"
                 data-testid="link-admin-login"
-              >
-                Admins log in here
-              </Button>
+              >Admin Login</Button>
             </Link>
           </div>
         </div>
       </div>
-      
       <div className="hidden lg:block relative bg-muted">
         <img 
           src={heroImage} 
