@@ -858,7 +858,7 @@ export default function ProjectDetails() {
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
               onChange={handleMessageFileUpload}
             />
-            <Card className="flex flex-col" style={{ height: 'calc(100vh - 240px)' }}>
+            <Card className="flex flex-col" style={{ height: 'calc(100vh - 280px)' }}>
               <CardHeader className="border-b border-border py-4">
                 <CardTitle className="text-lg">Project Communication</CardTitle>
                 <CardDescription>Chat with your project team</CardDescription>
