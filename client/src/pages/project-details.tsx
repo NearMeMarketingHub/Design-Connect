@@ -257,12 +257,15 @@ export default function ProjectDetails() {
     }
   });
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages load or change
   useEffect(() => {
     if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Use setTimeout to ensure DOM is fully rendered
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 50);
     }
-  }, [messages.length]);
+  }, [messages.length, activeTab]);
 
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
