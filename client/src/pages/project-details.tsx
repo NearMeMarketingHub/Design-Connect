@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -132,25 +133,17 @@ const MILESTONES = [
     tasks: ["Final cleaning", "Walkthrough scheduled", "Warranty docs prepared", "Keys delivered"] }
 ];
 
-type Message = {
-  id: number;
+type LocalMessage = {
+  id: string;
   sender: string;
-  role: string;
   avatar: string;
   message: string;
   time: string;
   isOwn: boolean;
   isSystem?: boolean;
   attachment?: { type: 'image' | 'file'; src: string; name: string };
-  replyTo?: { id: number; sender: string; message: string; image?: { src: string; title: string } };
+  replyTo?: { id: string; sender: string; message: string; image?: { src: string; title: string } };
 };
-
-const INITIAL_MESSAGES: Message[] = [
-  { id: 1, sender: "Mike Builder", role: "Project Manager", avatar: "MB", message: "Hi Sarah, just wanted to let you know the tile samples arrived. I'll leave them on the counter for you to check out this weekend.", time: "10:30 AM", isOwn: false },
-  { id: 2, sender: "You", role: "", avatar: "SJ", message: "Thanks Mike! We'll swing by Saturday morning. Are the new lighting fixtures there too?", time: "10:45 AM", isOwn: true },
-  { id: 3, sender: "Mike Builder", role: "Project Manager", avatar: "MB", message: "Yes, the pendant lights are in box 4 in the garage. Let me know if you want to open them up.", time: "10:48 AM", isOwn: false },
-  { id: 4, sender: "System", role: "", avatar: "SYS", message: "New plan uploaded: A2.1 - Elevations (Rev 2). Please review and approve.", time: "Yesterday", isOwn: false, isSystem: true }
-];
 
 const PROGRESS_PHOTOS = [
   { id: 1, date: "Dec 10, 2025", title: "Kitchen Framing", description: "Island framing complete", category: "Framing" },
@@ -180,6 +173,7 @@ export default function ProjectDetails() {
   const params = useParams<{ id: string }>();
   const projectId = params.id || "";
   const project = PROJECTS_DATA[projectId];
+  const queryClient = useQueryClient();
   
   const [activeTab, setActiveTab] = useState("overview");
   const [messageText, setMessageText] = useState("");
@@ -189,8 +183,7 @@ export default function ProjectDetails() {
   const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
   const [inspirationImages, setInspirationImages] = useState(INITIAL_INSPIRATION_IMAGES);
   const [expandedMilestones, setExpandedMilestones] = useState<number[]>([]);
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [replyingToMessage, setReplyingToMessage] = useState<{ id: number; sender: string; message: string } | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<{ id: string; sender: string; message: string } | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{ type: 'image' | 'file'; src: string; name: string } | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<{ type: 'image' | 'file'; src: string; name: string }[]>([
     { type: 'file', src: '#', name: 'Kitchen_Plans_v2.pdf' },
@@ -203,42 +196,107 @@ export default function ProjectDetails() {
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Fetch messages from API
+  const { data: apiMessages = [], isLoading: messagesLoading } = useQuery({
+    queryKey: ['/api/projects', projectId, 'messages'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/messages`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Transform API messages to local format
+  const messages: LocalMessage[] = apiMessages.map((msg: any) => ({
+    id: msg.id,
+    sender: msg.senderName,
+    avatar: msg.senderAvatar || msg.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+    message: msg.content,
+    time: new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+    isOwn: msg.senderName === 'You',
+    isSystem: msg.isSystem,
+    ...(msg.attachmentUrl && {
+      attachment: {
+        type: msg.attachmentType as 'image' | 'file',
+        src: msg.attachmentUrl,
+        name: msg.attachmentName || 'Attachment'
+      }
+    }),
+    ...(msg.replyToId && {
+      replyTo: {
+        id: msg.replyToId,
+        sender: msg.replyToSender || '',
+        message: msg.replyToContent || '',
+        ...(msg.replyToImageUrl && {
+          image: { src: msg.replyToImageUrl, title: msg.replyToImageTitle || '' }
+        })
+      }
+    })
+  }));
+
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async (messageData: any) => {
+      const res = await fetch(`/api/projects/${projectId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(messageData)
+      });
+      if (!res.ok) throw new Error('Failed to send message');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'messages'] });
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  });
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length]);
+
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
       prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
     );
   };
 
-  const formatTime = () => {
-    const now = new Date();
-    return now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  };
-
   const sendMessage = () => {
     if (!messageText.trim() && !pendingAttachment && !replyingToImage) return;
     
-    const newMessage: Message = {
-      id: Date.now(),
-      sender: "You",
-      role: "",
-      avatar: "SJ",
-      message: messageText.trim(),
-      time: formatTime(),
-      isOwn: true,
-      ...(pendingAttachment && { attachment: pendingAttachment }),
-      ...(replyingToMessage && { replyTo: replyingToMessage }),
-      ...(replyingToImage && { replyTo: { id: 0, sender: "", message: "", image: { src: replyingToImage.src, title: replyingToImage.title } } })
+    const messageData = {
+      projectId,
+      senderId: 'current-user',
+      senderName: 'You',
+      senderAvatar: 'SJ',
+      content: messageText.trim() || ' ',
+      ...(pendingAttachment && {
+        attachmentType: pendingAttachment.type,
+        attachmentUrl: pendingAttachment.src,
+        attachmentName: pendingAttachment.name
+      }),
+      ...(replyingToMessage && {
+        replyToId: replyingToMessage.id,
+        replyToSender: replyingToMessage.sender,
+        replyToContent: replyingToMessage.message
+      }),
+      ...(replyingToImage && {
+        replyToImageUrl: replyingToImage.src,
+        replyToImageTitle: replyingToImage.title
+      })
     };
     
-    setMessages(prev => [...prev, newMessage]);
+    sendMessageMutation.mutate(messageData);
     setMessageText("");
     setPendingAttachment(null);
     setReplyingToMessage(null);
     setReplyingToImage(null);
-    
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
   };
 
   const handleMessageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

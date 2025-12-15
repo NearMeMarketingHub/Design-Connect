@@ -153,8 +153,19 @@ export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
   senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderName: text("sender_name").notNull(),
+  senderAvatar: text("sender_avatar"),
   content: text("content").notNull(),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
+  attachmentType: text("attachment_type"),
+  attachmentUrl: text("attachment_url"),
+  attachmentName: text("attachment_name"),
+  replyToId: varchar("reply_to_id"),
+  replyToSender: text("reply_to_sender"),
+  replyToContent: text("reply_to_content"),
+  replyToImageUrl: text("reply_to_image_url"),
+  replyToImageTitle: text("reply_to_image_title"),
+  isSystem: boolean("is_system").default(false),
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, timestamp: true });
