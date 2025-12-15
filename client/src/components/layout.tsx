@@ -5,14 +5,30 @@ import {
   HardHat,
   Home,
   ArrowLeft,
-  FolderOpen
+  FolderOpen,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { user, loading } = useAuth();
 
-  const isDashboard = location === "/dashboard";
+  // Check if we're on any dashboard page
+  const isDashboard = location === "/dashboard" || location === "/super-admin" || location === "/contractor-dashboard";
+  
+  // Determine which dashboard to go back to based on user role
+  const getDashboardPath = () => {
+    if (user?.role === "admin") return "/super-admin";
+    if (user?.role === "contractor") return "/contractor-dashboard";
+    return "/dashboard"; // Default to client dashboard
+  };
+  
+  const dashboardPath = getDashboardPath();
+  
+  // Don't show back button until we know the user's role
+  const showBackButton = !isDashboard && !loading && user;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -23,20 +39,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {isDashboard ? (
             <>
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                <HardHat className="w-6 h-6" />
+                {user?.role === "admin" ? <Shield className="w-6 h-6" /> : <HardHat className="w-6 h-6" />}
               </div>
               <div className="hidden sm:block">
                 <h1 className="font-heading font-bold text-xl tracking-tight">BuildVision</h1>
               </div>
             </>
-          ) : (
+          ) : showBackButton ? (
             <Button variant="ghost" size="sm" className="gap-2" asChild data-testid="button-back-home">
-              <Link href="/dashboard">
+              <Link href={dashboardPath}>
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back to Dashboard</span>
                 <Home className="w-4 h-4 sm:hidden" />
               </Link>
             </Button>
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+              <HardHat className="w-6 h-6" />
+            </div>
           )}
         </div>
         

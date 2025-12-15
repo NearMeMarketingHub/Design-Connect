@@ -30,6 +30,11 @@ function Router() {
   if (location === "/admin-login") {
     return <AdminLogin />;
   }
+  
+  // Super Admin Dashboard has its own header, so render without Layout
+  if (location === "/super-admin") {
+    return <SuperAdminDashboard />;
+  }
 
   return (
     <Layout>
@@ -38,7 +43,6 @@ function Router() {
         <Route path="/my-projects" component={ClientProjects} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/admin-dashboard" component={AdminDashboard} />
-        <Route path="/super-admin" component={SuperAdminDashboard} />
         
         {/* Sales & Estimating */}
         <Route path="/sales" component={SalesDashboard} />
