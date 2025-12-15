@@ -205,12 +205,46 @@ export default function ProjectDetails() {
   const params = useParams<{ id: string }>();
   const [location] = useLocation();
   const projectId = params.id || "";
-  const project = PROJECTS_DATA[projectId];
+  const staticProject = PROJECTS_DATA[projectId];
   const queryClient = useQueryClient();
   
-  // Parse tab from URL query parameter
+  // Parse tab and admin context from URL query parameter (needed before API call)
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabFromUrl = urlParams.get('tab');
+  const isFromAdmin = urlParams.get('from') === 'admin';
+  
+  // Fetch project from API if not found in static data (for database projects)
+  // Only use admin endpoint when coming from admin context
+  const { data: apiProject, isLoading: projectLoading } = useQuery({
+    queryKey: ['/api/admin/projects', projectId, isFromAdmin],
+    queryFn: async () => {
+      const endpoint = isFromAdmin 
+        ? `/api/admin/projects/${projectId}` 
+        : `/api/projects/${projectId}`;
+      const res = await fetch(endpoint, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !staticProject && !!projectId,
+  });
+  
+  // Merge static or API project data
+  const project = staticProject || (apiProject ? {
+    id: apiProject.id,
+    name: apiProject.name,
+    address: apiProject.address || "Address not specified",
+    status: apiProject.status || "Active",
+    phase: apiProject.phase || "Planning",
+    progress: apiProject.progress || 0,
+    image: blueprintImage,
+    nextMilestone: apiProject.nextMilestone || "Upcoming milestone",
+    dueDate: "TBD",
+    budget: parseInt(apiProject.budget) || 0,
+    spent: 0,
+    startDate: "TBD",
+    endDate: "TBD",
+    description: apiProject.description || ""
+  } : null);
   const [activeTab, setActiveTab] = useState(tabFromUrl || "overview");
   
   // Update tab when URL changes
@@ -545,11 +579,32 @@ export default function ProjectDetails() {
     return phase;
   };
 
+  if (projectLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
+            <Button variant="ghost" size="icon" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-heading font-bold">Loading Project...</h1>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading project details...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!project) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/my-projects">
+          <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -563,8 +618,10 @@ export default function ProjectDetails() {
             <p className="text-muted-foreground mb-4">
               The project you're looking for doesn't exist or you don't have access to it.
             </p>
-            <Link href="/my-projects">
-              <Button data-testid="button-back-to-projects">Back to My Projects</Button>
+            <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
+              <Button data-testid="button-back-to-projects">
+                {isFromAdmin ? "Back to Admin Dashboard" : "Back to My Projects"}
+              </Button>
             </Link>
           </CardContent>
         </Card>
@@ -576,7 +633,7 @@ export default function ProjectDetails() {
     <div>
       {/* Header with Back Navigation */}
       <div className="flex items-center gap-4">
-        <Link href="/my-projects">
+        <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -585,12 +642,17 @@ export default function ProjectDetails() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-heading font-bold" data-testid="text-project-name">{project.name}</h1>
             <Badge className={`${
-              project.status === 'Active' ? 'bg-green-500 hover:bg-green-600' :
-              project.status === 'Planning' ? 'bg-blue-500 hover:bg-blue-600' :
+              project.status === 'Active' || project.status === 'active' ? 'bg-green-500 hover:bg-green-600' :
+              project.status === 'Planning' || project.status === 'planning' ? 'bg-blue-500 hover:bg-blue-600' :
               'bg-slate-500 hover:bg-slate-600'
             } border-0`} data-testid="badge-project-status">
               {project.status}
             </Badge>
+            {isFromAdmin && (
+              <Badge variant="outline" className="border-primary text-primary">
+                Admin View
+              </Badge>
+            )}
           </div>
           <div className="flex items-center text-muted-foreground text-sm mt-1">
             <MapPin className="w-4 h-4 mr-1" />

@@ -281,7 +281,7 @@ export default function SuperAdminDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Link href={`/project/${project.id}`}>
+                            <Link href={`/project/${project.id}?from=admin`}>
                               <Button size="sm" variant="ghost">
                                 <Eye className="w-4 h-4" />
                               </Button>

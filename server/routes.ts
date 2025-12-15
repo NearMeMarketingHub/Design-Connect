@@ -551,6 +551,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/projects/:projectId", requireAdmin, async (req, res, next) => {
+    try {
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      res.json(project);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/admin/contractors", requireAdmin, async (req, res, next) => {
     try {
       const contractors = await storage.getUsersByRole("contractor");
