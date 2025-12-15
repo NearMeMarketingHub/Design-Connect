@@ -4,7 +4,8 @@ import {
   LogOut,
   HardHat,
   Home,
-  ArrowLeft
+  ArrowLeft,
+  FolderOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -39,8 +40,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
         </div>
         
-        {/* Right side - Settings and Logout */}
+        {/* Right side - My Projects, Settings and Logout */}
         <div className="flex items-center gap-2">
+          {isDashboard && (
+            <Button variant="outline" size="sm" className="gap-2" asChild data-testid="button-my-projects">
+              <Link href="/my-projects">
+                <FolderOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">My Projects</span>
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="text-muted-foreground" asChild data-testid="button-settings">
             <Link href="/settings">
               <Settings className="w-5 h-5" />
