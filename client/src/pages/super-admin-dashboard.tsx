@@ -170,12 +170,15 @@ export default function SuperAdminDashboard() {
     setLocation("/");
   };
 
-  const filteredProjects = projects.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
-  );
+  const filteredProjects = projects
+    .filter(p => !p.isSandbox)
+    .filter(p => 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
+    );
 
-  const inProgressCount = projects.filter(p => p.status === "in_progress" || p.status === "active").length;
+  const realProjects = projects.filter(p => !p.isSandbox);
+  const inProgressCount = realProjects.filter(p => p.status === "in_progress" || p.status === "active").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -219,7 +222,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Projects</p>
-                  <h3 className="text-2xl font-bold text-foreground">{projects.length}</h3>
+                  <h3 className="text-2xl font-bold text-foreground">{realProjects.length}</h3>
                 </div>
               </div>
             </CardContent>
@@ -232,7 +235,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Active Contractors</p>
-                  <h3 className="text-2xl font-bold text-foreground">{contractors.length}</h3>
+                  <h3 className="text-2xl font-bold text-foreground">{contractors.filter(c => !c.isSandbox).length}</h3>
                 </div>
               </div>
             </CardContent>
@@ -245,7 +248,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Clients</p>
-                  <h3 className="text-2xl font-bold text-foreground">{clients.length}</h3>
+                  <h3 className="text-2xl font-bold text-foreground">{clients.filter(c => !c.isSandbox).length}</h3>
                 </div>
               </div>
             </CardContent>
