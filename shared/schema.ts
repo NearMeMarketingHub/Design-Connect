@@ -166,6 +166,9 @@ export const messages = pgTable("messages", {
   replyToImageUrl: text("reply_to_image_url"),
   replyToImageTitle: text("reply_to_image_title"),
   isSystem: boolean("is_system").default(false),
+  readAt: timestamp("read_at"),
+  editedAt: timestamp("edited_at"),
+  isDeleted: boolean("is_deleted").default(false),
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, timestamp: true });
