@@ -572,7 +572,7 @@ export default function ProjectDetails() {
 
           {/* MESSAGES TAB */}
           <TabsContent value="messages" className="space-y-6">
-            <Card className="h-[600px] flex flex-col">
+            <Card className="h-[calc(100vh-200px)] min-h-[500px] flex flex-col">
               <CardHeader className="border-b border-border py-4">
                 <CardTitle className="text-lg">Project Communication</CardTitle>
                 <CardDescription>Chat with your project team</CardDescription>
@@ -628,7 +628,7 @@ export default function ProjectDetails() {
                   </Button>
                   <Textarea 
                     placeholder="Type a message..." 
-                    className="min-h-[40px] resize-none py-2"
+                    className="min-h-[60px] flex-1 resize-none py-3"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     data-testid="input-message"
