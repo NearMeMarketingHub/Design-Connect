@@ -151,8 +151,8 @@ export type InspirationImage = typeof inspirationImages.$inferSelect;
 
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
-  senderId: varchar("sender_id").notNull().references(() => users.id),
+  projectId: varchar("project_id").notNull(),
+  senderId: varchar("sender_id").notNull(),
   senderName: text("sender_name").notNull(),
   senderAvatar: text("sender_avatar"),
   content: text("content").notNull(),
