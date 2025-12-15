@@ -18,6 +18,11 @@ import ClientProjects from "@/pages/client-projects";
 import SettingsPage from "@/pages/settings";
 import AdminLogin from "@/pages/admin-login";
 import SuperAdminDashboard from "@/pages/super-admin-dashboard";
+import SandboxDashboard from "@/pages/sandbox-dashboard";
+import SandboxProject from "@/pages/sandbox-project";
+import SandboxMessages from "@/pages/sandbox-messages";
+import SandboxDocuments from "@/pages/sandbox-documents";
+import SandboxPhotos from "@/pages/sandbox-photos";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -34,6 +39,20 @@ function Router() {
   // Super Admin Dashboard has its own header, so render without Layout
   if (location === "/super-admin") {
     return <SuperAdminDashboard />;
+  }
+  
+  // Sandbox pages have their own headers
+  if (location.startsWith("/sandbox")) {
+    return (
+      <Switch>
+        <Route path="/sandbox/dashboard" component={SandboxDashboard} />
+        <Route path="/sandbox/project/:id" component={SandboxProject} />
+        <Route path="/sandbox/project/:id/messages" component={SandboxMessages} />
+        <Route path="/sandbox/project/:id/documents" component={SandboxDocuments} />
+        <Route path="/sandbox/project/:id/photos" component={SandboxPhotos} />
+        <Route component={NotFound} />
+      </Switch>
+    );
   }
 
   return (

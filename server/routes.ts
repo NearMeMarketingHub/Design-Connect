@@ -594,6 +594,37 @@ export async function registerRoutes(
     }
   });
 
+  // Sandbox routes - Admin testing environment
+  app.get("/api/sandbox/data", requireAdmin, async (req, res, next) => {
+    try {
+      const data = await storage.getSandboxData();
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/sandbox/initialize", requireAdmin, async (req, res, next) => {
+    try {
+      const admin = req.user as User;
+      const data = await storage.initializeSandbox(admin);
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/sandbox/reset", requireAdmin, async (req, res, next) => {
+    try {
+      const admin = req.user as User;
+      await storage.resetSandbox();
+      const data = await storage.initializeSandbox(admin);
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Reaction routes
   app.get("/api/posts/:postId/reactions", async (req, res, next) => {
     try {

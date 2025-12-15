@@ -196,6 +196,23 @@ class ApiClient {
       body: JSON.stringify({ contractorId }),
     });
   }
+
+  // Sandbox methods
+  async getSandboxData() {
+    return this.fetch<{ client: Omit<User, "password"> | null; contractor: Omit<User, "password"> | null; project: Project | null }>("/sandbox/data");
+  }
+
+  async initializeSandbox() {
+    return this.fetch<{ client: Omit<User, "password">; contractor: Omit<User, "password">; project: Project }>("/sandbox/initialize", {
+      method: "POST",
+    });
+  }
+
+  async resetSandbox() {
+    return this.fetch<{ client: Omit<User, "password">; contractor: Omit<User, "password">; project: Project }>("/sandbox/reset", {
+      method: "POST",
+    });
+  }
 }
 
 export const api = new ApiClient();

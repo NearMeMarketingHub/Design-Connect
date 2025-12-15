@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("client"),
   name: text("name"),
+  isSandbox: boolean("is_sandbox").default(false),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
@@ -32,6 +33,7 @@ export const projects = pgTable("projects", {
   budget: numeric("budget"),
   clientId: varchar("client_id").references(() => users.id),
   contractorId: varchar("contractor_id").references(() => users.id),
+  isSandbox: boolean("is_sandbox").default(false),
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });

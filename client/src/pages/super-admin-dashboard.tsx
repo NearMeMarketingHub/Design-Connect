@@ -36,7 +36,13 @@ import {
   Search,
   LogOut,
   HardHat,
-  Loader2
+  Loader2,
+  TestTube,
+  MessageSquare,
+  FileText,
+  Image,
+  LayoutDashboard,
+  RefreshCw
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -77,6 +83,48 @@ export default function SuperAdminDashboard() {
     queryKey: ["/api/admin/clients"],
     queryFn: () => api.getClients(),
     enabled: user?.role === "admin",
+  });
+
+  const { data: sandboxData, isLoading: sandboxLoading } = useQuery({
+    queryKey: ["/api/sandbox/data"],
+    queryFn: () => api.getSandboxData(),
+    enabled: user?.role === "admin",
+  });
+
+  const initSandboxMutation = useMutation({
+    mutationFn: () => api.initializeSandbox(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sandbox/data"] });
+      toast({
+        title: "Sandbox Initialized",
+        description: "Test client, contractor, and project have been created.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Initialization Failed",
+        description: error.message || "Could not initialize sandbox",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetSandboxMutation = useMutation({
+    mutationFn: () => api.resetSandbox(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sandbox/data"] });
+      toast({
+        title: "Sandbox Reset",
+        description: "All sandbox data has been reset to defaults.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reset Failed",
+        description: error.message || "Could not reset sandbox",
+        variant: "destructive",
+      });
+    },
   });
 
   const assignMutation = useMutation({
@@ -306,52 +354,117 @@ export default function SuperAdminDashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Test different app views</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Link href="/dashboard">
-                <Button className="w-full justify-start" variant="outline">
-                  <Eye className="w-4 h-4 mr-2" />
-                  View as Client
-                </Button>
-              </Link>
-              <Link href="/admin-dashboard">
-                <Button className="w-full justify-start" variant="outline">
-                  <HardHat className="w-4 h-4 mr-2" />
-                  View as Contractor
-                </Button>
-              </Link>
-              <div className="pt-4 border-t">
-                <h4 className="text-sm font-medium text-foreground mb-3">Available Contractors</h4>
-                <div className="space-y-2">
-                  {contractorsLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : contractors.length === 0 ? (
-                    <p className="text-muted-foreground text-sm text-center py-2">No contractors found</p>
-                  ) : (
-                    contractors.map((contractor) => (
-                      <div 
-                        key={contractor.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{contractor.name || contractor.username}</p>
-                          <p className="text-xs text-muted-foreground">{contractor.email}</p>
-                        </div>
-                        <Badge 
-                          variant="outline" 
-                          className="border-green-600 text-green-600"
-                        >
-                          Active
-                        </Badge>
-                      </div>
-                    ))
-                  )}
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <TestTube className="w-5 h-5 text-purple-600" />
+                    Sandbox Testing
+                  </CardTitle>
+                  <CardDescription>Test features in an isolated environment</CardDescription>
                 </div>
+                <Badge variant="outline" className="border-purple-600 text-purple-600">
+                  Test Mode
+                </Badge>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {sandboxLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !sandboxData?.project ? (
+                <div className="text-center py-4">
+                  <p className="text-muted-foreground text-sm mb-4">No sandbox data found. Initialize to create test client, contractor, and project.</p>
+                  <Button 
+                    onClick={() => initSandboxMutation.mutate()}
+                    disabled={initSandboxMutation.isPending}
+                    className="w-full"
+                  >
+                    {initSandboxMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Initializing...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="w-4 h-4 mr-2" />
+                        Initialize Sandbox
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-purple-700 dark:text-purple-300">
+                      <strong>Test Client:</strong> {sandboxData.client?.name}<br />
+                      <strong>Test Contractor:</strong> {sandboxData.contractor?.name}<br />
+                      <strong>Test Project:</strong> {sandboxData.project.name}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Client Experience</p>
+                    <Link href={`/sandbox/dashboard`}>
+                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-dashboard">
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Client Dashboard
+                      </Button>
+                    </Link>
+                    <Link href={`/sandbox/project/${sandboxData.project.id}`}>
+                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-project">
+                        <Eye className="w-4 h-4 mr-2" />
+                        Project Details
+                      </Button>
+                    </Link>
+                    <Link href={`/sandbox/project/${sandboxData.project.id}/messages`}>
+                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-messages">
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Messages
+                      </Button>
+                    </Link>
+                    <Link href={`/sandbox/project/${sandboxData.project.id}/documents`}>
+                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-documents">
+                        <FileText className="w-4 h-4 mr-2" />
+                        Documents
+                      </Button>
+                    </Link>
+                    <Link href={`/sandbox/project/${sandboxData.project.id}/photos`}>
+                      <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-photos">
+                        <Image className="w-4 h-4 mr-2" />
+                        Progress Photos
+                      </Button>
+                    </Link>
+                  </div>
+                  
+                  <div className="space-y-2 pt-4 border-t">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contractor Experience</p>
+                    <Button className="w-full justify-start" variant="outline" disabled data-testid="button-sandbox-contractor">
+                      <HardHat className="w-4 h-4 mr-2" />
+                      Contractor Dashboard
+                      <Badge variant="secondary" className="ml-auto text-xs">Coming Soon</Badge>
+                    </Button>
+                  </div>
+                  
+                  <div className="pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full text-amber-600 border-amber-300 hover:bg-amber-50"
+                      onClick={() => resetSandboxMutation.mutate()}
+                      disabled={resetSandboxMutation.isPending}
+                      data-testid="button-reset-sandbox"
+                    >
+                      {resetSandboxMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Reset Sandbox Data
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

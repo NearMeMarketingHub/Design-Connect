@@ -1,6 +1,7 @@
 import { eq, and, not, isNull } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import bcrypt from "bcryptjs";
 import type {
   User, InsertUser,
   Project, InsertProject,
@@ -92,6 +93,11 @@ export interface IStorage {
   // Admin methods
   getUsersByRole(role: string): Promise<User[]>;
   getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string })[]>;
+
+  // Sandbox methods
+  getSandboxData(): Promise<{ client: User | null; contractor: User | null; project: Project | null }>;
+  initializeSandbox(admin: User): Promise<{ client: User; contractor: User; project: Project }>;
+  resetSandbox(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -375,6 +381,169 @@ export class DatabaseStorage implements IStorage {
       })
     );
     return projectsWithDetails;
+  }
+
+  // Sandbox methods
+  async getSandboxData(): Promise<{ client: User | null; contractor: User | null; project: Project | null }> {
+    const [client] = await db.select().from(schema.users).where(
+      and(eq(schema.users.isSandbox, true), eq(schema.users.role, "client"))
+    );
+    const [contractor] = await db.select().from(schema.users).where(
+      and(eq(schema.users.isSandbox, true), eq(schema.users.role, "contractor"))
+    );
+    const [project] = await db.select().from(schema.projects).where(eq(schema.projects.isSandbox, true));
+    
+    return {
+      client: client || null,
+      contractor: contractor || null,
+      project: project || null
+    };
+  }
+
+  async initializeSandbox(admin: User): Promise<{ client: User; contractor: User; project: Project }> {
+    // Check if sandbox data already exists
+    const existing = await this.getSandboxData();
+    if (existing.client && existing.contractor && existing.project) {
+      return {
+        client: existing.client,
+        contractor: existing.contractor,
+        project: existing.project
+      };
+    }
+
+    // Create sandbox client with hashed password (not meant to be logged into)
+    let client = existing.client;
+    if (!client) {
+      const hashedPassword = await bcrypt.hash("sandbox_not_for_login", 10);
+      const [newClient] = await db.insert(schema.users).values({
+        username: "sandbox_client",
+        email: "sandbox.client@buildvision.test",
+        password: hashedPassword,
+        role: "client",
+        name: "Test Client",
+        isSandbox: true,
+      }).returning();
+      client = newClient;
+    }
+
+    // Create sandbox contractor with hashed password (not meant to be logged into)
+    let contractor = existing.contractor;
+    if (!contractor) {
+      const hashedPassword = await bcrypt.hash("sandbox_not_for_login", 10);
+      const [newContractor] = await db.insert(schema.users).values({
+        username: "sandbox_contractor",
+        email: "sandbox.contractor@buildvision.test",
+        password: hashedPassword,
+        role: "contractor",
+        name: "Test Contractor",
+        isSandbox: true,
+      }).returning();
+      contractor = newContractor;
+    }
+
+    // Create sandbox project
+    let project = existing.project;
+    if (!project) {
+      const [newProject] = await db.insert(schema.projects).values({
+        name: "Sandbox Test Project",
+        address: "123 Test Street, Demo City, ST 12345",
+        status: "in_progress",
+        phase: "Foundation",
+        progress: 35,
+        budgetStatus: "on_track",
+        nextMilestone: "Framing Inspection",
+        dueDate: "2025-03-15",
+        description: "This is a sandbox project for testing features. Changes here won't affect real projects.",
+        type: "renovation",
+        budget: "150000",
+        clientId: client.id,
+        contractorId: contractor.id,
+        isSandbox: true,
+      }).returning();
+      project = newProject;
+
+      // Create sample project phases
+      await db.insert(schema.projectPhases).values([
+        {
+          projectId: project.id,
+          name: "Site Preparation",
+          status: "completed",
+          dateRange: "Jan 1 - Jan 15, 2025",
+          tasks: ["Clear site", "Grade foundation", "Install utilities"]
+        },
+        {
+          projectId: project.id,
+          name: "Foundation",
+          status: "in_progress",
+          dateRange: "Jan 16 - Feb 15, 2025",
+          tasks: ["Pour footings", "Install foundation walls", "Waterproofing"]
+        },
+        {
+          projectId: project.id,
+          name: "Framing",
+          status: "pending",
+          dateRange: "Feb 16 - Mar 30, 2025",
+          tasks: ["Wall framing", "Roof structure", "Window/door openings"]
+        }
+      ]);
+
+      // Create sample action items
+      await db.insert(schema.actionItems).values([
+        {
+          projectId: project.id,
+          title: "Review foundation plans",
+          assignedTo: "Test Client",
+          dueDate: "2025-01-20",
+          status: "pending"
+        },
+        {
+          projectId: project.id,
+          title: "Select finish materials",
+          assignedTo: "Test Client",
+          dueDate: "2025-02-01",
+          status: "pending"
+        }
+      ]);
+
+      // Create sample welcome message
+      await db.insert(schema.messages).values({
+        projectId: project.id,
+        senderId: contractor.id,
+        senderName: "Test Contractor",
+        senderAvatar: "TC",
+        content: "Welcome to the sandbox project! This is a test environment where you can explore all features without affecting real data.",
+        isSystem: false,
+      });
+    }
+
+    return { client, contractor, project };
+  }
+
+  async resetSandbox(): Promise<void> {
+    // Get sandbox project first
+    const [project] = await db.select().from(schema.projects).where(eq(schema.projects.isSandbox, true));
+    
+    if (project) {
+      // Delete related data
+      await db.delete(schema.messages).where(eq(schema.messages.projectId, project.id));
+      await db.delete(schema.actionItems).where(eq(schema.actionItems.projectId, project.id));
+      await db.delete(schema.projectPhases).where(eq(schema.projectPhases.projectId, project.id));
+      await db.delete(schema.inspirationImages).where(eq(schema.inspirationImages.projectId, project.id));
+      
+      // Delete progress posts and their comments/reactions
+      const posts = await db.select().from(schema.progressPosts).where(eq(schema.progressPosts.projectId, project.id));
+      for (const post of posts) {
+        await db.delete(schema.postComments).where(eq(schema.postComments.postId, post.id));
+        await db.delete(schema.postReactions).where(eq(schema.postReactions.postId, post.id));
+      }
+      await db.delete(schema.progressPosts).where(eq(schema.progressPosts.projectId, project.id));
+      
+      // Delete the project
+      await db.delete(schema.projects).where(eq(schema.projects.id, project.id));
+    }
+    
+    // Delete sandbox users
+    await db.delete(schema.users).where(eq(schema.users.isSandbox, true));
   }
 }
 
