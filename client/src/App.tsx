@@ -16,6 +16,7 @@ import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
 import ClientProjects from "@/pages/client-projects";
 import SettingsPage from "@/pages/settings";
+import ContractorPosts from "@/pages/contractor-posts";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
 
         {/* Projects & Operations */}
         <Route path="/project/:id" component={ProjectDetails} />
+        <Route path="/contractor/posts/:projectId" component={ContractorPosts} />
         <Route path="/timeline" component={TimelinePage} />
         <Route path="/schedule" component={TimelinePage} />
         

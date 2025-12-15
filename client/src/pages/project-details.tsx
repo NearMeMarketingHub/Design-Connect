@@ -229,12 +229,7 @@ export default function ProjectDetails() {
   const [postImageIndex, setPostImageIndex] = useState(0);
   const [newComment, setNewComment] = useState("");
   const [replyingToPost, setReplyingToPost] = useState<{ id: string; title: string; coverImage: string } | null>(null);
-  const [createPostOpen, setCreatePostOpen] = useState(false);
-  const [newPostTitle, setNewPostTitle] = useState("");
-  const [newPostCaption, setNewPostCaption] = useState("");
-  const [newPostImages, setNewPostImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const postImageInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -419,54 +414,6 @@ export default function ProjectDetails() {
       queryClient.invalidateQueries({ queryKey: ['/api/posts', selectedPost?.id, 'reactions'] });
     }
   });
-
-  // Create post mutation
-  const createPostMutation = useMutation({
-    mutationFn: async (postData: { title: string; caption: string; images: string[] }) => {
-      const res = await fetch(`/api/projects/${projectId}/posts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: postData.title,
-          caption: postData.caption,
-          coverImage: postData.images[0],
-          images: postData.images,
-          creatorName: 'Contractor'
-        })
-      });
-      if (!res.ok) throw new Error('Failed to create post');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'posts'] });
-      setCreatePostOpen(false);
-      setNewPostTitle("");
-      setNewPostCaption("");
-      setNewPostImages([]);
-    }
-  });
-
-  const handlePostImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    
-    // Limit to 10 images
-    const remainingSlots = 10 - newPostImages.length;
-    const filesToAdd = Array.from(files).slice(0, remainingSlots);
-    
-    filesToAdd.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        setNewPostImages(prev => [...prev, dataUrl]);
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    if (postImageInputRef.current) {
-      postImageInputRef.current.value = '';
-    }
-  };
 
   const openPostDetail = (post: any) => {
     setSelectedPost(post);
@@ -1469,23 +1416,11 @@ export default function ProjectDetails() {
 
           {/* PROGRESS PHOTOS TAB */}
           <TabsContent value="progress" className="space-y-6">
-            <input 
-              type="file" 
-              ref={postImageInputRef}
-              className="hidden"
-              accept="image/*"
-              multiple
-              onChange={handlePostImageUpload}
-            />
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold">Progress Updates</h3>
                 <p className="text-sm text-muted-foreground">Updates and photos from your contractor</p>
               </div>
-              <Button onClick={() => setCreatePostOpen(true)} data-testid="button-create-post">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Post
-              </Button>
             </div>
 
             {/* Demo posts if no API posts */}
@@ -1745,94 +1680,6 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Post Dialog */}
-      <Dialog open={createPostOpen} onOpenChange={setCreatePostOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Create Progress Update</DialogTitle>
-            <DialogDescription>
-              Share photos and updates about the project progress. You can add up to 10 images.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                placeholder="e.g., Kitchen Framing Complete"
-                value={newPostTitle}
-                onChange={(e) => setNewPostTitle(e.target.value)}
-                data-testid="input-post-title"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Caption</label>
-              <Textarea
-                placeholder="Describe the progress update..."
-                value={newPostCaption}
-                onChange={(e) => setNewPostCaption(e.target.value)}
-                className="min-h-[100px]"
-                data-testid="input-post-caption"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Photos ({newPostImages.length}/10)</label>
-              <div className="grid grid-cols-5 gap-2">
-                {newPostImages.map((img, idx) => (
-                  <div key={idx} className="relative aspect-square group">
-                    <img 
-                      src={img} 
-                      alt={`Upload ${idx + 1}`}
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                    <button
-                      className="absolute top-1 right-1 bg-black/60 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setNewPostImages(prev => prev.filter((_, i) => i !== idx))}
-                    >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </div>
-                ))}
-                {newPostImages.length < 10 && (
-                  <button
-                    onClick={() => postImageInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center hover:border-muted-foreground/50 transition-colors"
-                    data-testid="button-add-post-image"
-                  >
-                    <Plus className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground mt-1">Add</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setCreatePostOpen(false);
-              setNewPostTitle("");
-              setNewPostCaption("");
-              setNewPostImages([]);
-            }}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => {
-                if (newPostTitle.trim() && newPostImages.length > 0) {
-                  createPostMutation.mutate({
-                    title: newPostTitle.trim(),
-                    caption: newPostCaption.trim(),
-                    images: newPostImages
-                  });
-                }
-              }}
-              disabled={!newPostTitle.trim() || newPostImages.length === 0 || createPostMutation.isPending}
-              data-testid="button-publish-post"
-            >
-              {createPostMutation.isPending ? 'Publishing...' : 'Publish'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
