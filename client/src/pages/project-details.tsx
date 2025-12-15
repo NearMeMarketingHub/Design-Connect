@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -199,6 +199,7 @@ export default function ProjectDetails() {
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToBottom = useRef(false);
 
   // Fetch messages from API
   const { data: apiMessages = [], isLoading: messagesLoading } = useQuery({
@@ -258,11 +259,17 @@ export default function ProjectDetails() {
     }
   });
 
-  // Scroll to bottom when messages load or change - use layoutEffect for immediate scroll before paint
-  useLayoutEffect(() => {
-    if (messages.length > 0 && messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      container.scrollTop = container.scrollHeight;
+  // Scroll to bottom when messages load or tab changes
+  useEffect(() => {
+    if (messages.length > 0 && messagesContainerRef.current && activeTab === 'messages') {
+      // Use requestAnimationFrame to ensure layout is complete
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+          }
+        });
+      });
     }
   }, [messages, activeTab]);
 
