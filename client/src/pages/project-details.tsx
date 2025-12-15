@@ -223,9 +223,9 @@ export default function ProjectDetails() {
         name: msg.attachmentName || 'Attachment'
       }
     }),
-    ...(msg.replyToId && {
+    ...((msg.replyToId || msg.replyToImageUrl) && {
       replyTo: {
-        id: msg.replyToId,
+        id: msg.replyToId || '',
         sender: msg.replyToSender || '',
         message: msg.replyToContent || '',
         ...(msg.replyToImageUrl && {
@@ -932,12 +932,18 @@ export default function ProjectDetails() {
                                     onClick={() => openImageViewer([{ src: msg.attachment!.src, title: msg.attachment!.name }], 0)}
                                   />
                                 ) : (
-                                  <div className={`flex items-center gap-2 p-2 rounded ${
-                                    msg.isOwn ? 'bg-primary-foreground/10' : 'bg-background'
-                                  }`}>
+                                  <a 
+                                    href={msg.attachment.src} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    download={msg.attachment.name}
+                                    className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:opacity-80 transition-opacity ${
+                                      msg.isOwn ? 'bg-primary-foreground/10' : 'bg-background'
+                                    }`}
+                                  >
                                     <File className="w-4 h-4" />
-                                    <span className="text-sm truncate">{msg.attachment.name}</span>
-                                  </div>
+                                    <span className="text-sm truncate underline">{msg.attachment.name}</span>
+                                  </a>
                                 )}
                               </div>
                             )}
