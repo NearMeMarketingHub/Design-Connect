@@ -30,7 +30,9 @@ import {
   Phone,
   Mail,
   X,
-  ChevronDown
+  ChevronDown,
+  Reply,
+  File
 } from "lucide-react";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -128,7 +130,20 @@ const MILESTONES = [
     tasks: ["Final cleaning", "Walkthrough scheduled", "Warranty docs prepared", "Keys delivered"] }
 ];
 
-const MESSAGES = [
+type Message = {
+  id: number;
+  sender: string;
+  role: string;
+  avatar: string;
+  message: string;
+  time: string;
+  isOwn: boolean;
+  isSystem?: boolean;
+  attachment?: { type: 'image' | 'file'; src: string; name: string };
+  replyTo?: { id: number; sender: string; message: string; image?: { src: string; title: string } };
+};
+
+const INITIAL_MESSAGES: Message[] = [
   { id: 1, sender: "Mike Builder", role: "Project Manager", avatar: "MB", message: "Hi Sarah, just wanted to let you know the tile samples arrived. I'll leave them on the counter for you to check out this weekend.", time: "10:30 AM", isOwn: false },
   { id: 2, sender: "You", role: "", avatar: "SJ", message: "Thanks Mike! We'll swing by Saturday morning. Are the new lighting fixtures there too?", time: "10:45 AM", isOwn: true },
   { id: 3, sender: "Mike Builder", role: "Project Manager", avatar: "MB", message: "Yes, the pendant lights are in box 4 in the garage. Let me know if you want to open them up.", time: "10:48 AM", isOwn: false },
@@ -172,12 +187,67 @@ export default function ProjectDetails() {
   const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
   const [inspirationImages, setInspirationImages] = useState(INITIAL_INSPIRATION_IMAGES);
   const [expandedMilestones, setExpandedMilestones] = useState<number[]>([]);
+  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [replyingToMessage, setReplyingToMessage] = useState<{ id: number; sender: string; message: string } | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{ type: 'image' | 'file'; src: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageFileInputRef = useRef<HTMLInputElement>(null);
+  const messageImageInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
       prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
     );
+  };
+
+  const formatTime = () => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  const sendMessage = () => {
+    if (!messageText.trim() && !pendingAttachment && !replyingToImage) return;
+    
+    const newMessage: Message = {
+      id: Date.now(),
+      sender: "You",
+      role: "",
+      avatar: "SJ",
+      message: messageText.trim(),
+      time: formatTime(),
+      isOwn: true,
+      ...(pendingAttachment && { attachment: pendingAttachment }),
+      ...(replyingToMessage && { replyTo: replyingToMessage }),
+      ...(replyingToImage && { replyTo: { id: 0, sender: "", message: "", image: { src: replyingToImage.src, title: replyingToImage.title } } })
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    setMessageText("");
+    setPendingAttachment(null);
+    setReplyingToMessage(null);
+    setReplyingToImage(null);
+    
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const handleMessageFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setPendingAttachment({
+      type,
+      src: URL.createObjectURL(file),
+      name: file.name
+    });
+    
+    if (type === 'image' && messageImageInputRef.current) {
+      messageImageInputRef.current.value = "";
+    } else if (type === 'file' && messageFileInputRef.current) {
+      messageFileInputRef.current.value = "";
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -713,16 +783,29 @@ export default function ProjectDetails() {
 
           {/* MESSAGES TAB */}
           <TabsContent value="messages" className="space-y-6">
+            <input 
+              type="file" 
+              ref={messageFileInputRef}
+              className="hidden"
+              onChange={(e) => handleMessageFileUpload(e, 'file')}
+            />
+            <input 
+              type="file" 
+              ref={messageImageInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleMessageFileUpload(e, 'image')}
+            />
             <Card className="h-[calc(100vh-200px)] min-h-[500px] flex flex-col">
               <CardHeader className="border-b border-border py-4">
                 <CardTitle className="text-lg">Project Communication</CardTitle>
                 <CardDescription>Chat with your project team</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                {MESSAGES.map((msg) => (
+                {messages.map((msg) => (
                   <div 
                     key={msg.id} 
-                    className={`flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}
+                    className={`group flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}
                     data-testid={`message-${msg.id}`}
                   >
                     <Avatar className="h-8 w-8">
@@ -730,9 +813,7 @@ export default function ProjectDetails() {
                         {msg.avatar}
                       </AvatarFallback>
                     </Avatar>
-                    <div className={`max-w-[80%] ${
-                      msg.isSystem ? 'w-full' : ''
-                    }`}>
+                    <div className={`max-w-[80%] ${msg.isSystem ? 'w-full' : ''}`}>
                       {msg.isSystem ? (
                         <div className="bg-primary/10 border border-primary/20 p-3 rounded-lg flex items-center gap-3">
                           <AlertCircle className="h-5 w-5 text-primary flex-shrink-0" />
@@ -742,24 +823,103 @@ export default function ProjectDetails() {
                           </div>
                         </div>
                       ) : (
-                        <div className={`p-3 rounded-lg ${
-                          msg.isOwn 
-                            ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                            : 'bg-muted rounded-tl-none'
-                        }`}>
-                          <p className="text-sm">{msg.message}</p>
-                          <span className={`text-xs mt-1 block ${
-                            msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                          }`}>
-                            {msg.sender} • {msg.time}
-                          </span>
+                        <div className="relative">
+                          {/* Reply to preview */}
+                          {msg.replyTo && (
+                            <div className={`mb-1 p-2 rounded-t-lg border-l-2 border-primary/50 ${
+                              msg.isOwn ? 'bg-primary/20' : 'bg-muted/80'
+                            }`}>
+                              {msg.replyTo.image ? (
+                                <div className="flex items-center gap-2">
+                                  <img 
+                                    src={msg.replyTo.image.src} 
+                                    alt={msg.replyTo.image.title}
+                                    className="w-10 h-10 object-cover rounded cursor-pointer"
+                                    onClick={() => openImageViewer([{ src: msg.replyTo!.image!.src, title: msg.replyTo!.image!.title }], 0)}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{msg.replyTo.image.title}</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-xs font-medium text-primary">{msg.replyTo.sender}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{msg.replyTo.message}</p>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          
+                          <div className={`p-3 rounded-lg ${
+                            msg.isOwn 
+                              ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                              : 'bg-muted rounded-tl-none'
+                          } ${msg.replyTo ? 'rounded-t-none' : ''}`}>
+                            {/* Attachment preview */}
+                            {msg.attachment && (
+                              <div className="mb-2">
+                                {msg.attachment.type === 'image' ? (
+                                  <img 
+                                    src={msg.attachment.src} 
+                                    alt={msg.attachment.name}
+                                    className="max-w-full max-h-48 rounded cursor-pointer hover:opacity-90"
+                                    onClick={() => openImageViewer([{ src: msg.attachment!.src, title: msg.attachment!.name }], 0)}
+                                  />
+                                ) : (
+                                  <div className={`flex items-center gap-2 p-2 rounded ${
+                                    msg.isOwn ? 'bg-primary-foreground/10' : 'bg-background'
+                                  }`}>
+                                    <File className="w-4 h-4" />
+                                    <span className="text-sm truncate">{msg.attachment.name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {msg.message && <p className="text-sm">{msg.message}</p>}
+                            <span className={`text-xs mt-1 block ${
+                              msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                            }`}>
+                              {msg.sender} • {msg.time}
+                            </span>
+                          </div>
+                          
+                          {/* Reply button */}
+                          {!msg.isSystem && !msg.isOwn && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute -right-10 top-1/2 -translate-y-1/2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => setReplyingToMessage({ id: msg.id, sender: msg.sender, message: msg.message })}
+                              data-testid={`button-reply-${msg.id}`}
+                            >
+                              <Reply className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </CardContent>
               <div className="p-4 border-t border-border bg-muted/10">
+                {/* Replying to message preview */}
+                {replyingToMessage && (
+                  <div className="mb-3 flex items-start gap-3 p-2 bg-muted rounded-lg border border-border border-l-4 border-l-primary">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-primary">Replying to {replyingToMessage.sender}</p>
+                      <p className="text-sm text-muted-foreground truncate">{replyingToMessage.message}</p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => setReplyingToMessage(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Replying to image preview */}
                 {replyingToImage && (
                   <div className="mb-3 flex items-start gap-3 p-2 bg-muted rounded-lg border border-border">
                     <img 
@@ -788,21 +948,79 @@ export default function ProjectDetails() {
                     </Button>
                   </div>
                 )}
+                
+                {/* Pending attachment preview */}
+                {pendingAttachment && (
+                  <div className="mb-3 flex items-start gap-3 p-2 bg-muted rounded-lg border border-border">
+                    {pendingAttachment.type === 'image' ? (
+                      <img 
+                        src={pendingAttachment.src} 
+                        alt={pendingAttachment.name}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-background rounded flex items-center justify-center">
+                        <File className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{pendingAttachment.name}</p>
+                      <p className="text-xs text-muted-foreground">{pendingAttachment.type === 'image' ? 'Image' : 'File'} attached</p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => setPendingAttachment(null)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" data-testid="button-attach-file">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    data-testid="button-attach-file"
+                    onClick={() => messageFileInputRef.current?.click()}
+                    className="hover:bg-muted transition-colors"
+                  >
                     <Paperclip className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" data-testid="button-attach-image">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    data-testid="button-attach-image"
+                    onClick={() => messageImageInputRef.current?.click()}
+                    className="hover:bg-muted transition-colors"
+                  >
                     <ImageIcon className="w-4 h-4" />
                   </Button>
                   <Textarea 
-                    placeholder={replyingToImage ? `Comment on "${replyingToImage.title}"...` : "Type a message..."} 
+                    placeholder={
+                      replyingToImage ? `Comment on "${replyingToImage.title}"...` : 
+                      replyingToMessage ? `Reply to ${replyingToMessage.sender}...` :
+                      "Type a message..."
+                    } 
                     className="min-h-[60px] flex-1 resize-none py-3"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
                     data-testid="input-message"
                   />
-                  <Button size="icon" data-testid="button-send-message">
+                  <Button 
+                    size="icon" 
+                    data-testid="button-send-message"
+                    onClick={sendMessage}
+                    disabled={!messageText.trim() && !pendingAttachment && !replyingToImage}
+                    className="hover:bg-primary/90 transition-colors"
+                  >
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
