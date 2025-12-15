@@ -41,7 +41,11 @@ import {
   Pencil,
   Trash2,
   Check,
-  CheckCheck
+  CheckCheck,
+  Heart,
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -220,7 +224,17 @@ export default function ProjectDetails() {
   const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editContent, setEditContent] = useState("");
+  const [selectedPost, setSelectedPost] = useState<any | null>(null);
+  const [postDetailOpen, setPostDetailOpen] = useState(false);
+  const [postImageIndex, setPostImageIndex] = useState(0);
+  const [newComment, setNewComment] = useState("");
+  const [replyingToPost, setReplyingToPost] = useState<{ id: string; title: string; coverImage: string } | null>(null);
+  const [createPostOpen, setCreatePostOpen] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState("");
+  const [newPostCaption, setNewPostCaption] = useState("");
+  const [newPostImages, setNewPostImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const postImageInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -340,6 +354,126 @@ export default function ProjectDetails() {
     }
   }, [activeTab, projectId, messages.length]);
 
+  // Fetch progress posts
+  const { data: progressPosts = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'posts'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/posts`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Fetch comments for selected post
+  const { data: postComments = [] } = useQuery({
+    queryKey: ['/api/posts', selectedPost?.id, 'comments'],
+    queryFn: async () => {
+      const res = await fetch(`/api/posts/${selectedPost?.id}/comments`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedPost?.id,
+  });
+
+  // Fetch reactions for selected post
+  const { data: postReactions = [] } = useQuery({
+    queryKey: ['/api/posts', selectedPost?.id, 'reactions'],
+    queryFn: async () => {
+      const res = await fetch(`/api/posts/${selectedPost?.id}/reactions`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedPost?.id,
+  });
+
+  // Add comment mutation
+  const addCommentMutation = useMutation({
+    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, userName: 'You', userAvatar: 'YO' })
+      });
+      if (!res.ok) throw new Error('Failed to add comment');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/posts', selectedPost?.id, 'comments'] });
+      setNewComment("");
+    }
+  });
+
+  // Toggle reaction mutation
+  const toggleReactionMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await fetch(`/api/posts/${postId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reactionType: 'like', userName: 'You' })
+      });
+      if (!res.ok) throw new Error('Failed to toggle reaction');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/posts', selectedPost?.id, 'reactions'] });
+    }
+  });
+
+  // Create post mutation
+  const createPostMutation = useMutation({
+    mutationFn: async (postData: { title: string; caption: string; images: string[] }) => {
+      const res = await fetch(`/api/projects/${projectId}/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: postData.title,
+          caption: postData.caption,
+          coverImage: postData.images[0],
+          images: postData.images,
+          creatorName: 'Contractor'
+        })
+      });
+      if (!res.ok) throw new Error('Failed to create post');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'posts'] });
+      setCreatePostOpen(false);
+      setNewPostTitle("");
+      setNewPostCaption("");
+      setNewPostImages([]);
+    }
+  });
+
+  const handlePostImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    // Limit to 10 images
+    const remainingSlots = 10 - newPostImages.length;
+    const filesToAdd = Array.from(files).slice(0, remainingSlots);
+    
+    filesToAdd.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setNewPostImages(prev => [...prev, dataUrl]);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    if (postImageInputRef.current) {
+      postImageInputRef.current.value = '';
+    }
+  };
+
+  const openPostDetail = (post: any) => {
+    setSelectedPost(post);
+    setPostImageIndex(0);
+    setPostDetailOpen(true);
+  };
+
   const toggleMilestone = (id: number) => {
     setExpandedMilestones(prev => 
       prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
@@ -347,7 +481,7 @@ export default function ProjectDetails() {
   };
 
   const sendMessage = () => {
-    if (!messageText.trim() && !pendingAttachment && !replyingToImage) return;
+    if (!messageText.trim() && !pendingAttachment && !replyingToImage && !replyingToPost) return;
     
     const messageData = {
       projectId,
@@ -368,6 +502,10 @@ export default function ProjectDetails() {
       ...(replyingToImage && {
         replyToImageUrl: replyingToImage.src,
         replyToImageTitle: replyingToImage.title
+      }),
+      ...(replyingToPost && {
+        replyToImageUrl: replyingToPost.coverImage,
+        replyToImageTitle: `Progress: ${replyingToPost.title}`
       })
     };
     
@@ -376,6 +514,7 @@ export default function ProjectDetails() {
     setPendingAttachment(null);
     setReplyingToMessage(null);
     setReplyingToImage(null);
+    setReplyingToPost(null);
   };
 
   const handleMessageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1146,6 +1285,45 @@ export default function ProjectDetails() {
                     </Button>
                   </div>
                 )}
+
+                {/* Replying to progress post preview */}
+                {replyingToPost && (
+                  <div className="mb-3 flex items-start gap-3 p-2 bg-muted rounded-lg border border-border border-l-4 border-l-primary">
+                    <img 
+                      src={replyingToPost.coverImage} 
+                      alt={replyingToPost.title}
+                      className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => {
+                        // Find the post and open detail view
+                        const post = progressPosts.find((p: any) => p.id === replyingToPost.id) || 
+                          PROGRESS_PHOTOS.map((photo, idx) => ({
+                            id: `demo-${photo.id}`,
+                            title: photo.title,
+                            caption: photo.description,
+                            coverImage: `https://picsum.photos/seed/${photo.id * 456}/600/400`,
+                            images: [`https://picsum.photos/seed/${photo.id * 456}/600/400`],
+                            creatorName: 'Mike Builder',
+                            createdAt: new Date(Date.now() - idx * 86400000 * 2).toISOString()
+                          })).find(p => p.id === replyingToPost.id);
+                        if (post) openPostDetail(post);
+                      }}
+                      data-testid="img-post-reply-preview"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-primary">Replying to Progress Update</p>
+                      <p className="text-sm font-medium truncate">{replyingToPost.title}</p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => setReplyingToPost(null)}
+                      data-testid="button-clear-post-reply"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
                 
                 {/* Quick replies */}
                 <div className="mb-3 flex flex-wrap gap-2">
@@ -1259,6 +1437,7 @@ export default function ProjectDetails() {
                   </Popover>
                   <Textarea 
                     placeholder={
+                      replyingToPost ? `Comment on "${replyingToPost.title}"...` :
                       replyingToImage ? `Comment on "${replyingToImage.title}"...` : 
                       replyingToMessage ? `Reply to ${replyingToMessage.sender}...` :
                       "Type a message..."
@@ -1278,7 +1457,7 @@ export default function ProjectDetails() {
                     size="icon" 
                     data-testid="button-send-message"
                     onClick={sendMessage}
-                    disabled={!messageText.trim() && !pendingAttachment && !replyingToImage}
+                    disabled={!messageText.trim() && !pendingAttachment && !replyingToImage && !replyingToPost}
                     className="hover:bg-primary/90 transition-colors"
                   >
                     <Send className="w-4 h-4" />
@@ -1290,50 +1469,68 @@ export default function ProjectDetails() {
 
           {/* PROGRESS PHOTOS TAB */}
           <TabsContent value="progress" className="space-y-6">
+            <input 
+              type="file" 
+              ref={postImageInputRef}
+              className="hidden"
+              accept="image/*"
+              multiple
+              onChange={handlePostImageUpload}
+            />
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-lg font-semibold">Progress Photos</h3>
-                <p className="text-sm text-muted-foreground">Build documentation and site photos from your contractor</p>
+                <h3 className="text-lg font-semibold">Progress Updates</h3>
+                <p className="text-sm text-muted-foreground">Updates and photos from your contractor</p>
               </div>
+              <Button onClick={() => setCreatePostOpen(true)} data-testid="button-create-post">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Post
+              </Button>
             </div>
 
+            {/* Demo posts if no API posts */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {PROGRESS_PHOTOS.map((photo, index) => (
+              {(progressPosts.length > 0 ? progressPosts : PROGRESS_PHOTOS.map((photo, idx) => ({
+                id: `demo-${photo.id}`,
+                title: photo.title,
+                caption: photo.description,
+                coverImage: `https://picsum.photos/seed/${photo.id * 456}/600/400`,
+                images: [`https://picsum.photos/seed/${photo.id * 456}/600/400`, `https://picsum.photos/seed/${photo.id * 789}/600/400`],
+                creatorName: 'Mike Builder',
+                createdAt: new Date(Date.now() - idx * 86400000 * 2).toISOString()
+              }))).map((post: any) => (
                 <Card 
-                  key={photo.id} 
-                  className="group overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                  data-testid={`card-progress-photo-${photo.id}`}
-                  onClick={() => openImageViewer(
-                    PROGRESS_PHOTOS.map(p => ({
-                      src: `https://picsum.photos/seed/${p.id * 456}/600/400`,
-                      title: p.title,
-                      description: `${p.description} - ${p.date}`
-                    })),
-                    index
-                  )}
+                  key={post.id} 
+                  className="group overflow-hidden cursor-pointer hover:shadow-lg transition-all"
+                  data-testid={`card-post-${post.id}`}
+                  onClick={() => openPostDetail(post)}
                 >
-                  <div className="aspect-video relative overflow-hidden bg-muted">
+                  <div className="aspect-square relative overflow-hidden bg-muted">
                     <img 
-                      src={`https://picsum.photos/seed/${photo.id * 456}/600/400`}
-                      alt={photo.title}
+                      src={post.coverImage}
+                      alt={post.title}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button variant="secondary" size="sm">
-                        <Camera className="w-4 h-4 mr-2" />
-                        View Photo
-                      </Button>
-                    </div>
-                    <Badge className="absolute top-2 right-2 bg-black/60 border-0">
-                      {photo.category}
-                    </Badge>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {post.images && post.images.length > 1 && (
+                      <Badge className="absolute top-3 right-3 bg-black/60 border-0 text-white">
+                        <ImageIcon className="w-3 h-3 mr-1" />
+                        {post.images.length}
+                      </Badge>
+                    )}
                   </div>
                   <CardContent className="p-4">
-                    <h4 className="font-medium">{photo.title}</h4>
-                    <p className="text-sm text-muted-foreground">{photo.description}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarFallback className="text-xs">{post.creatorName?.split(' ').map((n: string) => n[0]).join('') || 'MB'}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">{post.creatorName}</span>
+                    </div>
+                    <h4 className="font-semibold line-clamp-1">{post.title}</h4>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{post.caption}</p>
                     <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {photo.date}
+                      {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   </CardContent>
                 </Card>
@@ -1392,6 +1589,248 @@ export default function ProjectDetails() {
               data-testid="button-save-edit"
             >
               {editMessageMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Post Detail Dialog */}
+      <Dialog open={postDetailOpen} onOpenChange={setPostDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          {selectedPost && (
+            <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+              {/* Image Section */}
+              <div className="relative bg-black flex-1 min-h-[300px] md:min-h-0">
+                <img 
+                  src={selectedPost.images?.[postImageIndex] || selectedPost.coverImage}
+                  alt={selectedPost.title}
+                  className="w-full h-full object-contain"
+                />
+                {selectedPost.images && selectedPost.images.length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setPostImageIndex(prev => prev > 0 ? prev - 1 : selectedPost.images.length - 1)}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setPostImageIndex(prev => prev < selectedPost.images.length - 1 ? prev + 1 : 0)}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {selectedPost.images.map((_: any, idx: number) => (
+                        <button
+                          key={idx}
+                          className={`w-2 h-2 rounded-full transition-colors ${idx === postImageIndex ? 'bg-white' : 'bg-white/50'}`}
+                          onClick={() => setPostImageIndex(idx)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Details Section */}
+              <div className="w-full md:w-[350px] flex flex-col bg-background">
+                <div className="p-4 border-b">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10">
+                      <AvatarFallback>{selectedPost.creatorName?.split(' ').map((n: string) => n[0]).join('') || 'MB'}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">{selectedPost.creatorName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(selectedPost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-lg mt-3">{selectedPost.title}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{selectedPost.caption}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="px-4 py-3 border-b flex items-center gap-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => toggleReactionMutation.mutate(selectedPost.id)}
+                    data-testid="button-like-post"
+                  >
+                    <Heart className={`w-5 h-5 ${postReactions.length > 0 ? 'fill-red-500 text-red-500' : ''}`} />
+                    <span>{postReactions.length}</span>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="gap-2"
+                    data-testid="button-comment-count"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    <span>{postComments.length}</span>
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="gap-2 ml-auto"
+                    onClick={() => {
+                      setReplyingToPost({ id: selectedPost.id, title: selectedPost.title, coverImage: selectedPost.coverImage });
+                      setPostDetailOpen(false);
+                      setActiveTab('messages');
+                    }}
+                    data-testid="button-reply-in-chat"
+                  >
+                    <Reply className="w-5 h-5" />
+                    Reply
+                  </Button>
+                </div>
+
+                {/* Comments */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[200px] md:max-h-none">
+                  {postComments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No comments yet</p>
+                  ) : (
+                    postComments.map((comment: any) => (
+                      <div key={comment.id} className="flex gap-2">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="text-xs">{comment.userAvatar || 'U'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="text-sm">
+                            <span className="font-semibold">{comment.userName}</span>{' '}
+                            {comment.content}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add Comment */}
+                <div className="p-4 border-t flex gap-2">
+                  <Input
+                    placeholder="Add a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newComment.trim()) {
+                        addCommentMutation.mutate({ postId: selectedPost.id, content: newComment.trim() });
+                      }
+                    }}
+                    data-testid="input-new-comment"
+                  />
+                  <Button 
+                    size="sm"
+                    disabled={!newComment.trim() || addCommentMutation.isPending}
+                    onClick={() => {
+                      if (newComment.trim()) {
+                        addCommentMutation.mutate({ postId: selectedPost.id, content: newComment.trim() });
+                      }
+                    }}
+                    data-testid="button-post-comment"
+                  >
+                    Post
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Post Dialog */}
+      <Dialog open={createPostOpen} onOpenChange={setCreatePostOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create Progress Update</DialogTitle>
+            <DialogDescription>
+              Share photos and updates about the project progress. You can add up to 10 images.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                placeholder="e.g., Kitchen Framing Complete"
+                value={newPostTitle}
+                onChange={(e) => setNewPostTitle(e.target.value)}
+                data-testid="input-post-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Caption</label>
+              <Textarea
+                placeholder="Describe the progress update..."
+                value={newPostCaption}
+                onChange={(e) => setNewPostCaption(e.target.value)}
+                className="min-h-[100px]"
+                data-testid="input-post-caption"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Photos ({newPostImages.length}/10)</label>
+              <div className="grid grid-cols-5 gap-2">
+                {newPostImages.map((img, idx) => (
+                  <div key={idx} className="relative aspect-square group">
+                    <img 
+                      src={img} 
+                      alt={`Upload ${idx + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    <button
+                      className="absolute top-1 right-1 bg-black/60 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => setNewPostImages(prev => prev.filter((_, i) => i !== idx))}
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+                {newPostImages.length < 10 && (
+                  <button
+                    onClick={() => postImageInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center hover:border-muted-foreground/50 transition-colors"
+                    data-testid="button-add-post-image"
+                  >
+                    <Plus className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground mt-1">Add</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setCreatePostOpen(false);
+              setNewPostTitle("");
+              setNewPostCaption("");
+              setNewPostImages([]);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (newPostTitle.trim() && newPostImages.length > 0) {
+                  createPostMutation.mutate({
+                    title: newPostTitle.trim(),
+                    caption: newPostCaption.trim(),
+                    images: newPostImages
+                  });
+                }
+              }}
+              disabled={!newPostTitle.trim() || newPostImages.length === 0 || createPostMutation.isPending}
+              data-testid="button-publish-post"
+            >
+              {createPostMutation.isPending ? 'Publishing...' : 'Publish'}
             </Button>
           </DialogFooter>
         </DialogContent>
