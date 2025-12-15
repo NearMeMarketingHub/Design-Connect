@@ -1020,6 +1020,24 @@ export default function ProjectDetails() {
                   </div>
                 )}
                 
+                {/* Quick replies */}
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {['👍', '👎', '✅', '🙏', 'Thanks!', 'Looks great!', 'Sounds good', 'On my way', 'Got it'].map((reply) => (
+                    <Button
+                      key={reply}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-3 text-sm"
+                      onClick={() => {
+                        setMessageText(reply);
+                      }}
+                      data-testid={`quick-reply-${reply}`}
+                    >
+                      {reply}
+                    </Button>
+                  ))}
+                </div>
+                
                 {/* Pending attachment preview */}
                 {pendingAttachment && (
                   <div className="mb-3 flex items-start gap-3 p-2 bg-muted rounded-lg border border-border">
