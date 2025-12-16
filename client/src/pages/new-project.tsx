@@ -100,7 +100,10 @@ export default function NewProject() {
 
   const [formData, setFormData] = useState({
     name: "",
-    address: "",
+    streetAddress1: "",
+    streetAddress2: "",
+    city: "",
+    zipCode: "",
     type: "",
     status: "Planning",
     phase: "Pre-Construction",
@@ -134,8 +137,17 @@ export default function NewProject() {
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      const address = [
+        data.streetAddress1,
+        data.streetAddress2,
+        data.city,
+        "FL",
+        data.zipCode
+      ].filter(Boolean).join(", ");
+      
       const res = await apiRequest("POST", "/api/projects", {
         ...data,
+        address,
         progress: 0,
         budget: data.budget ? parseFloat(data.budget) : null,
         clientId: data.clientId || null,
@@ -194,10 +206,26 @@ export default function NewProject() {
       });
       return;
     }
-    if (!formData.address.trim()) {
+    if (!formData.streetAddress1.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please enter a project address.",
+        description: "Please enter a street address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.city.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a city.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.zipCode.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a zip code.",
         variant: "destructive",
       });
       return;
@@ -318,17 +346,51 @@ export default function NewProject() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address" className="flex items-center gap-2">
+                    <Label htmlFor="streetAddress1" className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
-                      Project Address *
+                      Street Address *
                     </Label>
                     <Input
-                      id="address"
-                      placeholder="e.g., 123 Main Street, City, State 12345"
-                      value={formData.address}
-                      onChange={(e) => handleChange("address", e.target.value)}
-                      data-testid="input-project-address"
+                      id="streetAddress1"
+                      placeholder="e.g., 123 Main Street"
+                      value={formData.streetAddress1}
+                      onChange={(e) => handleChange("streetAddress1", e.target.value)}
+                      data-testid="input-street-address-1"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="streetAddress2">Street Address 2</Label>
+                    <Input
+                      id="streetAddress2"
+                      placeholder="e.g., Suite 100, Unit B"
+                      value={formData.streetAddress2}
+                      onChange={(e) => handleChange("streetAddress2", e.target.value)}
+                      data-testid="input-street-address-2"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City *</Label>
+                      <Input
+                        id="city"
+                        placeholder="e.g., Miami"
+                        value={formData.city}
+                        onChange={(e) => handleChange("city", e.target.value)}
+                        data-testid="input-city"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zipCode">Zip Code *</Label>
+                      <Input
+                        id="zipCode"
+                        placeholder="e.g., 33101"
+                        value={formData.zipCode}
+                        onChange={(e) => handleChange("zipCode", e.target.value)}
+                        data-testid="input-zip-code"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
