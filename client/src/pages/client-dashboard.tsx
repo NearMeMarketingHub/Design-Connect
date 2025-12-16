@@ -22,7 +22,7 @@ import projectImage from "@assets/generated_images/modern_luxury_home_interior_w
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
 export default function ClientDashboard() {
-  const { user } = useAuth();
+  const { user, currentPortal } = useAuth();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const { data: allProjects = [], isLoading } = useQuery<Project[]>({
@@ -34,14 +34,17 @@ export default function ClientDashboard() {
     },
   });
 
-  // Filter projects based on user role
+  // Filter projects based on portal context
   const myProjects = allProjects.filter(p => {
+    // When logged into client portal, only show projects where user is the client
+    if (currentPortal === 'client') {
+      return p.clientId === user?.id;
+    }
+    // When logged into admin/contractor portal, admins see all, contractors see assigned
     if (user?.role === 'admin') {
-      // Admins see all projects
       return true;
     }
-    // Clients only see projects where they're the client
-    return p.clientId === user?.id;
+    return p.contractorId === user?.id;
   });
   const activeProjects = myProjects.filter(p => p.status !== "Completed");
 

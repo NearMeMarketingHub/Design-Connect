@@ -88,7 +88,7 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 export default function ClientProjects() {
-  const { user } = useAuth();
+  const { user, currentPortal } = useAuth();
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -98,17 +98,17 @@ export default function ClientProjects() {
     },
   });
 
-  // Filter projects based on user role
+  // Filter projects based on portal context
   const myProjects = projects.filter(p => {
-    if (user?.role === 'admin') {
-      // Admins see all projects
-      return true;
-    } else if (user?.role === 'client') {
+    // When logged into client portal, only show projects where user is the client
+    if (currentPortal === 'client') {
       return p.clientId === user?.id;
-    } else {
-      // Contractor - show projects they're assigned to
-      return p.contractorId === user?.id;
     }
+    // When logged into admin/contractor portal, admins see all, contractors see assigned
+    if (user?.role === 'admin') {
+      return true;
+    }
+    return p.contractorId === user?.id;
   });
   const activeProjects = myProjects.filter(p => p.status !== 'Completed');
   const completedProjects = myProjects.filter(p => p.status === 'Completed');
