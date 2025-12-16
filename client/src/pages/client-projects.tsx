@@ -1,56 +1,35 @@
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { MapPin, ArrowRight, Calendar, CheckCircle2 } from "lucide-react";
+import { MapPin, ArrowRight, Calendar, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-context";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
-import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
-const PROJECTS = [
-  {
-    id: "jenkins",
-    name: "The Jenkins Residence",
-    address: "123 Maple Avenue",
-    status: "Active",
-    phase: "Phase 3: Rough-in",
-    progress: 45,
-    image: projectImage,
-    nextMilestone: "Drywall Inspection",
-    dueDate: "Jan 15, 2026"
-  },
-  {
-    id: "lakehouse",
-    name: "Lake House Retreat",
-    address: "889 Shoreline Drive",
-    status: "Planning",
-    phase: "Phase 1: Design",
-    progress: 15,
-    image: blueprintImage,
-    nextMilestone: "Permit Approval",
-    dueDate: "Mar 01, 2026"
-  },
-  {
-    id: "loft",
-    name: "Downtown Loft",
-    address: "450 Main St, Unit 4B",
-    status: "Completed",
-    phase: "Handover",
-    progress: 100,
-    image: projectImage,
-    nextMilestone: "Warranty Check",
-    dueDate: "Completed"
-  }
-];
+interface Project {
+  id: string;
+  name: string;
+  address: string;
+  status: string;
+  phase: string;
+  progress: number;
+  nextMilestone: string | null;
+  dueDate: string | null;
+  clientId: string | null;
+  contractorId: string | null;
+}
 
-function ProjectCard({ project }: { project: typeof PROJECTS[0] }) {
+function ProjectCard({ project }: { project: Project }) {
   const isCompleted = project.status === 'Completed';
   
   return (
     <Card className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300" data-testid={`card-project-${project.id}`}>
       <div className="aspect-video relative overflow-hidden">
         <img 
-          src={project.image} 
+          src={projectImage} 
           alt={project.name} 
           className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isCompleted ? 'grayscale-[30%]' : ''}`}
         />
@@ -59,7 +38,8 @@ function ProjectCard({ project }: { project: typeof PROJECTS[0] }) {
           <Badge className={`mb-2 border-0 ${
             project.status === 'Active' ? 'bg-green-500 hover:bg-green-600' :
             project.status === 'Planning' ? 'bg-blue-500 hover:bg-blue-600' :
-            'bg-slate-500 hover:bg-slate-600'
+            project.status === 'Completed' ? 'bg-slate-500 hover:bg-slate-600' :
+            'bg-orange-500 hover:bg-orange-600'
           }`}>
             {project.status}
           </Badge>
@@ -83,14 +63,14 @@ function ProjectCard({ project }: { project: typeof PROJECTS[0] }) {
               <CheckCircle2 className="w-4 h-4 text-primary mt-0.5" />
               <div>
                 <p className="text-xs text-muted-foreground">{isCompleted ? 'Final Status' : 'Next Milestone'}</p>
-                <p className="text-sm font-medium">{project.nextMilestone}</p>
+                <p className="text-sm font-medium">{project.nextMilestone || 'Not set'}</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <Calendar className="w-4 h-4 text-primary mt-0.5" />
               <div>
                 <p className="text-xs text-muted-foreground">{isCompleted ? 'Completion' : 'Target Date'}</p>
-                <p className="text-sm font-medium">{project.dueDate}</p>
+                <p className="text-sm font-medium">{project.dueDate || 'Not set'}</p>
               </div>
             </div>
           </div>
@@ -108,8 +88,35 @@ function ProjectCard({ project }: { project: typeof PROJECTS[0] }) {
 }
 
 export default function ClientProjects() {
-  const activeProjects = PROJECTS.filter(p => p.status !== 'Completed');
-  const completedProjects = PROJECTS.filter(p => p.status === 'Completed');
+  const { user } = useAuth();
+
+  const { data: projects = [], isLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/projects");
+      return res.json();
+    },
+  });
+
+  // Filter projects based on user role
+  const myProjects = projects.filter(p => {
+    if (user?.role === 'client') {
+      return p.clientId === user?.id;
+    } else {
+      // Contractor or admin - show projects they're assigned to
+      return p.contractorId === user?.id;
+    }
+  });
+  const activeProjects = myProjects.filter(p => p.status !== 'Completed');
+  const completedProjects = myProjects.filter(p => p.status === 'Completed');
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -118,26 +125,40 @@ export default function ClientProjects() {
         <p className="text-muted-foreground mt-1">View and manage all your properties.</p>
       </div>
 
-      {/* Active Projects */}
-      <section>
-        <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Current Projects</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      </section>
+      {myProjects.length === 0 ? (
+        <Card className="p-12 text-center">
+          <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No Projects Yet</h3>
+          <p className="text-muted-foreground">
+            {user?.role === 'client' 
+              ? "You don't have any projects assigned to you yet. Your contractor will add you to a project soon."
+              : "You don't have any projects assigned to you yet. Create a new project to get started."}
+          </p>
+        </Card>
+      ) : (
+        <>
+          {activeProjects.length > 0 && (
+            <section>
+              <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Current Projects</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeProjects.map((project) => (
+                  <ProjectCard key={project.id} project={project} />
+                ))}
+              </div>
+            </section>
+          )}
 
-      {/* Completed Projects */}
-      {completedProjects.length > 0 && (
-        <section>
-          <h2 className="text-xl font-heading font-semibold text-muted-foreground mb-4">Completed Projects</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {completedProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
-            ))}
-          </div>
-        </section>
+          {completedProjects.length > 0 && (
+            <section>
+              <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Completed Projects</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {completedProjects.map((project) => (
+                  <ProjectCard key={project.id} project={project} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );
