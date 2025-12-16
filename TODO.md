@@ -21,55 +21,29 @@ Last Updated: December 16, 2025
 
 ## 🔲 Pending
 
-### Contractor Side
+### Admin Side
+- [ ] Contractors Sandbox
 
-#### Budget Estimator
+### Contractor Side
 - [ ] Build contractor-facing calculator using admin-managed pricing data
-- [ ] Allow contractors to select categories and enter quantities
-- [ ] Auto-calculate totals from `budget_items` table
 - [ ] Floor Calculator for room-based square footage calculations
 - [ ] Generate estimate summaries that can be attached to projects
-
-#### Contractor Dashboard & Features
-- [ ] Contractor Dashboard page (currently "Coming Soon")
-- [ ] Contractors Sandbox - testing environment for contractor features
-- [ ] Progress Photos - build out post feature for uploading progress photos
-- [ ] Plans and Drawings section for contractors
-
-#### Document Upload from Contractor Side
-- [ ] Ability to choose when uploading a document whether it needs to be signed or just documented in the system
-
----
+- [ ] Building out the post feature for the progress photos on the contractors side of the app
+- [ ] Plans and Drawings section for Contractor
+- [ ] The ability to choose when uploading a document from the contractor side, whether it needs to be signed or its just being uploaded to have documented in the system
 
 ### Client Side
-
-#### Dashboard Connections (after contractor side is done)
-- [ ] Action Required section - build out once contractor page is complete
-- [ ] Stats Card - connect with data from contractor side
-- [ ] Recent Updates Card - connect with data from contractor side
-
-#### Documents Tab Reorganization
-- [ ] Split documents tab into multiple tabs or sub-tabs:
-  - Contracts
-  - Plans and Drawings
-  - Permits and Approvals
-  - Invoices and Payments
-  - Warranties and Manuals
-
-#### Plans and Drawings
-- [ ] Plans and Drawings section for clients
-
----
+- [ ] Action required section in the client side to be built out once contractor page is done
+- [ ] Stats card in the client page to connect with data completed in the contractor side
+- [ ] Recent Updates card in the client page to connect with data completed in the contractor side
+- [ ] Splitting up the documents tab in the client side to either have multiple tabs, or multiple tabs within the document tabs for Contracts, Plans and Drawings, Permits and Approvals, Invoices and Payments, and Warranties and Manuals
+- [ ] Plans and Drawings section for Client
 
 ### Integrations
+- [ ] Implementing Docusign
 
-#### DocuSign
-- [ ] Implement DocuSign for digital signatures
-
----
-
-### Branding & Final Touches
-- [ ] Change logo and app name when project is completed
+### Branding
+- [ ] Changing the logo and app name when completed
 
 ---
 
@@ -78,4 +52,3 @@ Last Updated: December 16, 2025
 - Skip Sub List (Sheet 3) from Excel - only implement Labor_Budget and Floor Calculator
 - Admin credentials: Username "Ciaadz697"
 - Database has 936 budget items imported from Excel
-- Client-side features depend on contractor-side data being completed first
