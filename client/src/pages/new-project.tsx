@@ -25,7 +25,6 @@ const PROJECT_TYPES = [
 const PROJECT_STATUSES = [
   "Planning",
   "Active",
-  "In Progress",
   "On Hold",
   "Completed",
 ];
@@ -43,14 +42,8 @@ const STATUS_PHASES: Record<string, string[]> = {
     "Insulation",
     "Drywall",
     "Finishing",
-  ],
-  "In Progress": [
-    "Foundation",
-    "Framing",
-    "Rough-in",
-    "Insulation",
-    "Drywall",
-    "Finishing",
+    "Final Inspection",
+    "Handover",
   ],
   "On Hold": [
     "Pre-Construction",
@@ -62,10 +55,11 @@ const STATUS_PHASES: Record<string, string[]> = {
     "Insulation",
     "Drywall",
     "Finishing",
-  ],
-  "Completed": [
     "Final Inspection",
     "Handover",
+  ],
+  "Completed": [
+    "Project Complete",
   ],
 };
 
@@ -81,6 +75,7 @@ const ALL_PHASES = [
   "Finishing",
   "Final Inspection",
   "Handover",
+  "Project Complete",
 ];
 
 export default function NewProject() {
