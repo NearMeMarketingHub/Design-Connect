@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { HardHat, ArrowRight, ArrowLeft, Shield } from "lucide-react";
+import { HardHat, ArrowRight, ArrowLeft, Shield, Eye, EyeOff } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function AdminLogin() {
   const [_, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, logout } = useAuth();
   const { toast } = useToast();
 
@@ -84,14 +85,26 @@ export default function AdminLogin() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="admin-password">Password</Label>
-                <Input 
-                  id="admin-password" 
-                  name="admin-password"
-                  type="password" 
-                  placeholder="••••••••" 
-                  required 
-                  data-testid="input-admin-password"
-                />
+                <div className="relative">
+                  <Input 
+                    id="admin-password" 
+                    name="admin-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••" 
+                    required 
+                    data-testid="input-admin-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    data-testid="button-toggle-password"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
