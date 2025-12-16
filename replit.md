@@ -91,9 +91,4 @@ Key data models include:
 
 ## Future Tasks
 
-### Budget Estimator - Contractor Side
-- Build contractor-facing calculator using the admin-managed pricing data
-- Allow contractors to create estimates by selecting categories and entering quantities
-- Auto-calculate totals based on pricing from budget_items table
-- Include Floor Calculator for room-based square footage calculations
-- Generate estimate summaries that can be attached to projects
+See `TODO.md` in the project root for the complete, up-to-date task list.
