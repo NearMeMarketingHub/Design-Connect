@@ -14,6 +14,7 @@ import TimelinePage from "@/pages/timeline";
 import SalesDashboard from "@/pages/sales-dashboard";
 import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
+import NewProject from "@/pages/new-project";
 import ClientProjects from "@/pages/client-projects";
 import SettingsPage from "@/pages/settings";
 import AdminLogin from "@/pages/admin-login";
@@ -76,6 +77,7 @@ function Router() {
         {/* Accounting & Invoicing */}
         <Route path="/accounting" component={AccountingDashboard} />
         <Route path="/create-invoice" component={CreateInvoice} />
+        <Route path="/new-project" component={NewProject} />
 
         {/* Projects & Operations */}
         <Route path="/project/:id" component={ProjectDetails} />
