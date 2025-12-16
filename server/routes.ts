@@ -662,5 +662,119 @@ export async function registerRoutes(
     }
   });
 
+  // Budget Category routes - Admin only
+  app.get("/api/budget/categories", requireAdmin, async (req, res, next) => {
+    try {
+      const categories = await storage.getBudgetCategories();
+      res.json(categories);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/budget/categories/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const category = await storage.getBudgetCategory(req.params.id);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      const items = await storage.getBudgetItems(req.params.id);
+      res.json({ ...category, items });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/budget/categories", requireAdmin, async (req, res, next) => {
+    try {
+      const category = await storage.createBudgetCategory(req.body);
+      res.json(category);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/budget/categories/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const category = await storage.updateBudgetCategory(req.params.id, req.body);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/budget/categories/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteBudgetCategory(req.params.id);
+      res.json({ message: "Category deleted" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Budget Item routes - Admin only
+  app.get("/api/budget/categories/:categoryId/items", requireAdmin, async (req, res, next) => {
+    try {
+      const items = await storage.getBudgetItems(req.params.categoryId);
+      res.json(items);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/budget/items", requireAdmin, async (req, res, next) => {
+    try {
+      const items = await storage.getAllBudgetItems();
+      res.json(items);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/budget/items/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const item = await storage.getBudgetItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/budget/items", requireAdmin, async (req, res, next) => {
+    try {
+      const item = await storage.createBudgetItem(req.body);
+      res.json(item);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/budget/items/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const item = await storage.updateBudgetItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/budget/items/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteBudgetItem(req.params.id);
+      res.json({ message: "Item deleted" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }
