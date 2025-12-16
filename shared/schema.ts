@@ -254,3 +254,21 @@ export const budgetItems = pgTable("budget_items", {
 export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({ id: true });
 export type InsertBudgetItem = z.infer<typeof insertBudgetItemSchema>;
 export type BudgetItem = typeof budgetItems.$inferSelect;
+
+// Project invites for client invitation system
+export const projectInvites = pgTable("project_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  clientName: text("client_name"),
+  status: text("status").notNull().default("pending"), // pending, accepted, expired
+  invitedBy: varchar("invited_by").references(() => users.id),
+  invitedUserId: varchar("invited_user_id").references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectInviteSchema = createInsertSchema(projectInvites).omit({ id: true, createdAt: true });
+export type InsertProjectInvite = z.infer<typeof insertProjectInviteSchema>;
+export type ProjectInvite = typeof projectInvites.$inferSelect;

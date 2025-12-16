@@ -18,7 +18,8 @@ import type {
   PostComment, InsertPostComment,
   PostReaction, InsertPostReaction,
   BudgetCategory, InsertBudgetCategory,
-  BudgetItem, InsertBudgetItem
+  BudgetItem, InsertBudgetItem,
+  ProjectInvite, InsertProjectInvite
 } from "@shared/schema";
 
 export interface IStorage {
@@ -119,6 +120,13 @@ export interface IStorage {
   createBudgetItem(item: InsertBudgetItem): Promise<BudgetItem>;
   updateBudgetItem(id: string, item: Partial<InsertBudgetItem>): Promise<BudgetItem | undefined>;
   deleteBudgetItem(id: string): Promise<void>;
+
+  // Project invite methods
+  createProjectInvite(invite: InsertProjectInvite): Promise<ProjectInvite>;
+  getProjectInviteByToken(token: string): Promise<ProjectInvite | undefined>;
+  getProjectInvitesByProjectId(projectId: string): Promise<ProjectInvite[]>;
+  updateProjectInvite(id: string, data: Partial<InsertProjectInvite>): Promise<ProjectInvite | undefined>;
+  acceptProjectInvite(token: string, userId: string): Promise<ProjectInvite | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -647,6 +655,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBudgetItem(id: string): Promise<void> {
     await db.delete(schema.budgetItems).where(eq(schema.budgetItems.id, id));
+  }
+
+  // Project invite methods
+  async createProjectInvite(insertInvite: InsertProjectInvite): Promise<ProjectInvite> {
+    const [invite] = await db.insert(schema.projectInvites).values(insertInvite).returning();
+    return invite;
+  }
+
+  async getProjectInviteByToken(token: string): Promise<ProjectInvite | undefined> {
+    const [invite] = await db.select().from(schema.projectInvites).where(eq(schema.projectInvites.token, token));
+    return invite;
+  }
+
+  async getProjectInvitesByProjectId(projectId: string): Promise<ProjectInvite[]> {
+    return await db.select().from(schema.projectInvites).where(eq(schema.projectInvites.projectId, projectId));
+  }
+
+  async updateProjectInvite(id: string, updateData: Partial<InsertProjectInvite>): Promise<ProjectInvite | undefined> {
+    const [invite] = await db.update(schema.projectInvites).set(updateData).where(eq(schema.projectInvites.id, id)).returning();
+    return invite;
+  }
+
+  async acceptProjectInvite(token: string, userId: string): Promise<ProjectInvite | undefined> {
+    const [invite] = await db.update(schema.projectInvites)
+      .set({ status: "accepted", invitedUserId: userId })
+      .where(eq(schema.projectInvites.token, token))
+      .returning();
+    return invite;
   }
 }
 

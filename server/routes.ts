@@ -869,5 +869,154 @@ export async function registerRoutes(
     }
   });
 
+  // Project Invite routes
+  const crypto = await import("crypto");
+  const { sendProjectInviteEmail } = await import("./email");
+
+  // Create invite and send email
+  app.post("/api/projects/:projectId/invite", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const { email, clientName } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Generate unique token
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      // Create invite record
+      const invite = await storage.createProjectInvite({
+        projectId: req.params.projectId,
+        email,
+        token,
+        clientName,
+        status: "pending",
+        invitedBy: user.id,
+        expiresAt,
+      });
+
+      // Send invite email
+      try {
+        await sendProjectInviteEmail(email, {
+          projectName: project.name,
+          contractorName: user.name || user.username,
+          inviteToken: token,
+          clientName,
+        });
+      } catch (emailError) {
+        console.error("Failed to send email:", emailError);
+        // Still return success - invite was created
+      }
+
+      res.json({ message: "Invitation sent successfully", invite: { id: invite.id, email, status: invite.status } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get invites for a project
+  app.get("/api/projects/:projectId/invites", requireAuth, async (req, res, next) => {
+    try {
+      const invites = await storage.getProjectInvitesByProjectId(req.params.projectId);
+      res.json(invites);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get invite by token (public - for accepting invites)
+  app.get("/api/invites/:token", async (req, res, next) => {
+    try {
+      const invite = await storage.getProjectInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ message: "Invalid or expired invitation" });
+      }
+
+      if (new Date() > invite.expiresAt) {
+        return res.status(400).json({ message: "This invitation has expired" });
+      }
+
+      if (invite.status !== "pending") {
+        return res.status(400).json({ message: "This invitation has already been used" });
+      }
+
+      // Get project info
+      const project = invite.projectId ? await storage.getProject(invite.projectId) : null;
+
+      res.json({
+        email: invite.email,
+        clientName: invite.clientName,
+        projectName: project?.name,
+        projectId: invite.projectId,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Accept invite and create account
+  app.post("/api/invites/:token/accept", async (req, res, next) => {
+    try {
+      const { username, password, name } = req.body;
+
+      const invite = await storage.getProjectInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ message: "Invalid invitation" });
+      }
+
+      if (new Date() > invite.expiresAt) {
+        return res.status(400).json({ message: "This invitation has expired" });
+      }
+
+      if (invite.status !== "pending") {
+        return res.status(400).json({ message: "This invitation has already been used" });
+      }
+
+      // Check if username exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+
+      // Create new client account
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newUser = await storage.createUser({
+        username,
+        email: invite.email,
+        password: hashedPassword,
+        role: "client",
+        name: name || invite.clientName,
+        isApproved: true,
+      });
+
+      // Update invite as accepted
+      await storage.acceptProjectInvite(req.params.token, newUser.id);
+
+      // Assign user to project
+      if (invite.projectId) {
+        await storage.updateProject(invite.projectId, { clientId: newUser.id });
+      }
+
+      // Log user in
+      req.login(newUser, (err) => {
+        if (err) {
+          return next(err);
+        }
+        const { password: _, ...userWithoutPassword } = newUser;
+        return res.json({ user: userWithoutPassword, message: "Account created successfully" });
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }

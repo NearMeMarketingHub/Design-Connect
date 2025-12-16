@@ -25,6 +25,7 @@ import SandboxMessages from "@/pages/sandbox-messages";
 import SandboxDocuments from "@/pages/sandbox-documents";
 import SandboxPhotos from "@/pages/sandbox-photos";
 import BudgetAdmin from "@/pages/budget-admin";
+import AcceptInvite from "@/pages/accept-invite";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -36,6 +37,16 @@ function Router() {
   
   if (location === "/admin-login") {
     return <AdminLogin />;
+  }
+  
+  // Accept invite page - doesn't require auth or layout
+  if (location.startsWith("/invite/")) {
+    return (
+      <Switch>
+        <Route path="/invite/:token" component={AcceptInvite} />
+        <Route component={NotFound} />
+      </Switch>
+    );
   }
   
   // Super Admin Dashboard has its own header, so render without Layout

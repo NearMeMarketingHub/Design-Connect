@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText } from "lucide-react";
+import { ArrowLeft, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText, Mail, UserPlus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -100,6 +101,12 @@ export default function NewProject() {
     dueDate: "",
   });
 
+  const [clientMode, setClientMode] = useState<"existing" | "invite">("existing");
+  const [inviteData, setInviteData] = useState({
+    email: "",
+    clientName: "",
+  });
+
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/users/clients"],
     queryFn: async () => {
@@ -118,12 +125,34 @@ export default function NewProject() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (project) => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      toast({
-        title: "Project Created",
-        description: "Your new project has been created successfully.",
-      });
+      
+      // If invite mode and email provided, send invite
+      if (clientMode === "invite" && inviteData.email) {
+        try {
+          await apiRequest("POST", `/api/projects/${project.id}/invite`, {
+            email: inviteData.email,
+            clientName: inviteData.clientName,
+          });
+          toast({
+            title: "Project Created & Invite Sent",
+            description: `Project created and invitation sent to ${inviteData.email}`,
+          });
+        } catch (inviteError) {
+          toast({
+            title: "Project Created",
+            description: "Project created but failed to send invite. You can send it later.",
+            variant: "default",
+          });
+        }
+      } else {
+        toast({
+          title: "Project Created",
+          description: "Your new project has been created successfully.",
+        });
+      }
+      
       setLocation("/admin-dashboard");
     },
     onError: (error: Error) => {
@@ -374,27 +403,71 @@ export default function NewProject() {
                   <User className="w-5 h-5" />
                   Client
                 </CardTitle>
-                <CardDescription>Assign to a client</CardDescription>
+                <CardDescription>Assign to an existing client or invite a new one</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="client">Select Client</Label>
-                  <Select value={formData.clientId} onValueChange={(v) => handleChange("clientId", v)}>
-                    <SelectTrigger data-testid="select-client">
-                      <SelectValue placeholder="Choose a client (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client: { id: string; name: string; username: string }) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name || client.username}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    You can assign a client later if needed
-                  </p>
-                </div>
+                <Tabs value={clientMode} onValueChange={(v) => setClientMode(v as "existing" | "invite")}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="existing" data-testid="tab-existing-client">
+                      <User className="w-4 h-4 mr-2" />
+                      Existing
+                    </TabsTrigger>
+                    <TabsTrigger value="invite" data-testid="tab-invite-client">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Invite New
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="existing" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="client">Select Client</Label>
+                      <Select value={formData.clientId} onValueChange={(v) => handleChange("clientId", v)}>
+                        <SelectTrigger data-testid="select-client">
+                          <SelectValue placeholder="Choose a client (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client: { id: string; name: string; username: string }) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name || client.username}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        You can assign a client later if needed
+                      </p>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="invite" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="clientName">Client Name</Label>
+                      <Input
+                        id="clientName"
+                        placeholder="John Smith"
+                        value={inviteData.clientName}
+                        onChange={(e) => setInviteData(prev => ({ ...prev, clientName: e.target.value }))}
+                        data-testid="input-client-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientEmail">Client Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="clientEmail"
+                          type="email"
+                          placeholder="client@example.com"
+                          className="pl-10"
+                          value={inviteData.email}
+                          onChange={(e) => setInviteData(prev => ({ ...prev, email: e.target.value }))}
+                          data-testid="input-client-email"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        An invitation will be sent after the project is created
+                      </p>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
 
