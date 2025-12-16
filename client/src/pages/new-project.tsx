@@ -525,12 +525,12 @@ export default function NewProject() {
               <CardHeader>
                 <CardTitle>Customize Phase Milestones</CardTitle>
                 <CardDescription>
-                  Add, remove, or rename milestones for each phase. These will be used to track progress.
+                  Add, remove, or rename milestones for each phase. These will be used to track progress throughout the project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {availablePhases.map((phase) => (
+                  {ALL_PHASES.map((phase) => (
                     <div key={phase} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-medium text-lg">{phase}</h4>
