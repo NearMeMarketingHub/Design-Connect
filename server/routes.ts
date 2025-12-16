@@ -660,10 +660,15 @@ export async function registerRoutes(
   });
 
   // Get clients for project assignment (contractors can also use this)
+  // Excludes sandbox clients by default
   app.get("/api/users/clients", requireAuth, async (req, res, next) => {
     try {
+      const includeSandbox = req.query.includeSandbox === "true";
       const clients = await storage.getUsersByRole("client");
-      res.json(clients.map(c => ({ id: c.id, name: c.name, username: c.username })));
+      const filteredClients = includeSandbox 
+        ? clients 
+        : clients.filter(c => !c.isSandbox);
+      res.json(filteredClients.map(c => ({ id: c.id, name: c.name, username: c.username })));
     } catch (error) {
       next(error);
     }

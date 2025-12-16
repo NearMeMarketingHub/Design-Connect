@@ -29,7 +29,46 @@ const PROJECT_STATUSES = [
   "Completed",
 ];
 
-const PROJECT_PHASES = [
+const STATUS_PHASES: Record<string, string[]> = {
+  "Planning": [
+    "Pre-Construction",
+    "Design",
+    "Permitting",
+  ],
+  "Active": [
+    "Foundation",
+    "Framing",
+    "Rough-in",
+    "Insulation",
+    "Drywall",
+    "Finishing",
+  ],
+  "In Progress": [
+    "Foundation",
+    "Framing",
+    "Rough-in",
+    "Insulation",
+    "Drywall",
+    "Finishing",
+  ],
+  "On Hold": [
+    "Pre-Construction",
+    "Design",
+    "Permitting",
+    "Foundation",
+    "Framing",
+    "Rough-in",
+    "Insulation",
+    "Drywall",
+    "Finishing",
+  ],
+  "Completed": [
+    "Final Inspection",
+    "Handover",
+  ],
+};
+
+const ALL_PHASES = [
   "Pre-Construction",
   "Design",
   "Permitting",
@@ -126,7 +165,19 @@ export default function NewProject() {
   };
 
   const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const newData = { ...prev, [field]: value };
+      
+      // When status changes, reset phase if current phase is not valid for new status
+      if (field === "status") {
+        const validPhases = STATUS_PHASES[value] || ALL_PHASES;
+        if (!validPhases.includes(prev.phase)) {
+          newData.phase = validPhases[0] || "";
+        }
+      }
+      
+      return newData;
+    });
   };
 
   return (
@@ -250,13 +301,16 @@ export default function NewProject() {
                         <SelectValue placeholder="Select phase" />
                       </SelectTrigger>
                       <SelectContent>
-                        {PROJECT_PHASES.map((phase) => (
+                        {(STATUS_PHASES[formData.status] || ALL_PHASES).map((phase: string) => (
                           <SelectItem key={phase} value={phase}>
                             {phase}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Phases shown are based on the selected status
+                    </p>
                   </div>
                 </div>
 
