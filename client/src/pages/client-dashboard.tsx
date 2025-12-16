@@ -34,8 +34,15 @@ export default function ClientDashboard() {
     },
   });
 
-  // Filter to only show projects where this client is attached
-  const myProjects = allProjects.filter(p => p.clientId === user?.id);
+  // Filter projects based on user role
+  const myProjects = allProjects.filter(p => {
+    if (user?.role === 'admin') {
+      // Admins see all projects
+      return true;
+    }
+    // Clients only see projects where they're the client
+    return p.clientId === user?.id;
+  });
   const activeProjects = myProjects.filter(p => p.status !== "Completed");
 
   // Set default selected project when data loads
