@@ -16,7 +16,9 @@ import type {
   Message, InsertMessage,
   ProgressPost, InsertProgressPost,
   PostComment, InsertPostComment,
-  PostReaction, InsertPostReaction
+  PostReaction, InsertPostReaction,
+  BudgetCategory, InsertBudgetCategory,
+  BudgetItem, InsertBudgetItem
 } from "@shared/schema";
 
 export interface IStorage {
@@ -98,6 +100,21 @@ export interface IStorage {
   getSandboxData(): Promise<{ client: User | null; contractor: User | null; project: Project | null }>;
   initializeSandbox(admin: User): Promise<{ client: User; contractor: User; project: Project }>;
   resetSandbox(): Promise<void>;
+
+  // Budget category methods
+  getBudgetCategories(): Promise<BudgetCategory[]>;
+  getBudgetCategory(id: string): Promise<BudgetCategory | undefined>;
+  createBudgetCategory(category: InsertBudgetCategory): Promise<BudgetCategory>;
+  updateBudgetCategory(id: string, category: Partial<InsertBudgetCategory>): Promise<BudgetCategory | undefined>;
+  deleteBudgetCategory(id: string): Promise<void>;
+
+  // Budget item methods
+  getBudgetItems(categoryId: string): Promise<BudgetItem[]>;
+  getAllBudgetItems(): Promise<BudgetItem[]>;
+  getBudgetItem(id: string): Promise<BudgetItem | undefined>;
+  createBudgetItem(item: InsertBudgetItem): Promise<BudgetItem>;
+  updateBudgetItem(id: string, item: Partial<InsertBudgetItem>): Promise<BudgetItem | undefined>;
+  deleteBudgetItem(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -544,6 +561,59 @@ export class DatabaseStorage implements IStorage {
     
     // Delete sandbox users
     await db.delete(schema.users).where(eq(schema.users.isSandbox, true));
+  }
+
+  // Budget category methods
+  async getBudgetCategories(): Promise<BudgetCategory[]> {
+    return await db.select().from(schema.budgetCategories).orderBy(schema.budgetCategories.displayOrder);
+  }
+
+  async getBudgetCategory(id: string): Promise<BudgetCategory | undefined> {
+    const [category] = await db.select().from(schema.budgetCategories).where(eq(schema.budgetCategories.id, id));
+    return category;
+  }
+
+  async createBudgetCategory(insertCategory: InsertBudgetCategory): Promise<BudgetCategory> {
+    const [category] = await db.insert(schema.budgetCategories).values(insertCategory).returning();
+    return category;
+  }
+
+  async updateBudgetCategory(id: string, updateData: Partial<InsertBudgetCategory>): Promise<BudgetCategory | undefined> {
+    const [category] = await db.update(schema.budgetCategories).set(updateData).where(eq(schema.budgetCategories.id, id)).returning();
+    return category;
+  }
+
+  async deleteBudgetCategory(id: string): Promise<void> {
+    await db.delete(schema.budgetItems).where(eq(schema.budgetItems.categoryId, id));
+    await db.delete(schema.budgetCategories).where(eq(schema.budgetCategories.id, id));
+  }
+
+  // Budget item methods
+  async getBudgetItems(categoryId: string): Promise<BudgetItem[]> {
+    return await db.select().from(schema.budgetItems).where(eq(schema.budgetItems.categoryId, categoryId)).orderBy(schema.budgetItems.displayOrder);
+  }
+
+  async getAllBudgetItems(): Promise<BudgetItem[]> {
+    return await db.select().from(schema.budgetItems).orderBy(schema.budgetItems.displayOrder);
+  }
+
+  async getBudgetItem(id: string): Promise<BudgetItem | undefined> {
+    const [item] = await db.select().from(schema.budgetItems).where(eq(schema.budgetItems.id, id));
+    return item;
+  }
+
+  async createBudgetItem(insertItem: InsertBudgetItem): Promise<BudgetItem> {
+    const [item] = await db.insert(schema.budgetItems).values(insertItem).returning();
+    return item;
+  }
+
+  async updateBudgetItem(id: string, updateData: Partial<InsertBudgetItem>): Promise<BudgetItem | undefined> {
+    const [item] = await db.update(schema.budgetItems).set(updateData).where(eq(schema.budgetItems.id, id)).returning();
+    return item;
+  }
+
+  async deleteBudgetItem(id: string): Promise<void> {
+    await db.delete(schema.budgetItems).where(eq(schema.budgetItems.id, id));
   }
 }
 
