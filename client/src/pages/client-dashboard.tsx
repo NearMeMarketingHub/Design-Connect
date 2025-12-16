@@ -23,7 +23,7 @@ import blueprintImage from "@assets/generated_images/construction_blueprints_and
 
 export default function ClientDashboard() {
   const { user } = useAuth();
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const { data: allProjects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -59,9 +59,7 @@ export default function ClientDashboard() {
 
   // Helper to format address
   const formatAddress = (project: Project) => {
-    const parts = [project.streetAddress1];
-    if (project.city) parts.push(project.city);
-    return parts.join(", ");
+    return project.address || "No address";
   };
 
   if (isLoading) {
@@ -114,7 +112,7 @@ export default function ClientDashboard() {
           <div className="w-full md:w-64">
             <Select 
               value={selectedProjectId?.toString()} 
-              onValueChange={(v) => setSelectedProjectId(parseInt(v))}
+              onValueChange={(v) => setSelectedProjectId(v)}
             >
               <SelectTrigger data-testid="select-project">
                 <SelectValue placeholder="Select Project" />
@@ -164,7 +162,7 @@ export default function ClientDashboard() {
               </div>
               
               <p className="text-white/80 max-w-xl mb-6 leading-relaxed">
-                {selectedProject.description || `Your ${selectedProject.projectType?.toLowerCase() || 'project'} is currently in the ${selectedProject.phase} phase.`}
+                {selectedProject.description || `Your ${selectedProject.type?.toLowerCase() || 'project'} is currently in the ${selectedProject.phase} phase.`}
               </p>
               
               <div className="flex items-center gap-6 p-4 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
@@ -270,7 +268,7 @@ export default function ClientDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Project Type</p>
-              <h3 className="text-lg font-bold">{selectedProject.projectType || 'N/A'}</h3>
+              <h3 className="text-lg font-bold">{selectedProject.type || 'N/A'}</h3>
             </div>
           </CardContent>
         </Card>
@@ -287,12 +285,7 @@ export default function ClientDashboard() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Address</p>
-                <p className="font-medium">
-                  {selectedProject.streetAddress1}
-                  {selectedProject.streetAddress2 && <>, {selectedProject.streetAddress2}</>}
-                  <br />
-                  {selectedProject.city}, FL {selectedProject.zipCode}
-                </p>
+                <p className="font-medium">{selectedProject.address}</p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Current Status</p>
