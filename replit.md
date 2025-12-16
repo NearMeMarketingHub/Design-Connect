@@ -52,6 +52,15 @@ Key data models include:
 - Password hashing with bcryptjs
 - Role-based access control (client vs contractor/admin views)
 - Protected API routes that return user context
+- Portal-based login validation:
+  - Clients can only log in through Client Portal
+  - Contractors can only log in through Contractor Portal
+  - Admins can access any portal
+- Contractor approval workflow:
+  - New contractors register with `isApproved: false`
+  - Contractors cannot log in until approved by admin
+  - Super Admin dashboard shows pending contractors for approval/rejection
+- Portal context tracking in auth-context for navigation (stored in sessionStorage)
 
 ### Build & Development
 - Development: Vite dev server with HMR proxied through Express

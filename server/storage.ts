@@ -95,6 +95,10 @@ export interface IStorage {
   // Admin methods
   getUsersByRole(role: string): Promise<User[]>;
   getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string })[]>;
+  getPendingContractors(): Promise<User[]>;
+  approveContractor(id: string): Promise<User | undefined>;
+  rejectContractor(id: string): Promise<void>;
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
 
   // Sandbox methods
   getSandboxData(): Promise<{ client: User | null; contractor: User | null; project: Project | null }>;
@@ -398,6 +402,35 @@ export class DatabaseStorage implements IStorage {
       })
     );
     return projectsWithDetails;
+  }
+
+  async getPendingContractors(): Promise<User[]> {
+    return await db.select().from(schema.users).where(
+      and(
+        eq(schema.users.role, "contractor"),
+        eq(schema.users.isApproved, false)
+      )
+    );
+  }
+
+  async approveContractor(id: string): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set({ isApproved: true })
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
+  }
+
+  async rejectContractor(id: string): Promise<void> {
+    await db.delete(schema.users).where(eq(schema.users.id, id));
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db.update(schema.users)
+      .set(data)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
   }
 
   // Sandbox methods

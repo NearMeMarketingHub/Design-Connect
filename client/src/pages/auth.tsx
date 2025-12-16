@@ -28,7 +28,7 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("email") as string;
-        await login(loginId, password);
+        await login(loginId, password, "client");
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
@@ -73,7 +73,7 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("admin-email") as string;
-        await login(loginId, password);
+        await login(loginId, password, "contractor");
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
@@ -91,12 +91,21 @@ export default function AuthPage() {
           throw new Error("Passwords do not match");
         }
 
-        await register(username, email, password, "contractor", `${firstName} ${lastName} - ${companyName}`);
-        toast({
-          title: "Account created!",
-          description: "Welcome to BuildVision.",
-        });
-        setLocation("/admin-dashboard");
+        const result = await register(username, email, password, "contractor", `${firstName} ${lastName} - ${companyName}`);
+        
+        if (result.pendingApproval) {
+          toast({
+            title: "Account Created",
+            description: result.message || "Your account is pending admin approval. You will be notified when approved.",
+          });
+          setIsLogin(true);
+        } else {
+          toast({
+            title: "Account created!",
+            description: "Welcome to BuildVision.",
+          });
+          setLocation("/admin-dashboard");
+        }
       }
     } catch (error: any) {
       toast({

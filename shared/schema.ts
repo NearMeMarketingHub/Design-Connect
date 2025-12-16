@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("client"),
   name: text("name"),
   isSandbox: boolean("is_sandbox").default(false),
+  isApproved: boolean("is_approved").default(true),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });

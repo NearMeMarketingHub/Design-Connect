@@ -5,9 +5,11 @@ import { api } from "./api";
 interface AuthContextType {
   user: Omit<User, "password"> | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<Omit<User, "password">>;
-  register: (username: string, email: string, password: string, role: string, name?: string) => Promise<void>;
+  currentPortal: 'client' | 'contractor' | 'admin' | null;
+  login: (username: string, password: string, portal: 'client' | 'contractor' | 'admin') => Promise<Omit<User, "password">>;
+  register: (username: string, email: string, password: string, role: string, name?: string) => Promise<{ pendingApproval?: boolean; message?: string }>;
   logout: () => Promise<void>;
+  setPortal: (portal: 'client' | 'contractor' | 'admin') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +17,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Omit<User, "password"> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPortal, setCurrentPortal] = useState<'client' | 'contractor' | 'admin' | null>(() => {
+    // Restore portal from session storage
+    const stored = sessionStorage.getItem('currentPortal');
+    return stored as 'client' | 'contractor' | 'admin' | null;
+  });
 
   useEffect(() => {
     checkAuth();
@@ -23,7 +30,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     try {
       const result = await api.getCurrentUser();
-      setUser(result.user || null);
+      const fetchedUser = result.user || null;
+      
+      // If user is an unapproved contractor, treat as not authenticated
+      if (fetchedUser && fetchedUser.role === 'contractor' && !fetchedUser.isApproved) {
+        setUser(null);
+        // Clear the session on server side
+        await api.logout().catch(() => {});
+      } else {
+        setUser(fetchedUser);
+      }
     } catch (error) {
       setUser(null);
     } finally {
@@ -31,24 +47,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (username: string, password: string) => {
-    const { user } = await api.login(username, password);
+  const setPortal = (portal: 'client' | 'contractor' | 'admin') => {
+    setCurrentPortal(portal);
+    sessionStorage.setItem('currentPortal', portal);
+  };
+
+  const login = async (username: string, password: string, portal: 'client' | 'contractor' | 'admin') => {
+    const { user } = await api.login(username, password, portal);
     setUser(user);
+    setPortal(portal);
     return user;
   };
 
   const register = async (username: string, email: string, password: string, role: string, name?: string) => {
-    const { user } = await api.register(username, email, password, role, name);
-    setUser(user);
+    const result = await api.register(username, email, password, role, name);
+    // Only set user if not pending approval
+    if (!result.pendingApproval) {
+      setUser(result.user);
+    }
+    return { pendingApproval: result.pendingApproval, message: result.message };
   };
 
   const logout = async () => {
     await api.logout();
     setUser(null);
+    setCurrentPortal(null);
+    sessionStorage.removeItem('currentPortal');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, currentPortal, login, register, logout, setPortal }}>
       {children}
     </AuthContext.Provider>
   );

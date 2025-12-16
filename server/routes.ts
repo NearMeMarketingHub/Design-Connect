@@ -92,13 +92,28 @@ export async function registerRoutes(
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Contractors need admin approval, clients are auto-approved
+      const isApproved = role !== "contractor";
+      
       const user = await storage.createUser({
         username,
         email,
         password: hashedPassword,
         role: role || "client",
         name,
+        isApproved,
       });
+
+      // If contractor, don't log them in - they need approval first
+      if (role === "contractor") {
+        const { password: _, ...userWithoutPassword } = user;
+        return res.json({ 
+          user: userWithoutPassword, 
+          pendingApproval: true,
+          message: "Your account has been created and is pending admin approval."
+        });
+      }
 
       req.login(user, (err) => {
         if (err) {
@@ -113,6 +128,8 @@ export async function registerRoutes(
   });
 
   app.post("/api/auth/login", (req, res, next) => {
+    const { portal } = req.body; // 'client', 'contractor', or 'admin'
+    
     passport.authenticate("local", (err: any, user: User, info: any) => {
       if (err) {
         return next(err);
@@ -120,12 +137,37 @@ export async function registerRoutes(
       if (!user) {
         return res.status(400).json({ message: info?.message || "Login failed" });
       }
+      
+      // Role-based portal access validation
+      // Admins can access any portal
+      if (user.role !== "admin") {
+        // Clients can only use client portal
+        if (user.role === "client" && portal !== "client") {
+          return res.status(403).json({ 
+            message: "Please use the Client Portal to log in." 
+          });
+        }
+        // Contractors can only use contractor portal
+        if (user.role === "contractor" && portal !== "contractor") {
+          return res.status(403).json({ 
+            message: "Please use the Contractor Portal to log in." 
+          });
+        }
+      }
+      
+      // Check if contractor is approved
+      if (user.role === "contractor" && !user.isApproved) {
+        return res.status(403).json({ 
+          message: "Your account is pending admin approval. Please wait for approval before logging in." 
+        });
+      }
+      
       req.login(user, (err) => {
         if (err) {
           return next(err);
         }
         const { password: _, ...userWithoutPassword } = user;
-        return res.json({ user: userWithoutPassword });
+        return res.json({ user: userWithoutPassword, portal });
       });
     })(req, res, next);
   });
@@ -143,6 +185,50 @@ export async function registerRoutes(
       return res.json({ user: userWithoutPassword });
     }
     res.status(401).json({ message: "Not authenticated" });
+  });
+
+  // Admin-only middleware
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as User;
+    if (user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    next();
+  };
+
+  // Admin contractor approval routes
+  app.get("/api/admin/contractors/pending", requireAdmin, async (req, res, next) => {
+    try {
+      const contractors = await storage.getPendingContractors();
+      const contractorsWithoutPasswords = contractors.map(({ password: _, ...user }) => user);
+      res.json(contractorsWithoutPasswords);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/contractors/:id/approve", requireAdmin, async (req, res, next) => {
+    try {
+      const user = await storage.approveContractor(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "Contractor not found" });
+      }
+      res.json({ message: "Contractor approved successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/contractors/:id/reject", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.rejectContractor(req.params.id);
+      res.json({ message: "Contractor rejected and removed" });
+    } catch (error) {
+      next(error);
+    }
   });
 
   // Project routes
@@ -533,15 +619,7 @@ export async function registerRoutes(
     }
   });
 
-  // Admin routes
-  const requireAdmin = (req: any, res: any, next: any) => {
-    const user = req.user as User | undefined;
-    if (!user || user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    next();
-  };
-
+  // Admin project routes (requireAdmin middleware defined earlier)
   app.get("/api/admin/projects", requireAdmin, async (req, res, next) => {
     try {
       const projects = await storage.getAllProjectsWithDetails();

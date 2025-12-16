@@ -23,7 +23,7 @@ export default function AdminLogin() {
     const password = formData.get("admin-password") as string;
 
     try {
-      const user = await login(loginId, password);
+      const user = await login(loginId, password, "admin");
       
       if (user.role !== "admin") {
         await logout();

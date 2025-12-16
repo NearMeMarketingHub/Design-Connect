@@ -43,7 +43,10 @@ import {
   Image,
   LayoutDashboard,
   RefreshCw,
-  Calculator
+  Calculator,
+  Check,
+  X,
+  Clock
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -92,6 +95,12 @@ export default function SuperAdminDashboard() {
     enabled: user?.role === "admin",
   });
 
+  const { data: pendingContractors = [], isLoading: pendingLoading } = useQuery({
+    queryKey: ["/api/admin/contractors/pending"],
+    queryFn: () => api.getPendingContractors(),
+    enabled: user?.role === "admin",
+  });
+
   const initSandboxMutation = useMutation({
     mutationFn: () => api.initializeSandbox(),
     onSuccess: () => {
@@ -123,6 +132,43 @@ export default function SuperAdminDashboard() {
       toast({
         title: "Reset Failed",
         description: error.message || "Could not reset sandbox",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const approveContractorMutation = useMutation({
+    mutationFn: (contractorId: string) => api.approveContractor(contractorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors"] });
+      toast({
+        title: "Contractor Approved",
+        description: "The contractor can now log in to their account.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Could not approve contractor",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectContractorMutation = useMutation({
+    mutationFn: (contractorId: string) => api.rejectContractor(contractorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors/pending"] });
+      toast({
+        title: "Contractor Rejected",
+        description: "The contractor account has been removed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Rejection Failed",
+        description: error.message || "Could not reject contractor",
         variant: "destructive",
       });
     },
@@ -214,7 +260,7 @@ export default function SuperAdminDashboard() {
           <p className="text-muted-foreground mt-1">Manage projects, contractors, and system settings</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
@@ -267,7 +313,79 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
+          <Card className={pendingContractors.length > 0 ? "border-orange-300 bg-orange-50" : ""}>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-lg ${pendingContractors.length > 0 ? "bg-orange-200" : "bg-orange-100"}`}>
+                  <Clock className={`w-6 h-6 ${pendingContractors.length > 0 ? "text-orange-700" : "text-orange-600"}`} />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending Approval</p>
+                  <h3 className="text-2xl font-bold text-foreground">{pendingContractors.length}</h3>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        {pendingContractors.length > 0 && (
+          <Card className="border-orange-300">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-600" />
+                Pending Contractor Approvals
+              </CardTitle>
+              <CardDescription>Review and approve new contractor registrations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingContractors.map((contractor) => (
+                    <TableRow key={contractor.id} data-testid={`row-pending-contractor-${contractor.id}`}>
+                      <TableCell className="font-medium">{contractor.name || "No name"}</TableCell>
+                      <TableCell>{contractor.username}</TableCell>
+                      <TableCell>{contractor.email}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="border-green-500 text-green-600 hover:bg-green-50"
+                            onClick={() => approveContractorMutation.mutate(contractor.id)}
+                            disabled={approveContractorMutation.isPending}
+                            data-testid={`btn-approve-contractor-${contractor.id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="border-red-500 text-red-600 hover:bg-red-50"
+                            onClick={() => rejectContractorMutation.mutate(contractor.id)}
+                            disabled={rejectContractorMutation.isPending}
+                            data-testid={`btn-reject-contractor-${contractor.id}`}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">

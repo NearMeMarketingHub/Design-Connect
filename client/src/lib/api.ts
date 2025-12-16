@@ -23,16 +23,33 @@ class ApiClient {
 
   // Auth methods
   async register(username: string, email: string, password: string, role: string, name?: string) {
-    return this.fetch<{ user: Omit<User, "password"> }>("/auth/register", {
+    return this.fetch<{ user: Omit<User, "password">; pendingApproval?: boolean; message?: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify({ username, email, password, role, name }),
     });
   }
 
-  async login(username: string, password: string) {
-    return this.fetch<{ user: Omit<User, "password"> }>("/auth/login", {
+  async login(username: string, password: string, portal: 'client' | 'contractor' | 'admin') {
+    return this.fetch<{ user: Omit<User, "password">; portal: string }>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, portal }),
+    });
+  }
+
+  // Admin contractor approval
+  async getPendingContractors() {
+    return this.fetch<Omit<User, "password">[]>("/admin/contractors/pending");
+  }
+
+  async approveContractor(contractorId: string) {
+    return this.fetch<{ message: string }>(`/admin/contractors/${contractorId}/approve`, {
+      method: "POST",
+    });
+  }
+
+  async rejectContractor(contractorId: string) {
+    return this.fetch<{ message: string }>(`/admin/contractors/${contractorId}/reject`, {
+      method: "POST",
     });
   }
 
