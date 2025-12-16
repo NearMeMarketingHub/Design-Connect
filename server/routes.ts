@@ -261,7 +261,11 @@ export async function registerRoutes(
 
   app.post("/api/projects", requireAuth, async (req, res, next) => {
     try {
-      const project = await storage.createProject(req.body);
+      const user = req.user as User;
+      const project = await storage.createProject({
+        ...req.body,
+        contractorId: user.id,
+      });
       res.json(project);
     } catch (error) {
       next(error);
