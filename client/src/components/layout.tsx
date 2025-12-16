@@ -13,15 +13,21 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, currentPortal } = useAuth();
 
   // Check if we're on any dashboard page
-  const isDashboard = location === "/dashboard" || location === "/super-admin" || location === "/contractor-dashboard";
+  const isDashboard = location === "/dashboard" || location === "/super-admin" || location === "/admin-dashboard";
   
-  // Determine which dashboard to go back to based on user role
+  // Determine which dashboard to go back to based on the portal they logged in through
   const getDashboardPath = () => {
+    // Use the portal context to determine where to navigate
+    if (currentPortal === "admin") return "/super-admin";
+    if (currentPortal === "contractor") return "/admin-dashboard";
+    if (currentPortal === "client") return "/dashboard";
+    
+    // Fallback to role-based if no portal context (legacy support)
     if (user?.role === "admin") return "/super-admin";
-    if (user?.role === "contractor") return "/contractor-dashboard";
+    if (user?.role === "contractor") return "/admin-dashboard";
     return "/dashboard"; // Default to client dashboard
   };
   

@@ -48,7 +48,7 @@ interface CategoryWithItems extends BudgetCategory {
 
 export default function BudgetAdmin() {
   const [_, setLocation] = useLocation();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, currentPortal } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -319,7 +319,7 @@ export default function BudgetAdmin() {
               <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Link href="/super-admin">
+              <Link href={currentPortal === "admin" ? "/super-admin" : currentPortal === "contractor" ? "/admin-dashboard" : "/dashboard"}>
                 <Button variant="outline" size="sm" data-testid="button-dashboard">
                   Back to Dashboard
                 </Button>
