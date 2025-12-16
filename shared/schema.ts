@@ -220,3 +220,36 @@ export const postReactions = pgTable("post_reactions", {
 export const insertPostReactionSchema = createInsertSchema(postReactions).omit({ id: true, createdAt: true });
 export type InsertPostReaction = z.infer<typeof insertPostReactionSchema>;
 export type PostReaction = typeof postReactions.$inferSelect;
+
+export const budgetCategories = pgTable("budget_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+});
+
+export const insertBudgetCategorySchema = createInsertSchema(budgetCategories).omit({ id: true });
+export type InsertBudgetCategory = z.infer<typeof insertBudgetCategorySchema>;
+export type BudgetCategory = typeof budgetCategories.$inferSelect;
+
+export const budgetItems = pgTable("budget_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").notNull().references(() => budgetCategories.id),
+  itemType: text("item_type").notNull(),
+  description: text("description").notNull(),
+  unitType: text("unit_type").notNull(),
+  cost: numeric("cost").default("0"),
+  burdens: numeric("burdens").default("0"),
+  materialFee: numeric("material_fee").default("0"),
+  laborRate: numeric("labor_rate").default("0"),
+  subRate: numeric("sub_rate").default("0"),
+  retailPrice: numeric("retail_price").default("0"),
+  notes: text("notes"),
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+});
+
+export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({ id: true });
+export type InsertBudgetItem = z.infer<typeof insertBudgetItemSchema>;
+export type BudgetItem = typeof budgetItems.$inferSelect;
