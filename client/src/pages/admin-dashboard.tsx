@@ -22,6 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 
 interface Project {
   id: string;
@@ -32,12 +33,15 @@ interface Project {
   budget: string | null;
   progress: number;
   address: string;
+  contractorId: string | null;
+  clientId: string | null;
 }
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: projects = [], isLoading, isError, error } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -47,17 +51,20 @@ export default function AdminDashboard() {
     },
   });
 
-  const filteredProjects = projects.filter((project) =>
+  // Filter to only show projects assigned to current contractor
+  const myProjects = projects.filter(p => p.contractorId === user?.id);
+
+  const filteredProjects = myProjects.filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeProjects = projects.filter(p => 
+  const activeProjects = myProjects.filter(p => 
     p.status === "Active" || p.status === "In Progress" || p.status === "active" || p.status === "in_progress"
   );
   
-  const totalBudget = projects.reduce((sum, p) => sum + (parseFloat(p.budget || "0") || 0), 0);
+  const totalBudget = myProjects.reduce((sum, p) => sum + (parseFloat(p.budget || "0") || 0), 0);
 
   const escapeCSV = (value: string) => {
     if (value.includes(",") || value.includes('"') || value.includes("\n")) {
@@ -68,7 +75,7 @@ export default function AdminDashboard() {
 
   const handleExportReport = () => {
     const headers = ["Project Name", "Address", "Type", "Status", "Phase", "Budget", "Progress"];
-    const rows = projects.map(p => [
+    const rows = myProjects.map(p => [
       escapeCSV(p.name),
       escapeCSV(p.address || ""),
       escapeCSV(p.type || ""),
@@ -159,7 +166,7 @@ export default function AdminDashboard() {
               {activeProjects.length}
             </h3>
             <p className="text-xs mt-4 text-muted-foreground">
-              {projects.length} total projects
+              {myProjects.length} total projects
             </p>
           </CardContent>
         </Card>
