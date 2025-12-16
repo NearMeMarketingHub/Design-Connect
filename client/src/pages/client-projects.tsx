@@ -100,10 +100,13 @@ export default function ClientProjects() {
 
   // Filter projects based on user role
   const myProjects = projects.filter(p => {
-    if (user?.role === 'client') {
+    if (user?.role === 'admin') {
+      // Admins see all projects
+      return true;
+    } else if (user?.role === 'client') {
       return p.clientId === user?.id;
     } else {
-      // Contractor or admin - show projects they're assigned to
+      // Contractor - show projects they're assigned to
       return p.contractorId === user?.id;
     }
   });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -10,64 +10,98 @@ import {
   AlertCircle, 
   CalendarDays,
   DollarSign,
-  MapPin
+  MapPin,
+  FolderOpen,
+  Loader2
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
+import { useQuery } from "@tanstack/react-query";
+import type { Project } from "@shared/schema";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
-const PROJECTS = {
-  jenkins: {
-    id: "jenkins",
-    name: "The Jenkins Residence",
-    address: "123 Maple Avenue",
-    status: "Active",
-    phase: "Phase 3: Rough-in",
-    progress: 45,
-    budgetStatus: "On Track",
-    nextMilestone: "Drywall",
-    image: projectImage,
-    description: "Current progress is on schedule. Plumbing and electrical rough-ins are 80% complete. Next inspection scheduled for Friday."
-  },
-  lakehouse: {
-    id: "lakehouse",
-    name: "Lake House Retreat",
-    address: "889 Shoreline Drive",
-    status: "Planning",
-    phase: "Phase 1: Design",
-    progress: 15,
-    budgetStatus: "Pending",
-    nextMilestone: "Permit Approval",
-    image: blueprintImage,
-    description: "Architectural drawings are under review by the city. Final material selections for the exterior are needed."
-  },
-  loft: {
-    id: "loft",
-    name: "Downtown Loft",
-    address: "450 Main St, Unit 4B",
-    status: "Completed",
-    phase: "Phase 6: Handover",
-    progress: 100,
-    budgetStatus: "Closed",
-    nextMilestone: "Warranty Period",
-    image: projectImage, // Using same image for mock
-    description: "Project completed on Jan 15, 2025. Final walkthrough signed off."
-  }
-};
-
 export default function ClientDashboard() {
-  const [selectedProject, setSelectedProject] = useState<keyof typeof PROJECTS>("jenkins");
-  const project = PROJECTS[selectedProject];
   const { user } = useAuth();
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
+  const { data: allProjects = [], isLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+  });
+
+  // Filter to only show projects where this client is attached
+  const myProjects = allProjects.filter(p => p.clientId === user?.id);
+  const activeProjects = myProjects.filter(p => p.status !== "Completed");
+
+  // Set default selected project when data loads
+  useEffect(() => {
+    if (myProjects.length > 0 && selectedProjectId === null) {
+      // Prefer an active project, otherwise use the first one
+      const defaultProject = activeProjects[0] || myProjects[0];
+      setSelectedProjectId(defaultProject.id);
+    }
+  }, [myProjects, activeProjects, selectedProjectId]);
+
+  const selectedProject = myProjects.find(p => p.id === selectedProjectId);
 
   // Get first name from user's full name
   const firstName = user?.name?.split(' ')[0] || 'there';
 
-  // Filter out completed projects for the switcher
-  const activeProjects = Object.entries(PROJECTS).filter(
-    ([_, p]) => p.status !== "Completed"
-  );
+  // Helper to get project image based on status
+  const getProjectImage = (status: string) => {
+    return status === "Planning" ? blueprintImage : projectImage;
+  };
+
+  // Helper to format address
+  const formatAddress = (project: Project) => {
+    const parts = [project.streetAddress1];
+    if (project.city) parts.push(project.city);
+    return parts.join(", ");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // No projects assigned to this client
+  if (myProjects.length === 0) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Welcome Home, {firstName}</h1>
+          <p className="text-muted-foreground mt-1">Here's what's happening with your active projects.</p>
+        </div>
+        <Card className="p-12 text-center">
+          <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No Projects Yet</h3>
+          <p className="text-muted-foreground">
+            You don't have any projects assigned to you yet. Your contractor will add you to a project soon.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Fallback if no project is selected yet
+  if (!selectedProject) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const progress = selectedProject.progress || 0;
+  const budget = parseFloat(selectedProject.budget || "0");
 
   return (
     <div className="space-y-8">
@@ -79,15 +113,15 @@ export default function ClientDashboard() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="w-full md:w-64">
             <Select 
-              value={selectedProject} 
-              onValueChange={(v) => setSelectedProject(v as keyof typeof PROJECTS)}
+              value={selectedProjectId?.toString()} 
+              onValueChange={(v) => setSelectedProjectId(parseInt(v))}
             >
-              <SelectTrigger>
+              <SelectTrigger data-testid="select-project">
                 <SelectValue placeholder="Select Project" />
               </SelectTrigger>
               <SelectContent>
-                {activeProjects.map(([key, p]) => (
-                  <SelectItem key={key} value={key}>
+                {myProjects.map((p) => (
+                  <SelectItem key={p.id} value={p.id.toString()} data-testid={`select-project-${p.id}`}>
                     <span className="font-medium">{p.name}</span> 
                     <span className="ml-2 text-xs text-muted-foreground">({p.status})</span>
                   </SelectItem>
@@ -100,11 +134,11 @@ export default function ClientDashboard() {
 
       {/* Project Hero Card */}
       <div className="grid md:grid-cols-3 gap-6">
-        <Link href={`/project/${project.id}`} className="md:col-span-2" data-testid={`link-project-hero-${project.id}`}>
+        <Link href={`/project/${selectedProject.id}`} className="md:col-span-2" data-testid={`link-project-hero-${selectedProject.id}`}>
           <Card className="h-full overflow-hidden relative group border-0 shadow-lg cursor-pointer">
             <div className="absolute inset-0">
               <img 
-                src={project.image} 
+                src={getProjectImage(selectedProject.status)} 
                 alt="Project Render" 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -113,9 +147,9 @@ export default function ClientDashboard() {
             <div className="relative h-full flex flex-col justify-end p-6 text-white min-h-[350px]">
               <div className="flex items-center gap-2 mb-3">
                 <Badge className="bg-accent text-accent-foreground border-none hover:bg-accent/90">
-                  {project.phase}
+                  {selectedProject.phase}
                 </Badge>
-                {project.status === "Active" && (
+                {selectedProject.status === "Active" && (
                   <Badge variant="outline" className="border-white/30 text-white bg-green-500/20 backdrop-blur-sm">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-2 animate-pulse" />
                     Live Updates
@@ -123,28 +157,28 @@ export default function ClientDashboard() {
                 )}
               </div>
               
-              <h2 className="text-3xl font-heading font-bold mb-1">{project.name}</h2>
+              <h2 className="text-3xl font-heading font-bold mb-1">{selectedProject.name}</h2>
               <div className="flex items-center text-white/70 text-sm mb-4">
                 <MapPin className="w-4 h-4 mr-1" />
-                {project.address}
+                {formatAddress(selectedProject)}
               </div>
               
               <p className="text-white/80 max-w-xl mb-6 leading-relaxed">
-                {project.description}
+                {selectedProject.description || `Your ${selectedProject.projectType?.toLowerCase() || 'project'} is currently in the ${selectedProject.phase} phase.`}
               </p>
               
               <div className="flex items-center gap-6 p-4 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
                 <div className="flex-1">
                   <div className="flex justify-between text-sm mb-2 font-medium">
                     <span>Completion</span>
-                    <span>{project.progress}%</span>
+                    <span>{progress}%</span>
                   </div>
-                  <Progress value={project.progress} className="h-2 bg-white/20 [&>div]:bg-accent" />
+                  <Progress value={progress} className="h-2 bg-white/20 [&>div]:bg-accent" />
                 </div>
                 <div className="h-8 w-px bg-white/20" />
                 <div>
                   <span className="text-xs text-white/60 block uppercase tracking-wider">Status</span>
-                  <span className="font-medium">{project.status}</span>
+                  <span className="font-medium">{selectedProject.status}</span>
                 </div>
               </div>
             </div>
@@ -160,32 +194,32 @@ export default function ClientDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
-              {selectedProject === 'jenkins' ? (
+              {selectedProject.status === "Active" ? (
                 <>
                   <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer group">
                     <div className="flex justify-between items-start mb-1">
-                      <h4 className="font-medium text-sm group-hover:text-primary transition-colors">Approve Change Order #03</h4>
-                      <Badge variant="outline" className="text-[10px] h-5">Urgent</Badge>
+                      <h4 className="font-medium text-sm group-hover:text-primary transition-colors">Review Project Documents</h4>
+                      <Badge variant="outline" className="text-[10px] h-5">Pending</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">Master bath tile upgrade request pending approval.</p>
-                    <Link href="/project/jenkins?tab=documents">
-                      <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-review-sign">Review & Sign</Button>
+                    <p className="text-xs text-muted-foreground">Check for any documents that need your review or signature.</p>
+                    <Link href={`/project/${selectedProject.id}?tab=documents`}>
+                      <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-review-sign">View Documents</Button>
                     </Link>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer group">
-                    <h4 className="font-medium text-sm group-hover:text-primary transition-colors">Select Lighting Fixtures</h4>
-                    <p className="text-xs text-muted-foreground mt-1">Kitchen island pendant selection needed by Friday.</p>
-                    <Link href={`/project/${selectedProject}?tab=inspiration`}>
+                    <h4 className="font-medium text-sm group-hover:text-primary transition-colors">View Inspiration Board</h4>
+                    <p className="text-xs text-muted-foreground mt-1">Check design ideas and material selections for your project.</p>
+                    <Link href={`/project/${selectedProject.id}?tab=inspiration`}>
                       <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">Go to Selections</Button>
                     </Link>
                   </div>
                 </>
               ) : (
                 <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                  <h4 className="font-medium text-sm">Review Initial Concepts</h4>
-                  <p className="text-xs text-muted-foreground mt-1">Architect has uploaded 3 variations for the front elevation.</p>
-                  <Link href={`/project/${selectedProject}?tab=documents`}>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-view-concepts">View Concepts</Button>
+                  <h4 className="font-medium text-sm">No Actions Required</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Your project is in {selectedProject.phase}. We'll notify you when action is needed.</p>
+                  <Link href={`/project/${selectedProject.id}`}>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-view-project">View Project</Button>
                   </Link>
                 </div>
               )}
@@ -202,8 +236,8 @@ export default function ClientDashboard() {
               <Clock className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Days Remaining</p>
-              <h3 className="text-2xl font-bold">{selectedProject === 'jenkins' ? '45' : '120'}</h3>
+              <p className="text-sm font-medium text-muted-foreground">Project Phase</p>
+              <h3 className="text-lg font-bold">{selectedProject.phase}</h3>
             </div>
           </CardContent>
         </Card>
@@ -213,8 +247,8 @@ export default function ClientDashboard() {
               <DollarSign className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Budget Status</p>
-              <h3 className="text-2xl font-bold">{project.budgetStatus}</h3>
+              <p className="text-sm font-medium text-muted-foreground">Budget</p>
+              <h3 className="text-2xl font-bold">${budget.toLocaleString()}</h3>
             </div>
           </CardContent>
         </Card>
@@ -224,8 +258,8 @@ export default function ClientDashboard() {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Completed Tasks</p>
-              <h3 className="text-2xl font-bold">{selectedProject === 'jenkins' ? '24/58' : '3/45'}</h3>
+              <p className="text-sm font-medium text-muted-foreground">Progress</p>
+              <h3 className="text-2xl font-bold">{progress}%</h3>
             </div>
           </CardContent>
         </Card>
@@ -235,8 +269,8 @@ export default function ClientDashboard() {
               <CalendarDays className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Next Milestone</p>
-              <h3 className="text-lg font-bold">{project.nextMilestone}</h3>
+              <p className="text-sm font-medium text-muted-foreground">Project Type</p>
+              <h3 className="text-lg font-bold">{selectedProject.projectType || 'N/A'}</h3>
             </div>
           </CardContent>
         </Card>
@@ -245,36 +279,44 @@ export default function ClientDashboard() {
       {/* Recent Updates */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Project Updates</CardTitle>
-          <CardDescription>Daily logs from your project manager</CardDescription>
+          <CardTitle>Project Details</CardTitle>
+          <CardDescription>Information about your selected project</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-4 pb-6 border-b border-border last:border-0 last:pb-0">
-                <div className="flex-shrink-0 w-24 text-sm text-muted-foreground pt-1">
-                  Today, 9:00 AM
-                </div>
-                <div>
-                  <h4 className="font-medium text-foreground">
-                    {selectedProject === 'jenkins' 
-                      ? "Electrical Rough-in Inspection Passed" 
-                      : "Survey Team on Site"}
-                  </h4>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {selectedProject === 'jenkins'
-                      ? "The city inspector signed off on all electrical work this morning. The crew is now proceeding with insulation installation."
-                      : "Topographical survey completed. Data is being processed for the architect."}
-                  </p>
-                  {i === 1 && selectedProject === 'jenkins' && (
-                    <div className="mt-3 flex gap-2">
-                      <div className="w-20 h-20 rounded-md bg-muted border border-border" />
-                      <div className="w-20 h-20 rounded-md bg-muted border border-border" />
-                    </div>
-                  )}
+          <div className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Address</p>
+                <p className="font-medium">
+                  {selectedProject.streetAddress1}
+                  {selectedProject.streetAddress2 && <>, {selectedProject.streetAddress2}</>}
+                  <br />
+                  {selectedProject.city}, FL {selectedProject.zipCode}
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Current Status</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant={selectedProject.status === "Active" ? "default" : "secondary"}>
+                    {selectedProject.status}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">• {selectedProject.phase}</span>
                 </div>
               </div>
-            ))}
+            </div>
+            {selectedProject.description && (
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Description</p>
+                <p className="text-sm">{selectedProject.description}</p>
+              </div>
+            )}
+            <div className="pt-4">
+              <Link href={`/project/${selectedProject.id}`}>
+                <Button className="w-full md:w-auto" data-testid="button-view-full-project">
+                  View Full Project Details
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>
