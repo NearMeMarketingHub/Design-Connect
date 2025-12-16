@@ -104,7 +104,11 @@ export default function ClientProjects() {
     if (currentPortal === 'client') {
       return p.clientId === user?.id;
     }
-    // When logged into admin/contractor portal, admins see all, contractors see assigned
+    // When logged into contractor portal, show only projects assigned to user (even for admins)
+    if (currentPortal === 'contractor') {
+      return p.contractorId === user?.id;
+    }
+    // When logged into admin portal, admins see all projects, contractors see assigned
     if (user?.role === 'admin') {
       return true;
     }

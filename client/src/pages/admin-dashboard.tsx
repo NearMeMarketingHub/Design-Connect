@@ -10,13 +10,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Search, Plus, MoreHorizontal, Filter, Download, Eye, Edit, FileText } from "lucide-react";
+import { Search, Plus, Filter, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -249,12 +243,16 @@ export default function AdminDashboard() {
                   <TableHead>Current Phase</TableHead>
                   <TableHead>Budget</TableHead>
                   <TableHead>Progress</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProjects.map((project) => (
-                  <TableRow key={project.id} data-testid={`row-project-${project.id}`}>
+                  <TableRow 
+                    key={project.id} 
+                    data-testid={`row-project-${project.id}`}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setLocation(`/project/${project.id}`)}
+                  >
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell>{project.type || "-"}</TableCell>
                     <TableCell>
@@ -274,29 +272,6 @@ export default function AdminDashboard() {
                           />
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" data-testid={`button-actions-${project.id}`}>
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setLocation(`/project/${project.id}`)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setLocation(`/project/${project.id}`)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Project
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="w-4 h-4 mr-2" />
-                            Create Estimate
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}

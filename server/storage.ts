@@ -58,6 +58,8 @@ export interface IStorage {
   // Project phase methods
   getProjectPhases(projectId: string): Promise<ProjectPhase[]>;
   createProjectPhase(phase: InsertProjectPhase): Promise<ProjectPhase>;
+  updateProjectPhase(id: string, phase: Partial<InsertProjectPhase>): Promise<ProjectPhase | undefined>;
+  recalculateProjectProgress(projectId: string): Promise<void>;
   
   // Action item methods
   getActionItems(projectId: string): Promise<ActionItem[]>;
@@ -248,7 +250,32 @@ export class DatabaseStorage implements IStorage {
 
   async createProjectPhase(insertPhase: InsertProjectPhase): Promise<ProjectPhase> {
     const [phase] = await db.insert(schema.projectPhases).values(insertPhase).returning();
+    // Auto-recalculate project progress after adding a phase
+    await this.recalculateProjectProgress(insertPhase.projectId);
     return phase;
+  }
+
+  async updateProjectPhase(id: string, updateData: Partial<InsertProjectPhase>): Promise<ProjectPhase | undefined> {
+    const [phase] = await db.update(schema.projectPhases).set(updateData).where(eq(schema.projectPhases.id, id)).returning();
+    if (phase) {
+      // Auto-recalculate project progress after updating a phase
+      await this.recalculateProjectProgress(phase.projectId);
+    }
+    return phase;
+  }
+
+  // Calculate project progress based on completed phases/milestones
+  async recalculateProjectProgress(projectId: string): Promise<void> {
+    const phases = await this.getProjectPhases(projectId);
+    if (phases.length === 0) return;
+    
+    // Handle various status formats: 'completed', 'Completed'
+    const completedPhases = phases.filter(p => p.status.toLowerCase() === 'completed').length;
+    const progress = Math.round((completedPhases / phases.length) * 100);
+    
+    await db.update(schema.projects)
+      .set({ progress })
+      .where(eq(schema.projects.id, projectId));
   }
 
   // Action item methods

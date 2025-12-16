@@ -411,6 +411,18 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/phases/:id", requireAuth, async (req, res, next) => {
+    try {
+      const phase = await storage.updateProjectPhase(req.params.id, req.body);
+      if (!phase) {
+        return res.status(404).json({ message: "Phase not found" });
+      }
+      res.json(phase);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Action item routes
   app.get("/api/projects/:projectId/action-items", requireAuth, async (req, res, next) => {
     try {

@@ -69,7 +69,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -240,7 +239,6 @@ export default function ProjectDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [editStatus, setEditStatus] = useState("");
   const [editPhase, setEditPhase] = useState("");
-  const [editProgress, setEditProgress] = useState(0);
   const [editDescription, setEditDescription] = useState("");
   
   // Parse tab and admin context from URL query parameter (needed before API call)
@@ -300,13 +298,68 @@ export default function ProjectDetails() {
       setIsEditing(false);
     }
   });
+
+  // Fetch project phases from API
+  const { data: apiPhases = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'phases'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/phases`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !staticProject && !!projectId,
+  });
+
+  // Update phase status mutation (for marking milestones complete/incomplete)
+  const updatePhaseMutation = useMutation({
+    mutationFn: async ({ phaseId, status }: { phaseId: string; status: string }) => {
+      const res = await fetch(`/api/phases/${phaseId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error('Failed to update phase');
+      return res.json();
+    },
+    onSuccess: () => {
+      // Invalidate all relevant queries to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phases'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/projects', projectId, isFromAdmin] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      // Also invalidate the specific project endpoint to get updated progress
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+    }
+  });
+
+  // Toggle phase completion status (use lowercase status values to match DB)
+  const togglePhaseStatus = (phaseId: string, currentStatus: string) => {
+    // Handle various status formats (legacy: 'Completed', 'In Progress', modern: 'completed', 'in_progress')
+    const isCompleted = currentStatus.toLowerCase() === 'completed';
+    const newStatus = isCompleted ? 'pending' : 'completed';
+    updatePhaseMutation.mutate({ phaseId, status: newStatus });
+  };
+
+  // Use API phases if available, otherwise fall back to static MILESTONES
+  // Keep original phase data for proper status tracking
+  const displayMilestones = apiPhases.length > 0 
+    ? apiPhases.map((p: any, idx: number) => ({
+        id: p.id,
+        name: p.name,
+        date: p.dateRange || 'TBD',
+        status: p.status === 'Completed' ? 'completed' : p.status === 'In Progress' ? 'in_progress' : 'upcoming',
+        originalStatus: p.status, // Keep original status for toggle
+        description: `Phase ${idx + 1}`,
+        details: '',
+        tasks: p.tasks || []
+      }))
+    : MILESTONES;
   
   // Initialize edit state when entering edit mode
   const startEditing = () => {
     if (project) {
       setEditStatus(project.status);
       setEditPhase(project.phase);
-      setEditProgress(project.progress);
       setEditDescription(project.description || "");
       setIsEditing(true);
     }
@@ -317,7 +370,6 @@ export default function ProjectDetails() {
     updateProjectMutation.mutate({
       status: editStatus,
       phase: editPhase,
-      progress: editProgress,
       description: editDescription
     });
   };
@@ -916,18 +968,13 @@ export default function ProjectDetails() {
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="edit-progress">Progress</Label>
-                        <span className="text-sm font-medium">{editProgress}%</span>
+                        <Label>Progress</Label>
+                        <span className="text-sm text-muted-foreground">(Auto-calculated from milestones)</span>
                       </div>
-                      <Slider
-                        id="edit-progress"
-                        value={[editProgress]}
-                        onValueChange={(value) => setEditProgress(value[0])}
-                        max={100}
-                        step={5}
-                        className="w-full"
-                        data-testid="slider-edit-progress"
-                      />
+                      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                        <span className="text-2xl font-bold">{project.progress}%</span>
+                        <span className="text-sm text-muted-foreground">based on completed milestones</span>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-description">Description</Label>
@@ -1192,8 +1239,9 @@ export default function ProjectDetails() {
             <Card>
               <CardContent className="p-6">
                 <div className="relative">
-                  {MILESTONES.map((milestone, index) => {
+                  {displayMilestones.map((milestone: any, index: number) => {
                     const isExpanded = expandedMilestones.includes(milestone.id);
+                    const isApiPhase = apiPhases.length > 0;
                     return (
                       <div key={milestone.id} className="flex gap-4 pb-8 last:pb-0" data-testid={`milestone-${milestone.id}`}>
                         {/* Timeline line and dot */}
@@ -1207,7 +1255,7 @@ export default function ProjectDetails() {
                               <CheckCircle2 className="w-3 h-3 text-white m-auto" style={{ marginTop: '-1px' }} />
                             )}
                           </div>
-                          {index < MILESTONES.length - 1 && (
+                          {index < displayMilestones.length - 1 && (
                             <div className={`w-0.5 flex-1 mt-2 ${
                               milestone.status === 'completed' ? 'bg-green-500' : 'bg-muted-foreground/20'
                             }`} />
@@ -1232,20 +1280,37 @@ export default function ProjectDetails() {
                                 <p className="text-sm text-muted-foreground">{milestone.description}</p>
                               </div>
                             </div>
-                            <div className="text-right flex-shrink-0 ml-4">
-                              <p className="text-sm font-medium">{milestone.date}</p>
-                              <Badge 
-                                variant={milestone.status === 'completed' ? 'default' : 'outline'}
-                                className={`text-xs mt-1 ${
-                                  milestone.status === 'completed' ? 'bg-green-500' :
-                                  milestone.status === 'in_progress' ? 'border-primary text-primary' :
-                                  ''
-                                }`}
-                                data-testid={`badge-milestone-status-${milestone.id}`}
-                              >
-                                {milestone.status === 'completed' ? 'Complete' :
-                                 milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
-                              </Badge>
+                            <div className="text-right flex-shrink-0 ml-4 flex items-center gap-2">
+                              <div>
+                                <p className="text-sm font-medium">{milestone.date}</p>
+                                <Badge 
+                                  variant={milestone.status === 'completed' ? 'default' : 'outline'}
+                                  className={`text-xs mt-1 ${
+                                    milestone.status === 'completed' ? 'bg-green-500' :
+                                    milestone.status === 'in_progress' ? 'border-primary text-primary' :
+                                    ''
+                                  }`}
+                                  data-testid={`badge-milestone-status-${milestone.id}`}
+                                >
+                                  {milestone.status === 'completed' ? 'Complete' :
+                                   milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                                </Badge>
+                              </div>
+                              {/* Toggle button for contractors to mark phase complete/incomplete */}
+                              {canEdit && isApiPhase && (
+                                <Button
+                                  size="sm"
+                                  variant={milestone.status === 'completed' ? 'outline' : 'default'}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePhaseStatus(milestone.id, milestone.originalStatus || '');
+                                  }}
+                                  disabled={updatePhaseMutation.isPending}
+                                  data-testid={`button-toggle-phase-${milestone.id}`}
+                                >
+                                  {milestone.status === 'completed' ? 'Undo' : 'Complete'}
+                                </Button>
+                              )}
                             </div>
                           </div>
                           
@@ -1258,7 +1323,7 @@ export default function ProjectDetails() {
                               <div>
                                 <p className="text-xs font-medium text-muted-foreground mb-2">Tasks:</p>
                                 <div className="space-y-1">
-                                  {milestone.tasks.map((task, taskIndex) => (
+                                  {milestone.tasks.map((task: string, taskIndex: number) => (
                                     <div key={taskIndex} className="flex items-center gap-2 text-sm">
                                       <CheckCircle2 className={`w-3.5 h-3.5 ${
                                         milestone.status === 'completed' ? 'text-green-500' : 
