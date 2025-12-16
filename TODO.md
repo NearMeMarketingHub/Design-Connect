@@ -21,18 +21,55 @@ Last Updated: December 16, 2025
 
 ## 🔲 Pending
 
-### Contractor Budget Estimator
+### Contractor Side
+
+#### Budget Estimator
 - [ ] Build contractor-facing calculator using admin-managed pricing data
 - [ ] Allow contractors to select categories and enter quantities
 - [ ] Auto-calculate totals from `budget_items` table
 - [ ] Floor Calculator for room-based square footage calculations
 - [ ] Generate estimate summaries that can be attached to projects
 
-### Contractor Dashboard
-- [ ] Contractor Dashboard page (marked "Coming Soon" in app)
+#### Contractor Dashboard & Features
+- [ ] Contractor Dashboard page (currently "Coming Soon")
+- [ ] Contractors Sandbox - testing environment for contractor features
+- [ ] Progress Photos - build out post feature for uploading progress photos
+- [ ] Plans and Drawings section for contractors
 
-### Document Management
-- [ ] Digital Signatures for contracts (marked "Coming Soon" in app)
+#### Document Upload from Contractor Side
+- [ ] Ability to choose when uploading a document whether it needs to be signed or just documented in the system
+
+---
+
+### Client Side
+
+#### Dashboard Connections (after contractor side is done)
+- [ ] Action Required section - build out once contractor page is complete
+- [ ] Stats Card - connect with data from contractor side
+- [ ] Recent Updates Card - connect with data from contractor side
+
+#### Documents Tab Reorganization
+- [ ] Split documents tab into multiple tabs or sub-tabs:
+  - Contracts
+  - Plans and Drawings
+  - Permits and Approvals
+  - Invoices and Payments
+  - Warranties and Manuals
+
+#### Plans and Drawings
+- [ ] Plans and Drawings section for clients
+
+---
+
+### Integrations
+
+#### DocuSign
+- [ ] Implement DocuSign for digital signatures
+
+---
+
+### Branding & Final Touches
+- [ ] Change logo and app name when project is completed
 
 ---
 
@@ -41,10 +78,4 @@ Last Updated: December 16, 2025
 - Skip Sub List (Sheet 3) from Excel - only implement Labor_Budget and Floor Calculator
 - Admin credentials: Username "Ciaadz697"
 - Database has 936 budget items imported from Excel
-
----
-
-## 🆕 Additional Tasks (To Be Added)
-
-<!-- Add additional tasks from previous conversations here -->
-
+- Client-side features depend on contractor-side data being completed first
