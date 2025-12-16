@@ -648,7 +648,9 @@ export async function registerRoutes(
   app.get("/api/admin/contractors", requireAdmin, async (req, res, next) => {
     try {
       const contractors = await storage.getUsersByRole("contractor");
-      res.json(contractors.map(c => ({ ...c, password: undefined })));
+      const admins = await storage.getUsersByRole("admin");
+      const allUsers = [...contractors, ...admins];
+      res.json(allUsers.map(c => ({ ...c, password: undefined })));
     } catch (error) {
       next(error);
     }
