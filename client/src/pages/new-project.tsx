@@ -13,13 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 const PROJECT_TYPES = [
-  "New Construction",
   "Renovation",
   "Remodel",
   "Addition",
   "Commercial",
   "Residential",
-  "Mixed Use",
 ];
 
 const PROJECT_STATUSES = [
@@ -183,6 +181,11 @@ export default function NewProject() {
   });
 
   const handleNextStep = () => {
+    setCurrentStep(2);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!formData.name.trim()) {
       toast({
         title: "Missing Information",
@@ -207,11 +210,6 @@ export default function NewProject() {
       });
       return;
     }
-    setCurrentStep(2);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
     createProjectMutation.mutate(formData);
   };
 
