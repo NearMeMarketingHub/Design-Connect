@@ -79,3 +79,12 @@ Key data models include:
 - Custom Vite plugins for development banner and error overlays
 - Meta image plugin for OpenGraph/Twitter card images
 - Cartographer plugin for code navigation
+
+## Future Tasks
+
+### Budget Estimator - Contractor Side
+- Build contractor-facing calculator using the admin-managed pricing data
+- Allow contractors to create estimates by selecting categories and entering quantities
+- Auto-calculate totals based on pricing from budget_items table
+- Include Floor Calculator for room-based square footage calculations
+- Generate estimate summaries that can be attached to projects
