@@ -42,7 +42,8 @@ import {
   FileText,
   Image,
   LayoutDashboard,
-  RefreshCw
+  RefreshCw,
+  Calculator
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -355,21 +356,47 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <TestTube className="w-5 h-5 text-purple-600" />
-                    Sandbox Testing
-                  </CardTitle>
-                  <CardDescription>Test features in an isolated environment</CardDescription>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calculator className="w-5 h-5 text-green-600" />
+                      Budget Manager
+                    </CardTitle>
+                    <CardDescription>Manage pricing and budget templates</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="border-green-600 text-green-600">
+                    Admin
+                  </Badge>
                 </div>
-                <Badge variant="outline" className="border-purple-600 text-purple-600">
-                  Test Mode
-                </Badge>
-              </div>
-            </CardHeader>
+              </CardHeader>
+              <CardContent>
+                <Link href="/budget-admin">
+                  <Button className="w-full" data-testid="button-budget-manager">
+                    <Calculator className="w-4 h-4 mr-2" />
+                    Open Price Manager
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <TestTube className="w-5 h-5 text-purple-600" />
+                      Sandbox Testing
+                    </CardTitle>
+                    <CardDescription>Test features in an isolated environment</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="border-purple-600 text-purple-600">
+                    Test Mode
+                  </Badge>
+                </div>
+              </CardHeader>
             <CardContent className="space-y-4">
               {sandboxLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -446,6 +473,7 @@ export default function SuperAdminDashboard() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       </main>
 

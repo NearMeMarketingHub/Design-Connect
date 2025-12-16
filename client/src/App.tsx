@@ -23,6 +23,7 @@ import SandboxProject from "@/pages/sandbox-project";
 import SandboxMessages from "@/pages/sandbox-messages";
 import SandboxDocuments from "@/pages/sandbox-documents";
 import SandboxPhotos from "@/pages/sandbox-photos";
+import BudgetAdmin from "@/pages/budget-admin";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -39,6 +40,11 @@ function Router() {
   // Super Admin Dashboard has its own header, so render without Layout
   if (location === "/super-admin") {
     return <SuperAdminDashboard />;
+  }
+  
+  // Budget Admin has its own header
+  if (location === "/budget-admin") {
+    return <BudgetAdmin />;
   }
   
   // Sandbox pages have their own headers
