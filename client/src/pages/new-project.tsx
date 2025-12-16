@@ -137,6 +137,7 @@ export default function NewProject() {
           size="icon"
           onClick={() => setLocation("/admin-dashboard")}
           data-testid="button-back"
+          className="hover:bg-muted transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -345,7 +346,7 @@ export default function NewProject() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full hover:bg-primary/90 hover:scale-[1.02] transition-all"
               size="lg"
               disabled={createProjectMutation.isPending}
               data-testid="button-create-project"

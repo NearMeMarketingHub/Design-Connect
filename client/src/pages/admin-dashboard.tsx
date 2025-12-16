@@ -119,12 +119,20 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground mt-1">Manage active jobs, estimates, and schedules.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportReport} data-testid="button-export-report">
+          <Button 
+            variant="outline" 
+            onClick={handleExportReport} 
+            data-testid="button-export-report"
+            className="hover:bg-muted hover:scale-[1.02] transition-all"
+          >
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
           <Link href="/new-project">
-            <Button className="bg-primary text-primary-foreground" data-testid="button-new-project">
+            <Button 
+              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-all" 
+              data-testid="button-new-project"
+            >
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
@@ -193,7 +201,7 @@ export default function AdminDashboard() {
                   data-testid="input-search-projects"
                 />
               </div>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" className="hover:bg-muted transition-colors">
                 <Filter className="w-4 h-4" />
               </Button>
             </div>
@@ -214,7 +222,10 @@ export default function AdminDashboard() {
               </p>
               {!searchQuery && (
                 <Link href="/new-project">
-                  <Button data-testid="button-create-first-project">
+                  <Button 
+                    data-testid="button-create-first-project"
+                    className="hover:bg-primary/90 hover:scale-[1.02] transition-all"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Create Project
                   </Button>
