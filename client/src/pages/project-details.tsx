@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
@@ -201,12 +205,43 @@ const TEAM_MEMBERS = [
   { id: 3, name: "Tom Electric", role: "Electrician", initials: "TE", email: "tom@buildvision.com", phone: "(555) 345-6789" }
 ];
 
+// Status and phase options for contractor editing
+const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
+const PHASES_BY_STATUS: Record<string, string[]> = {
+  "Planning": ["Pre-Construction", "Design Development", "Permitting"],
+  "Active": ["Foundation", "Framing", "Rough-In", "Drywall", "Finishes", "Final Inspection", "Handover"],
+  "On Hold": ["On Hold"],
+  "Completed": ["Project Complete"]
+};
+
+// Get all unique phases including any custom/legacy phases
+const getAllPhases = (status: string, currentPhase?: string): string[] => {
+  const standardPhases = PHASES_BY_STATUS[status] || [];
+  // Include the current phase if it's not in the standard list (for legacy/custom phases)
+  if (currentPhase && !standardPhases.includes(currentPhase)) {
+    return [currentPhase, ...standardPhases];
+  }
+  return standardPhases;
+};
+
 export default function ProjectDetails() {
   const params = useParams<{ id: string }>();
   const [location] = useLocation();
   const projectId = params.id || "";
   const staticProject = PROJECTS_DATA[projectId];
   const queryClient = useQueryClient();
+  const { user, currentPortal } = useAuth();
+  
+  // Contractor controls - check if user can edit this project
+  const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
+  const canEdit = isContractorView && (user?.role === 'contractor' || user?.role === 'admin');
+  
+  // State for contractor editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editStatus, setEditStatus] = useState("");
+  const [editPhase, setEditPhase] = useState("");
+  const [editProgress, setEditProgress] = useState(0);
+  const [editDescription, setEditDescription] = useState("");
   
   // Parse tab and admin context from URL query parameter (needed before API call)
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -246,6 +281,51 @@ export default function ProjectDetails() {
     description: apiProject.description || ""
   } : null);
   const [activeTab, setActiveTab] = useState(tabFromUrl || "overview");
+  
+  // Update project mutation for contractor editing
+  const updateProjectMutation = useMutation({
+    mutationFn: async (data: { status?: string; phase?: string; progress?: number; description?: string }) => {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Failed to update project');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/projects', projectId, isFromAdmin] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setIsEditing(false);
+    }
+  });
+  
+  // Initialize edit state when entering edit mode
+  const startEditing = () => {
+    if (project) {
+      setEditStatus(project.status);
+      setEditPhase(project.phase);
+      setEditProgress(project.progress);
+      setEditDescription(project.description || "");
+      setIsEditing(true);
+    }
+  };
+  
+  // Save project changes
+  const saveProjectChanges = () => {
+    updateProjectMutation.mutate({
+      status: editStatus,
+      phase: editPhase,
+      progress: editProgress,
+      description: editDescription
+    });
+  };
+  
+  // Get available phases for the selected status (includes current phase if not in standard list)
+  const getAvailablePhases = (status: string) => {
+    return getAllPhases(status, project?.phase);
+  };
   
   // Update tab when URL changes
   useEffect(() => {
@@ -766,6 +846,104 @@ export default function ProjectDetails() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Contractor Controls - Only visible to contractors/admins */}
+            {canEdit && !staticProject && (
+              <Card className="border-primary/20 bg-primary/5" data-testid="card-contractor-controls">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Pencil className="h-5 w-5" />
+                      Project Controls
+                    </CardTitle>
+                    {!isEditing ? (
+                      <Button onClick={startEditing} variant="outline" size="sm" data-testid="button-edit-project">
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit Project
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button onClick={() => setIsEditing(false)} variant="outline" size="sm" data-testid="button-cancel-edit">
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={saveProjectChanges} 
+                          size="sm" 
+                          disabled={updateProjectMutation.isPending}
+                          data-testid="button-save-project"
+                        >
+                          {updateProjectMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                {isEditing && (
+                  <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-status">Status</Label>
+                        <Select value={editStatus} onValueChange={(value) => {
+                          setEditStatus(value);
+                          const phases = getAllPhases(value, editPhase);
+                          if (phases.length > 0 && !phases.includes(editPhase)) {
+                            setEditPhase(phases[0]);
+                          }
+                        }}>
+                          <SelectTrigger id="edit-status" data-testid="select-edit-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PROJECT_STATUSES.map((status) => (
+                              <SelectItem key={status} value={status}>{status}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-phase">Phase</Label>
+                        <Select value={editPhase} onValueChange={setEditPhase}>
+                          <SelectTrigger id="edit-phase" data-testid="select-edit-phase">
+                            <SelectValue placeholder="Select phase" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAllPhases(editStatus, editPhase).map((phase) => (
+                              <SelectItem key={phase} value={phase}>{phase}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="edit-progress">Progress</Label>
+                        <span className="text-sm font-medium">{editProgress}%</span>
+                      </div>
+                      <Slider
+                        id="edit-progress"
+                        value={[editProgress]}
+                        onValueChange={(value) => setEditProgress(value[0])}
+                        max={100}
+                        step={5}
+                        className="w-full"
+                        data-testid="slider-edit-progress"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-description">Description</Label>
+                      <Textarea
+                        id="edit-description"
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        placeholder="Project description..."
+                        rows={3}
+                        data-testid="textarea-edit-description"
+                      />
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            )}
 
             {/* Main Content Grid */}
             <div className="grid md:grid-cols-3 gap-6">
