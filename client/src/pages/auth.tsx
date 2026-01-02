@@ -44,6 +44,7 @@ export default function AuthPage() {
   // Contractor request states
   const [requestSubmitted, setRequestSubmitted] = useState(false);
   const [companyType, setCompanyType] = useState("");
+  const [customCompanyType, setCustomCompanyType] = useState("");
 
   const handleClientAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -118,6 +119,11 @@ export default function AuthPage() {
           throw new Error("Please select a company type");
         }
 
+        const finalCompanyType = companyType === "Other" ? customCompanyType : companyType;
+        if (companyType === "Other" && !customCompanyType.trim()) {
+          throw new Error("Please specify your company type");
+        }
+
         const res = await fetch("/api/contractor-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -126,7 +132,7 @@ export default function AuthPage() {
             lastName,
             username,
             companyName,
-            companyType,
+            companyType: finalCompanyType,
             email
           })
         });
@@ -405,6 +411,19 @@ export default function AuthPage() {
                                 </SelectContent>
                               </Select>
                             </div>
+                            {companyType === "Other" && (
+                              <div className="space-y-2">
+                                <Label htmlFor="custom-company-type">Please specify</Label>
+                                <Input 
+                                  id="custom-company-type" 
+                                  value={customCompanyType}
+                                  onChange={(e) => setCustomCompanyType(e.target.value)}
+                                  placeholder="e.g., Solar Installer, Pool Builder" 
+                                  required 
+                                  data-testid="input-custom-company-type"
+                                />
+                              </div>
+                            )}
                             <div className="space-y-2">
                               <Label htmlFor="admin-signup-email">Work Email (Optional)</Label>
                               <Input 
