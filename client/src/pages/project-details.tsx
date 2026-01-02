@@ -686,29 +686,28 @@ export default function ProjectDetails() {
       
       try {
         // Get presigned upload URL
-        const signedRes = await fetch('/objects/signed-upload', {
+        const signedRes = await fetch('/api/uploads/request-url', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            directory: 'posts'
+            name: file.name,
+            size: file.size,
+            contentType: file.type
           })
         });
         if (!signedRes.ok) throw new Error('Failed to get upload URL');
-        const { signedUrl, key } = await signedRes.json();
+        const { uploadURL, objectPath } = await signedRes.json();
         
         // Upload to object storage
-        const uploadRes = await fetch(signedUrl, {
+        const uploadRes = await fetch(uploadURL, {
           method: 'PUT',
           headers: { 'Content-Type': file.type },
           body: file
         });
         if (!uploadRes.ok) throw new Error('Upload failed');
         
-        // Build public URL
-        const publicUrl = `/objects/${key}`;
-        setNewPostImages(prev => [...prev, publicUrl]);
+        // Use the object path as the public URL
+        setNewPostImages(prev => [...prev, objectPath]);
       } catch (error) {
         console.error('Upload failed:', error);
         alert('Failed to upload image');
