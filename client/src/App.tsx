@@ -30,6 +30,7 @@ import ContractorManagement from "@/pages/contractor-management";
 import ContractorProfile from "@/pages/contractor-profile";
 import MyProfile from "@/pages/my-profile";
 import ContractorCalculator from "@/pages/contractor-calculator";
+import FloorCalculator from "@/pages/floor-calculator";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -81,6 +82,11 @@ function Router() {
   // Contractor Calculator has its own header
   if (location === "/calculator") {
     return <ContractorCalculator />;
+  }
+  
+  // Floor Calculator has its own header
+  if (location === "/floor-calculator") {
+    return <FloorCalculator />;
   }
   
   // Sandbox pages have their own headers

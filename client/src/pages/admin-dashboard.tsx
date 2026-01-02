@@ -10,7 +10,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Search, Plus, Filter, Download, Calculator } from "lucide-react";
+import { Search, Plus, Filter, Download, Calculator, Ruler } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -128,6 +128,16 @@ export default function AdminDashboard() {
             >
               <Calculator className="w-4 h-4 mr-2" />
               Calculator
+            </Button>
+          </Link>
+          <Link href="/floor-calculator">
+            <Button 
+              variant="outline"
+              data-testid="button-floor-calculator"
+              className="hover:bg-muted hover:scale-[1.02] transition-all"
+            >
+              <Ruler className="w-4 h-4 mr-2" />
+              Floor Calc
             </Button>
           </Link>
           <Button 
