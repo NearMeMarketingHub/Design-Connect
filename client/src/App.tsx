@@ -26,6 +26,7 @@ import SandboxDocuments from "@/pages/sandbox-documents";
 import SandboxPhotos from "@/pages/sandbox-photos";
 import BudgetAdmin from "@/pages/budget-admin";
 import AcceptInvite from "@/pages/accept-invite";
+import ContractorManagement from "@/pages/contractor-management";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -52,6 +53,11 @@ function Router() {
   // Super Admin Dashboard has its own header, so render without Layout
   if (location === "/super-admin") {
     return <SuperAdminDashboard />;
+  }
+  
+  // Contractor Management has its own header
+  if (location === "/super-admin/contractors") {
+    return <ContractorManagement />;
   }
   
   // Budget Admin has its own header

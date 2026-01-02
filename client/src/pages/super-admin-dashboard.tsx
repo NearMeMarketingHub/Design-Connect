@@ -356,140 +356,22 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
-          <Card className={(pendingContractors.length + contractorRequests.length) > 0 ? "border-orange-300 bg-orange-50" : ""}>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${(pendingContractors.length + contractorRequests.length) > 0 ? "bg-orange-200" : "bg-orange-100"}`}>
-                  <Clock className={`w-6 h-6 ${(pendingContractors.length + contractorRequests.length) > 0 ? "text-orange-700" : "text-orange-600"}`} />
+          <Link href="/super-admin/contractors">
+            <Card className={`cursor-pointer hover:shadow-md transition-shadow ${(pendingContractors.length + contractorRequests.length) > 0 ? "border-orange-300 bg-orange-50" : ""}`}>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-lg ${(pendingContractors.length + contractorRequests.length) > 0 ? "bg-orange-200" : "bg-orange-100"}`}>
+                    <Clock className={`w-6 h-6 ${(pendingContractors.length + contractorRequests.length) > 0 ? "text-orange-700" : "text-orange-600"}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pending Requests</p>
+                    <h3 className="text-2xl font-bold text-foreground">{pendingContractors.length + contractorRequests.length}</h3>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Requests</p>
-                  <h3 className="text-2xl font-bold text-foreground">{pendingContractors.length + contractorRequests.length}</h3>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
-
-        {pendingContractors.length > 0 && (
-          <Card className="border-orange-300">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-orange-600" />
-                Pending Contractor Approvals
-              </CardTitle>
-              <CardDescription>Review and approve new contractor registrations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingContractors.map((contractor) => (
-                    <TableRow key={contractor.id} data-testid={`row-pending-contractor-${contractor.id}`}>
-                      <TableCell className="font-medium">{contractor.name || "No name"}</TableCell>
-                      <TableCell>{contractor.username}</TableCell>
-                      <TableCell>{contractor.email}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="border-green-500 text-green-600 hover:bg-green-50"
-                            onClick={() => approveContractorMutation.mutate(contractor.id)}
-                            disabled={approveContractorMutation.isPending}
-                            data-testid={`btn-approve-contractor-${contractor.id}`}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="border-red-500 text-red-600 hover:bg-red-50"
-                            onClick={() => rejectContractorMutation.mutate(contractor.id)}
-                            disabled={rejectContractorMutation.isPending}
-                            data-testid={`btn-reject-contractor-${contractor.id}`}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-
-        {contractorRequests.length > 0 && (
-          <Card className="border-blue-300">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-blue-600" />
-                Contractor Access Requests
-              </CardTitle>
-              <CardDescription>Review access requests from new contractors</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contractorRequests.map((request) => (
-                    <TableRow key={request.id} data-testid={`row-contractor-request-${request.id}`}>
-                      <TableCell className="font-medium">{request.firstName} {request.lastName}</TableCell>
-                      <TableCell>{request.username}</TableCell>
-                      <TableCell>{request.companyName}</TableCell>
-                      <TableCell>{request.companyType}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="border-green-500 text-green-600 hover:bg-green-50"
-                            onClick={() => approveRequestMutation.mutate(request.id)}
-                            disabled={approveRequestMutation.isPending}
-                            data-testid={`btn-approve-request-${request.id}`}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="border-red-500 text-red-600 hover:bg-red-50"
-                            onClick={() => rejectRequestMutation.mutate(request.id)}
-                            disabled={rejectRequestMutation.isPending}
-                            data-testid={`btn-reject-request-${request.id}`}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
