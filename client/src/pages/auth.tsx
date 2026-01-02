@@ -4,11 +4,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardHat, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HardHat, ArrowRight, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import heroImage from "@assets/generated_images/construction_site_frame_with_sunset.png";
+
+const COMPANY_TYPES = [
+  "General Contractor",
+  "Project Manager",
+  "Lead Designer",
+  "Electrician",
+  "Plumber",
+  "HVAC Technician",
+  "Carpenter",
+  "Roofer",
+  "Painter",
+  "Flooring Specialist",
+  "Mason",
+  "Landscaper",
+  "Other"
+];
 
 export default function AuthPage() {
   const [_, setLocation] = useLocation();
@@ -23,6 +40,10 @@ export default function AuthPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
+  
+  // Contractor request states
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [companyType, setCompanyType] = useState("");
 
   const handleClientAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -86,37 +107,41 @@ export default function AuthPage() {
         });
         setLocation("/admin-dashboard");
       } else {
-        const companyName = formData.get("company-name") as string;
+        // Submit access request (no account creation)
         const firstName = formData.get("admin-first-name") as string;
         const lastName = formData.get("admin-last-name") as string;
         const username = formData.get("admin-username") as string;
+        const companyName = formData.get("company-name") as string;
         const email = formData.get("admin-signup-email") as string;
-        const confirmPassword = formData.get("admin-confirm-password") as string;
 
-        if (password !== confirmPassword) {
-          throw new Error("Passwords do not match");
+        if (!companyType) {
+          throw new Error("Please select a company type");
         }
 
-        const result = await register(username, email, password, "contractor", `${firstName} ${lastName} - ${companyName}`);
-        
-        if (result.pendingApproval) {
-          toast({
-            title: "Account Created",
-            description: result.message || "Your account is pending admin approval. You will be notified when approved.",
-          });
-          setIsLogin(true);
-        } else {
-          toast({
-            title: "Account created!",
-            description: "Welcome to BuildVision.",
-          });
-          setLocation("/admin-dashboard");
+        const res = await fetch("/api/contractor-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            username,
+            companyName,
+            companyType,
+            email
+          })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || "Failed to submit request");
         }
+
+        setRequestSubmitted(true);
       }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Authentication failed",
+        description: error.message || "Request failed",
         variant: "destructive",
       });
     } finally {
@@ -282,146 +307,169 @@ export default function AuthPage() {
             
             <TabsContent value="contractor">
               <Card className="border-border/50 shadow-lg">
-                <CardHeader>
-                  <CardTitle>{isLogin ? "Team Access" : "Partner Registration"}</CardTitle>
-                  <CardDescription>
-                    {isLogin 
-                      ? "Secure login for project managers and estimators." 
-                      : "Join the network of certified contractors."}
-                  </CardDescription>
-                </CardHeader>
-                <form onSubmit={handleContractorAuth}>
-                  <CardContent className="space-y-4">
-                    {!isLogin && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="company-name">Company Name</Label>
-                          <Input 
-                            id="company-name" 
-                            name="company-name"
-                            placeholder="Acme Construction" 
-                            required 
-                            data-testid="input-company-name"
-                          />
+                {requestSubmitted && !isLogin ? (
+                  <>
+                    <CardHeader>
+                      <div className="flex items-center justify-center mb-4">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                          <CheckCircle2 className="w-8 h-8 text-green-600" />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="admin-first-name">First Name</Label>
-                            <Input 
-                              id="admin-first-name" 
-                              name="admin-first-name"
-                              placeholder="Mike" 
-                              required 
-                              data-testid="input-admin-first-name"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="admin-last-name">Last Name</Label>
-                            <Input 
-                              id="admin-last-name" 
-                              name="admin-last-name"
-                              placeholder="Builder" 
-                              required 
-                              data-testid="input-admin-last-name"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="admin-username">Username</Label>
-                          <Input 
-                            id="admin-username" 
-                            name="admin-username"
-                            placeholder="mikebuilder" 
-                            required 
-                            data-testid="input-admin-username"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="admin-signup-email">Work Email</Label>
-                          <Input 
-                            id="admin-signup-email" 
-                            name="admin-signup-email"
-                            type="email"
-                            placeholder="admin@buildvision.com"
-                            required 
-                            data-testid="input-admin-signup-email"
-                          />
-                        </div>
-                      </>
-                    )}
-                    {isLogin && (
-                      <div className="space-y-2">
-                        <Label htmlFor="admin-email">Email or Username</Label>
-                        <Input 
-                          id="admin-email" 
-                          name="admin-email"
-                          type="text"
-                          placeholder="email or username"
-                          required 
-                          data-testid="input-admin-email"
-                        />
                       </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-password">Password</Label>
-                      <div className="relative">
-                        <Input 
-                          id="admin-password" 
-                          name="admin-password"
-                          type={showAdminPassword ? "text" : "password"}
-                          required 
-                          data-testid="input-admin-password"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowAdminPassword(!showAdminPassword)}
-                          data-testid="button-toggle-admin-password"
+                      <CardTitle className="text-center">Request Submitted!</CardTitle>
+                      <CardDescription className="text-center">
+                        Your access request has been submitted successfully. Our team will review your application and you will receive login credentials via email once approved.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button 
+                        className="w-full" 
+                        variant="outline"
+                        onClick={() => {
+                          setRequestSubmitted(false);
+                          setIsLogin(true);
+                        }}
+                        data-testid="button-back-to-login"
+                      >
+                        Back to Login
+                      </Button>
+                    </CardContent>
+                  </>
+                ) : (
+                  <>
+                    <CardHeader>
+                      <CardTitle>{isLogin ? "Team Access" : "Request Access"}</CardTitle>
+                      <CardDescription>
+                        {isLogin 
+                          ? "Secure login for project managers and estimators." 
+                          : "Submit your request to join the BuildVision network."}
+                      </CardDescription>
+                    </CardHeader>
+                    <form onSubmit={handleContractorAuth}>
+                      <CardContent className="space-y-4">
+                        {!isLogin && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="admin-first-name">First Name</Label>
+                                <Input 
+                                  id="admin-first-name" 
+                                  name="admin-first-name"
+                                  placeholder="Mike" 
+                                  required 
+                                  data-testid="input-admin-first-name"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="admin-last-name">Last Name</Label>
+                                <Input 
+                                  id="admin-last-name" 
+                                  name="admin-last-name"
+                                  placeholder="Builder" 
+                                  required 
+                                  data-testid="input-admin-last-name"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="admin-username">Username</Label>
+                              <Input 
+                                id="admin-username" 
+                                name="admin-username"
+                                placeholder="mikebuilder" 
+                                required 
+                                data-testid="input-admin-username"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="company-name">Company Name</Label>
+                              <Input 
+                                id="company-name" 
+                                name="company-name"
+                                placeholder="Acme Construction" 
+                                required 
+                                data-testid="input-company-name"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="company-type">Company Type</Label>
+                              <Select value={companyType} onValueChange={setCompanyType}>
+                                <SelectTrigger data-testid="select-company-type">
+                                  <SelectValue placeholder="Select company type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {COMPANY_TYPES.map((type) => (
+                                    <SelectItem key={type} value={type}>
+                                      {type}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="admin-signup-email">Work Email (Optional)</Label>
+                              <Input 
+                                id="admin-signup-email" 
+                                name="admin-signup-email"
+                                type="email"
+                                placeholder="admin@company.com"
+                                data-testid="input-admin-signup-email"
+                              />
+                            </div>
+                          </>
+                        )}
+                        {isLogin && (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="admin-email">Email or Username</Label>
+                              <Input 
+                                id="admin-email" 
+                                name="admin-email"
+                                type="text"
+                                placeholder="email or username"
+                                required 
+                                data-testid="input-admin-email"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="admin-password">Password</Label>
+                              <div className="relative">
+                                <Input 
+                                  id="admin-password" 
+                                  name="admin-password"
+                                  type={showAdminPassword ? "text" : "password"}
+                                  required 
+                                  data-testid="input-admin-password"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                  onClick={() => setShowAdminPassword(!showAdminPassword)}
+                                  data-testid="button-toggle-admin-password"
+                                >
+                                  {showAdminPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                      <CardFooter>
+                        <Button 
+                          type="submit" 
+                          className="w-full font-medium" 
+                          variant="default" 
+                          disabled={loading}
+                          data-testid="button-contractor-submit"
                         >
-                          {showAdminPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                          {loading ? "Please wait..." : isLogin ? "Access Dashboard" : "Submit Request"} 
+                          {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                         </Button>
-                      </div>
-                    </div>
-                    {!isLogin && (
-                      <div className="space-y-2">
-                        <Label htmlFor="admin-confirm-password">Confirm Password</Label>
-                        <div className="relative">
-                          <Input 
-                            id="admin-confirm-password" 
-                            name="admin-confirm-password"
-                            type={showAdminConfirmPassword ? "text" : "password"}
-                            required 
-                            data-testid="input-admin-confirm-password"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowAdminConfirmPassword(!showAdminConfirmPassword)}
-                            data-testid="button-toggle-admin-confirm-password"
-                          >
-                            {showAdminConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      type="submit" 
-                      className="w-full font-medium" 
-                      variant="default" 
-                      disabled={loading}
-                      data-testid="button-contractor-submit"
-                    >
-                      {loading ? "Please wait..." : isLogin ? "Access Dashboard" : "Register Company"} 
-                      {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
-                    </Button>
-                  </CardFooter>
-                </form>
+                      </CardFooter>
+                    </form>
+                  </>
+                )}
               </Card>
             </TabsContent>
           </Tabs>

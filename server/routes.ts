@@ -1038,5 +1038,114 @@ export async function registerRoutes(
     }
   });
 
+  // Contractor access request routes
+  app.post("/api/contractor-requests", async (req, res, next) => {
+    try {
+      const { firstName, lastName, username, companyName, companyType, email } = req.body;
+      
+      if (!firstName || !lastName || !username || !companyName || !companyType) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+
+      const request = await storage.createContractorRequest({
+        firstName,
+        lastName,
+        username,
+        companyName,
+        companyType,
+        email: email || null,
+        status: "pending"
+      });
+
+      res.status(201).json({ 
+        message: "Your request has been submitted successfully. You will receive a response shortly.",
+        request 
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/contractor-requests", requireAdmin, async (req, res, next) => {
+    try {
+      const requests = await storage.getContractorRequests();
+      res.json(requests);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/contractor-requests/pending", requireAdmin, async (req, res, next) => {
+    try {
+      const requests = await storage.getPendingContractorRequests();
+      res.json(requests);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/contractor-requests/:id/approve", requireAdmin, async (req, res, next) => {
+    try {
+      const request = await storage.getContractorRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+
+      // Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+      // Create the contractor account
+      const newUser = await storage.createUser({
+        username: request.username,
+        email: request.email || undefined,
+        password: hashedPassword,
+        role: "contractor",
+        name: `${request.firstName} ${request.lastName} - ${request.companyName}`,
+        isApproved: true,
+      });
+
+      // Update request status
+      await storage.updateContractorRequest(req.params.id, {
+        status: "approved",
+        reviewedAt: new Date(),
+        reviewedBy: (req.user as User).id
+      });
+
+      res.json({ 
+        message: "Contractor approved successfully",
+        user: { ...newUser, password: undefined },
+        tempPassword // In production, this would be sent via email
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/contractor-requests/:id/reject", requireAdmin, async (req, res, next) => {
+    try {
+      const request = await storage.getContractorRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+
+      await storage.updateContractorRequest(req.params.id, {
+        status: "rejected",
+        reviewedAt: new Date(),
+        reviewedBy: (req.user as User).id
+      });
+
+      res.json({ message: "Request rejected" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }

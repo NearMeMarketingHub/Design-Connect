@@ -19,7 +19,8 @@ import type {
   PostReaction, InsertPostReaction,
   BudgetCategory, InsertBudgetCategory,
   BudgetItem, InsertBudgetItem,
-  ProjectInvite, InsertProjectInvite
+  ProjectInvite, InsertProjectInvite,
+  ContractorRequest, InsertContractorRequest
 } from "@shared/schema";
 
 export interface IStorage {
@@ -129,6 +130,13 @@ export interface IStorage {
   getProjectInvitesByProjectId(projectId: string): Promise<ProjectInvite[]>;
   updateProjectInvite(id: string, data: Partial<InsertProjectInvite>): Promise<ProjectInvite | undefined>;
   acceptProjectInvite(token: string, userId: string): Promise<ProjectInvite | undefined>;
+
+  // Contractor request methods
+  createContractorRequest(request: InsertContractorRequest): Promise<ContractorRequest>;
+  getContractorRequests(): Promise<ContractorRequest[]>;
+  getPendingContractorRequests(): Promise<ContractorRequest[]>;
+  getContractorRequest(id: string): Promise<ContractorRequest | undefined>;
+  updateContractorRequest(id: string, data: Partial<ContractorRequest>): Promise<ContractorRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -710,6 +718,30 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.projectInvites.token, token))
       .returning();
     return invite;
+  }
+
+  // Contractor request methods
+  async createContractorRequest(insertRequest: InsertContractorRequest): Promise<ContractorRequest> {
+    const [request] = await db.insert(schema.contractorRequests).values(insertRequest).returning();
+    return request;
+  }
+
+  async getContractorRequests(): Promise<ContractorRequest[]> {
+    return await db.select().from(schema.contractorRequests).orderBy(schema.contractorRequests.createdAt);
+  }
+
+  async getPendingContractorRequests(): Promise<ContractorRequest[]> {
+    return await db.select().from(schema.contractorRequests).where(eq(schema.contractorRequests.status, "pending")).orderBy(schema.contractorRequests.createdAt);
+  }
+
+  async getContractorRequest(id: string): Promise<ContractorRequest | undefined> {
+    const [request] = await db.select().from(schema.contractorRequests).where(eq(schema.contractorRequests.id, id));
+    return request;
+  }
+
+  async updateContractorRequest(id: string, updateData: Partial<ContractorRequest>): Promise<ContractorRequest | undefined> {
+    const [request] = await db.update(schema.contractorRequests).set(updateData).where(eq(schema.contractorRequests.id, id)).returning();
+    return request;
   }
 }
 

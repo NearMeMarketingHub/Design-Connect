@@ -272,3 +272,22 @@ export const projectInvites = pgTable("project_invites", {
 export const insertProjectInviteSchema = createInsertSchema(projectInvites).omit({ id: true, createdAt: true });
 export type InsertProjectInvite = z.infer<typeof insertProjectInviteSchema>;
 export type ProjectInvite = typeof projectInvites.$inferSelect;
+
+// Contractor access requests
+export const contractorRequests = pgTable("contractor_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  username: text("username").notNull(),
+  companyName: text("company_name").notNull(),
+  companyType: text("company_type").notNull(),
+  email: text("email"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+});
+
+export const insertContractorRequestSchema = createInsertSchema(contractorRequests).omit({ id: true, createdAt: true, reviewedAt: true, reviewedBy: true });
+export type InsertContractorRequest = z.infer<typeof insertContractorRequestSchema>;
+export type ContractorRequest = typeof contractorRequests.$inferSelect;
