@@ -147,18 +147,6 @@ export default function ContractorManagement() {
     },
   });
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user || user.role !== "admin") {
-    return null;
-  }
-
   const activeContractors = contractors.filter((c: Omit<User, "password">) => c.isApproved && !c.isSandbox);
   const totalPending = pendingContractors.length + contractorRequests.length;
 
@@ -202,6 +190,18 @@ export default function ContractorManagement() {
       setSortOrder("asc");
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user || user.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -372,7 +372,13 @@ export default function ContractorManagement() {
                     <TableBody>
                       {sortedContractors.map((contractor: Omit<User, "password">) => (
                         <TableRow key={contractor.id} data-testid={`row-contractor-${contractor.id}`}>
-                          <TableCell className="font-medium">{contractor.name || "No name"}</TableCell>
+                          <TableCell className="font-medium">
+                            <Link href={`/super-admin/contractors/${contractor.id}`}>
+                              <span className="text-primary hover:underline cursor-pointer">
+                                {contractor.name || "No name"}
+                              </span>
+                            </Link>
+                          </TableCell>
                           <TableCell>{contractor.companyName || "-"}</TableCell>
                           <TableCell>
                             {contractor.companyType ? (

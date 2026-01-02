@@ -27,6 +27,7 @@ import SandboxPhotos from "@/pages/sandbox-photos";
 import BudgetAdmin from "@/pages/budget-admin";
 import AcceptInvite from "@/pages/accept-invite";
 import ContractorManagement from "@/pages/contractor-management";
+import ContractorProfile from "@/pages/contractor-profile";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -58,6 +59,16 @@ function Router() {
   // Contractor Management has its own header
   if (location === "/super-admin/contractors") {
     return <ContractorManagement />;
+  }
+  
+  // Contractor Profile has its own header
+  if (location.startsWith("/super-admin/contractors/")) {
+    return (
+      <Switch>
+        <Route path="/super-admin/contractors/:id" component={ContractorProfile} />
+        <Route component={NotFound} />
+      </Switch>
+    );
   }
   
   // Budget Admin has its own header
