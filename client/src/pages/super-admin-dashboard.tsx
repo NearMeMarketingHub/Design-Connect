@@ -283,6 +283,17 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/super-admin/contractors">
+            <Button variant="outline" size="sm" data-testid="btn-manage-contractors">
+              <Users className="w-4 h-4 mr-2" />
+              Manage Contractors
+              {(pendingContractors.length + contractorRequests.length) > 0 && (
+                <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-700">
+                  {pendingContractors.length + contractorRequests.length}
+                </Badge>
+              )}
+            </Button>
+          </Link>
           <Badge variant="outline" className="border-green-600 text-green-600">
             Admin Mode
           </Badge>
