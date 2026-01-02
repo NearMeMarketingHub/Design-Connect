@@ -175,26 +175,26 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={user?.profilePicture || ""} />
-                <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-              </Avatar>
+              <ObjectUploader
+                maxNumberOfFiles={1}
+                maxFileSize={5242880}
+                onGetUploadParameters={getUploadParameters}
+                onComplete={handleUploadComplete}
+                buttonClassName="p-0 h-auto rounded-full relative group cursor-pointer"
+                buttonVariant="ghost"
+                testId="btn-upload-profile-photo"
+              >
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={user?.profilePicture || ""} />
+                  <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="w-5 h-5 text-white" />
+                </div>
+              </ObjectUploader>
               <div className="flex-1">
                 <p className="font-medium">{user?.name || 'User'}</p>
                 <p className="text-sm text-muted-foreground">{user?.role === 'client' ? 'Homeowner' : user?.role === 'admin' ? 'Administrator' : 'Contractor'}</p>
-                <div className="mt-2">
-                  <ObjectUploader
-                    maxNumberOfFiles={1}
-                    maxFileSize={5242880}
-                    onGetUploadParameters={getUploadParameters}
-                    onComplete={handleUploadComplete}
-                    buttonClassName="h-8 text-xs gap-1"
-                    testId="btn-upload-profile-photo"
-                  >
-                    <Camera className="w-3 h-3" />
-                    {user?.profilePicture ? "Change Photo" : "Upload Photo"}
-                  </ObjectUploader>
-                </div>
               </div>
             </div>
 
