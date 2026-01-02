@@ -28,6 +28,7 @@ import BudgetAdmin from "@/pages/budget-admin";
 import AcceptInvite from "@/pages/accept-invite";
 import ContractorManagement from "@/pages/contractor-management";
 import ContractorProfile from "@/pages/contractor-profile";
+import MyProfile from "@/pages/my-profile";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -95,6 +96,7 @@ function Router() {
       <Switch>
         <Route path="/dashboard" component={ClientDashboard} />
         <Route path="/my-projects" component={ClientProjects} />
+        <Route path="/my-profile" component={MyProfile} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/admin-dashboard" component={AdminDashboard} />
         

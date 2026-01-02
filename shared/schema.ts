@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   name: text("name"),
   companyName: text("company_name"),
   companyType: text("company_type"),
+  profilePicture: text("profile_picture"),
   isSandbox: boolean("is_sandbox").default(false),
   isApproved: boolean("is_approved").default(true),
 });

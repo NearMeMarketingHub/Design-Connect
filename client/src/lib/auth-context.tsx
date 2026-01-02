@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (username: string, email: string, password: string, role: string, name?: string) => Promise<{ pendingApproval?: boolean; message?: string }>;
   logout: () => Promise<void>;
   setPortal: (portal: 'client' | 'contractor' | 'admin') => void;
+  refetch: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,8 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('currentPortal');
   };
 
+  const refetch = async () => {
+    await checkAuth();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, currentPortal, login, register, logout, setPortal }}>
+    <AuthContext.Provider value={{ user, loading, currentPortal, login, register, logout, setPortal, refetch }}>
       {children}
     </AuthContext.Provider>
   );

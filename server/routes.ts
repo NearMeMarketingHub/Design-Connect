@@ -9,6 +9,7 @@ import connectPgSimple from "connect-pg-simple";
 import pkg from "pg";
 const { Pool } = pkg;
 import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage } from "@shared/schema";
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 
 const PgSession = connectPgSimple(session);
 
@@ -1144,6 +1145,38 @@ export async function registerRoutes(
       });
 
       res.json({ message: "Request rejected" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Register object storage routes
+  registerObjectStorageRoutes(app);
+
+  // Update user profile picture
+  app.post("/api/user/profile-picture", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const user = req.user as User;
+      const { objectPath } = req.body;
+      
+      if (!objectPath) {
+        return res.status(400).json({ error: "Object path required" });
+      }
+
+      // Set the ACL policy to make the profile picture public
+      const objectStorageService = new ObjectStorageService();
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        objectPath,
+        { owner: user.id, visibility: "public" }
+      );
+
+      // Update user's profile picture in database
+      await storage.updateUser(user.id, { profilePicture: normalizedPath });
+
+      res.json({ success: true, profilePicture: normalizedPath });
     } catch (error) {
       next(error);
     }

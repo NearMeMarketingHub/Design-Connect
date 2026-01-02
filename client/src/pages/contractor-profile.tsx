@@ -133,9 +133,17 @@ export default function ContractorProfile() {
           <Card className="lg:col-span-1">
             <CardHeader>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-primary" />
-                </div>
+                {contractor.profilePicture ? (
+                  <img 
+                    src={contractor.profilePicture} 
+                    alt={contractor.name || contractor.username}
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <UserIcon className="w-8 h-8 text-primary" />
+                  </div>
+                )}
                 <div>
                   <CardTitle>{contractor.name || contractor.username}</CardTitle>
                   <CardDescription>
