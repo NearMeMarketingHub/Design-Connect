@@ -28,7 +28,7 @@ Last Updated: December 16, 2025
 - [ ] Build contractor-facing calculator using admin-managed pricing data
 - [ ] Floor Calculator for room-based square footage calculations
 - [ ] Generate estimate summaries that can be attached to projects
-- [ ] Building out the post feature for the progress photos on the contractors side of the app
+- [x] Building out the post feature for the progress photos on the contractors side of the app
 - [ ] Plans and Drawings section for Contractor
 - [ ] The ability to choose when uploading a document from the contractor side, whether it needs to be signed or its just being uploaded to have documented in the system
 - [ ] Project-type-specific default milestones - Different preset milestones based on Project Type (Renovation, Remodel, Addition, Commercial, Residential) selected during project creation. Waiting on milestone data.

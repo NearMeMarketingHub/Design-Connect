@@ -580,11 +580,20 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/posts", async (req, res, next) => {
     try {
       const user = req.user as User | undefined;
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Only contractors and admins can create posts
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can create progress posts" });
+      }
+      
       const post = await storage.createProgressPost({
         ...req.body,
         projectId: req.params.projectId,
-        creatorId: user?.id || 'demo-contractor',
-        creatorName: user?.name || req.body.creatorName || 'Contractor',
+        creatorId: user.id,
+        creatorName: user.name || 'Contractor',
       });
       res.json(post);
     } catch (error) {
@@ -594,6 +603,21 @@ export async function registerRoutes(
 
   app.delete("/api/posts/:postId", async (req, res, next) => {
     try {
+      const user = req.user as User | undefined;
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Check post ownership - admins can delete any, contractors only their own
+      const post = await storage.getProgressPost(req.params.postId);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      
+      if (user.role !== 'admin' && post.creatorId !== user.id) {
+        return res.status(403).json({ message: "You can only delete your own posts" });
+      }
+      
       await storage.deleteProgressPost(req.params.postId);
       res.json({ success: true });
     } catch (error) {

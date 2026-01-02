@@ -411,6 +411,10 @@ export default function ProjectDetails() {
   const [postImageIndex, setPostImageIndex] = useState(0);
   const [newComment, setNewComment] = useState("");
   const [replyingToPost, setReplyingToPost] = useState<{ id: string; title: string; coverImage: string } | null>(null);
+  const [createPostOpen, setCreatePostOpen] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState("");
+  const [newPostCaption, setNewPostCaption] = useState("");
+  const [newPostImages, setNewPostImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -596,6 +600,121 @@ export default function ProjectDetails() {
       queryClient.invalidateQueries({ queryKey: ['/api/posts', selectedPost?.id, 'reactions'] });
     }
   });
+
+  // Create progress post mutation
+  const createPostMutation = useMutation({
+    mutationFn: async (data: { title: string; caption: string; images: string[] }) => {
+      const res = await fetch(`/api/projects/${projectId}/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: data.title,
+          caption: data.caption,
+          coverImage: data.images[0] || '',
+          images: data.images
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to create post');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'posts'] });
+      setCreatePostOpen(false);
+      setNewPostTitle("");
+      setNewPostCaption("");
+      setNewPostImages([]);
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to create post');
+    }
+  });
+
+  // Delete progress post mutation
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete post');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'posts'] });
+      setPostDetailOpen(false);
+      setSelectedPost(null);
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to delete post');
+    }
+  });
+
+  const handleCreatePost = () => {
+    if (!newPostTitle.trim() || newPostImages.length === 0) return;
+    createPostMutation.mutate({
+      title: newPostTitle.trim(),
+      caption: newPostCaption.trim(),
+      images: newPostImages
+    });
+  };
+
+  const handleDeletePost = (postId: string) => {
+    if (confirm('Are you sure you want to delete this post?')) {
+      deletePostMutation.mutate(postId);
+    }
+  };
+
+  // Handle post image upload
+  const postImageInputRef = useRef<HTMLInputElement>(null);
+  const handlePostImageUpload = async (files: FileList) => {
+    for (const file of Array.from(files)) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Only image files are allowed');
+        continue;
+      }
+      
+      try {
+        // Get presigned upload URL
+        const signedRes = await fetch('/objects/signed-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type,
+            directory: 'posts'
+          })
+        });
+        if (!signedRes.ok) throw new Error('Failed to get upload URL');
+        const { signedUrl, key } = await signedRes.json();
+        
+        // Upload to object storage
+        const uploadRes = await fetch(signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file
+        });
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        
+        // Build public URL
+        const publicUrl = `/objects/${key}`;
+        setNewPostImages(prev => [...prev, publicUrl]);
+      } catch (error) {
+        console.error('Upload failed:', error);
+        alert('Failed to upload image');
+      }
+    }
+  };
 
   const openPostDetail = (post: any) => {
     setSelectedPost(post);
@@ -1749,6 +1868,15 @@ export default function ProjectDetails() {
                 <h3 className="text-lg font-semibold">Progress Updates</h3>
                 <p className="text-sm text-muted-foreground">Updates and photos from your contractor</p>
               </div>
+              {canEdit && (
+                <Button 
+                  onClick={() => setCreatePostOpen(true)}
+                  data-testid="button-create-post"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Post
+                </Button>
+              )}
             </div>
 
             {/* Demo posts if no API posts */}
@@ -2164,6 +2292,18 @@ export default function ProjectDetails() {
                     <Reply className="w-5 h-5" />
                     Reply
                   </Button>
+                  {canEdit && !selectedPost.id.startsWith('demo-') && 
+                   (user?.role === 'admin' || selectedPost.creatorId === user?.id) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={() => handleDeletePost(selectedPost.id)}
+                      data-testid="button-delete-post"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
 
                 {/* Comments */}
@@ -2219,6 +2359,109 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Post Modal */}
+      <Dialog open={createPostOpen} onOpenChange={(open) => {
+        setCreatePostOpen(open);
+        if (!open) {
+          setNewPostTitle("");
+          setNewPostCaption("");
+          setNewPostImages([]);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Progress Post</DialogTitle>
+            <DialogDescription>Share project updates with photos</DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="post-title">Title</Label>
+              <Input
+                id="post-title"
+                placeholder="e.g., Kitchen Framing Complete"
+                value={newPostTitle}
+                onChange={(e) => setNewPostTitle(e.target.value)}
+                data-testid="input-post-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="post-caption">Description</Label>
+              <Textarea
+                id="post-caption"
+                placeholder="Describe the progress made..."
+                value={newPostCaption}
+                onChange={(e) => setNewPostCaption(e.target.value)}
+                rows={3}
+                data-testid="input-post-caption"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Photos</Label>
+              <input
+                type="file"
+                ref={postImageInputRef}
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handlePostImageUpload(e.target.files);
+                    e.target.value = '';
+                  }
+                }}
+              />
+              
+              {newPostImages.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {newPostImages.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                      <img src={url} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 w-6 h-6"
+                        onClick={() => setNewPostImages(prev => prev.filter((_, i) => i !== idx))}
+                        data-testid={`button-remove-image-${idx}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => postImageInputRef.current?.click()}
+                data-testid="button-upload-post-images"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {newPostImages.length > 0 ? 'Add More Photos' : 'Upload Photos'}
+              </Button>
+              <p className="text-xs text-muted-foreground">Max 5MB per image. At least one photo required.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreatePostOpen(false)} data-testid="button-cancel-post">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreatePost}
+              disabled={!newPostTitle.trim() || newPostImages.length === 0 || createPostMutation.isPending}
+              data-testid="button-submit-post"
+            >
+              {createPostMutation.isPending ? 'Creating...' : 'Create Post'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
