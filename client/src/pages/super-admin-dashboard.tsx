@@ -53,7 +53,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import type { Project, User } from "@shared/schema";
+import type { Project, User, ContractorRequest } from "@shared/schema";
 
 export default function SuperAdminDashboard() {
   const [_, setLocation] = useLocation();
@@ -98,6 +98,12 @@ export default function SuperAdminDashboard() {
   const { data: pendingContractors = [], isLoading: pendingLoading } = useQuery({
     queryKey: ["/api/admin/contractors/pending"],
     queryFn: () => api.getPendingContractors(),
+    enabled: user?.role === "admin",
+  });
+
+  const { data: contractorRequests = [], isLoading: requestsLoading } = useQuery({
+    queryKey: ["/api/contractor-requests/pending"],
+    queryFn: () => api.getPendingContractorRequests(),
     enabled: user?.role === "admin",
   });
 
@@ -169,6 +175,43 @@ export default function SuperAdminDashboard() {
       toast({
         title: "Rejection Failed",
         description: error.message || "Could not reject contractor",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const approveRequestMutation = useMutation({
+    mutationFn: (requestId: string) => api.approveContractorRequest(requestId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contractor-requests/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors"] });
+      toast({
+        title: "Request Approved",
+        description: `Contractor account created. Temporary password: ${data.tempPassword}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Could not approve request",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectRequestMutation = useMutation({
+    mutationFn: (requestId: string) => api.rejectContractorRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contractor-requests/pending"] });
+      toast({
+        title: "Request Rejected",
+        description: "The access request has been rejected.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Rejection Failed",
+        description: error.message || "Could not reject request",
         variant: "destructive",
       });
     },
@@ -313,15 +356,15 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
-          <Card className={pendingContractors.length > 0 ? "border-orange-300 bg-orange-50" : ""}>
+          <Card className={(pendingContractors.length + contractorRequests.length) > 0 ? "border-orange-300 bg-orange-50" : ""}>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${pendingContractors.length > 0 ? "bg-orange-200" : "bg-orange-100"}`}>
-                  <Clock className={`w-6 h-6 ${pendingContractors.length > 0 ? "text-orange-700" : "text-orange-600"}`} />
+                <div className={`p-3 rounded-lg ${(pendingContractors.length + contractorRequests.length) > 0 ? "bg-orange-200" : "bg-orange-100"}`}>
+                  <Clock className={`w-6 h-6 ${(pendingContractors.length + contractorRequests.length) > 0 ? "text-orange-700" : "text-orange-600"}`} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pending Approval</p>
-                  <h3 className="text-2xl font-bold text-foreground">{pendingContractors.length}</h3>
+                  <p className="text-sm text-muted-foreground">Pending Requests</p>
+                  <h3 className="text-2xl font-bold text-foreground">{pendingContractors.length + contractorRequests.length}</h3>
                 </div>
               </div>
             </CardContent>
@@ -373,6 +416,67 @@ export default function SuperAdminDashboard() {
                             onClick={() => rejectContractorMutation.mutate(contractor.id)}
                             disabled={rejectContractorMutation.isPending}
                             data-testid={`btn-reject-contractor-${contractor.id}`}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {contractorRequests.length > 0 && (
+          <Card className="border-blue-300">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-blue-600" />
+                Contractor Access Requests
+              </CardTitle>
+              <CardDescription>Review access requests from new contractors</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contractorRequests.map((request) => (
+                    <TableRow key={request.id} data-testid={`row-contractor-request-${request.id}`}>
+                      <TableCell className="font-medium">{request.firstName} {request.lastName}</TableCell>
+                      <TableCell>{request.username}</TableCell>
+                      <TableCell>{request.companyName}</TableCell>
+                      <TableCell>{request.companyType}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="border-green-500 text-green-600 hover:bg-green-50"
+                            onClick={() => approveRequestMutation.mutate(request.id)}
+                            disabled={approveRequestMutation.isPending}
+                            data-testid={`btn-approve-request-${request.id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="border-red-500 text-red-600 hover:bg-red-50"
+                            onClick={() => rejectRequestMutation.mutate(request.id)}
+                            disabled={rejectRequestMutation.isPending}
+                            data-testid={`btn-reject-request-${request.id}`}
                           >
                             <X className="w-4 h-4 mr-1" />
                             Reject

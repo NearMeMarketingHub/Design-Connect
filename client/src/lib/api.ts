@@ -1,4 +1,4 @@
-import type { User, Project, Estimate, EstimateLineItem, Invoice, InvoiceLineItem, RecurringBilling, ProjectPhase, ActionItem, InspirationImage, Message } from "@shared/schema";
+import type { User, Project, Estimate, EstimateLineItem, Invoice, InvoiceLineItem, RecurringBilling, ProjectPhase, ActionItem, InspirationImage, Message, ContractorRequest } from "@shared/schema";
 
 class ApiClient {
   private baseUrl = "/api";
@@ -50,6 +50,27 @@ class ApiClient {
   async rejectContractor(contractorId: string) {
     return this.fetch<{ message: string }>(`/admin/contractors/${contractorId}/reject`, {
       method: "POST",
+    });
+  }
+
+  // Contractor access requests
+  async getContractorRequests() {
+    return this.fetch<ContractorRequest[]>("/contractor-requests");
+  }
+
+  async getPendingContractorRequests() {
+    return this.fetch<ContractorRequest[]>("/contractor-requests/pending");
+  }
+
+  async approveContractorRequest(requestId: string) {
+    return this.fetch<{ message: string; tempPassword: string }>(`/contractor-requests/${requestId}/approve`, {
+      method: "PATCH",
+    });
+  }
+
+  async rejectContractorRequest(requestId: string) {
+    return this.fetch<{ message: string }>(`/contractor-requests/${requestId}/reject`, {
+      method: "PATCH",
     });
   }
 
