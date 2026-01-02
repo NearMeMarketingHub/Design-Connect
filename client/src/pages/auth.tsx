@@ -106,7 +106,7 @@ export default function AuthPage() {
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-        setLocation("/admin-dashboard");
+        setLocation("/dashboard");
       } else {
         // Submit access request (no account creation)
         const firstName = formData.get("admin-first-name") as string;
