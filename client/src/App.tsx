@@ -31,7 +31,7 @@ import { AuthProvider } from "@/lib/auth-context";
 function Router() {
   const [location] = useLocation();
 
-  if (location === "/") {
+  if (location === "/" || location === "/auth") {
     return <AuthPage />;
   }
   
