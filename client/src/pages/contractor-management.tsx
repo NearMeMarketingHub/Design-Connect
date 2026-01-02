@@ -1,8 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Table, 
   TableBody, 
@@ -20,7 +27,8 @@ import {
   Check,
   X,
   Clock,
-  Building2
+  Building2,
+  ArrowUpDown
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -29,12 +37,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import type { User, ContractorRequest } from "@shared/schema";
 
+type SortField = "name" | "companyName" | "companyType" | "username";
+type SortOrder = "asc" | "desc";
+
 export default function ContractorManagement() {
   const [_, setLocation] = useLocation();
   const { user, loading: authLoading, logout } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("active");
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) {
@@ -149,6 +162,47 @@ export default function ContractorManagement() {
   const activeContractors = contractors.filter((c: Omit<User, "password">) => c.isApproved && !c.isSandbox);
   const totalPending = pendingContractors.length + contractorRequests.length;
 
+  const sortedContractors = useMemo(() => {
+    return [...activeContractors].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+      
+      switch (sortField) {
+        case "name":
+          aVal = (a.name || "").toLowerCase();
+          bVal = (b.name || "").toLowerCase();
+          break;
+        case "companyName":
+          aVal = (a.companyName || "").toLowerCase();
+          bVal = (b.companyName || "").toLowerCase();
+          break;
+        case "companyType":
+          aVal = (a.companyType || "").toLowerCase();
+          bVal = (b.companyType || "").toLowerCase();
+          break;
+        case "username":
+          aVal = a.username.toLowerCase();
+          bVal = b.username.toLowerCase();
+          break;
+      }
+      
+      if (sortOrder === "asc") {
+        return aVal.localeCompare(bVal);
+      } else {
+        return bVal.localeCompare(aVal);
+      }
+    });
+  }, [activeContractors, sortField, sortOrder]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -243,8 +297,35 @@ export default function ContractorManagement() {
           <TabsContent value="active">
             <Card>
               <CardHeader>
-                <CardTitle>Active Contractors</CardTitle>
-                <CardDescription>All approved contractors in the system</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Active Contractors</CardTitle>
+                    <CardDescription>All approved contractors in the system</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Sort by:</span>
+                    <Select value={sortField} onValueChange={(value) => setSortField(value as SortField)}>
+                      <SelectTrigger className="w-[150px]" data-testid="select-sort-field">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="companyName">Company</SelectItem>
+                        <SelectItem value="companyType">Type</SelectItem>
+                        <SelectItem value="username">Username</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                      data-testid="btn-toggle-sort-order"
+                    >
+                      <ArrowUpDown className="w-4 h-4 mr-1" />
+                      {sortOrder === "asc" ? "A-Z" : "Z-A"}
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {contractorsLoading ? (
@@ -257,17 +338,47 @@ export default function ContractorManagement() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Username</TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleSort("name")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Name
+                            {sortField === "name" && <ArrowUpDown className="w-3 h-3" />}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleSort("companyName")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Company
+                            {sortField === "companyName" && <ArrowUpDown className="w-3 h-3" />}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleSort("companyType")}
+                        >
+                          <div className="flex items-center gap-1">
+                            Type
+                            {sortField === "companyType" && <ArrowUpDown className="w-3 h-3" />}
+                          </div>
+                        </TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activeContractors.map((contractor: Omit<User, "password">) => (
+                      {sortedContractors.map((contractor: Omit<User, "password">) => (
                         <TableRow key={contractor.id} data-testid={`row-contractor-${contractor.id}`}>
                           <TableCell className="font-medium">{contractor.name || "No name"}</TableCell>
-                          <TableCell>{contractor.username}</TableCell>
+                          <TableCell>{contractor.companyName || "-"}</TableCell>
+                          <TableCell>
+                            {contractor.companyType ? (
+                              <Badge variant="outline">{contractor.companyType}</Badge>
+                            ) : "-"}
+                          </TableCell>
                           <TableCell>{contractor.email || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="bg-green-100 text-green-700">

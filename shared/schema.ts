@@ -10,6 +10,8 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("client"),
   name: text("name"),
+  companyName: text("company_name"),
+  companyType: text("company_type"),
   isSandbox: boolean("is_sandbox").default(false),
   isApproved: boolean("is_approved").default(true),
 });

@@ -1107,7 +1107,9 @@ export async function registerRoutes(
         email: request.email || undefined,
         password: hashedPassword,
         role: "contractor",
-        name: `${request.firstName} ${request.lastName} - ${request.companyName}`,
+        name: `${request.firstName} ${request.lastName}`,
+        companyName: request.companyName,
+        companyType: request.companyType,
         isApproved: true,
       });
 
