@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,16 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { User, Bell, Lock, Save, Eye, EyeOff } from "lucide-react";
+import { User, Bell, Lock, Save, Eye, EyeOff, Camera } from "lucide-react";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UppyFile, UploadResult } from "@uppy/core";
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, refetch } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [uploadedPath, setUploadedPath] = useState<string | null>(null);
   
   const firstName = user?.name?.split(' ')[0] || '';
   const lastName = user?.name?.split(' ').slice(1).join(' ') || '';
@@ -40,6 +45,77 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const updateProfilePictureMutation = useMutation({
+    mutationFn: async (objectPath: string) => {
+      const res = await fetch("/api/user/profile-picture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ objectPath }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update profile picture");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Photo Updated",
+        description: "Your profile picture has been updated.",
+      });
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Could not update profile picture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getUploadParameters = useCallback(
+    async (
+      file: UppyFile<Record<string, unknown>, Record<string, unknown>>
+    ): Promise<{
+      method: "PUT";
+      url: string;
+      headers?: Record<string, string>;
+    }> => {
+      const res = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await res.json();
+      setUploadedPath(objectPath);
+      return {
+        method: "PUT",
+        url: uploadURL,
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+      };
+    },
+    []
+  );
+
+  const handleUploadComplete = useCallback(
+    (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+      if (result.successful && result.successful.length > 0 && uploadedPath) {
+        updateProfilePictureMutation.mutate(uploadedPath);
+        setUploadedPath(null);
+      }
+    },
+    [uploadedPath, updateProfilePictureMutation]
+  );
 
   const handleProfileSave = () => {
     toast({
@@ -100,12 +176,25 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
-                <AvatarImage src="" />
+                <AvatarImage src={user?.profilePicture || ""} />
                 <AvatarFallback className="text-lg">{initials}</AvatarFallback>
               </Avatar>
-              <div>
+              <div className="flex-1">
                 <p className="font-medium">{user?.name || 'User'}</p>
-                <p className="text-sm text-muted-foreground">{user?.role === 'client' ? 'Homeowner' : 'Contractor'}</p>
+                <p className="text-sm text-muted-foreground">{user?.role === 'client' ? 'Homeowner' : user?.role === 'admin' ? 'Administrator' : 'Contractor'}</p>
+                <div className="mt-2">
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={5242880}
+                    onGetUploadParameters={getUploadParameters}
+                    onComplete={handleUploadComplete}
+                    buttonClassName="h-8 text-xs gap-1"
+                    testId="btn-upload-profile-photo"
+                  >
+                    <Camera className="w-3 h-3" />
+                    {user?.profilePicture ? "Change Photo" : "Upload Photo"}
+                  </ObjectUploader>
+                </div>
               </div>
             </div>
 
