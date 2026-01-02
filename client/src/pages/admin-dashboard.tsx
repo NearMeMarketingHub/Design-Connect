@@ -10,7 +10,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Search, Plus, Filter, Download } from "lucide-react";
+import { Search, Plus, Filter, Download, Calculator } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -120,6 +120,16 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground mt-1">Manage active jobs, estimates, and schedules.</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/calculator">
+            <Button 
+              variant="outline"
+              data-testid="button-calculator"
+              className="hover:bg-muted hover:scale-[1.02] transition-all"
+            >
+              <Calculator className="w-4 h-4 mr-2" />
+              Calculator
+            </Button>
+          </Link>
           <Button 
             variant="outline" 
             onClick={handleExportReport} 

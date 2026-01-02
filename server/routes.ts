@@ -800,6 +800,64 @@ export async function registerRoutes(
     }
   });
 
+  // Contractor Calculator routes - Read-only access for contractors/admins
+  const requireContractorOrAdmin = (req: any, res: any, next: any) => {
+    const user = req.user as User | undefined;
+    if (!user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    if (user.role !== 'contractor' && user.role !== 'admin') {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    // Contractors must be approved
+    if (user.role === 'contractor' && !user.isApproved) {
+      return res.status(403).json({ message: "Your account is pending approval" });
+    }
+    next();
+  };
+
+  app.get("/api/calculator/categories", requireContractorOrAdmin, async (req, res, next) => {
+    try {
+      const categories = await storage.getBudgetCategories();
+      res.json(categories);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/calculator/categories/:id/items", requireContractorOrAdmin, async (req, res, next) => {
+    try {
+      const items = await storage.getBudgetItems(req.params.id);
+      res.json(items);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/calculator/items", requireContractorOrAdmin, async (req, res, next) => {
+    try {
+      const items = await storage.getAllBudgetItems();
+      res.json(items);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/calculator/items/search", requireContractorOrAdmin, async (req, res, next) => {
+    try {
+      const query = (req.query.q as string) || '';
+      const items = await storage.getAllBudgetItems();
+      // Filter items by search query
+      const filtered = items.filter((item: any) => 
+        item.description.toLowerCase().includes(query.toLowerCase()) ||
+        item.itemType.toLowerCase().includes(query.toLowerCase())
+      );
+      res.json(filtered);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Budget Category routes - Admin only
   app.get("/api/budget/categories", requireAdmin, async (req, res, next) => {
     try {

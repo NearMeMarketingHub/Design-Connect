@@ -25,7 +25,7 @@ Last Updated: December 16, 2025
 - [ ] Contractors Sandbox
 
 ### Contractor Side
-- [ ] Build contractor-facing calculator using admin-managed pricing data
+- [x] Build contractor-facing calculator using admin-managed pricing data
 - [ ] Floor Calculator for room-based square footage calculations
 - [ ] Generate estimate summaries that can be attached to projects
 - [x] Building out the post feature for the progress photos on the contractors side of the app

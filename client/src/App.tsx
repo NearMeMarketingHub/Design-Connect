@@ -29,6 +29,7 @@ import AcceptInvite from "@/pages/accept-invite";
 import ContractorManagement from "@/pages/contractor-management";
 import ContractorProfile from "@/pages/contractor-profile";
 import MyProfile from "@/pages/my-profile";
+import ContractorCalculator from "@/pages/contractor-calculator";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -75,6 +76,11 @@ function Router() {
   // Budget Admin has its own header
   if (location === "/budget-admin") {
     return <BudgetAdmin />;
+  }
+  
+  // Contractor Calculator has its own header
+  if (location === "/calculator") {
+    return <ContractorCalculator />;
   }
   
   // Sandbox pages have their own headers
