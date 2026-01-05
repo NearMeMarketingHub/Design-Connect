@@ -52,7 +52,8 @@ import {
   Layers,
   Shield,
   Receipt,
-  BookOpen
+  BookOpen,
+  Settings
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -71,6 +72,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
@@ -241,6 +243,7 @@ export default function ProjectDetails() {
   const [editStatus, setEditStatus] = useState("");
   const [editPhase, setEditPhase] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [localProgress, setLocalProgress] = useState<number | null>(null);
   
   // Parse tab and admin context from URL query parameter (needed before API call)
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -283,7 +286,7 @@ export default function ProjectDetails() {
   
   // Update project mutation for contractor editing
   const updateProjectMutation = useMutation({
-    mutationFn: async (data: { status?: string; phase?: string; progress?: number; description?: string }) => {
+    mutationFn: async (data: { status?: string; phase?: string; progress?: number; description?: string; nextMilestone?: string }) => {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1162,6 +1165,128 @@ export default function ProjectDetails() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Contractor Controls - Only visible to contractors/admins */}
+                {canEdit && (
+                  <Card data-testid="card-contractor-controls" className="border-2 border-primary/20 bg-primary/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-primary">
+                        <Settings className="h-5 w-5" />
+                        Contractor Controls
+                      </CardTitle>
+                      <CardDescription>Manage project milestones and progress</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Progress Slider */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Overall Progress</Label>
+                          <span className="text-sm font-bold text-primary">{localProgress !== null ? localProgress : project.progress}%</span>
+                        </div>
+                        <Slider
+                          value={[localProgress !== null ? localProgress : project.progress]}
+                          onValueChange={(value) => {
+                            setLocalProgress(value[0]);
+                          }}
+                          onValueCommit={(value) => {
+                            updateProjectMutation.mutate({ progress: value[0] }, {
+                              onSettled: () => setLocalProgress(null)
+                            });
+                          }}
+                          max={100}
+                          step={5}
+                          className="w-full"
+                          disabled={updateProjectMutation.isPending}
+                          data-testid="slider-progress"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Drag to manually adjust progress, or complete milestones in the Timeline tab
+                        </p>
+                      </div>
+
+                      {/* Quick Status Update */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Project Status</Label>
+                        <Select 
+                          value={project.status} 
+                          onValueChange={(value) => updateProjectMutation.mutate({ status: value })}
+                        >
+                          <SelectTrigger data-testid="select-quick-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="On Hold">On Hold</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="Cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Current Phase Update */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Current Phase</Label>
+                        <Select 
+                          value={project.phase} 
+                          onValueChange={(value) => updateProjectMutation.mutate({ phase: value })}
+                        >
+                          <SelectTrigger data-testid="select-quick-phase">
+                            <SelectValue placeholder="Select phase" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAllPhases(project.status, project.phase).map((phase) => (
+                              <SelectItem key={phase} value={phase}>{phase}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Next Milestone Update */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Next Milestone</Label>
+                        <Select 
+                          value={project.nextMilestone || ""} 
+                          onValueChange={(value) => updateProjectMutation.mutate({ nextMilestone: value })}
+                        >
+                          <SelectTrigger data-testid="select-next-milestone">
+                            <SelectValue placeholder="Select next milestone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {displayMilestones
+                              .filter((m: any) => m.status !== 'completed')
+                              .map((m: any) => (
+                                <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="flex gap-2 pt-2 border-t">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            const nextIncomplete = displayMilestones.find((m: any) => m.status !== 'completed');
+                            if (nextIncomplete && apiPhases.length > 0) {
+                              togglePhaseStatus(nextIncomplete.id, 'pending');
+                            }
+                          }}
+                          disabled={updatePhaseMutation.isPending || !apiPhases.length}
+                          data-testid="button-complete-next-milestone"
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Complete Next Milestone
+                        </Button>
+                      </div>
+
+                      {updateProjectMutation.isPending && (
+                        <p className="text-xs text-muted-foreground text-center">Saving changes...</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Right Column - Team and Quick Links */}
