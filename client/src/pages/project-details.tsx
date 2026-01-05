@@ -1462,8 +1462,8 @@ export default function ProjectDetails() {
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="newest" data-testid="option-sort-newest">Newest First</SelectItem>
-                    <SelectItem value="oldest" data-testid="option-sort-oldest">Oldest First</SelectItem>
+                    <SelectItem value="newest" data-testid="option-sort-newest">Newest to Oldest</SelectItem>
+                    <SelectItem value="oldest" data-testid="option-sort-oldest">Oldest to Newest</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button 
