@@ -52,7 +52,7 @@ export default function SandboxDashboard() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Sandbox not initialized</p>
-          <Link href="/super-admin">
+          <Link href="/admin/dashboard">
             <Button>Return to Admin</Button>
           </Link>
         </div>
@@ -89,7 +89,7 @@ export default function SandboxDashboard() {
           <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-settings">
             <Settings className="w-5 h-5" />
           </Button>
-          <Link href="/super-admin">
+          <Link href="/admin/dashboard">
             <Button variant="ghost" size="icon" className="text-muted-foreground" data-testid="button-exit-sandbox">
               <Shield className="w-5 h-5" />
             </Button>

@@ -142,7 +142,7 @@ export default function ClientDashboard() {
 
       {/* Project Hero Card */}
       <div className="grid md:grid-cols-3 gap-6">
-        <Link href={`/project/${selectedProject.id}`} className="md:col-span-2" data-testid={`link-project-hero-${selectedProject.id}`}>
+        <Link href={`/client/project/${selectedProject.id}`} className="md:col-span-2" data-testid={`link-project-hero-${selectedProject.id}`}>
           <Card className="h-full overflow-hidden relative group border-0 shadow-lg cursor-pointer">
             <div className="absolute inset-0">
               <img 
@@ -210,14 +210,14 @@ export default function ClientDashboard() {
                       <Badge variant="outline" className="text-[10px] h-5">Pending</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">Check for any documents that need your review or signature.</p>
-                    <Link href={`/project/${selectedProject.id}?tab=documents`}>
+                    <Link href={`/client/project/${selectedProject.id}?tab=documents`}>
                       <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-review-sign">View Documents</Button>
                     </Link>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer group">
                     <h4 className="font-medium text-sm group-hover:text-primary transition-colors">View Inspiration Board</h4>
                     <p className="text-xs text-muted-foreground mt-1">Check design ideas and material selections for your project.</p>
-                    <Link href={`/project/${selectedProject.id}?tab=inspiration`}>
+                    <Link href={`/client/project/${selectedProject.id}?tab=inspiration`}>
                       <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8">Go to Selections</Button>
                     </Link>
                   </div>
@@ -226,7 +226,7 @@ export default function ClientDashboard() {
                 <div className="p-4 bg-muted/50 rounded-lg border border-border">
                   <h4 className="font-medium text-sm">No Actions Required</h4>
                   <p className="text-xs text-muted-foreground mt-1">Your project is in {selectedProject.phase}. We'll notify you when action is needed.</p>
-                  <Link href={`/project/${selectedProject.id}`}>
+                  <Link href={`/client/project/${selectedProject.id}`}>
                     <Button size="sm" variant="outline" className="mt-3 w-full text-xs h-8" data-testid="button-view-project">View Project</Button>
                   </Link>
                 </div>
@@ -314,7 +314,7 @@ export default function ClientDashboard() {
               </div>
             )}
             <div className="pt-4">
-              <Link href={`/project/${selectedProject.id}`}>
+              <Link href={`/client/project/${selectedProject.id}`}>
                 <Button className="w-full md:w-auto" data-testid="button-view-full-project">
                   View Full Project Details
                 </Button>

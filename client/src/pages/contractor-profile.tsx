@@ -76,7 +76,7 @@ export default function ContractorProfile() {
             <UserIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-bold mb-2">Contractor Not Found</h2>
             <p className="text-muted-foreground mb-4">The contractor you're looking for doesn't exist.</p>
-            <Link href="/super-admin/contractors">
+            <Link href="/admin/contractors">
               <Button>Back to Contractors</Button>
             </Link>
           </CardContent>
@@ -118,7 +118,7 @@ export default function ContractorProfile() {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/super-admin/contractors">
+            <Link href="/admin/contractors">
               <Button variant="ghost" size="sm" data-testid="btn-back-to-contractors">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Contractors
@@ -253,7 +253,7 @@ export default function ContractorProfile() {
                           <TableRow 
                             key={project.id} 
                             className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => setLocation(`/project/${project.id}`)}
+                            onClick={() => setLocation(`/admin/project/${project.id}`)}
                             data-testid={`row-project-${project.id}`}
                           >
                             <TableCell className="font-medium">{project.name}</TableCell>
@@ -307,7 +307,7 @@ export default function ContractorProfile() {
                           <TableRow 
                             key={project.id} 
                             className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => setLocation(`/project/${project.id}`)}
+                            onClick={() => setLocation(`/admin/project/${project.id}`)}
                             data-testid={`row-completed-project-${project.id}`}
                           >
                             <TableCell className="font-medium">{project.name}</TableCell>

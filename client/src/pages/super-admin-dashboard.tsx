@@ -67,7 +67,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) {
-      setLocation("/admin-login");
+      setLocation("/admin/login");
     }
   }, [user, authLoading, setLocation]);
 
@@ -283,7 +283,7 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/super-admin/contractors">
+          <Link href="/admin/contractors">
             <Button variant="outline" size="sm" data-testid="btn-manage-contractors">
               <Users className="w-4 h-4 mr-2" />
               Manage Contractors
@@ -367,7 +367,7 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
-          <Link href="/super-admin/contractors">
+          <Link href="/admin/contractors">
             <Card className={`cursor-pointer hover:shadow-md transition-shadow ${(pendingContractors.length + contractorRequests.length) > 0 ? "border-orange-300 bg-orange-50" : ""}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
@@ -448,7 +448,7 @@ export default function SuperAdminDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Link href={`/project/${project.id}?from=admin`}>
+                            <Link href={`/admin/project/${project.id}`}>
                               <Button size="sm" variant="ghost">
                                 <Eye className="w-4 h-4" />
                               </Button>
@@ -488,7 +488,7 @@ export default function SuperAdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Link href="/budget-admin">
+                <Link href="/admin/budget">
                   <Button className="w-full" data-testid="button-budget-manager">
                     <Calculator className="w-4 h-4 mr-2" />
                     Open Price Manager
@@ -550,7 +550,7 @@ export default function SuperAdminDashboard() {
                   
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Client Experience</p>
-                    <Link href={`/sandbox/dashboard`}>
+                    <Link href={`/admin/sandbox/dashboard`}>
                       <Button className="w-full justify-start" variant="outline" data-testid="button-sandbox-dashboard">
                         <LayoutDashboard className="w-4 h-4 mr-2" />
                         Client Dashboard

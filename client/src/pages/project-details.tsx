@@ -238,6 +238,14 @@ export default function ProjectDetails() {
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
   const canEdit = isContractorView && (user?.role === 'contractor' || user?.role === 'admin');
   
+  // Get back path based on current portal
+  const getBackPath = () => {
+    if (currentPortal === 'admin') return '/admin/dashboard';
+    if (currentPortal === 'contractor') return '/contractor/dashboard';
+    return '/client/projects';
+  };
+  const backPath = getBackPath();
+  
   // State for contractor editing
   const [isEditing, setIsEditing] = useState(false);
   const [editStatus, setEditStatus] = useState("");
@@ -837,7 +845,7 @@ export default function ProjectDetails() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
+          <Link href={backPath}>
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -858,7 +866,7 @@ export default function ProjectDetails() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
+          <Link href={backPath}>
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -872,9 +880,9 @@ export default function ProjectDetails() {
             <p className="text-muted-foreground mb-4">
               The project you're looking for doesn't exist or you don't have access to it.
             </p>
-            <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
+            <Link href={backPath}>
               <Button data-testid="button-back-to-projects">
-                {isFromAdmin ? "Back to Admin Dashboard" : "Back to My Projects"}
+                Back to Dashboard
               </Button>
             </Link>
           </CardContent>
@@ -887,7 +895,7 @@ export default function ProjectDetails() {
     <div>
       {/* Header with Back Navigation */}
       <div className="flex items-center gap-4">
-        <Link href={isFromAdmin ? "/super-admin" : "/my-projects"}>
+        <Link href={backPath}>
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>

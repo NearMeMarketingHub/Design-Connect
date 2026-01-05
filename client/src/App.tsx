@@ -36,6 +36,7 @@ import { AuthProvider } from "@/lib/auth-context";
 function Router() {
   const [location] = useLocation();
 
+  // Public/Auth Routes
   if (location === "/" || location === "/auth") {
     return <AuthPage />;
   }
@@ -54,41 +55,6 @@ function Router() {
     );
   }
   
-  // Super Admin Dashboard has its own header, so render without Layout
-  if (location === "/super-admin") {
-    return <SuperAdminDashboard />;
-  }
-  
-  // Contractor Management has its own header
-  if (location === "/super-admin/contractors") {
-    return <ContractorManagement />;
-  }
-  
-  // Contractor Profile has its own header
-  if (location.startsWith("/super-admin/contractors/")) {
-    return (
-      <Switch>
-        <Route path="/super-admin/contractors/:id" component={ContractorProfile} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
-  
-  // Budget Admin has its own header
-  if (location === "/budget-admin") {
-    return <BudgetAdmin />;
-  }
-  
-  // Contractor Calculator has its own header
-  if (location === "/calculator") {
-    return <ContractorCalculator />;
-  }
-  
-  // Floor Calculator has its own header
-  if (location === "/floor-calculator") {
-    return <FloorCalculator />;
-  }
-  
   // Sandbox pages have their own headers
   if (location.startsWith("/sandbox")) {
     return (
@@ -103,47 +69,67 @@ function Router() {
     );
   }
 
-  return (
-    <Layout>
+  // Admin Portal Routes (have their own headers)
+  if (location.startsWith("/admin")) {
+    return (
       <Switch>
-        <Route path="/dashboard" component={ClientDashboard} />
-        <Route path="/my-projects" component={ClientProjects} />
-        <Route path="/my-profile" component={MyProfile} />
-        <Route path="/settings" component={SettingsPage} />
-        <Route path="/admin-dashboard" component={AdminDashboard} />
-        
-        {/* Sales & Estimating */}
-        <Route path="/sales" component={SalesDashboard} />
-        <Route path="/estimates" component={Estimator} />
-        
-        {/* Accounting & Invoicing */}
-        <Route path="/accounting" component={AccountingDashboard} />
-        <Route path="/create-invoice" component={CreateInvoice} />
-        <Route path="/new-project" component={NewProject} />
-
-        {/* Projects & Operations */}
-        <Route path="/project/:id" component={ProjectDetails} />
-        <Route path="/timeline" component={TimelinePage} />
-        <Route path="/schedule" component={TimelinePage} />
-        
-        {/* Redirects/Placeholders for demo completeness */}
-        <Route path="/inspiration">
-          {() => <ProjectDetails />} 
-        </Route>
-        <Route path="/documents">
-          {() => <ProjectDetails />}
-        </Route>
-        <Route path="/projects">
-          {() => <AdminDashboard />}
-        </Route>
-         <Route path="/admin-docs">
-          {() => <ProjectDetails />}
-        </Route>
-
+        <Route path="/admin/dashboard" component={SuperAdminDashboard} />
+        <Route path="/admin/contractors" component={ContractorManagement} />
+        <Route path="/admin/contractors/:id" component={ContractorProfile} />
+        <Route path="/admin/budget" component={BudgetAdmin} />
         <Route component={NotFound} />
       </Switch>
-    </Layout>
-  );
+    );
+  }
+
+  // Contractor Portal Routes (pages with own headers)
+  if (location === "/contractor/calculator") {
+    return <ContractorCalculator />;
+  }
+  
+  if (location === "/contractor/floor-calculator") {
+    return <FloorCalculator />;
+  }
+
+  // Client Portal Routes (with Layout)
+  if (location.startsWith("/client")) {
+    return (
+      <Layout>
+        <Switch>
+          <Route path="/client/dashboard" component={ClientDashboard} />
+          <Route path="/client/projects" component={ClientProjects} />
+          <Route path="/client/project/:id" component={ProjectDetails} />
+          <Route path="/client/profile" component={MyProfile} />
+          <Route path="/client/settings" component={SettingsPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    );
+  }
+
+  // Contractor Portal Routes (with Layout)
+  if (location.startsWith("/contractor")) {
+    return (
+      <Layout>
+        <Switch>
+          <Route path="/contractor/dashboard" component={AdminDashboard} />
+          <Route path="/contractor/sales" component={SalesDashboard} />
+          <Route path="/contractor/estimates" component={Estimator} />
+          <Route path="/contractor/accounting" component={AccountingDashboard} />
+          <Route path="/contractor/invoice/new" component={CreateInvoice} />
+          <Route path="/contractor/project/new" component={NewProject} />
+          <Route path="/contractor/project/:id" component={ProjectDetails} />
+          <Route path="/contractor/timeline" component={TimelinePage} />
+          <Route path="/contractor/profile" component={MyProfile} />
+          <Route path="/contractor/settings" component={SettingsPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    );
+  }
+
+  // Fallback to NotFound for any unmatched routes
+  return <NotFound />;
 }
 
 function App() {

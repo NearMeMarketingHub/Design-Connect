@@ -89,7 +89,7 @@ export default function ContractorCalculator() {
   const [estimateName, setEstimateName] = useState("");
   const [estimateNotes, setEstimateNotes] = useState("");
 
-  const dashboardPath = currentPortal === "admin" ? "/super-admin" : "/dashboard";
+  const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<BudgetCategory[]>({
     queryKey: ["/api/calculator/categories"],

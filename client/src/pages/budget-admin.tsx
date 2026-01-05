@@ -261,7 +261,7 @@ export default function BudgetAdmin() {
       <header className="border-b bg-card px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/super-admin">
+            <Link href="/admin/dashboard">
               <Button variant="ghost" size="icon" data-testid="button-back">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
@@ -319,7 +319,7 @@ export default function BudgetAdmin() {
               <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Link href={currentPortal === "admin" ? "/super-admin" : currentPortal === "contractor" ? "/admin-dashboard" : "/dashboard"}>
+              <Link href={currentPortal === "admin" ? "/admin/dashboard" : currentPortal === "contractor" ? "/contractor/dashboard" : "/client/dashboard"}>
                 <Button variant="outline" size="sm" data-testid="button-dashboard">
                   Back to Dashboard
                 </Button>

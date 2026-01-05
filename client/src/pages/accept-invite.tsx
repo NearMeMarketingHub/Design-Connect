@@ -56,7 +56,7 @@ export default function AcceptInvite() {
         description: "Your account has been created and you're now logged in.",
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      setLocation("/dashboard");
+      setLocation("/client/dashboard");
     },
     onError: (error: Error) => {
       toast({

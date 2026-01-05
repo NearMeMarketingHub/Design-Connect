@@ -93,7 +93,7 @@ export default function FloorCalculator() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [estimateName, setEstimateName] = useState("");
 
-  const dashboardPath = currentPortal === "admin" ? "/super-admin" : "/admin-dashboard";
+  const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
 
   const { data: allItems = [], isLoading: itemsLoading } = useQuery<BudgetItem[]>({
     queryKey: ["/api/calculator/items"],
@@ -192,7 +192,7 @@ export default function FloorCalculator() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href="/calculator">
+          <Link href="/contractor/calculator">
             <Button variant="outline" data-testid="button-item-calculator">
               <Calculator className="w-4 h-4 mr-2" />
               Item Calculator

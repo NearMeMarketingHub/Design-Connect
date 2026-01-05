@@ -68,7 +68,7 @@ export default function SandboxMessages() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Sandbox not initialized</p>
-          <Link href="/super-admin">
+          <Link href="/admin/dashboard">
             <Button>Return to Admin</Button>
           </Link>
         </div>
@@ -105,7 +105,7 @@ export default function SandboxMessages() {
             <TestTube className="w-3 h-3 mr-1" />
             Test Mode
           </Badge>
-          <Link href="/super-admin">
+          <Link href="/admin/dashboard">
             <Button variant="outline" size="sm" className="gap-2" data-testid="button-exit-sandbox">
               <Shield className="w-4 h-4" />
               <span className="hidden sm:inline">Exit to Admin</span>

@@ -120,7 +120,7 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground mt-1">Manage active jobs, estimates, and schedules.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/calculator">
+          <Link href="/contractor/calculator">
             <Button 
               variant="outline"
               data-testid="button-calculator"
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
               Calculator
             </Button>
           </Link>
-          <Link href="/floor-calculator">
+          <Link href="/contractor/floor-calculator">
             <Button 
               variant="outline"
               data-testid="button-floor-calculator"
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
-          <Link href="/new-project">
+          <Link href="/contractor/project/new">
             <Button 
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-all" 
               data-testid="button-new-project"
@@ -242,7 +242,7 @@ export default function AdminDashboard() {
                 {searchQuery ? "No projects match your search." : "No projects yet. Create your first project!"}
               </p>
               {!searchQuery && (
-                <Link href="/new-project">
+                <Link href="/contractor/project/new">
                   <Button 
                     data-testid="button-create-first-project"
                     className="hover:bg-primary/90 hover:scale-[1.02] transition-all"
@@ -271,7 +271,7 @@ export default function AdminDashboard() {
                     key={project.id} 
                     data-testid={`row-project-${project.id}`}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setLocation(`/project/${project.id}`)}
+                    onClick={() => setLocation(`/contractor/project/${project.id}`)}
                   >
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell>{project.type || "-"}</TableCell>

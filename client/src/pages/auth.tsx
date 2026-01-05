@@ -61,7 +61,7 @@ export default function AuthPage() {
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-        setLocation("/dashboard");
+        setLocation("/client/dashboard");
       } else {
         const firstName = formData.get("first-name") as string;
         const lastName = formData.get("last-name") as string;
@@ -78,7 +78,7 @@ export default function AuthPage() {
           title: "Account created!",
           description: "Welcome to BuildVision.",
         });
-        setLocation("/dashboard");
+        setLocation("/client/dashboard");
       }
     } catch (error: any) {
       toast({
@@ -106,7 +106,7 @@ export default function AuthPage() {
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-        setLocation("/admin-dashboard");
+        setLocation("/contractor/dashboard");
       } else {
         // Submit access request (no account creation)
         const firstName = formData.get("admin-first-name") as string;

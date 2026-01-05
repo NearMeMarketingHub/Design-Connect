@@ -181,7 +181,7 @@ export default function NewProject() {
         });
       }
       
-      setLocation("/admin-dashboard");
+      setLocation("/contractor/dashboard");
     },
     onError: (error: Error) => {
       toast({

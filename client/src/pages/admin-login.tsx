@@ -40,7 +40,7 @@ export default function AdminLogin() {
         title: "Welcome, Administrator",
         description: "You have successfully logged in.",
       });
-      setLocation("/super-admin");
+      setLocation("/admin/dashboard");
     } catch (error: any) {
       toast({
         title: "Access Denied",

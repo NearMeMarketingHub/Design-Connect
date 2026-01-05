@@ -77,7 +77,7 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </CardContent>
       <CardFooter className="p-4 bg-muted/30 border-t border-border">
-        <Link href={`/project/${project.id}`} className="w-full" data-testid={`link-project-${project.id}`}>
+        <Link href={`/client/project/${project.id}`} className="w-full" data-testid={`link-project-${project.id}`}>
           <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             {isCompleted ? 'View Project' : 'View Dashboard'} <ArrowRight className="w-4 h-4 ml-2" />
           </Button>

@@ -16,22 +16,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, loading, currentPortal } = useAuth();
 
   // Check if we're on any dashboard page
-  const isDashboard = location === "/dashboard" || location === "/super-admin" || location === "/admin-dashboard";
+  const isDashboard = location === "/client/dashboard" || location === "/admin/dashboard" || location === "/contractor/dashboard";
   
   // Determine which dashboard to go back to based on the portal they logged in through
   const getDashboardPath = () => {
     // Use the portal context to determine where to navigate
-    if (currentPortal === "admin") return "/super-admin";
-    if (currentPortal === "contractor") return "/admin-dashboard";
-    if (currentPortal === "client") return "/dashboard";
+    if (currentPortal === "admin") return "/admin/dashboard";
+    if (currentPortal === "contractor") return "/contractor/dashboard";
+    if (currentPortal === "client") return "/client/dashboard";
     
     // Fallback to role-based if no portal context (legacy support)
-    if (user?.role === "admin") return "/super-admin";
-    if (user?.role === "contractor") return "/admin-dashboard";
-    return "/dashboard"; // Default to client dashboard
+    if (user?.role === "admin") return "/admin/dashboard";
+    if (user?.role === "contractor") return "/contractor/dashboard";
+    return "/client/dashboard"; // Default to client dashboard
+  };
+  
+  // Get the base path for current portal
+  const getPortalBasePath = () => {
+    if (currentPortal === "admin") return "/admin";
+    if (currentPortal === "contractor") return "/contractor";
+    return "/client";
   };
   
   const dashboardPath = getDashboardPath();
+  const basePath = getPortalBasePath();
   
   // Don't show back button until we know the user's role
   const showBackButton = !isDashboard && !loading && user;
@@ -68,16 +76,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         
         {/* Right side - My Projects, Settings and Logout */}
         <div className="flex items-center gap-2">
-          {isDashboard && (
+          {isDashboard && currentPortal === "client" && (
             <Button variant="outline" size="sm" className="gap-2" asChild data-testid="button-my-projects">
-              <Link href="/my-projects">
+              <Link href="/client/projects">
                 <FolderOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">My Projects</span>
               </Link>
             </Button>
           )}
           <Button variant="ghost" size="icon" className="text-muted-foreground" asChild data-testid="button-settings">
-            <Link href="/settings">
+            <Link href={`${basePath}/settings`}>
               <Settings className="w-5 h-5" />
             </Link>
           </Button>

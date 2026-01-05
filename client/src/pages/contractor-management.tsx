@@ -209,7 +209,7 @@ export default function ContractorManagement() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/super-admin">
+              <Link href="/admin/dashboard">
                 <Button variant="ghost" size="sm" data-testid="btn-back-to-admin">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Dashboard
@@ -373,7 +373,7 @@ export default function ContractorManagement() {
                       {sortedContractors.map((contractor: Omit<User, "password">) => (
                         <TableRow key={contractor.id} data-testid={`row-contractor-${contractor.id}`}>
                           <TableCell className="font-medium">
-                            <Link href={`/super-admin/contractors/${contractor.id}`}>
+                            <Link href={`/admin/contractors/${contractor.id}`}>
                               <span className="text-primary hover:underline cursor-pointer">
                                 {contractor.name || "No name"}
                               </span>
