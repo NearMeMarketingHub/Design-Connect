@@ -448,6 +448,15 @@ export default function ProjectDetails() {
   const [newPostTitle, setNewPostTitle] = useState("");
   const [newPostCaption, setNewPostCaption] = useState("");
   const [newPostImages, setNewPostImages] = useState<string[]>([]);
+  const [selectedInspiration, setSelectedInspiration] = useState<any | null>(null);
+  const [inspirationDetailOpen, setInspirationDetailOpen] = useState(false);
+  const [createInspirationOpen, setCreateInspirationOpen] = useState(false);
+  const [newInspirationTitle, setNewInspirationTitle] = useState("");
+  const [newInspirationCaption, setNewInspirationCaption] = useState("");
+  const [newInspirationCategory, setNewInspirationCategory] = useState("");
+  const [newInspirationImage, setNewInspirationImage] = useState("");
+  const [newInspirationComment, setNewInspirationComment] = useState("");
+  const inspirationFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -577,6 +586,102 @@ export default function ProjectDetails() {
       return res.json();
     },
     enabled: !!projectId,
+  });
+
+  // Fetch inspiration images from API
+  const { data: apiInspirationImages = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'inspiration'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/inspiration`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Create inspiration image mutation
+  const createInspirationMutation = useMutation({
+    mutationFn: async (data: { imageUrl: string; title: string; caption?: string; category?: string }) => {
+      const res = await fetch(`/api/projects/${projectId}/inspiration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Failed to create inspiration image');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'inspiration'] });
+    }
+  });
+
+  // Delete inspiration image mutation
+  const deleteInspirationMutation = useMutation({
+    mutationFn: async (imageId: string) => {
+      const res = await fetch(`/api/inspiration/${imageId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete inspiration image');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'inspiration'] });
+      setSelectedInspiration(null);
+      setInspirationDetailOpen(false);
+    }
+  });
+
+  // Fetch comments for selected inspiration (reuses posts endpoint)
+  const { data: inspirationComments = [] } = useQuery({
+    queryKey: ['/api/posts', selectedInspiration?.id, 'comments'],
+    queryFn: async () => {
+      const res = await fetch(`/api/posts/${selectedInspiration?.id}/comments`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedInspiration?.id,
+  });
+
+  // Fetch reactions for selected inspiration (reuses posts endpoint)
+  const { data: inspirationReactions = [] } = useQuery({
+    queryKey: ['/api/posts', selectedInspiration?.id, 'reactions'],
+    queryFn: async () => {
+      const res = await fetch(`/api/posts/${selectedInspiration?.id}/reactions`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedInspiration?.id,
+  });
+
+  // Add inspiration comment mutation
+  const addInspirationCommentMutation = useMutation({
+    mutationFn: async ({ imageId, content }: { imageId: string; content: string }) => {
+      const res = await fetch(`/api/posts/${imageId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, userName: user?.name || 'You', userAvatar: user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'YO' })
+      });
+      if (!res.ok) throw new Error('Failed to add comment');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/posts', selectedInspiration?.id, 'comments'] });
+      setNewInspirationComment("");
+    }
+  });
+
+  // Toggle inspiration reaction mutation
+  const toggleInspirationReactionMutation = useMutation({
+    mutationFn: async (imageId: string) => {
+      const res = await fetch(`/api/posts/${imageId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reactionType: 'like', userName: user?.name || 'You' })
+      });
+      if (!res.ok) throw new Error('Failed to toggle reaction');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/posts', selectedInspiration?.id, 'reactions'] });
+    }
   });
 
   // Fetch comments for selected post
@@ -824,24 +929,54 @@ export default function ProjectDetails() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
     
-    const newImages = Array.from(files).map((file, index) => {
-      const id = Date.now() + index;
-      const fileName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-      const title = fileName.charAt(0).toUpperCase() + fileName.slice(1);
-      return {
-        id,
-        title,
-        category: "Uploaded",
-        src: URL.createObjectURL(file)
-      };
-    });
+    const file = files[0];
+    const fileName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+    const title = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+    const imageUrl = URL.createObjectURL(file);
     
-    setInspirationImages(prev => [...prev, ...newImages]);
+    setNewInspirationTitle(title);
+    setNewInspirationImage(imageUrl);
+    setCreateInspirationOpen(true);
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const handleInspirationFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const imageUrl = URL.createObjectURL(file);
+    setNewInspirationImage(imageUrl);
+    
+    if (inspirationFileInputRef.current) {
+      inspirationFileInputRef.current.value = "";
+    }
+  };
+
+  const openInspirationDetail = (inspiration: any) => {
+    setSelectedInspiration(inspiration);
+    setInspirationDetailOpen(true);
+  };
+
+  const createInspiration = () => {
+    if (!newInspirationTitle.trim() || !newInspirationImage) return;
+    
+    createInspirationMutation.mutate({
+      imageUrl: newInspirationImage,
+      title: newInspirationTitle.trim(),
+      caption: newInspirationCaption.trim() || undefined,
+      category: newInspirationCategory.trim() || undefined
+    });
+    
+    setCreateInspirationOpen(false);
+    setNewInspirationTitle("");
+    setNewInspirationCaption("");
+    setNewInspirationCategory("");
+    setNewInspirationImage("");
   };
 
   const openImageViewer = (images: { src: string; title?: string; description?: string }[], startIndex = 0) => {
@@ -1204,13 +1339,12 @@ export default function ProjectDetails() {
             </div>
           </TabsContent>
 
-          {/* INSPIRATION & SELECTIONS TAB */}
+          {/* INSPIRATION & SELECTIONS TAB - Instagram-style Feed */}
           <TabsContent value="inspiration" className="space-y-6">
             <input 
               type="file" 
               ref={fileInputRef}
               accept="image/*"
-              multiple
               className="hidden"
               onChange={handleFileUpload}
               data-testid="input-file-upload"
@@ -1218,74 +1352,119 @@ export default function ProjectDetails() {
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold">Inspiration & Selections</h3>
-                <p className="text-sm text-muted-foreground">Upload inspiration photos and track material selections</p>
+                <p className="text-sm text-muted-foreground">Design ideas and material selections from the team</p>
               </div>
               <Button 
                 data-testid="button-upload-inspiration"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setCreateInspirationOpen(true)}
                 className="hover:bg-primary/90 transition-colors"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Upload Image
+                Add Inspiration
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {inspirationImages.map((img, index) => (
-                <div 
-                  key={img.id} 
-                  className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary transition-colors"
-                  data-testid={`card-inspiration-${img.id}`}
-                  onClick={() => openImageViewer(
-                    inspirationImages.map(i => ({
-                      src: i.src,
-                      title: i.title,
-                      description: i.category
-                    })),
-                    index
-                  )}
+            {/* Instagram-style grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Use API images if available, fallback to demo data */}
+              {(apiInspirationImages.length > 0 ? apiInspirationImages : INITIAL_INSPIRATION_IMAGES.map((img, idx) => ({
+                id: `demo-${img.id}`,
+                imageUrl: img.src,
+                title: img.title,
+                caption: `Sample ${img.category} inspiration for your project`,
+                category: img.category,
+                creatorName: 'Design Team',
+                createdAt: new Date(Date.now() - idx * 86400000 * 3).toISOString()
+              }))).map((inspiration: any) => (
+                <Card 
+                  key={inspiration.id} 
+                  className="group overflow-hidden cursor-pointer hover:shadow-lg transition-all"
+                  data-testid={`card-inspiration-${inspiration.id}`}
+                  onClick={() => openInspirationDetail(inspiration)}
                 >
-                  <img 
-                    src={img.src} 
-                    alt={img.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button 
-                      size="icon" 
-                      variant="secondary" 
-                      data-testid={`button-comment-inspiration-${img.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReplyingToImage({
-                          src: img.src,
-                          title: img.title,
-                          category: img.category
-                        });
-                        handleTabChange("messages");
-                      }}
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                    </Button>
+                  <div className="aspect-square relative overflow-hidden bg-muted">
+                    <img 
+                      src={inspiration.imageUrl}
+                      alt={inspiration.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {inspiration.category && (
+                      <Badge className="absolute top-3 right-3 bg-black/60 border-0 text-white">
+                        {inspiration.category}
+                      </Badge>
+                    )}
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                    <div>
-                      <p className="text-white text-sm font-medium">{img.title}</p>
-                      <p className="text-white/70 text-xs">{img.category}</p>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarFallback className="text-xs">
+                          {inspiration.creatorName?.split(' ').map((n: string) => n[0]).join('') || 'DT'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">{inspiration.creatorName || 'Design Team'}</span>
                     </div>
-                  </div>
-                </div>
+                    <h4 className="font-semibold line-clamp-1">{inspiration.title}</h4>
+                    {inspiration.caption && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{inspiration.caption}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-3">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(inspiration.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 gap-1"
+                          data-testid={`button-like-inspiration-${inspiration.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleInspirationReactionMutation.mutate(inspiration.id);
+                          }}
+                        >
+                          <Heart className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 gap-1"
+                          data-testid={`button-chat-inspiration-${inspiration.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReplyingToImage({
+                              src: inspiration.imageUrl,
+                              title: inspiration.title,
+                              category: inspiration.category || 'Inspiration'
+                            });
+                            handleTabChange("messages");
+                          }}
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-              
-              {/* Upload Placeholder */}
-              <div 
-                className="aspect-square border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/50 cursor-pointer transition-colors"
-                data-testid="button-add-inspiration"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Plus className="w-8 h-8 mb-2" />
-                <span className="text-sm font-medium">Add Image</span>
-              </div>
+
+              {/* Empty state with upload CTA */}
+              {apiInspirationImages.length === 0 && INITIAL_INSPIRATION_IMAGES.length === 0 && (
+                <Card className="border-dashed col-span-full">
+                  <CardContent className="p-12 text-center">
+                    <ImageIcon className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Inspiration Yet</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Add design ideas, material samples, and visual references for your project.
+                    </p>
+                    <Button onClick={() => setCreateInspirationOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Inspiration
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
 
@@ -2496,6 +2675,272 @@ export default function ProjectDetails() {
               {createPostMutation.isPending ? 'Creating...' : 'Create Post'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Inspiration Modal */}
+      <Dialog open={createInspirationOpen} onOpenChange={(open) => {
+        setCreateInspirationOpen(open);
+        if (!open) {
+          setNewInspirationTitle("");
+          setNewInspirationCaption("");
+          setNewInspirationCategory("");
+          setNewInspirationImage("");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Inspiration</DialogTitle>
+            <DialogDescription>Share design ideas and material selections</DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <input
+              type="file"
+              ref={inspirationFileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleInspirationFileSelect}
+            />
+
+            {newInspirationImage ? (
+              <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+                <img 
+                  src={newInspirationImage} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover" 
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2"
+                  onClick={() => setNewInspirationImage("")}
+                  data-testid="button-remove-inspiration-image"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="aspect-video border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => inspirationFileInputRef.current?.click()}
+              >
+                <ImageIcon className="w-10 h-10 text-muted-foreground mb-2" />
+                <span className="text-sm text-muted-foreground">Click to upload image</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="inspiration-title">Title</Label>
+              <Input
+                id="inspiration-title"
+                placeholder="e.g., Kitchen Backsplash Idea"
+                value={newInspirationTitle}
+                onChange={(e) => setNewInspirationTitle(e.target.value)}
+                data-testid="input-inspiration-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="inspiration-category">Category</Label>
+              <Input
+                id="inspiration-category"
+                placeholder="e.g., Kitchen, Bathroom, Flooring"
+                value={newInspirationCategory}
+                onChange={(e) => setNewInspirationCategory(e.target.value)}
+                data-testid="input-inspiration-category"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="inspiration-caption">Description (optional)</Label>
+              <Textarea
+                id="inspiration-caption"
+                placeholder="Add notes about this design idea..."
+                value={newInspirationCaption}
+                onChange={(e) => setNewInspirationCaption(e.target.value)}
+                rows={3}
+                data-testid="input-inspiration-caption"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateInspirationOpen(false)} data-testid="button-cancel-inspiration">
+              Cancel
+            </Button>
+            <Button 
+              onClick={createInspiration}
+              disabled={!newInspirationTitle.trim() || !newInspirationImage || createInspirationMutation.isPending}
+              data-testid="button-submit-inspiration"
+            >
+              {createInspirationMutation.isPending ? 'Adding...' : 'Add Inspiration'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inspiration Detail Modal */}
+      <Dialog open={inspirationDetailOpen} onOpenChange={(open) => {
+        setInspirationDetailOpen(open);
+        if (!open) {
+          setSelectedInspiration(null);
+          setNewInspirationComment("");
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          {selectedInspiration && (
+            <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
+              {/* Image Section */}
+              <div className="md:w-1/2 bg-black flex items-center justify-center">
+                <img 
+                  src={selectedInspiration.imageUrl}
+                  alt={selectedInspiration.title}
+                  className="w-full h-auto max-h-[50vh] md:max-h-[90vh] object-contain"
+                />
+              </div>
+
+              {/* Details Section */}
+              <div className="md:w-1/2 flex flex-col max-h-[40vh] md:max-h-[90vh]">
+                {/* Header */}
+                <div className="p-4 border-b flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback>
+                        {selectedInspiration.creatorName?.split(' ').map((n: string) => n[0]).join('') || 'DT'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{selectedInspiration.creatorName || 'Design Team'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(selectedInspiration.createdAt).toLocaleDateString('en-US', { 
+                          month: 'short', day: 'numeric', year: 'numeric' 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  {canEdit && !selectedInspiration.id.startsWith('demo-') && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="text-destructive"
+                      onClick={() => {
+                        if (confirm('Delete this inspiration image?')) {
+                          deleteInspirationMutation.mutate(selectedInspiration.id);
+                        }
+                      }}
+                      data-testid="button-delete-inspiration"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="p-4 border-b space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-lg">{selectedInspiration.title}</h3>
+                    {selectedInspiration.category && (
+                      <Badge variant="secondary">{selectedInspiration.category}</Badge>
+                    )}
+                  </div>
+                  {selectedInspiration.caption && (
+                    <p className="text-sm text-muted-foreground">{selectedInspiration.caption}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 border-b flex items-center gap-4">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => toggleInspirationReactionMutation.mutate(selectedInspiration.id)}
+                    data-testid="button-like-inspiration-detail"
+                  >
+                    <Heart className={`w-4 h-4 ${inspirationReactions.some((r: any) => r.userName === (user?.name || 'You')) ? 'fill-red-500 text-red-500' : ''}`} />
+                    {inspirationReactions.length > 0 && <span>{inspirationReactions.length}</span>}
+                    Like
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => {
+                      setReplyingToImage({
+                        src: selectedInspiration.imageUrl,
+                        title: selectedInspiration.title,
+                        category: selectedInspiration.category || 'Inspiration'
+                      });
+                      setInspirationDetailOpen(false);
+                      handleTabChange("messages");
+                    }}
+                    data-testid="button-discuss-inspiration"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Discuss in Chat
+                  </Button>
+                </div>
+
+                {/* Comments */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {inspirationComments.length > 0 ? (
+                    inspirationComments.map((comment: any) => (
+                      <div key={comment.id} className="flex gap-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="text-xs">{comment.userAvatar || 'U'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{comment.userName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(comment.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm">{comment.content}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No comments yet</p>
+                  )}
+                </div>
+
+                {/* Comment Input */}
+                <div className="p-4 border-t flex gap-2">
+                  <Input
+                    placeholder="Add a comment..."
+                    value={newInspirationComment}
+                    onChange={(e) => setNewInspirationComment(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newInspirationComment.trim()) {
+                        addInspirationCommentMutation.mutate({ 
+                          imageId: selectedInspiration.id, 
+                          content: newInspirationComment.trim() 
+                        });
+                      }
+                    }}
+                    data-testid="input-inspiration-comment"
+                  />
+                  <Button 
+                    size="sm"
+                    disabled={!newInspirationComment.trim() || addInspirationCommentMutation.isPending}
+                    onClick={() => {
+                      if (newInspirationComment.trim()) {
+                        addInspirationCommentMutation.mutate({ 
+                          imageId: selectedInspiration.id, 
+                          content: newInspirationComment.trim() 
+                        });
+                      }
+                    }}
+                    data-testid="button-post-inspiration-comment"
+                  >
+                    Post
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
