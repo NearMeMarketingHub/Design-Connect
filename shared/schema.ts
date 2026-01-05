@@ -150,6 +150,8 @@ export const inspirationImages = pgTable("inspiration_images", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
   imageUrl: text("image_url").notNull(),
+  coverImage: text("cover_image"),
+  images: text("images").array(),
   title: text("title").notNull().default(""),
   caption: text("caption"),
   category: text("category"),
