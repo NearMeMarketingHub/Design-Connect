@@ -21,7 +21,7 @@ export default function SalesDashboard() {
           <h1 className="text-3xl font-heading font-bold text-foreground">Sales Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage quotes, estimates, and pipeline.</p>
         </div>
-        <Link href="/contractor/estimates">
+        <Link href="/admin/estimates">
           <Button className="bg-primary text-primary-foreground">
             <Plus className="w-4 h-4 mr-2" />
             Create Quote

@@ -10,7 +10,6 @@ import ClientDashboard from "@/pages/client-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Estimator from "@/pages/estimator";
 import ProjectDetails from "@/pages/project-details";
-import TimelinePage from "@/pages/timeline";
 import SalesDashboard from "@/pages/sales-dashboard";
 import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
@@ -77,6 +76,10 @@ function Router() {
         <Route path="/admin/contractors" component={ContractorManagement} />
         <Route path="/admin/contractors/:id" component={ContractorProfile} />
         <Route path="/admin/budget" component={BudgetAdmin} />
+        <Route path="/admin/sales" component={SalesDashboard} />
+        <Route path="/admin/estimates" component={Estimator} />
+        <Route path="/admin/accounting" component={AccountingDashboard} />
+        <Route path="/admin/invoice/new" component={CreateInvoice} />
         <Route component={NotFound} />
       </Switch>
     );
@@ -105,13 +108,8 @@ function Router() {
         <Switch>
           <Route path="/contractor/dashboard" component={AdminDashboard} />
           <Route path="/contractor/projects" component={ClientProjects} />
-          <Route path="/contractor/sales" component={SalesDashboard} />
-          <Route path="/contractor/estimates" component={Estimator} />
-          <Route path="/contractor/accounting" component={AccountingDashboard} />
-          <Route path="/contractor/invoice/new" component={CreateInvoice} />
           <Route path="/contractor/new-project" component={NewProject} />
           <Route path="/contractor/project/:id" component={ProjectDetails} />
-          <Route path="/contractor/timeline" component={TimelinePage} />
           <Route path="/contractor/calculator" component={ContractorCalculator} />
           <Route path="/contractor/floor-calculator" component={FloorCalculator} />
           <Route path="/contractor/profile" component={MyProfile} />

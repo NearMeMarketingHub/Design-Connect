@@ -46,7 +46,9 @@ import {
   Calculator,
   Check,
   X,
-  Clock
+  Clock,
+  TrendingUp,
+  Receipt
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -492,6 +494,43 @@ export default function SuperAdminDashboard() {
                   <Button className="w-full" data-testid="button-budget-manager">
                     <Calculator className="w-4 h-4 mr-2" />
                     Open Price Manager
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-blue-600" />
+                      Financial Management
+                    </CardTitle>
+                    <CardDescription>Sales, estimates, and accounting</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="border-blue-600 text-blue-600">
+                    Admin
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Link href="/admin/sales">
+                  <Button className="w-full justify-start" variant="outline" data-testid="button-sales">
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    Sales Dashboard
+                  </Button>
+                </Link>
+                <Link href="/admin/estimates">
+                  <Button className="w-full justify-start" variant="outline" data-testid="button-estimates">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Estimates
+                  </Button>
+                </Link>
+                <Link href="/admin/accounting">
+                  <Button className="w-full justify-start" variant="outline" data-testid="button-accounting">
+                    <Receipt className="w-4 h-4 mr-2" />
+                    Accounting
                   </Button>
                 </Link>
               </CardContent>

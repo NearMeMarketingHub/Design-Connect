@@ -9,10 +9,6 @@ import {
   FolderOpen,
   Shield,
   LayoutDashboard,
-  TrendingUp,
-  FileText,
-  Receipt,
-  Calendar,
   Calculator,
   Grid3X3,
   Menu,
@@ -58,10 +54,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const contractorSidebarItems: SidebarItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/contractor/dashboard" },
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
-    { label: "Sales", icon: <TrendingUp className="w-5 h-5" />, href: "/contractor/sales" },
-    { label: "Estimates", icon: <FileText className="w-5 h-5" />, href: "/contractor/estimates" },
-    { label: "Accounting", icon: <Receipt className="w-5 h-5" />, href: "/contractor/accounting" },
-    { label: "Timeline", icon: <Calendar className="w-5 h-5" />, href: "/contractor/timeline" },
     { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
     { label: "Floor Calc", icon: <Grid3X3 className="w-5 h-5" />, href: "/contractor/floor-calculator" },
   ];
