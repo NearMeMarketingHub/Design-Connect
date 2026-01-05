@@ -92,6 +92,12 @@ function Router() {
         <Switch>
           <Route path="/client/dashboard" component={ClientDashboard} />
           <Route path="/client/projects" component={ClientProjects} />
+          <Route path="/client/project/:id/progress" component={ProjectDetails} />
+          <Route path="/client/project/:id/documents" component={ProjectDetails} />
+          <Route path="/client/project/:id/messages" component={ProjectDetails} />
+          <Route path="/client/project/:id/budget" component={ProjectDetails} />
+          <Route path="/client/project/:id/timeline" component={ProjectDetails} />
+          <Route path="/client/project/:id/inspiration" component={ProjectDetails} />
           <Route path="/client/project/:id" component={ProjectDetails} />
           <Route path="/client/profile" component={MyProfile} />
           <Route path="/client/settings" component={SettingsPage} />
@@ -109,6 +115,12 @@ function Router() {
           <Route path="/contractor/dashboard" component={AdminDashboard} />
           <Route path="/contractor/projects" component={ClientProjects} />
           <Route path="/contractor/new-project" component={NewProject} />
+          <Route path="/contractor/project/:id/progress" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/documents" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/messages" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/budget" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/timeline" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/inspiration" component={ProjectDetails} />
           <Route path="/contractor/project/:id" component={ProjectDetails} />
           <Route path="/contractor/calculator" component={ContractorCalculator} />
           <Route path="/contractor/floor-calculator" component={FloorCalculator} />

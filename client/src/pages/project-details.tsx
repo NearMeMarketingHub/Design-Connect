@@ -228,7 +228,7 @@ const getAllPhases = (status: string, currentPhase?: string): string[] => {
 
 export default function ProjectDetails() {
   const params = useParams<{ id: string }>();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const projectId = params.id || "";
   const staticProject = PROJECTS_DATA[projectId];
   const queryClient = useQueryClient();
@@ -238,13 +238,43 @@ export default function ProjectDetails() {
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
   const canEdit = isContractorView && (user?.role === 'contractor' || user?.role === 'admin');
   
+  // Get portal base path
+  const getPortalPath = () => {
+    if (currentPortal === 'admin') return '/admin';
+    if (currentPortal === 'contractor') return '/contractor';
+    return '/client';
+  };
+  const portalPath = getPortalPath();
+  const projectBasePath = `${portalPath}/project/${projectId}`;
+  
   // Get back path based on current portal
   const getBackPath = () => {
     if (currentPortal === 'admin') return '/admin/dashboard';
-    if (currentPortal === 'contractor') return '/contractor/dashboard';
+    if (currentPortal === 'contractor') return '/contractor/projects';
     return '/client/projects';
   };
   const backPath = getBackPath();
+  
+  // Determine active tab from URL path (strip query string first)
+  const getTabFromPath = () => {
+    const path = location.split('?')[0];
+    if (path.endsWith('/progress')) return 'progress';
+    if (path.endsWith('/documents')) return 'documents';
+    if (path.endsWith('/messages')) return 'messages';
+    if (path.endsWith('/budget')) return 'budget';
+    if (path.endsWith('/timeline')) return 'timeline';
+    if (path.endsWith('/inspiration')) return 'inspiration';
+    return 'overview';
+  };
+  
+  // Handle tab change - navigate to sub-page
+  const handleTabChange = (tab: string) => {
+    if (tab === 'overview') {
+      setLocation(projectBasePath);
+    } else {
+      setLocation(`${projectBasePath}/${tab}`);
+    }
+  };
   
   // State for contractor editing
   const [isEditing, setIsEditing] = useState(false);
@@ -253,9 +283,8 @@ export default function ProjectDetails() {
   const [editDescription, setEditDescription] = useState("");
   const [localProgress, setLocalProgress] = useState<number | null>(null);
   
-  // Parse tab and admin context from URL query parameter (needed before API call)
+  // Parse admin context from URL query parameter (needed before API call)
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
-  const tabFromUrl = urlParams.get('tab');
   const isFromAdmin = urlParams.get('from') === 'admin';
   
   // Fetch project from API if not found in static data (for database projects)
@@ -290,7 +319,7 @@ export default function ProjectDetails() {
     endDate: "TBD",
     description: apiProject.description || ""
   } : null);
-  const [activeTab, setActiveTab] = useState(tabFromUrl || "overview");
+  const activeTab = getTabFromPath();
   
   // Update project mutation for contractor editing
   const updateProjectMutation = useMutation({
@@ -391,12 +420,6 @@ export default function ProjectDetails() {
     return getAllPhases(status, project?.phase);
   };
   
-  // Update tab when URL changes
-  useEffect(() => {
-    if (tabFromUrl && tabFromUrl !== activeTab) {
-      setActiveTab(tabFromUrl);
-    }
-  }, [tabFromUrl]);
   const [messageText, setMessageText] = useState("");
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<{ src: string; title?: string; description?: string }[]>([]);
@@ -924,7 +947,7 @@ export default function ProjectDetails() {
       </div>
 
       {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
         <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none h-auto overflow-x-auto flex-nowrap">
           <TabsTrigger 
             value="overview"
@@ -1361,7 +1384,7 @@ export default function ProjectDetails() {
                       variant="outline" 
                       className="w-full mt-2 hover:bg-muted transition-colors" 
                       data-testid="button-contact-team"
-                      onClick={() => setActiveTab("messages")}
+                      onClick={() => handleTabChange("messages")}
                     >
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Team
@@ -1454,7 +1477,7 @@ export default function ProjectDetails() {
                           title: img.title,
                           category: img.category
                         });
-                        setActiveTab("messages");
+                        handleTabChange("messages");
                       }}
                     >
                       <MessageSquare className="w-4 h-4" />
@@ -2418,7 +2441,7 @@ export default function ProjectDetails() {
                     onClick={() => {
                       setReplyingToPost({ id: selectedPost.id, title: selectedPost.title, coverImage: selectedPost.coverImage });
                       setPostDetailOpen(false);
-                      setActiveTab('messages');
+                      handleTabChange('messages');
                     }}
                     data-testid="button-reply-in-chat"
                   >

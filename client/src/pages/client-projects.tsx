@@ -22,8 +22,9 @@ interface Project {
   contractorId: string | null;
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, portalPath }: { project: Project; portalPath: string }) {
   const isCompleted = project.status === 'Completed';
+  const projectPath = `${portalPath}/project/${project.id}`;
   
   return (
     <Card className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300" data-testid={`card-project-${project.id}`}>
@@ -77,7 +78,7 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </CardContent>
       <CardFooter className="p-4 bg-muted/30 border-t border-border">
-        <Link href={`/client/project/${project.id}`} className="w-full" data-testid={`link-project-${project.id}`}>
+        <Link href={projectPath} className="w-full" data-testid={`link-project-${project.id}`}>
           <Button className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
             {isCompleted ? 'View Project' : 'View Dashboard'} <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
@@ -116,6 +117,8 @@ export default function ClientProjects() {
   });
   const activeProjects = myProjects.filter(p => p.status !== 'Completed');
   const completedProjects = myProjects.filter(p => p.status === 'Completed');
+  
+  const portalPath = currentPortal === 'contractor' ? '/contractor' : currentPortal === 'admin' ? '/admin' : '/client';
 
   if (isLoading) {
     return (
@@ -149,7 +152,7 @@ export default function ClientProjects() {
               <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Current Projects</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activeProjects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
+                  <ProjectCard key={project.id} project={project} portalPath={portalPath} />
                 ))}
               </div>
             </section>
@@ -160,7 +163,7 @@ export default function ClientProjects() {
               <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Completed Projects</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {completedProjects.map((project) => (
-                  <ProjectCard key={project.id} project={project} />
+                  <ProjectCard key={project.id} project={project} portalPath={portalPath} />
                 ))}
               </div>
             </section>
