@@ -18,6 +18,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { Message } from "@shared/schema";
 import { format } from "date-fns";
+import { getInitials } from "@/lib/utils";
 
 export default function SandboxMessages() {
   const [, params] = useRoute("/sandbox/project/:id/messages");
@@ -144,7 +145,7 @@ export default function SandboxMessages() {
                     >
                       <Avatar className="w-8 h-8 shrink-0">
                         <AvatarFallback className={msg.isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted'}>
-                          {msg.senderAvatar || msg.senderName?.slice(0, 2).toUpperCase()}
+                          {getInitials(msg.senderName)}
                         </AvatarFallback>
                       </Avatar>
                       <div className={`flex flex-col ${msg.isOwn ? 'items-end' : 'items-start'} max-w-[70%]`}>

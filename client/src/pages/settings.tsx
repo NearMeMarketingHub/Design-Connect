@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { User, Bell, Lock, Save, Eye, EyeOff, Camera } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UppyFile, UploadResult } from "@uppy/core";
@@ -21,7 +22,7 @@ export default function SettingsPage() {
   
   const firstName = user?.name?.split(' ')[0] || '';
   const lastName = user?.name?.split(' ').slice(1).join(' ') || '';
-  const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase() || 'U';
+  const initials = getInitials(user?.name);
 
   const [profileData, setProfileData] = useState({
     firstName,

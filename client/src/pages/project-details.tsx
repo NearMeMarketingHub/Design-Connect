@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { getInitials } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -436,7 +437,7 @@ export default function ProjectDetails() {
     .map((msg: any) => ({
       id: msg.id,
       sender: msg.senderName,
-      avatar: msg.senderAvatar || msg.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
+      avatar: msg.senderAvatar || getInitials(msg.senderName),
       message: msg.content,
       time: new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       isOwn: msg.isOwn === true || msg.senderName === 'You' || msg.senderId === 'current-user',
@@ -2313,7 +2314,7 @@ export default function ProjectDetails() {
                     postComments.map((comment: any) => (
                       <div key={comment.id} className="flex gap-2">
                         <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-xs">{comment.userAvatar || 'U'}</AvatarFallback>
+                          <AvatarFallback className="text-xs">{getInitials(comment.userName)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <p className="text-sm">
