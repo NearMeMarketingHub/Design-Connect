@@ -116,7 +116,7 @@ export default function AdminDashboard() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Project Overview</h1>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Projects Overview</h1>
           <p className="text-muted-foreground mt-1">Manage active jobs, estimates, and schedules.</p>
         </div>
         <div className="flex gap-2">
@@ -140,7 +140,6 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
-
       <div className="grid md:grid-cols-4 gap-4">
         <Card className="bg-primary text-primary-foreground border-none">
           <CardContent className="p-6">
@@ -183,7 +182,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
