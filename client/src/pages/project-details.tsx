@@ -2975,6 +2975,22 @@ export default function ProjectDetails() {
         }
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          {/* Delete button positioned next to close button */}
+          {selectedInspiration && canEdit && !String(selectedInspiration.id).startsWith('demo-') && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="absolute right-10 top-3 z-50 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                if (confirm('Delete this inspiration image?')) {
+                  deleteInspirationMutation.mutate(selectedInspiration.id);
+                }
+              }}
+              data-testid="button-delete-inspiration"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
           {selectedInspiration && (
             <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
               {/* Image Section with Carousel */}
@@ -3040,21 +3056,6 @@ export default function ProjectDetails() {
                       </p>
                     </div>
                   </div>
-                  {canEdit && !selectedInspiration.id.startsWith('demo-') && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="text-destructive"
-                      onClick={() => {
-                        if (confirm('Delete this inspiration image?')) {
-                          deleteInspirationMutation.mutate(selectedInspiration.id);
-                        }
-                      }}
-                      data-testid="button-delete-inspiration"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
                 </div>
 
                 {/* Content */}
