@@ -184,20 +184,12 @@ export default function FloorCalculator() {
           </h1>
           <p className="text-muted-foreground mt-1">Calculate square footage and flooring costs by room</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/contractor/calculator">
-            <Button variant="outline" data-testid="button-item-calculator">
-              <Calculator className="w-4 h-4 mr-2" />
-              Item Calculator
-            </Button>
-          </Link>
-          {rooms.length > 0 && (
-            <Button variant="outline" onClick={clearAllRooms} data-testid="button-clear-all">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Clear All
-            </Button>
-          )}
-        </div>
+        {rooms.length > 0 && (
+          <Button variant="outline" onClick={clearAllRooms} data-testid="button-clear-all">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Clear All
+          </Button>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

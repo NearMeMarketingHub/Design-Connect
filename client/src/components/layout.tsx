@@ -16,9 +16,7 @@ import {
   Calculator,
   Grid3X3,
   Menu,
-  X,
-  Plus,
-  Download
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -176,18 +174,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </div>
             
-            {/* Right side - Action buttons */}
+            {/* Right side - Settings and Logout */}
             <div className="flex items-center gap-2">
-              <Button size="sm" className="gap-2" asChild data-testid="button-new-project">
-                <Link href="/contractor/new-project">
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">New Project</span>
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2" data-testid="button-export">
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export Report</span>
-              </Button>
               <Button variant="ghost" size="icon" className="text-muted-foreground" asChild data-testid="button-settings">
                 <Link href={`${basePath}/settings`}>
                   <Settings className="w-5 h-5" />

@@ -44,7 +44,6 @@ import {
   Save,
   X,
   ChevronRight,
-  Grid3X3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -225,20 +224,12 @@ export default function ContractorCalculator() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
-            <Calculator className="w-8 h-8 text-primary" />
-            Estimate Calculator
-          </h1>
-          <p className="text-muted-foreground mt-1">Build estimates using your price book</p>
-        </div>
-        <Link href="/contractor/floor-calculator">
-          <Button variant="outline" data-testid="button-floor-calculator">
-            <Grid3X3 className="w-4 h-4 mr-2" />
-            Floor Calculator
-          </Button>
-        </Link>
+      <div>
+        <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+          <Calculator className="w-8 h-8 text-primary" />
+          Estimate Calculator
+        </h1>
+        <p className="text-muted-foreground mt-1">Build estimates using your price book</p>
       </div>
 
       <div className="flex" style={{ height: 'calc(100vh - 12rem)' }}>
