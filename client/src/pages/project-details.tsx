@@ -458,6 +458,7 @@ export default function ProjectDetails() {
   const [newInspirationComment, setNewInspirationComment] = useState("");
   const [inspirationImageIndex, setInspirationImageIndex] = useState(0);
   const [inspirationSortOrder, setInspirationSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [inspirationCategoryFilter, setInspirationCategoryFilter] = useState<string>('all');
   const inspirationFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
@@ -1457,8 +1458,26 @@ export default function ProjectDetails() {
                 <p className="text-sm text-muted-foreground">Design ideas and material selections from the team</p>
               </div>
               <div className="flex items-center gap-2">
+                <Select value={inspirationCategoryFilter} onValueChange={setInspirationCategoryFilter}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-inspiration-category">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="option-category-all">All Categories</SelectItem>
+                    {/* Get unique categories from inspiration images */}
+                    {(Array.from(new Set(
+                      (apiInspirationImages.length > 0 ? apiInspirationImages : INITIAL_INSPIRATION_IMAGES.map(img => ({ category: img.category })))
+                        .map((img: any) => img.category)
+                        .filter(Boolean)
+                    )) as string[]).map((category) => (
+                      <SelectItem key={category} value={category} data-testid={`option-category-${category.toLowerCase().replace(/\s+/g, '-')}`}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select value={inspirationSortOrder} onValueChange={(value: 'newest' | 'oldest') => setInspirationSortOrder(value)}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-inspiration-sort">
+                  <SelectTrigger className="w-[160px]" data-testid="select-inspiration-sort">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1491,6 +1510,7 @@ export default function ProjectDetails() {
                 creatorName: 'Design Team',
                 createdAt: new Date(Date.now() - idx * 86400000 * 3).toISOString()
               })))
+              .filter((img: any) => inspirationCategoryFilter === 'all' || img.category === inspirationCategoryFilter)
               .sort((a: any, b: any) => {
                 const dateA = new Date(a.createdAt).getTime();
                 const dateB = new Date(b.createdAt).getTime();
