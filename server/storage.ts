@@ -1,7 +1,17 @@
-import { eq, and, not, isNull } from "drizzle-orm";
+import { eq, and, not, isNull, like, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import bcrypt from "bcryptjs";
+
+// Helper function to generate project slug ID
+// Format: lowercased name (no spaces/special chars) + MMYYYY
+function generateProjectSlug(name: string, date: Date = new Date()): string {
+  // Remove special characters and spaces, convert to lowercase
+  const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${cleanName}${month}${year}`;
+}
 import type {
   User, InsertUser,
   Project, InsertProject,
@@ -137,6 +147,9 @@ export interface IStorage {
   getPendingContractorRequests(): Promise<ContractorRequest[]>;
   getContractorRequest(id: string): Promise<ContractorRequest | undefined>;
   updateContractorRequest(id: string, data: Partial<ContractorRequest>): Promise<ContractorRequest | undefined>;
+  
+  // Migration methods
+  migrateProjectIdsToSlug(): Promise<{ migrated: number; errors: string[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -184,7 +197,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
-    const [project] = await db.insert(schema.projects).values(insertProject).returning();
+    // Generate slug ID from project name
+    const baseSlug = generateProjectSlug(insertProject.name);
+    
+    // Check for existing projects with same base slug to handle collisions
+    const existingProjects = await db.select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(like(schema.projects.id, `${baseSlug}%`));
+    
+    let finalId = baseSlug;
+    if (existingProjects.length > 0) {
+      // Find the highest suffix number
+      let maxSuffix = 0;
+      for (const proj of existingProjects) {
+        if (proj.id === baseSlug) {
+          maxSuffix = Math.max(maxSuffix, 1);
+        } else {
+          const match = proj.id.match(new RegExp(`^${baseSlug}-(\\d+)$`));
+          if (match) {
+            maxSuffix = Math.max(maxSuffix, parseInt(match[1], 10));
+          }
+        }
+      }
+      if (maxSuffix > 0) {
+        finalId = `${baseSlug}-${maxSuffix + 1}`;
+      }
+    }
+    
+    const [project] = await db.insert(schema.projects).values({
+      ...insertProject,
+      id: finalId
+    } as any).returning();
     return project;
   }
 
@@ -537,7 +580,9 @@ export class DatabaseStorage implements IStorage {
     // Create sandbox project
     let project = existing.project;
     if (!project) {
+      const sandboxSlug = generateProjectSlug("Sandbox Test Project");
       const [newProject] = await db.insert(schema.projects).values({
+        id: sandboxSlug,
         name: "Sandbox Test Project",
         address: "123 Test Street, Demo City, ST 12345",
         status: "in_progress",
@@ -742,6 +787,97 @@ export class DatabaseStorage implements IStorage {
   async updateContractorRequest(id: string, updateData: Partial<ContractorRequest>): Promise<ContractorRequest | undefined> {
     const [request] = await db.update(schema.contractorRequests).set(updateData).where(eq(schema.contractorRequests.id, id)).returning();
     return request;
+  }
+
+  // Migration method to convert existing project IDs to slug format
+  async migrateProjectIdsToSlug(): Promise<{ migrated: number; errors: string[] }> {
+    const errors: string[] = [];
+    let migrated = 0;
+
+    // Get all projects
+    const allProjects = await db.select().from(schema.projects);
+    
+    for (const project of allProjects) {
+      const oldId = project.id;
+      
+      // Skip if already looks like a slug (no dashes typical of UUIDs, contains numbers at end for date)
+      if (!oldId.includes('-') || oldId.match(/\d{6,8}$/)) {
+        continue;
+      }
+
+      try {
+        // Generate new slug ID
+        const createdDate = project.createdAt || new Date();
+        const newId = generateProjectSlug(project.name, new Date(createdDate));
+        
+        // Check for collision and add suffix if needed
+        const existingWithSlug = await db.select({ id: schema.projects.id })
+          .from(schema.projects)
+          .where(like(schema.projects.id, `${newId}%`));
+        
+        let finalNewId = newId;
+        const filteredExisting = existingWithSlug.filter(p => p.id !== oldId);
+        if (filteredExisting.length > 0) {
+          let maxSuffix = 1;
+          for (const proj of filteredExisting) {
+            if (proj.id === newId) {
+              maxSuffix = Math.max(maxSuffix, 1);
+            } else {
+              const match = proj.id.match(new RegExp(`^${newId}-(\\d+)$`));
+              if (match) {
+                maxSuffix = Math.max(maxSuffix, parseInt(match[1], 10));
+              }
+            }
+          }
+          finalNewId = `${newId}-${maxSuffix + 1}`;
+        }
+
+        // Use a transaction with FK constraints temporarily dropped
+        await db.transaction(async (tx) => {
+          // Drop FK constraints
+          await tx.execute(sql`ALTER TABLE estimates DROP CONSTRAINT IF EXISTS estimates_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE recurring_billing DROP CONSTRAINT IF EXISTS recurring_billing_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE project_phases DROP CONSTRAINT IF EXISTS project_phases_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE action_items DROP CONSTRAINT IF EXISTS action_items_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE inspiration_images DROP CONSTRAINT IF EXISTS inspiration_images_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE progress_posts DROP CONSTRAINT IF EXISTS progress_posts_project_id_projects_id_fk`);
+          await tx.execute(sql`ALTER TABLE project_invites DROP CONSTRAINT IF EXISTS project_invites_project_id_projects_id_fk`);
+          
+          // Update project ID
+          await tx.execute(sql`UPDATE projects SET id = ${finalNewId} WHERE id = ${oldId}`);
+          
+          // Update FK references
+          await tx.execute(sql`UPDATE estimates SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE invoices SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE recurring_billing SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE project_phases SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE action_items SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE inspiration_images SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE messages SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE progress_posts SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          await tx.execute(sql`UPDATE project_invites SET project_id = ${finalNewId} WHERE project_id = ${oldId}`);
+          
+          // Re-add FK constraints
+          await tx.execute(sql`ALTER TABLE estimates ADD CONSTRAINT estimates_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE invoices ADD CONSTRAINT invoices_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE recurring_billing ADD CONSTRAINT recurring_billing_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE project_phases ADD CONSTRAINT project_phases_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE action_items ADD CONSTRAINT action_items_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE inspiration_images ADD CONSTRAINT inspiration_images_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE messages ADD CONSTRAINT messages_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE progress_posts ADD CONSTRAINT progress_posts_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+          await tx.execute(sql`ALTER TABLE project_invites ADD CONSTRAINT project_invites_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id)`);
+        });
+
+        migrated++;
+      } catch (err) {
+        errors.push(`Failed to migrate project ${oldId}: ${err}`);
+      }
+    }
+
+    return { migrated, errors };
   }
 }
 

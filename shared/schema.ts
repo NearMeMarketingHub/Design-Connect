@@ -22,7 +22,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 export const projects = pgTable("projects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: varchar("id").primaryKey(),
   name: text("name").notNull(),
   address: text("address").notNull(),
   status: text("status").notNull(),
@@ -38,6 +38,7 @@ export const projects = pgTable("projects", {
   clientId: varchar("client_id").references(() => users.id),
   contractorId: varchar("contractor_id").references(() => users.id),
   isSandbox: boolean("is_sandbox").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });

@@ -732,6 +732,16 @@ export async function registerRoutes(
     }
   });
 
+  // Migration endpoint to convert existing project IDs to slug format
+  app.post("/api/admin/migrate-project-ids", requireAdmin, async (req, res, next) => {
+    try {
+      const result = await storage.migrateProjectIdsToSlug();
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Sandbox routes - Admin testing environment
   app.get("/api/sandbox/data", requireAdmin, async (req, res, next) => {
     try {
