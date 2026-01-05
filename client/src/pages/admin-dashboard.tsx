@@ -10,7 +10,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Search, Plus, Filter, Download, Calculator, Ruler } from "lucide-react";
+import { Search, Plus, Filter, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -120,26 +120,6 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground mt-1">Manage active jobs, estimates, and schedules.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/contractor/calculator">
-            <Button 
-              variant="outline"
-              data-testid="button-calculator"
-              className="hover:bg-muted hover:scale-[1.02] transition-all"
-            >
-              <Calculator className="w-4 h-4 mr-2" />
-              Calculator
-            </Button>
-          </Link>
-          <Link href="/contractor/floor-calculator">
-            <Button 
-              variant="outline"
-              data-testid="button-floor-calculator"
-              className="hover:bg-muted hover:scale-[1.02] transition-all"
-            >
-              <Ruler className="w-4 h-4 mr-2" />
-              Floor Calc
-            </Button>
-          </Link>
           <Button 
             variant="outline" 
             onClick={handleExportReport} 
@@ -149,7 +129,7 @@ export default function AdminDashboard() {
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
-          <Link href="/contractor/project/new">
+          <Link href="/contractor/new-project">
             <Button 
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02] transition-all" 
               data-testid="button-new-project"
