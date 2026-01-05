@@ -2915,14 +2915,26 @@ export default function ProjectDetails() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="inspiration-category">Category</Label>
-              <Input
-                id="inspiration-category"
-                placeholder="e.g., Kitchen, Bathroom, Flooring"
-                value={newInspirationCategory}
-                onChange={(e) => setNewInspirationCategory(e.target.value)}
-                data-testid="input-inspiration-category"
-              />
+              <Label htmlFor="inspiration-category">Category <span className="text-destructive">*</span></Label>
+              <Select value={newInspirationCategory} onValueChange={setNewInspirationCategory}>
+                <SelectTrigger id="inspiration-category" data-testid="select-inspiration-category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Kitchen">Kitchen</SelectItem>
+                  <SelectItem value="Bathroom">Bathroom</SelectItem>
+                  <SelectItem value="Flooring">Flooring</SelectItem>
+                  <SelectItem value="Exterior">Exterior</SelectItem>
+                  <SelectItem value="Lighting">Lighting</SelectItem>
+                  <SelectItem value="Living Room">Living Room</SelectItem>
+                  <SelectItem value="Bedroom">Bedroom</SelectItem>
+                  <SelectItem value="Outdoor">Outdoor</SelectItem>
+                  <SelectItem value="Paint & Colors">Paint & Colors</SelectItem>
+                  <SelectItem value="Materials">Materials</SelectItem>
+                  <SelectItem value="Fixtures">Fixtures</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -2944,7 +2956,7 @@ export default function ProjectDetails() {
             </Button>
             <Button 
               onClick={createInspiration}
-              disabled={!newInspirationTitle.trim() || inspirationFilesToUpload.length === 0 || inspirationUploading || createInspirationMutation.isPending}
+              disabled={!newInspirationTitle.trim() || !newInspirationCategory || inspirationFilesToUpload.length === 0 || inspirationUploading || createInspirationMutation.isPending}
               data-testid="button-submit-inspiration"
             >
               {inspirationUploading ? 'Uploading...' : createInspirationMutation.isPending ? 'Adding...' : 'Add Inspiration'}
