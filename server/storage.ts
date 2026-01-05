@@ -79,7 +79,9 @@ export interface IStorage {
   
   // Inspiration image methods
   getInspirationImages(projectId: string): Promise<InspirationImage[]>;
+  getInspirationImage(id: string): Promise<InspirationImage | undefined>;
   createInspirationImage(image: InsertInspirationImage): Promise<InspirationImage>;
+  deleteInspirationImage(id: string): Promise<void>;
   
   // Message methods
   getMessages(projectId: string): Promise<Message[]>;
@@ -352,6 +354,15 @@ export class DatabaseStorage implements IStorage {
   async createInspirationImage(insertImage: InsertInspirationImage): Promise<InspirationImage> {
     const [image] = await db.insert(schema.inspirationImages).values(insertImage).returning();
     return image;
+  }
+
+  async getInspirationImage(id: string): Promise<InspirationImage | undefined> {
+    const [image] = await db.select().from(schema.inspirationImages).where(eq(schema.inspirationImages.id, id));
+    return image;
+  }
+
+  async deleteInspirationImage(id: string): Promise<void> {
+    await db.delete(schema.inspirationImages).where(eq(schema.inspirationImages.id, id));
   }
 
   // Message methods

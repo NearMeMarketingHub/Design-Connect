@@ -459,7 +459,7 @@ export async function registerRoutes(
   });
 
   // Inspiration image routes
-  app.get("/api/projects/:projectId/inspiration", requireAuth, async (req, res, next) => {
+  app.get("/api/projects/:projectId/inspiration", async (req, res, next) => {
     try {
       const images = await storage.getInspirationImages(req.params.projectId);
       res.json(images);
@@ -468,13 +468,25 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/projects/:projectId/inspiration", requireAuth, async (req, res, next) => {
+  app.post("/api/projects/:projectId/inspiration", async (req, res, next) => {
     try {
+      const user = req.user as User | undefined;
       const image = await storage.createInspirationImage({
         ...req.body,
         projectId: req.params.projectId,
+        creatorId: user?.id || req.body.creatorId || 'demo-user',
+        creatorName: user?.name || req.body.creatorName || 'You',
       });
       res.json(image);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/inspiration/:imageId", async (req, res, next) => {
+    try {
+      await storage.deleteInspirationImage(req.params.imageId);
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }

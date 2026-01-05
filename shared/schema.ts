@@ -150,10 +150,15 @@ export const inspirationImages = pgTable("inspiration_images", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
   imageUrl: text("image_url").notNull(),
+  title: text("title").notNull().default(""),
   caption: text("caption"),
+  category: text("category"),
+  creatorId: varchar("creator_id"),
+  creatorName: text("creator_name").notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertInspirationImageSchema = createInsertSchema(inspirationImages).omit({ id: true });
+export const insertInspirationImageSchema = createInsertSchema(inspirationImages).omit({ id: true, createdAt: true });
 export type InsertInspirationImage = z.infer<typeof insertInspirationImageSchema>;
 export type InspirationImage = typeof inspirationImages.$inferSelect;
 
