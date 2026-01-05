@@ -454,8 +454,9 @@ export default function ProjectDetails() {
   const [newInspirationTitle, setNewInspirationTitle] = useState("");
   const [newInspirationCaption, setNewInspirationCaption] = useState("");
   const [newInspirationCategory, setNewInspirationCategory] = useState("");
-  const [newInspirationImage, setNewInspirationImage] = useState("");
+  const [newInspirationImages, setNewInspirationImages] = useState<string[]>([]);
   const [newInspirationComment, setNewInspirationComment] = useState("");
+  const [inspirationImageIndex, setInspirationImageIndex] = useState(0);
   const inspirationFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
@@ -601,7 +602,7 @@ export default function ProjectDetails() {
 
   // Create inspiration image mutation
   const createInspirationMutation = useMutation({
-    mutationFn: async (data: { imageUrl: string; title: string; caption?: string; category?: string }) => {
+    mutationFn: async (data: { imageUrl: string; coverImage?: string; images?: string[]; title: string; caption?: string; category?: string }) => {
       const res = await fetch(`/api/projects/${projectId}/inspiration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -927,32 +928,41 @@ export default function ProjectDetails() {
     setAttachmentPopoverOpen(false);
   };
 
-  // State to store the actual file for upload
-  const [inspirationFileToUpload, setInspirationFileToUpload] = useState<File | null>(null);
+  // State to store the actual files for upload (multi-image support)
+  const [inspirationFilesToUpload, setInspirationFilesToUpload] = useState<File[]>([]);
   const [inspirationUploading, setInspirationUploading] = useState(false);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    const file = files[0];
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      alert('Only image files are allowed');
-      return;
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Max 5MB per image.`);
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        continue;
+      }
+      newFiles.push(file);
+      newPreviews.push(URL.createObjectURL(file));
     }
     
-    const fileName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-    const title = fileName.charAt(0).toUpperCase() + fileName.slice(1);
-    const previewUrl = URL.createObjectURL(file);
-    
-    setNewInspirationTitle(title);
-    setNewInspirationImage(previewUrl);
-    setInspirationFileToUpload(file);
-    setCreateInspirationOpen(true);
+    if (newFiles.length > 0) {
+      // Set title from first file if no title yet
+      if (!newInspirationTitle) {
+        const fileName = newFiles[0].name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+        setNewInspirationTitle(fileName.charAt(0).toUpperCase() + fileName.slice(1));
+      }
+      setNewInspirationImages(prev => [...prev, ...newPreviews]);
+      setInspirationFilesToUpload(prev => [...prev, ...newFiles]);
+      setCreateInspirationOpen(true);
+    }
     
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -960,25 +970,43 @@ export default function ProjectDetails() {
   };
 
   const handleInspirationFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      alert('Only image files are allowed');
-      return;
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Max 5MB per image.`);
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        continue;
+      }
+      newFiles.push(file);
+      newPreviews.push(URL.createObjectURL(file));
     }
     
-    const previewUrl = URL.createObjectURL(file);
-    setNewInspirationImage(previewUrl);
-    setInspirationFileToUpload(file);
+    if (newFiles.length > 0) {
+      setNewInspirationImages(prev => [...prev, ...newPreviews]);
+      setInspirationFilesToUpload(prev => [...prev, ...newFiles]);
+    }
     
     if (inspirationFileInputRef.current) {
       inspirationFileInputRef.current.value = "";
     }
+  };
+
+  const removeInspirationImage = (index: number) => {
+    // Revoke blob URL to prevent memory leak
+    if (newInspirationImages[index]?.startsWith('blob:')) {
+      URL.revokeObjectURL(newInspirationImages[index]);
+    }
+    setNewInspirationImages(prev => prev.filter((_, i) => i !== index));
+    setInspirationFilesToUpload(prev => prev.filter((_, i) => i !== index));
   };
 
   const openInspirationDetail = (inspiration: any) => {
@@ -987,46 +1015,62 @@ export default function ProjectDetails() {
   };
 
   const createInspiration = async () => {
-    if (!newInspirationTitle.trim() || !inspirationFileToUpload) return;
+    if (!newInspirationTitle.trim() || inspirationFilesToUpload.length === 0) return;
     
     setInspirationUploading(true);
     
     try {
-      // Step 1: Get presigned upload URL
-      const signedRes = await fetch('/api/uploads/request-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: inspirationFileToUpload.name,
-          size: inspirationFileToUpload.size,
-          contentType: inspirationFileToUpload.type
-        })
-      });
-      if (!signedRes.ok) throw new Error('Failed to get upload URL');
-      const { uploadURL, objectPath } = await signedRes.json();
+      // Upload all files and collect the CDN URLs
+      const uploadedUrls: string[] = [];
       
-      // Step 2: Upload to object storage
-      const uploadRes = await fetch(uploadURL, {
-        method: 'PUT',
-        headers: { 'Content-Type': inspirationFileToUpload.type },
-        body: inspirationFileToUpload
-      });
-      if (!uploadRes.ok) throw new Error('Upload failed');
+      for (const file of inspirationFilesToUpload) {
+        // Step 1: Get presigned upload URL
+        const signedRes = await fetch('/api/uploads/request-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            contentType: file.type
+          })
+        });
+        if (!signedRes.ok) throw new Error('Failed to get upload URL');
+        const { uploadURL, objectPath } = await signedRes.json();
+        
+        // Step 2: Upload to object storage
+        const uploadRes = await fetch(uploadURL, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file
+        });
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        
+        uploadedUrls.push(objectPath);
+      }
       
-      // Step 3: Create inspiration with the CDN URL
+      // Step 3: Create inspiration with cover image and all images
       createInspirationMutation.mutate({
-        imageUrl: objectPath,
+        imageUrl: uploadedUrls[0], // Keep for backward compatibility
+        coverImage: uploadedUrls[0],
+        images: uploadedUrls,
         title: newInspirationTitle.trim(),
         caption: newInspirationCaption.trim() || undefined,
         category: newInspirationCategory.trim() || undefined
+      });
+      
+      // Clean up blob URLs
+      newInspirationImages.forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
       });
       
       setCreateInspirationOpen(false);
       setNewInspirationTitle("");
       setNewInspirationCaption("");
       setNewInspirationCategory("");
-      setNewInspirationImage("");
-      setInspirationFileToUpload(null);
+      setNewInspirationImages([]);
+      setInspirationFilesToUpload([]);
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Failed to upload image');
@@ -1401,6 +1445,7 @@ export default function ProjectDetails() {
               type="file" 
               ref={fileInputRef}
               accept="image/*"
+              multiple
               className="hidden"
               onChange={handleFileUpload}
               data-testid="input-file-upload"
@@ -1426,6 +1471,8 @@ export default function ProjectDetails() {
               {(apiInspirationImages.length > 0 ? apiInspirationImages : INITIAL_INSPIRATION_IMAGES.map((img, idx) => ({
                 id: `demo-${img.id}`,
                 imageUrl: img.src,
+                coverImage: img.src,
+                images: [img.src],
                 title: img.title,
                 caption: `Sample ${img.category} inspiration for your project`,
                 category: img.category,
@@ -1436,15 +1483,24 @@ export default function ProjectDetails() {
                   key={inspiration.id} 
                   className="group overflow-hidden cursor-pointer hover:shadow-lg transition-all"
                   data-testid={`card-inspiration-${inspiration.id}`}
-                  onClick={() => openInspirationDetail(inspiration)}
+                  onClick={() => {
+                    setInspirationImageIndex(0);
+                    openInspirationDetail(inspiration);
+                  }}
                 >
                   <div className="aspect-square relative overflow-hidden bg-muted">
                     <img 
-                      src={inspiration.imageUrl}
+                      src={inspiration.coverImage || inspiration.imageUrl}
                       alt={inspiration.title}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {inspiration.images && inspiration.images.length > 1 && (
+                      <Badge className="absolute top-3 left-3 bg-black/60 border-0 text-white">
+                        <ImageIcon className="w-3 h-3 mr-1" />
+                        {inspiration.images.length}
+                      </Badge>
+                    )}
                     {inspiration.category && (
                       <Badge className="absolute top-3 right-3 bg-black/60 border-0 text-white">
                         {inspiration.category}
@@ -2740,14 +2796,17 @@ export default function ProjectDetails() {
       <Dialog open={createInspirationOpen} onOpenChange={(open) => {
         setCreateInspirationOpen(open);
         if (!open) {
-          if (newInspirationImage && newInspirationImage.startsWith('blob:')) {
-            URL.revokeObjectURL(newInspirationImage);
-          }
+          // Clean up blob URLs
+          newInspirationImages.forEach(url => {
+            if (url.startsWith('blob:')) {
+              URL.revokeObjectURL(url);
+            }
+          });
           setNewInspirationTitle("");
           setNewInspirationCaption("");
           setNewInspirationCategory("");
-          setNewInspirationImage("");
-          setInspirationFileToUpload(null);
+          setNewInspirationImages([]);
+          setInspirationFilesToUpload([]);
         }
       }}>
         <DialogContent className="max-w-lg">
@@ -2761,26 +2820,39 @@ export default function ProjectDetails() {
               type="file"
               ref={inspirationFileInputRef}
               accept="image/*"
+              multiple
               className="hidden"
               onChange={handleInspirationFileSelect}
             />
 
-            {newInspirationImage ? (
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
-                <img 
-                  src={newInspirationImage} 
-                  alt="Preview" 
-                  className="w-full h-full object-cover" 
-                />
+            {newInspirationImages.length > 0 ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  {newInspirationImages.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                      <img src={url} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 w-6 h-6"
+                        onClick={() => removeInspirationImage(idx)}
+                        data-testid={`button-remove-inspiration-image-${idx}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
                 <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2"
-                  onClick={() => setNewInspirationImage("")}
-                  data-testid="button-remove-inspiration-image"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => inspirationFileInputRef.current?.click()}
+                  data-testid="button-add-more-inspiration-images"
                 >
-                  <X className="w-4 h-4" />
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add More Photos
                 </Button>
+                <p className="text-xs text-muted-foreground">Max 5MB per image.</p>
               </div>
             ) : (
               <div
@@ -2788,7 +2860,8 @@ export default function ProjectDetails() {
                 onClick={() => inspirationFileInputRef.current?.click()}
               >
                 <ImageIcon className="w-10 h-10 text-muted-foreground mb-2" />
-                <span className="text-sm text-muted-foreground">Click to upload image</span>
+                <span className="text-sm text-muted-foreground">Click to upload images</span>
+                <span className="text-xs text-muted-foreground mt-1">You can select multiple photos</span>
               </div>
             )}
 
@@ -2833,7 +2906,7 @@ export default function ProjectDetails() {
             </Button>
             <Button 
               onClick={createInspiration}
-              disabled={!newInspirationTitle.trim() || !inspirationFileToUpload || inspirationUploading || createInspirationMutation.isPending}
+              disabled={!newInspirationTitle.trim() || inspirationFilesToUpload.length === 0 || inspirationUploading || createInspirationMutation.isPending}
               data-testid="button-submit-inspiration"
             >
               {inspirationUploading ? 'Uploading...' : createInspirationMutation.isPending ? 'Adding...' : 'Add Inspiration'}
@@ -2848,18 +2921,54 @@ export default function ProjectDetails() {
         if (!open) {
           setSelectedInspiration(null);
           setNewInspirationComment("");
+          setInspirationImageIndex(0);
         }
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
           {selectedInspiration && (
             <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
-              {/* Image Section */}
-              <div className="md:w-1/2 bg-black flex items-center justify-center">
+              {/* Image Section with Carousel */}
+              <div className="md:w-1/2 bg-black flex items-center justify-center relative">
                 <img 
-                  src={selectedInspiration.imageUrl}
+                  src={(selectedInspiration.images && selectedInspiration.images.length > 0) 
+                    ? selectedInspiration.images[inspirationImageIndex] 
+                    : (selectedInspiration.coverImage || selectedInspiration.imageUrl)}
                   alt={selectedInspiration.title}
                   className="w-full h-auto max-h-[50vh] md:max-h-[90vh] object-contain"
                 />
+                {/* Carousel Navigation */}
+                {selectedInspiration.images && selectedInspiration.images.length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setInspirationImageIndex(prev => prev > 0 ? prev - 1 : selectedInspiration.images.length - 1)}
+                      data-testid="button-inspiration-prev-image"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setInspirationImageIndex(prev => prev < selectedInspiration.images.length - 1 ? prev + 1 : 0)}
+                      data-testid="button-inspiration-next-image"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {selectedInspiration.images.map((_: any, idx: number) => (
+                        <button
+                          key={idx}
+                          className={`w-2 h-2 rounded-full transition-colors ${idx === inspirationImageIndex ? 'bg-white' : 'bg-white/50'}`}
+                          onClick={() => setInspirationImageIndex(idx)}
+                          data-testid={`button-inspiration-dot-${idx}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Details Section */}
