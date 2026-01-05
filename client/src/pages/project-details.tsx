@@ -457,6 +457,7 @@ export default function ProjectDetails() {
   const [newInspirationImages, setNewInspirationImages] = useState<string[]>([]);
   const [newInspirationComment, setNewInspirationComment] = useState("");
   const [inspirationImageIndex, setInspirationImageIndex] = useState(0);
+  const [inspirationSortOrder, setInspirationSortOrder] = useState<'newest' | 'oldest'>('newest');
   const inspirationFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
@@ -1455,14 +1456,25 @@ export default function ProjectDetails() {
                 <h3 className="text-lg font-semibold">Inspiration & Selections</h3>
                 <p className="text-sm text-muted-foreground">Design ideas and material selections from the team</p>
               </div>
-              <Button 
-                data-testid="button-upload-inspiration"
-                onClick={() => setCreateInspirationOpen(true)}
-                className="hover:bg-primary/90 transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Inspiration
-              </Button>
+              <div className="flex items-center gap-2">
+                <Select value={inspirationSortOrder} onValueChange={(value: 'newest' | 'oldest') => setInspirationSortOrder(value)}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-inspiration-sort">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest" data-testid="option-sort-newest">Newest First</SelectItem>
+                    <SelectItem value="oldest" data-testid="option-sort-oldest">Oldest First</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  data-testid="button-upload-inspiration"
+                  onClick={() => setCreateInspirationOpen(true)}
+                  className="hover:bg-primary/90 transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Inspiration
+                </Button>
+              </div>
             </div>
 
             {/* Instagram-style grid */}
@@ -1478,7 +1490,13 @@ export default function ProjectDetails() {
                 category: img.category,
                 creatorName: 'Design Team',
                 createdAt: new Date(Date.now() - idx * 86400000 * 3).toISOString()
-              }))).map((inspiration: any) => (
+              })))
+              .sort((a: any, b: any) => {
+                const dateA = new Date(a.createdAt).getTime();
+                const dateB = new Date(b.createdAt).getTime();
+                return inspirationSortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+              })
+              .map((inspiration: any) => (
                 <Card 
                   key={inspiration.id} 
                   className="group overflow-hidden cursor-pointer hover:shadow-lg transition-all"
