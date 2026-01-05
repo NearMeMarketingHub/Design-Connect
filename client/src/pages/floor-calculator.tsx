@@ -175,21 +175,14 @@ export default function FloorCalculator() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href={dashboardPath}>
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
-              <Ruler className="w-8 h-8 text-primary" />
-              Floor Calculator
-            </h1>
-            <p className="text-muted-foreground mt-1">Calculate square footage and flooring costs by room</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+            <Ruler className="w-8 h-8 text-primary" />
+            Floor Calculator
+          </h1>
+          <p className="text-muted-foreground mt-1">Calculate square footage and flooring costs by room</p>
         </div>
         <div className="flex gap-2">
           <Link href="/contractor/calculator">

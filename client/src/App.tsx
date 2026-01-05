@@ -82,15 +82,6 @@ function Router() {
     );
   }
 
-  // Contractor Portal Routes (pages with own headers)
-  if (location === "/contractor/calculator") {
-    return <ContractorCalculator />;
-  }
-  
-  if (location === "/contractor/floor-calculator") {
-    return <FloorCalculator />;
-  }
-
   // Client Portal Routes (with Layout)
   if (location.startsWith("/client")) {
     return (
@@ -113,13 +104,16 @@ function Router() {
       <Layout>
         <Switch>
           <Route path="/contractor/dashboard" component={AdminDashboard} />
+          <Route path="/contractor/projects" component={ClientProjects} />
           <Route path="/contractor/sales" component={SalesDashboard} />
           <Route path="/contractor/estimates" component={Estimator} />
           <Route path="/contractor/accounting" component={AccountingDashboard} />
           <Route path="/contractor/invoice/new" component={CreateInvoice} />
-          <Route path="/contractor/project/new" component={NewProject} />
+          <Route path="/contractor/new-project" component={NewProject} />
           <Route path="/contractor/project/:id" component={ProjectDetails} />
           <Route path="/contractor/timeline" component={TimelinePage} />
+          <Route path="/contractor/calculator" component={ContractorCalculator} />
+          <Route path="/contractor/floor-calculator" component={FloorCalculator} />
           <Route path="/contractor/profile" component={MyProfile} />
           <Route path="/contractor/settings" component={SettingsPage} />
           <Route component={NotFound} />

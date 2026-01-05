@@ -32,7 +32,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft,
   Calculator,
   Search,
   Plus,
@@ -45,6 +44,7 @@ import {
   Save,
   X,
   ChevronRight,
+  Grid3X3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -224,24 +224,24 @@ export default function ContractorCalculator() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="gap-2" asChild data-testid="button-back">
-            <Link href={dashboardPath}>
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back to Dashboard</span>
-            </Link>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+            <Calculator className="w-8 h-8 text-primary" />
+            Estimate Calculator
+          </h1>
+          <p className="text-muted-foreground mt-1">Build estimates using your price book</p>
+        </div>
+        <Link href="/contractor/floor-calculator">
+          <Button variant="outline" data-testid="button-floor-calculator">
+            <Grid3X3 className="w-4 h-4 mr-2" />
+            Floor Calculator
           </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Calculator className="w-5 h-5 text-primary" />
-          <h1 className="font-bold text-lg">Estimate Calculator</h1>
-        </div>
-        <div className="w-[100px]" />
-      </header>
+        </Link>
+      </div>
 
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex" style={{ height: 'calc(100vh - 12rem)' }}>
         <div className="flex-1 flex flex-col md:flex-row">
           <div className="w-full md:w-80 border-r bg-muted/30 flex flex-col">
             <div className="p-4 border-b">

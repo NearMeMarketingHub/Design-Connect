@@ -26,7 +26,7 @@ export default function AccountingDashboard() {
           <h1 className="text-3xl font-heading font-bold text-foreground">Accounting</h1>
           <p className="text-muted-foreground mt-1">Manage invoices, payments, and recurring billing.</p>
         </div>
-        <Link href="/create-invoice">
+        <Link href="/contractor/invoice/new">
           <Button className="bg-primary text-primary-foreground">
             <Plus className="w-4 h-4 mr-2" />
             New Invoice
