@@ -147,6 +147,24 @@ export const insertPhaseUpdateSchema = createInsertSchema(phaseUpdates).omit({ i
 export type InsertPhaseUpdate = z.infer<typeof insertPhaseUpdateSchema>;
 export type PhaseUpdate = typeof phaseUpdates.$inferSelect;
 
+// Milestone tasks - individual tasks within a phase/milestone with optional percentage tracking
+export const milestoneTasks = pgTable("milestone_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phaseId: varchar("phase_id").notNull().references(() => projectPhases.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  title: text("title").notNull(),
+  requiresPercentage: boolean("requires_percentage").notNull().default(false),
+  progressPercent: integer("progress_percent").default(0),
+  isComplete: boolean("is_complete").notNull().default(false),
+  orderIndex: integer("order_index").notNull().default(0),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMilestoneTaskSchema = createInsertSchema(milestoneTasks).omit({ id: true, createdAt: true });
+export type InsertMilestoneTask = z.infer<typeof insertMilestoneTaskSchema>;
+export type MilestoneTask = typeof milestoneTasks.$inferSelect;
+
 export const actionItems = pgTable("action_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
