@@ -2975,12 +2975,10 @@ export default function ProjectDetails() {
         }
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-          {/* Delete button positioned next to close button */}
+          {/* Delete button positioned next to close button - uses same styling as DialogPrimitive.Close */}
           {selectedInspiration && canEdit && !String(selectedInspiration.id).startsWith('demo-') && (
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="absolute right-12 top-4 z-50 rounded-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+            <button 
+              className="absolute right-12 top-4 z-50 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-destructive"
               onClick={() => {
                 if (confirm('Delete this inspiration image?')) {
                   deleteInspirationMutation.mutate(selectedInspiration.id);
@@ -2988,8 +2986,8 @@ export default function ProjectDetails() {
               }}
               data-testid="button-delete-inspiration"
             >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+              <Trash2 className="h-4 w-4" />
+            </button>
           )}
           {selectedInspiration && (
             <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
