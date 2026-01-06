@@ -2978,7 +2978,7 @@ export default function ProjectDetails() {
           {/* Delete button positioned next to close button - uses same styling as DialogPrimitive.Close */}
           {selectedInspiration && canEdit && !String(selectedInspiration.id).startsWith('demo-') && (
             <button 
-              className="absolute right-12 top-4 z-50 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-destructive"
+              className="absolute right-12 top-4 z-50 rounded-sm p-1 ring-offset-background transition-all hover:bg-destructive/10 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-destructive"
               onClick={() => {
                 if (confirm('Delete this inspiration image?')) {
                   deleteInspirationMutation.mutate(selectedInspiration.id);
