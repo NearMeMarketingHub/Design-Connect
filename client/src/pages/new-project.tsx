@@ -127,6 +127,9 @@ export default function NewProject() {
     return initial;
   });
 
+  // Track which milestones need percentage tracking (phase -> milestone index -> settings)
+  const [milestoneTasks, setMilestoneTasks] = useState<Record<string, { requiresPercentage: boolean }[]>>({});
+
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/users/clients"],
     queryFn: async () => {
@@ -155,6 +158,36 @@ export default function NewProject() {
       return res.json();
     },
     onSuccess: async (project) => {
+      // Create phases/milestones for the project
+      try {
+        for (const phase of ALL_PHASES) {
+          const milestones = phaseMilestones[phase] || [];
+          if (milestones.length > 0) {
+            // Create the phase with its milestones as tasks array
+            const phaseRes = await apiRequest("POST", `/api/projects/${project.id}/phases`, {
+              name: phase,
+              status: "pending",
+              dateRange: "TBD",
+              tasks: milestones,
+            });
+            const createdPhase = await phaseRes.json();
+            
+            // Create milestone tasks for each milestone in this phase
+            for (let i = 0; i < milestones.length; i++) {
+              const taskData = milestoneTasks[phase]?.[i];
+              await apiRequest("POST", `/api/phases/${createdPhase.id}/tasks`, {
+                projectId: project.id,
+                title: milestones[i],
+                requiresPercentage: taskData?.requiresPercentage || false,
+                orderIndex: i,
+              });
+            }
+          }
+        }
+      } catch (phaseError) {
+        console.error("Failed to create some phases:", phaseError);
+      }
+      
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       
       if (clientMode === "invite" && inviteData.email) {
@@ -607,26 +640,44 @@ export default function NewProject() {
                           Add Milestone
                         </Button>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {(phaseMilestones[phase] || []).map((milestone, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                            <Input
-                              value={milestone}
-                              onChange={(e) => updateMilestone(phase, index, e.target.value)}
-                              className="flex-1"
-                              data-testid={`input-milestone-${phase}-${index}`}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeMilestone(phase, index)}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              data-testid={`button-remove-milestone-${phase}-${index}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <div key={index} className="flex flex-col gap-1 p-2 border rounded-md bg-muted/20">
+                            <div className="flex items-center gap-2">
+                              <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
+                              <Input
+                                value={milestone}
+                                onChange={(e) => updateMilestone(phase, index, e.target.value)}
+                                className="flex-1"
+                                data-testid={`input-milestone-${phase}-${index}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeMilestone(phase, index)}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                data-testid={`button-remove-milestone-${phase}-${index}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <label className="flex items-center gap-2 ml-6 text-xs text-muted-foreground cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={milestoneTasks[phase]?.[index]?.requiresPercentage || false}
+                                onChange={(e) => {
+                                  setMilestoneTasks(prev => {
+                                    const phaseData = [...(prev[phase] || [])];
+                                    phaseData[index] = { requiresPercentage: e.target.checked };
+                                    return { ...prev, [phase]: phaseData };
+                                  });
+                                }}
+                                className="rounded"
+                                data-testid={`checkbox-percentage-${phase}-${index}`}
+                              />
+                              Track percentage progress
+                            </label>
                           </div>
                         ))}
                         {(phaseMilestones[phase] || []).length === 0 && (

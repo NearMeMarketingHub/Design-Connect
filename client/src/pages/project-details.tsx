@@ -1765,14 +1765,14 @@ export default function ProjectDetails() {
               <p className="text-sm text-muted-foreground">Track milestones and project phases</p>
             </div>
 
-            {/* Project Controls - Only visible to contractors/admins */}
+            {/* Project Overview - Only visible to contractors/admins */}
             {canEdit && !staticProject && (
-              <Card className="border-primary/20 bg-primary/5" data-testid="card-project-controls">
+              <Card data-testid="card-project-overview">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                      <Pencil className="h-5 w-5" />
-                      Project Controls
+                      <Settings className="h-5 w-5" />
+                      Project Overview
                     </CardTitle>
                     {!isEditing ? (
                       <Button onClick={startEditing} variant="outline" size="sm" data-testid="button-edit-project">
