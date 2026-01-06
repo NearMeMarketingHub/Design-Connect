@@ -142,29 +142,29 @@ const PROJECTS_DATA: Record<string, {
 };
 
 const MILESTONES = [
-  { id: 1, name: "Project Kickoff", date: "Oct 1, 2025", status: "completed", description: "Initial meeting and project scope finalized", 
-    details: "Met with homeowners to review final plans and material selections. Discussed timeline expectations and communication preferences. Site access arranged and temporary utilities confirmed.", 
+  { id: 1, name: "Project Kickoff", date: "TBD", status: "upcoming", description: "Initial meeting and project scope finalized", 
+    details: "Meet with homeowners to review final plans and material selections. Discuss timeline expectations and communication preferences. Site access arranged and temporary utilities confirmed.", 
     tasks: ["Contract signed", "Deposit received", "Permits submitted"] },
-  { id: 2, name: "Demolition Complete", date: "Oct 15, 2025", status: "completed", description: "All demo work finished, site cleared",
-    details: "Removed existing kitchen cabinets, flooring, and non-load-bearing wall between kitchen and dining room. Debris hauled and site cleaned for framing crew.",
-    tasks: ["Kitchen demo complete", "Wall removal done", "Debris removed", "Site cleaned"] },
-  { id: 3, name: "Framing Inspection", date: "Nov 8, 2025", status: "completed", description: "Structural framing passed inspection",
-    details: "City inspector approved all structural framing including the new header for the open floor plan. Minor corrections made to one joist hanger.",
+  { id: 2, name: "Demolition Complete", date: "TBD", status: "upcoming", description: "All demo work finished, site cleared",
+    details: "Remove existing structures as needed. Haul debris and clean site for next phase.",
+    tasks: ["Demo complete", "Debris removed", "Site cleaned"] },
+  { id: 3, name: "Framing Inspection", date: "TBD", status: "upcoming", description: "Structural framing passed inspection",
+    details: "City inspector to approve all structural framing.",
     tasks: ["Headers installed", "Joists secured", "Inspection passed"] },
-  { id: 4, name: "Rough-in Complete", date: "Dec 20, 2025", status: "in_progress", description: "Electrical, plumbing, and HVAC rough-ins",
-    details: "Electrical panel upgraded to 200A. New circuits run for kitchen appliances. Plumbing relocated for island sink. HVAC ductwork modified for open floor plan.",
-    tasks: ["Electrical 80% complete", "Plumbing 90% complete", "HVAC modifications done", "Awaiting inspection"] },
-  { id: 5, name: "Drywall Installation", date: "Jan 10, 2026", status: "upcoming", description: "Drywall hanging and mudding",
-    details: "Drywall crew scheduled for 5-day install. Includes hanging, taping, mudding, and sanding. Ceiling texture to match existing areas.",
-    tasks: ["Schedule drywall crew", "Order materials", "Hang drywall", "Tape and mud", "Sand and prep"] },
-  { id: 6, name: "Finish Work Begins", date: "Feb 1, 2026", status: "upcoming", description: "Cabinets, trim, and fixtures",
-    details: "Cabinet installation followed by countertop templating. Trim carpentry includes baseboards, crown molding, and window casings. Light fixtures and plumbing fixtures installed.",
-    tasks: ["Install cabinets", "Template countertops", "Install trim", "Paint walls", "Install fixtures"] },
-  { id: 7, name: "Final Inspection", date: "Mar 1, 2026", status: "upcoming", description: "Final city inspection",
-    details: "City inspector will verify all permitted work meets code. Includes electrical, plumbing, mechanical, and structural sign-offs.",
+  { id: 4, name: "Rough-in Complete", date: "TBD", status: "upcoming", description: "Electrical, plumbing, and HVAC rough-ins",
+    details: "Complete all rough-in work for electrical, plumbing, and HVAC systems.",
+    tasks: ["Electrical complete", "Plumbing complete", "HVAC complete", "Awaiting inspection"] },
+  { id: 5, name: "Drywall Installation", date: "TBD", status: "upcoming", description: "Drywall hanging and mudding",
+    details: "Drywall installation including hanging, taping, mudding, and sanding.",
+    tasks: ["Order materials", "Hang drywall", "Tape and mud", "Sand and prep"] },
+  { id: 6, name: "Finish Work Begins", date: "TBD", status: "upcoming", description: "Cabinets, trim, and fixtures",
+    details: "Cabinet installation, trim carpentry, and fixture installation.",
+    tasks: ["Install cabinets", "Install trim", "Paint walls", "Install fixtures"] },
+  { id: 7, name: "Final Inspection", date: "TBD", status: "upcoming", description: "Final city inspection",
+    details: "City inspector will verify all permitted work meets code.",
     tasks: ["Schedule inspection", "Prep checklist", "Address any corrections"] },
-  { id: 8, name: "Project Handover", date: "Mar 15, 2026", status: "upcoming", description: "Keys delivered, warranty begins",
-    details: "Final walkthrough with homeowners to review all completed work. Warranty documentation provided. Maintenance instructions for new systems and finishes.",
+  { id: 8, name: "Project Handover", date: "TBD", status: "upcoming", description: "Keys delivered, warranty begins",
+    details: "Final walkthrough with homeowners to review all completed work.",
     tasks: ["Final cleaning", "Walkthrough scheduled", "Warranty docs prepared", "Keys delivered"] }
 ];
 
@@ -377,6 +377,65 @@ export default function ProjectDetails() {
     const isCompleted = currentStatus.toLowerCase() === 'completed';
     const newStatus = isCompleted ? 'pending' : 'completed';
     updatePhaseMutation.mutate({ phaseId, status: newStatus });
+  };
+
+  // Fetch phase updates for this project
+  const { data: phaseUpdates = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'phase-updates'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/phase-updates`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !staticProject && !!projectId && apiPhases.length > 0,
+  });
+
+  // State for adding new phase update
+  const [newPhaseUpdate, setNewPhaseUpdate] = useState<{ [phaseId: string]: string }>({});
+
+  // Create phase update mutation
+  const createPhaseUpdateMutation = useMutation({
+    mutationFn: async ({ phaseId, projectId, content }: { phaseId: string; projectId: string; content: string }) => {
+      const res = await fetch(`/api/phases/${phaseId}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId, content })
+      });
+      if (!res.ok) throw new Error('Failed to create update');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phase-updates'] });
+    }
+  });
+
+  // Delete phase update mutation
+  const deletePhaseUpdateMutation = useMutation({
+    mutationFn: async (updateId: string) => {
+      const res = await fetch(`/api/phase-updates/${updateId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to delete update');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phase-updates'] });
+    }
+  });
+
+  // Add a phase update
+  const addPhaseUpdate = (phaseId: string) => {
+    const content = newPhaseUpdate[phaseId]?.trim();
+    if (!content) return;
+    createPhaseUpdateMutation.mutate({ phaseId, projectId: projectId!, content });
+    setNewPhaseUpdate(prev => ({ ...prev, [phaseId]: '' }));
+  };
+
+  // Get updates for a specific phase
+  const getPhaseUpdates = (phaseId: string) => {
+    return phaseUpdates.filter((u: any) => u.phaseId === phaseId);
   };
 
   // Use API phases if available, otherwise fall back to static MILESTONES
@@ -1728,17 +1787,37 @@ export default function ProjectDetails() {
                     const isApiPhase = apiPhases.length > 0;
                     return (
                       <div key={milestone.id} className="flex gap-4 pb-8 last:pb-0" data-testid={`milestone-${milestone.id}`}>
-                        {/* Timeline line and dot */}
+                        {/* Timeline line and checkbox/dot */}
                         <div className="flex flex-col items-center">
-                          <div className={`w-4 h-4 rounded-full border-2 ${
-                            milestone.status === 'completed' ? 'bg-green-500 border-green-500' :
-                            milestone.status === 'in_progress' ? 'bg-primary border-primary animate-pulse' :
-                            'bg-muted border-muted-foreground/30'
-                          }`}>
-                            {milestone.status === 'completed' && (
-                              <CheckCircle2 className="w-3 h-3 text-white m-auto" style={{ marginTop: '-1px' }} />
-                            )}
-                          </div>
+                          {/* Clickable checkbox for contractors, visual indicator for clients */}
+                          {canEdit && isApiPhase ? (
+                            <button
+                              onClick={() => togglePhaseStatus(milestone.id, milestone.originalStatus || '')}
+                              disabled={updatePhaseMutation.isPending}
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110 ${
+                                milestone.status === 'completed' 
+                                  ? 'bg-green-500 border-green-500 hover:bg-green-600' 
+                                  : milestone.status === 'in_progress' 
+                                    ? 'bg-primary border-primary animate-pulse hover:bg-primary/80' 
+                                    : 'bg-muted border-muted-foreground/30 hover:border-primary hover:bg-primary/10'
+                              }`}
+                              data-testid={`checkbox-milestone-${milestone.id}`}
+                            >
+                              {milestone.status === 'completed' && (
+                                <CheckCircle2 className="w-4 h-4 text-white" />
+                              )}
+                            </button>
+                          ) : (
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              milestone.status === 'completed' ? 'bg-green-500 border-green-500' :
+                              milestone.status === 'in_progress' ? 'bg-primary border-primary animate-pulse' :
+                              'bg-muted border-muted-foreground/30'
+                            }`}>
+                              {milestone.status === 'completed' && (
+                                <CheckCircle2 className="w-3 h-3 text-white" />
+                              )}
+                            </div>
+                          )}
                           {index < displayMilestones.length - 1 && (
                             <div className={`w-0.5 flex-1 mt-2 ${
                               milestone.status === 'completed' ? 'bg-green-500' : 'bg-muted-foreground/20'
@@ -1764,63 +1843,116 @@ export default function ProjectDetails() {
                                 <p className="text-sm text-muted-foreground">{milestone.description}</p>
                               </div>
                             </div>
-                            <div className="text-right flex-shrink-0 ml-4 flex items-center gap-2">
-                              <div>
-                                <p className="text-sm font-medium">{milestone.date}</p>
-                                <Badge 
-                                  variant={milestone.status === 'completed' ? 'default' : 'outline'}
-                                  className={`text-xs mt-1 ${
-                                    milestone.status === 'completed' ? 'bg-green-500' :
-                                    milestone.status === 'in_progress' ? 'border-primary text-primary' :
-                                    ''
-                                  }`}
-                                  data-testid={`badge-milestone-status-${milestone.id}`}
-                                >
-                                  {milestone.status === 'completed' ? 'Complete' :
-                                   milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
-                                </Badge>
-                              </div>
-                              {/* Toggle button for contractors to mark phase complete/incomplete */}
-                              {canEdit && isApiPhase && (
-                                <Button
-                                  size="sm"
-                                  variant={milestone.status === 'completed' ? 'outline' : 'default'}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    togglePhaseStatus(milestone.id, milestone.originalStatus || '');
-                                  }}
-                                  disabled={updatePhaseMutation.isPending}
-                                  data-testid={`button-toggle-phase-${milestone.id}`}
-                                >
-                                  {milestone.status === 'completed' ? 'Undo' : 'Complete'}
-                                </Button>
-                              )}
+                            <div className="text-right flex-shrink-0 ml-4">
+                              <p className="text-sm font-medium">{milestone.date}</p>
+                              <Badge 
+                                variant={milestone.status === 'completed' ? 'default' : 'outline'}
+                                className={`text-xs mt-1 ${
+                                  milestone.status === 'completed' ? 'bg-green-500' :
+                                  milestone.status === 'in_progress' ? 'border-primary text-primary' :
+                                  ''
+                                }`}
+                                data-testid={`badge-milestone-status-${milestone.id}`}
+                              >
+                                {milestone.status === 'completed' ? 'Complete' :
+                                 milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                              </Badge>
                             </div>
                           </div>
                           
                           {/* Expanded content */}
                           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            isExpanded ? 'max-h-96 opacity-100 mt-3' : 'max-h-0 opacity-0'
+                            isExpanded ? 'max-h-[500px] opacity-100 mt-3' : 'max-h-0 opacity-0'
                           }`}>
                             <div className="ml-6 pl-4 border-l-2 border-muted space-y-3">
-                              <p className="text-sm text-muted-foreground">{milestone.details}</p>
-                              <div>
-                                <p className="text-xs font-medium text-muted-foreground mb-2">Tasks:</p>
-                                <div className="space-y-1">
-                                  {milestone.tasks.map((task: string, taskIndex: number) => (
-                                    <div key={taskIndex} className="flex items-center gap-2 text-sm">
-                                      <CheckCircle2 className={`w-3.5 h-3.5 ${
-                                        milestone.status === 'completed' ? 'text-green-500' : 
-                                        milestone.status === 'in_progress' && taskIndex < 2 ? 'text-green-500' :
-                                        'text-muted-foreground/40'
-                                      }`} />
-                                      <span className={milestone.status === 'completed' || (milestone.status === 'in_progress' && taskIndex < 2) ? '' : 'text-muted-foreground'}>
-                                        {task}
-                                      </span>
-                                    </div>
-                                  ))}
+                              {milestone.details && (
+                                <p className="text-sm text-muted-foreground">{milestone.details}</p>
+                              )}
+                              
+                              {/* Tasks list */}
+                              {milestone.tasks && milestone.tasks.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-2">Tasks:</p>
+                                  <div className="space-y-1">
+                                    {milestone.tasks.map((task: string, taskIndex: number) => (
+                                      <div key={taskIndex} className="flex items-center gap-2 text-sm">
+                                        <CheckCircle2 className={`w-3.5 h-3.5 ${
+                                          milestone.status === 'completed' ? 'text-green-500' : 
+                                          milestone.status === 'in_progress' && taskIndex < 2 ? 'text-green-500' :
+                                          'text-muted-foreground/40'
+                                        }`} />
+                                        <span className={milestone.status === 'completed' || (milestone.status === 'in_progress' && taskIndex < 2) ? '' : 'text-muted-foreground'}>
+                                          {task}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
+                              )}
+
+                              {/* Phase Updates */}
+                              {isApiPhase && (
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-muted-foreground">Updates:</p>
+                                  
+                                  {/* Existing updates */}
+                                  {getPhaseUpdates(milestone.id).length > 0 ? (
+                                    <div className="space-y-2">
+                                      {getPhaseUpdates(milestone.id).map((update: any) => (
+                                        <div key={update.id} className="flex items-start gap-2 bg-muted/30 rounded-md p-2 text-sm group" data-testid={`update-${update.id}`}>
+                                          <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                                          <div className="flex-1">
+                                            <p>{update.content}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              {update.createdByName} • {new Date(update.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </p>
+                                          </div>
+                                          {canEdit && (
+                                            <button
+                                              onClick={() => deletePhaseUpdateMutation.mutate(update.id)}
+                                              className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity p-1"
+                                              data-testid={`button-delete-update-${update.id}`}
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground italic">No updates yet</p>
+                                  )}
+
+                                  {/* Add new update form - only for contractors */}
+                                  {canEdit && (
+                                    <div className="flex gap-2 mt-2">
+                                      <Input
+                                        placeholder="Add an update (e.g., 'Electrical 60% done')"
+                                        value={newPhaseUpdate[milestone.id] || ''}
+                                        onChange={(e) => setNewPhaseUpdate(prev => ({ ...prev, [milestone.id]: e.target.value }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            addPhaseUpdate(milestone.id);
+                                          }
+                                        }}
+                                        className="text-sm h-8"
+                                        data-testid={`input-phase-update-${milestone.id}`}
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => addPhaseUpdate(milestone.id)}
+                                        disabled={!newPhaseUpdate[milestone.id]?.trim() || createPhaseUpdateMutation.isPending}
+                                        className="h-8"
+                                        data-testid={`button-add-update-${milestone.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

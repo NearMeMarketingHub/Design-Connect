@@ -424,6 +424,49 @@ export async function registerRoutes(
     }
   });
 
+  // Phase update routes
+  app.get("/api/projects/:projectId/phase-updates", requireAuth, async (req, res, next) => {
+    try {
+      const updates = await storage.getProjectPhaseUpdates(req.params.projectId);
+      res.json(updates);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/phases/:phaseId/updates", requireAuth, async (req, res, next) => {
+    try {
+      const updates = await storage.getPhaseUpdates(req.params.phaseId);
+      res.json(updates);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/phases/:phaseId/updates", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as any;
+      const update = await storage.createPhaseUpdate({
+        ...req.body,
+        phaseId: req.params.phaseId,
+        createdBy: user.id,
+        createdByName: user.name || user.username,
+      });
+      res.json(update);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/phase-updates/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deletePhaseUpdate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Action item routes
   app.get("/api/projects/:projectId/action-items", requireAuth, async (req, res, next) => {
     try {

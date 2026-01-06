@@ -133,6 +133,20 @@ export const insertProjectPhaseSchema = createInsertSchema(projectPhases).omit({
 export type InsertProjectPhase = z.infer<typeof insertProjectPhaseSchema>;
 export type ProjectPhase = typeof projectPhases.$inferSelect;
 
+export const phaseUpdates = pgTable("phase_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phaseId: varchar("phase_id").notNull().references(() => projectPhases.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  content: text("content").notNull(),
+  createdBy: varchar("created_by"),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPhaseUpdateSchema = createInsertSchema(phaseUpdates).omit({ id: true, createdAt: true });
+export type InsertPhaseUpdate = z.infer<typeof insertPhaseUpdateSchema>;
+export type PhaseUpdate = typeof phaseUpdates.$inferSelect;
+
 export const actionItems = pgTable("action_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),

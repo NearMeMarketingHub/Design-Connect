@@ -21,6 +21,7 @@ import type {
   InvoiceLineItem, InsertInvoiceLineItem,
   RecurringBilling, InsertRecurringBilling,
   ProjectPhase, InsertProjectPhase,
+  PhaseUpdate, InsertPhaseUpdate,
   ActionItem, InsertActionItem,
   InspirationImage, InsertInspirationImage,
   Message, InsertMessage,
@@ -71,6 +72,12 @@ export interface IStorage {
   createProjectPhase(phase: InsertProjectPhase): Promise<ProjectPhase>;
   updateProjectPhase(id: string, phase: Partial<InsertProjectPhase>): Promise<ProjectPhase | undefined>;
   recalculateProjectProgress(projectId: string): Promise<void>;
+  
+  // Phase update methods
+  getPhaseUpdates(phaseId: string): Promise<PhaseUpdate[]>;
+  getProjectPhaseUpdates(projectId: string): Promise<PhaseUpdate[]>;
+  createPhaseUpdate(update: InsertPhaseUpdate): Promise<PhaseUpdate>;
+  deletePhaseUpdate(id: string): Promise<void>;
   
   // Action item methods
   getActionItems(projectId: string): Promise<ActionItem[]>;
@@ -329,6 +336,28 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.projects)
       .set({ progress })
       .where(eq(schema.projects.id, projectId));
+  }
+
+  // Phase update methods
+  async getPhaseUpdates(phaseId: string): Promise<PhaseUpdate[]> {
+    return await db.select().from(schema.phaseUpdates)
+      .where(eq(schema.phaseUpdates.phaseId, phaseId))
+      .orderBy(schema.phaseUpdates.createdAt);
+  }
+
+  async getProjectPhaseUpdates(projectId: string): Promise<PhaseUpdate[]> {
+    return await db.select().from(schema.phaseUpdates)
+      .where(eq(schema.phaseUpdates.projectId, projectId))
+      .orderBy(schema.phaseUpdates.createdAt);
+  }
+
+  async createPhaseUpdate(update: InsertPhaseUpdate): Promise<PhaseUpdate> {
+    const [phaseUpdate] = await db.insert(schema.phaseUpdates).values(update).returning();
+    return phaseUpdate;
+  }
+
+  async deletePhaseUpdate(id: string): Promise<void> {
+    await db.delete(schema.phaseUpdates).where(eq(schema.phaseUpdates.id, id));
   }
 
   // Action item methods
