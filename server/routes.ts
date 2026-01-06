@@ -424,32 +424,30 @@ export async function registerRoutes(
     }
   });
 
-  // Initialize default phases for existing projects that don't have any
+  // Initialize phases for existing projects - accepts phases from frontend
   app.post("/api/projects/:projectId/phases/initialize", requireAuth, async (req, res, next) => {
     try {
       const { projectId } = req.params;
+      const { phases: phasesToCreate } = req.body;
+      
       const existingPhases = await storage.getProjectPhases(projectId);
       
       if (existingPhases.length > 0) {
         return res.json(existingPhases);
       }
       
-      const defaultPhases = [
-        "Pre-Construction",
-        "Foundation & Framing",
-        "Electrical & Plumbing",
-        "Interior Finishing",
-        "Final Walkthrough"
-      ];
+      if (!phasesToCreate || !Array.isArray(phasesToCreate)) {
+        return res.status(400).json({ message: "phases array is required" });
+      }
       
       const createdPhases = [];
-      for (let i = 0; i < defaultPhases.length; i++) {
+      for (const phaseData of phasesToCreate) {
         const phase = await storage.createProjectPhase({
           projectId,
-          name: defaultPhases[i],
-          status: "Not Started",
-          dateRange: "",
-          tasks: [],
+          name: phaseData.name,
+          status: "pending",
+          dateRange: phaseData.date || "",
+          tasks: phaseData.tasks || [],
         });
         createdPhases.push(phase);
       }

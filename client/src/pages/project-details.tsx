@@ -388,9 +388,9 @@ export default function ProjectDetails() {
     }
   });
 
-  // Toggle phase completion status (use lowercase status values to match DB)
+  // Toggle phase completion status - simple on/off toggle
   const togglePhaseStatus = (phaseId: string, currentStatus: string) => {
-    // Handle various status formats (legacy: 'Completed', 'In Progress', modern: 'completed', 'in_progress')
+    // Simple toggle: if completed (in any format), set to pending; otherwise set to completed
     const isCompleted = currentStatus.toLowerCase() === 'completed';
     const newStatus = isCompleted ? 'pending' : 'completed';
     updatePhaseMutation.mutate({ phaseId, status: newStatus });
@@ -399,11 +399,12 @@ export default function ProjectDetails() {
   // Handle clicking on static milestone (initialize phases first, then toggle)
   const handleStaticMilestoneClick = async (milestoneName: string, index: number) => {
     try {
-      // Initialize phases for this project
+      // Initialize phases for this project - pass the static MILESTONES data
       const res = await fetch(`/api/projects/${projectId}/phases/initialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ phases: MILESTONES })
       });
       if (!res.ok) throw new Error('Failed to initialize phases');
       const phases = await res.json();
@@ -411,7 +412,7 @@ export default function ProjectDetails() {
       // Find the phase that matches this milestone
       const phase = phases.find((p: any) => p.name === milestoneName) || phases[index];
       if (phase) {
-        // Toggle the phase
+        // Simple toggle: if completed, set to pending; otherwise set to completed
         const newStatus = phase.status === 'completed' ? 'pending' : 'completed';
         await fetch(`/api/phases/${phase.id}`, {
           method: 'PATCH',
@@ -570,16 +571,22 @@ export default function ProjectDetails() {
   // Use API phases if available, otherwise fall back to static MILESTONES
   // Keep original phase data for proper status tracking
   const displayMilestones = apiPhases.length > 0 
-    ? apiPhases.map((p: any, idx: number) => ({
-        id: p.id,
-        name: p.name,
-        date: p.dateRange || 'TBD',
-        status: p.status === 'Completed' ? 'completed' : p.status === 'In Progress' ? 'in_progress' : 'upcoming',
-        originalStatus: p.status, // Keep original status for toggle
-        description: `Phase ${idx + 1}`,
-        details: '',
-        tasks: p.tasks || []
-      }))
+    ? apiPhases.map((p: any, idx: number) => {
+        // Normalize status: completed stays completed, everything else is upcoming
+        const normalizedStatus = p.status?.toLowerCase() === 'completed' ? 'completed' : 'upcoming';
+        // Find matching static milestone to get description and details
+        const staticMilestone = MILESTONES.find(m => m.name === p.name) || MILESTONES[idx];
+        return {
+          id: p.id,
+          name: p.name,
+          date: p.dateRange || staticMilestone?.date || 'TBD',
+          status: normalizedStatus,
+          originalStatus: p.status, // Keep original status for toggle
+          description: staticMilestone?.description || `Phase ${idx + 1}`,
+          details: staticMilestone?.details || '',
+          tasks: p.tasks || staticMilestone?.tasks || []
+        };
+      })
     : MILESTONES;
   
   // Initialize edit state when entering edit mode
