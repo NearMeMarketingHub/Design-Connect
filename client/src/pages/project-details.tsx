@@ -371,12 +371,62 @@ export default function ProjectDetails() {
     }
   });
 
+  // Initialize phases mutation (for existing projects without phases)
+  const initializePhasesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/phases/initialize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to initialize phases');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phases'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+    }
+  });
+
   // Toggle phase completion status (use lowercase status values to match DB)
   const togglePhaseStatus = (phaseId: string, currentStatus: string) => {
     // Handle various status formats (legacy: 'Completed', 'In Progress', modern: 'completed', 'in_progress')
     const isCompleted = currentStatus.toLowerCase() === 'completed';
     const newStatus = isCompleted ? 'pending' : 'completed';
     updatePhaseMutation.mutate({ phaseId, status: newStatus });
+  };
+
+  // Handle clicking on static milestone (initialize phases first, then toggle)
+  const handleStaticMilestoneClick = async (milestoneName: string, index: number) => {
+    try {
+      // Initialize phases for this project
+      const res = await fetch(`/api/projects/${projectId}/phases/initialize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to initialize phases');
+      const phases = await res.json();
+      
+      // Find the phase that matches this milestone
+      const phase = phases.find((p: any) => p.name === milestoneName) || phases[index];
+      if (phase) {
+        // Toggle the phase
+        const newStatus = phase.status === 'completed' ? 'pending' : 'completed';
+        await fetch(`/api/phases/${phase.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ status: newStatus })
+        });
+      }
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phases'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+    } catch (error) {
+      console.error('Failed to toggle milestone:', error);
+    }
   };
 
   // Fetch phase updates for this project
@@ -1869,10 +1919,16 @@ export default function ProjectDetails() {
                         {/* Timeline line and checkbox/dot */}
                         <div className="flex flex-col items-center">
                           {/* Clickable checkbox for contractors, visual indicator for clients */}
-                          {canEdit && isApiPhase ? (
+                          {canEdit ? (
                             <button
-                              onClick={() => togglePhaseStatus(milestone.id, milestone.originalStatus || '')}
-                              disabled={updatePhaseMutation.isPending}
+                              onClick={() => {
+                                if (isApiPhase) {
+                                  togglePhaseStatus(milestone.id, milestone.originalStatus || '');
+                                } else {
+                                  handleStaticMilestoneClick(milestone.name, index);
+                                }
+                              }}
+                              disabled={updatePhaseMutation.isPending || initializePhasesMutation.isPending}
                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110 ${
                                 milestone.status === 'completed' 
                                   ? 'bg-green-500 border-green-500 hover:bg-green-600' 

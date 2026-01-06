@@ -424,6 +424,42 @@ export async function registerRoutes(
     }
   });
 
+  // Initialize default phases for existing projects that don't have any
+  app.post("/api/projects/:projectId/phases/initialize", requireAuth, async (req, res, next) => {
+    try {
+      const { projectId } = req.params;
+      const existingPhases = await storage.getProjectPhases(projectId);
+      
+      if (existingPhases.length > 0) {
+        return res.json(existingPhases);
+      }
+      
+      const defaultPhases = [
+        "Pre-Construction",
+        "Foundation & Framing",
+        "Electrical & Plumbing",
+        "Interior Finishing",
+        "Final Walkthrough"
+      ];
+      
+      const createdPhases = [];
+      for (let i = 0; i < defaultPhases.length; i++) {
+        const phase = await storage.createProjectPhase({
+          projectId,
+          name: defaultPhases[i],
+          status: "Not Started",
+          dateRange: "",
+          tasks: [],
+        });
+        createdPhases.push(phase);
+      }
+      
+      res.json(createdPhases);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Phase update routes
   app.get("/api/projects/:projectId/phase-updates", requireAuth, async (req, res, next) => {
     try {
