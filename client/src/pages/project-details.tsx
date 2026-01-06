@@ -211,7 +211,7 @@ const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 const PHASES_BY_STATUS: Record<string, string[]> = {
   "Planning": ["Pre-Construction", "Design Development", "Permitting"],
   "Active": ["Foundation", "Framing", "Rough-In", "Drywall", "Finishes", "Final Inspection", "Handover"],
-  "On Hold": ["On Hold"],
+  "On Hold": [], // No milestones - On Hold is a temporary pause state
   "Completed": ["Project Complete"]
 };
 
@@ -597,11 +597,12 @@ export default function ProjectDetails() {
     : MILESTONES;
   
   // Filter to show milestones for the current status
+  // "On Hold" shows no milestones - it's just a pause state, not a work phase
   const getStatusMilestones = (status: string) => {
     const statusPhases: Record<string, string[]> = {
       "Planning": ["Pre-Construction", "Design", "Permitting"],
       "Active": ["Foundation", "Framing", "Rough-in", "Insulation", "Drywall", "Finishing", "Final Inspection", "Handover"],
-      "On Hold": ["Pre-Construction", "Design", "Permitting", "Foundation", "Framing", "Rough-in", "Insulation", "Drywall", "Finishing", "Final Inspection", "Handover"],
+      "On Hold": [], // No milestones shown during hold - it's a temporary pause
       "Completed": ["Project Complete"],
     };
     return statusPhases[status] || [];

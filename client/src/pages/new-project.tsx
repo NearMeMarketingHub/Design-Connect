@@ -58,19 +58,7 @@ const STATUS_PHASES: Record<string, string[]> = {
     "Final Inspection",
     "Handover",
   ],
-  "On Hold": [
-    "Pre-Construction",
-    "Design",
-    "Permitting",
-    "Foundation",
-    "Framing",
-    "Rough-in",
-    "Insulation",
-    "Drywall",
-    "Finishing",
-    "Final Inspection",
-    "Handover",
-  ],
+  "On Hold": [], // No milestones - On Hold is a temporary pause state
   "Completed": [
     "Project Complete",
   ],
