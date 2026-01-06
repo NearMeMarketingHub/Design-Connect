@@ -506,6 +506,10 @@ export default function ProjectDetails() {
   
   // State for tracking slider values during drag (to prevent snap-back)
   const [sliderValues, setSliderValues] = useState<{ [taskId: string]: number }>({});
+  
+  // State for tracking which task's percentage is being edited via text input
+  const [editingPercentTask, setEditingPercentTask] = useState<string | null>(null);
+  const [editingPercentValue, setEditingPercentValue] = useState<string>("");
 
   // Create milestone task mutation
   const createMilestoneTaskMutation = useMutation({
@@ -2060,7 +2064,52 @@ export default function ProjectDetails() {
                                                     className="w-24 h-2 accent-primary cursor-pointer"
                                                     data-testid={`slider-task-${task.id}`}
                                                   />
-                                                  <span className="text-xs font-medium w-10 text-right">{sliderValues[task.id] ?? task.progressPercent ?? 0}%</span>
+                                                  {editingPercentTask === task.id ? (
+                                                    <input
+                                                      type="number"
+                                                      min="0"
+                                                      max="100"
+                                                      value={editingPercentValue}
+                                                      onChange={(e) => setEditingPercentValue(e.target.value)}
+                                                      onBlur={() => {
+                                                        const value = Math.min(100, Math.max(0, parseInt(editingPercentValue) || 0));
+                                                        setSliderValues(prev => ({ ...prev, [task.id]: value }));
+                                                        updateMilestoneTaskMutation.mutate({ 
+                                                          taskId: task.id, 
+                                                          updates: { progressPercent: value, isComplete: value === 100 } 
+                                                        });
+                                                        setEditingPercentTask(null);
+                                                      }}
+                                                      onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                          const value = Math.min(100, Math.max(0, parseInt(editingPercentValue) || 0));
+                                                          setSliderValues(prev => ({ ...prev, [task.id]: value }));
+                                                          updateMilestoneTaskMutation.mutate({ 
+                                                            taskId: task.id, 
+                                                            updates: { progressPercent: value, isComplete: value === 100 } 
+                                                          });
+                                                          setEditingPercentTask(null);
+                                                        } else if (e.key === 'Escape') {
+                                                          setEditingPercentTask(null);
+                                                        }
+                                                      }}
+                                                      autoFocus
+                                                      className="w-12 h-5 text-xs text-right border rounded px-1"
+                                                      data-testid={`input-percent-${task.id}`}
+                                                    />
+                                                  ) : (
+                                                    <span 
+                                                      className="text-xs font-medium w-10 text-right cursor-pointer hover:bg-muted rounded px-1"
+                                                      onClick={() => {
+                                                        setEditingPercentTask(task.id);
+                                                        setEditingPercentValue(String(sliderValues[task.id] ?? task.progressPercent ?? 0));
+                                                      }}
+                                                      title="Click to edit"
+                                                      data-testid={`percent-display-${task.id}`}
+                                                    >
+                                                      {sliderValues[task.id] ?? task.progressPercent ?? 0}%
+                                                    </span>
+                                                  )}
                                                 </div>
                                               ) : (
                                                 <div className="flex items-center gap-2">
