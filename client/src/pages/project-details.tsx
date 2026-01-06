@@ -438,6 +438,85 @@ export default function ProjectDetails() {
     return phaseUpdates.filter((u: any) => u.phaseId === phaseId);
   };
 
+  // Fetch milestone tasks for this project
+  const { data: milestoneTasks = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'milestone-tasks'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/milestone-tasks`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !staticProject && !!projectId && apiPhases.length > 0,
+  });
+
+  // State for adding new milestone task
+  const [newTaskTitle, setNewTaskTitle] = useState<{ [phaseId: string]: string }>({});
+  const [newTaskNeedsPercentage, setNewTaskNeedsPercentage] = useState<{ [phaseId: string]: boolean }>({});
+
+  // Create milestone task mutation
+  const createMilestoneTaskMutation = useMutation({
+    mutationFn: async ({ phaseId, projectId, title, requiresPercentage }: { phaseId: string; projectId: string; title: string; requiresPercentage: boolean }) => {
+      const res = await fetch(`/api/phases/${phaseId}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId, title, requiresPercentage })
+      });
+      if (!res.ok) throw new Error('Failed to create task');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+    }
+  });
+
+  // Update milestone task mutation
+  const updateMilestoneTaskMutation = useMutation({
+    mutationFn: async ({ taskId, updates }: { taskId: string; updates: { isComplete?: boolean; progressPercent?: number } }) => {
+      const res = await fetch(`/api/milestone-tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updates)
+      });
+      if (!res.ok) throw new Error('Failed to update task');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+    }
+  });
+
+  // Delete milestone task mutation
+  const deleteMilestoneTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const res = await fetch(`/api/milestone-tasks/${taskId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to delete task');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+    }
+  });
+
+  // Add a milestone task
+  const addMilestoneTask = (phaseId: string) => {
+    const title = newTaskTitle[phaseId]?.trim();
+    if (!title) return;
+    const requiresPercentage = newTaskNeedsPercentage[phaseId] || false;
+    createMilestoneTaskMutation.mutate({ phaseId, projectId: projectId!, title, requiresPercentage });
+    setNewTaskTitle(prev => ({ ...prev, [phaseId]: '' }));
+    setNewTaskNeedsPercentage(prev => ({ ...prev, [phaseId]: false }));
+  };
+
+  // Get tasks for a specific phase
+  const getPhaseTasks = (phaseId: string) => {
+    return milestoneTasks.filter((t: any) => t.phaseId === phaseId);
+  };
+
   // Use API phases if available, otherwise fall back to static MILESTONES
   // Keep original phase data for proper status tracking
   const displayMilestones = apiPhases.length > 0 
@@ -1862,15 +1941,151 @@ export default function ProjectDetails() {
                           
                           {/* Expanded content */}
                           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            isExpanded ? 'max-h-[500px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+                            isExpanded ? 'max-h-[800px] opacity-100 mt-3 overflow-y-auto' : 'max-h-0 opacity-0'
                           }`}>
-                            <div className="ml-6 pl-4 border-l-2 border-muted space-y-3">
+                            <div className="ml-6 pl-4 border-l-2 border-muted space-y-4">
                               {milestone.details && (
                                 <p className="text-sm text-muted-foreground">{milestone.details}</p>
                               )}
                               
-                              {/* Tasks list */}
-                              {milestone.tasks && milestone.tasks.length > 0 && (
+                              {/* Milestone Tasks - new database-backed tasks */}
+                              {isApiPhase && (
+                                <div className="space-y-3">
+                                  <p className="text-xs font-medium text-muted-foreground">Tasks:</p>
+                                  
+                                  {/* Existing tasks */}
+                                  {getPhaseTasks(milestone.id).length > 0 ? (
+                                    <div className="space-y-2">
+                                      {getPhaseTasks(milestone.id).map((task: any) => (
+                                        <div key={task.id} className="flex items-center gap-3 bg-muted/30 rounded-md p-2 group" data-testid={`task-${task.id}`}>
+                                          {/* Checkbox or percentage based on task type */}
+                                          {task.requiresPercentage ? (
+                                            <div className="flex items-center gap-2 flex-1">
+                                              <span className="text-sm flex-1">{task.title}</span>
+                                              {canEdit ? (
+                                                <div className="flex items-center gap-2">
+                                                  <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={task.progressPercent || 0}
+                                                    onChange={(e) => updateMilestoneTaskMutation.mutate({ 
+                                                      taskId: task.id, 
+                                                      updates: { progressPercent: parseInt(e.target.value) } 
+                                                    })}
+                                                    className="w-20 h-1.5 accent-primary"
+                                                    data-testid={`slider-task-${task.id}`}
+                                                  />
+                                                  <span className="text-xs font-medium w-10 text-right">{task.progressPercent || 0}%</span>
+                                                </div>
+                                              ) : (
+                                                <div className="flex items-center gap-2">
+                                                  <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                    <div 
+                                                      className="h-full bg-primary transition-all" 
+                                                      style={{ width: `${task.progressPercent || 0}%` }}
+                                                    />
+                                                  </div>
+                                                  <span className="text-xs font-medium w-10 text-right">{task.progressPercent || 0}%</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-2 flex-1">
+                                              {canEdit ? (
+                                                <button
+                                                  onClick={() => updateMilestoneTaskMutation.mutate({ 
+                                                    taskId: task.id, 
+                                                    updates: { isComplete: !task.isComplete } 
+                                                  })}
+                                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                                    task.isComplete 
+                                                      ? 'bg-green-500 border-green-500' 
+                                                      : 'border-muted-foreground/30 hover:border-primary'
+                                                  }`}
+                                                  data-testid={`checkbox-task-${task.id}`}
+                                                >
+                                                  {task.isComplete && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                                </button>
+                                              ) : (
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                                  task.isComplete 
+                                                    ? 'bg-green-500 border-green-500' 
+                                                    : 'border-muted-foreground/30'
+                                                }`}>
+                                                  {task.isComplete && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                                </div>
+                                              )}
+                                              <span className={`text-sm ${task.isComplete ? 'line-through text-muted-foreground' : ''}`}>
+                                                {task.title}
+                                              </span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Delete button for contractors */}
+                                          {canEdit && (
+                                            <button
+                                              onClick={() => deleteMilestoneTaskMutation.mutate(task.id)}
+                                              className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity p-1"
+                                              data-testid={`button-delete-task-${task.id}`}
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-muted-foreground italic">No tasks yet</p>
+                                  )}
+
+                                  {/* Add new task form - only for contractors */}
+                                  {canEdit && (
+                                    <div className="space-y-2 pt-2 border-t border-muted">
+                                      <div className="flex gap-2">
+                                        <Input
+                                          placeholder="Add a task..."
+                                          value={newTaskTitle[milestone.id] || ''}
+                                          onChange={(e) => setNewTaskTitle(prev => ({ ...prev, [milestone.id]: e.target.value }))}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              addMilestoneTask(milestone.id);
+                                            }
+                                          }}
+                                          className="text-sm h-8 flex-1"
+                                          data-testid={`input-new-task-${milestone.id}`}
+                                        />
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => addMilestoneTask(milestone.id)}
+                                          disabled={!newTaskTitle[milestone.id]?.trim() || createMilestoneTaskMutation.isPending}
+                                          className="h-8"
+                                          data-testid={`button-add-task-${milestone.id}`}
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-xs text-muted-foreground flex items-center gap-2 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={newTaskNeedsPercentage[milestone.id] || false}
+                                            onChange={(e) => setNewTaskNeedsPercentage(prev => ({ ...prev, [milestone.id]: e.target.checked }))}
+                                            className="rounded border-muted-foreground/30"
+                                            data-testid={`checkbox-needs-percentage-${milestone.id}`}
+                                          />
+                                          Track percentage progress
+                                        </label>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Legacy static tasks (for demo projects) */}
+                              {!isApiPhase && milestone.tasks && milestone.tasks.length > 0 && (
                                 <div>
                                   <p className="text-xs font-medium text-muted-foreground mb-2">Tasks:</p>
                                   <div className="space-y-1">
@@ -1887,70 +2102,6 @@ export default function ProjectDetails() {
                                       </div>
                                     ))}
                                   </div>
-                                </div>
-                              )}
-
-                              {/* Phase Updates */}
-                              {isApiPhase && (
-                                <div className="space-y-2">
-                                  <p className="text-xs font-medium text-muted-foreground">Updates:</p>
-                                  
-                                  {/* Existing updates */}
-                                  {getPhaseUpdates(milestone.id).length > 0 ? (
-                                    <div className="space-y-2">
-                                      {getPhaseUpdates(milestone.id).map((update: any) => (
-                                        <div key={update.id} className="flex items-start gap-2 bg-muted/30 rounded-md p-2 text-sm group" data-testid={`update-${update.id}`}>
-                                          <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                                          <div className="flex-1">
-                                            <p>{update.content}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                              {update.createdByName} • {new Date(update.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                            </p>
-                                          </div>
-                                          {canEdit && (
-                                            <button
-                                              onClick={() => deletePhaseUpdateMutation.mutate(update.id)}
-                                              className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity p-1"
-                                              data-testid={`button-delete-update-${update.id}`}
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </button>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-muted-foreground italic">No updates yet</p>
-                                  )}
-
-                                  {/* Add new update form - only for contractors */}
-                                  {canEdit && (
-                                    <div className="flex gap-2 mt-2">
-                                      <Input
-                                        placeholder="Add an update (e.g., 'Electrical 60% done')"
-                                        value={newPhaseUpdate[milestone.id] || ''}
-                                        onChange={(e) => setNewPhaseUpdate(prev => ({ ...prev, [milestone.id]: e.target.value }))}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            addPhaseUpdate(milestone.id);
-                                          }
-                                        }}
-                                        className="text-sm h-8"
-                                        data-testid={`input-phase-update-${milestone.id}`}
-                                      />
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => addPhaseUpdate(milestone.id)}
-                                        disabled={!newPhaseUpdate[milestone.id]?.trim() || createPhaseUpdateMutation.isPending}
-                                        className="h-8"
-                                        data-testid={`button-add-update-${milestone.id}`}
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  )}
                                 </div>
                               )}
                             </div>
