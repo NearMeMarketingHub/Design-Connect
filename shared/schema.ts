@@ -127,6 +127,7 @@ export const projectPhases = pgTable("project_phases", {
   status: text("status").notNull(),
   dateRange: text("date_range").notNull(),
   tasks: text("tasks").array().notNull(),
+  orderIndex: integer("order_index").notNull().default(0),
 });
 
 export const insertProjectPhaseSchema = createInsertSchema(projectPhases).omit({ id: true });

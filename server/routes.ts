@@ -441,13 +441,15 @@ export async function registerRoutes(
       }
       
       const createdPhases = [];
-      for (const phaseData of phasesToCreate) {
+      for (let i = 0; i < phasesToCreate.length; i++) {
+        const phaseData = phasesToCreate[i];
         const phase = await storage.createProjectPhase({
           projectId,
           name: phaseData.name,
           status: "pending",
           dateRange: phaseData.date || "",
           tasks: phaseData.tasks || [],
+          orderIndex: i,
         });
         createdPhases.push(phase);
       }

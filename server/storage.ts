@@ -313,7 +313,7 @@ export class DatabaseStorage implements IStorage {
 
   // Project phase methods
   async getProjectPhases(projectId: string): Promise<ProjectPhase[]> {
-    return await db.select().from(schema.projectPhases).where(eq(schema.projectPhases.projectId, projectId));
+    return await db.select().from(schema.projectPhases).where(eq(schema.projectPhases.projectId, projectId)).orderBy(schema.projectPhases.orderIndex);
   }
 
   async createProjectPhase(insertPhase: InsertProjectPhase): Promise<ProjectPhase> {
