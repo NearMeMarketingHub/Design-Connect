@@ -577,7 +577,7 @@ export default function ProjectDetails() {
 
   // Use API phases if available, otherwise fall back to static MILESTONES
   // Keep original phase data for proper status tracking
-  const displayMilestones = apiPhases.length > 0 
+  const allMilestones = apiPhases.length > 0 
     ? apiPhases.map((p: any, idx: number) => {
         // Normalize status: completed stays completed, everything else is upcoming
         const normalizedStatus = p.status?.toLowerCase() === 'completed' ? 'completed' : 'upcoming';
@@ -595,6 +595,11 @@ export default function ProjectDetails() {
         };
       })
     : MILESTONES;
+  
+  // Filter to show only the milestone for the current phase
+  const displayMilestones = project?.phase 
+    ? allMilestones.filter((m: any) => m.name === project.phase)
+    : allMilestones;
   
   // Initialize edit state when entering edit mode
   const startEditing = () => {
