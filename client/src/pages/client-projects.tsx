@@ -22,7 +22,10 @@ interface Project {
   dueDate: string | null;
   clientId: string | null;
   contractorId: string | null;
+  createdAt: string | null;
 }
+
+const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 
 function ProjectCard({ project, portalPath }: { project: Project; portalPath: string }) {
   const isCompleted = project.status === 'Completed';
@@ -95,7 +98,7 @@ function ProjectCard({ project, portalPath }: { project: Project; portalPath: st
 export default function ClientProjects() {
   const { user, currentPortal } = useAuth();
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [phaseFilter, setPhaseFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -122,33 +125,20 @@ export default function ClientProjects() {
     return p.contractorId === user?.id;
   });
   
-  // Apply phase filter
-  if (phaseFilter !== "all") {
-    myProjects = myProjects.filter(p => p.phase === phaseFilter);
+  // Apply status filter
+  if (statusFilter !== "all") {
+    myProjects = myProjects.filter(p => p.status === statusFilter);
   }
   
-  // Apply sort order (using project ID which contains date info, or just alphabetically for now)
+  // Apply sort order using createdAt timestamp
   myProjects = [...myProjects].sort((a, b) => {
-    // Extract date from project ID (format: name-MMYYYY-suffix)
-    const getDateFromId = (id: string) => {
-      const match = id.match(/(\d{2})(\d{4})(?:-\d+)?$/);
-      if (match) {
-        const month = parseInt(match[1]);
-        const year = parseInt(match[2]);
-        return new Date(year, month - 1);
-      }
-      return new Date(0);
-    };
-    const dateA = getDateFromId(a.id);
-    const dateB = getDateFromId(b.id);
-    return sortOrder === "newest" ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
   });
   
   const activeProjects = myProjects.filter(p => p.status !== 'Completed');
   const completedProjects = myProjects.filter(p => p.status === 'Completed');
-  
-  // Get unique phases from all projects (before filtering) for the filter dropdown
-  const allProjectPhases = Array.from(new Set(projects.map(p => p.phase).filter(Boolean))).sort();
   
   const portalPath = currentPortal === 'contractor' ? '/contractor' : currentPortal === 'admin' ? '/admin' : '/client';
 
@@ -182,15 +172,15 @@ export default function ClientProjects() {
           </div>
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
-            <Select value={phaseFilter} onValueChange={setPhaseFilter}>
-              <SelectTrigger className="w-[160px]" data-testid="select-phase-filter">
-                <SelectValue placeholder="All Phases" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" data-testid="option-all-phases">All Phases</SelectItem>
-                {allProjectPhases.map((phase: string) => (
-                  <SelectItem key={phase} value={phase} data-testid={`option-phase-${phase.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {phase}
+                <SelectItem value="all" data-testid="option-all-statuses">All Statuses</SelectItem>
+                {PROJECT_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {status}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -203,11 +193,11 @@ export default function ClientProjects() {
         <Card className="p-12 text-center">
           <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2">
-            {phaseFilter !== "all" ? "No Projects Found" : "No Projects Yet"}
+            {statusFilter !== "all" ? "No Projects Found" : "No Projects Yet"}
           </h3>
           <p className="text-muted-foreground">
-            {phaseFilter !== "all" 
-              ? `No projects match the "${phaseFilter}" phase filter. Try selecting a different phase.`
+            {statusFilter !== "all" 
+              ? `No projects match the "${statusFilter}" status filter. Try selecting a different status.`
               : user?.role === 'client' 
                 ? "You don't have any projects assigned to you yet. Your contractor will add you to a project soon."
                 : "You don't have any projects assigned to you yet. Create a new project to get started."}
