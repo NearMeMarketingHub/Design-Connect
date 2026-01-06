@@ -1860,65 +1860,98 @@ export default function ProjectDetails() {
                     )}
                   </div>
                 </CardHeader>
-                {isEditing && (
-                  <CardContent className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-status">Status</Label>
-                        <Select value={editStatus} onValueChange={(value) => {
-                          setEditStatus(value);
-                          const phases = getAllPhases(value, editPhase);
-                          if (phases.length > 0 && !phases.includes(editPhase)) {
-                            setEditPhase(phases[0]);
-                          }
-                        }}>
-                          <SelectTrigger id="edit-status" data-testid="select-edit-status">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PROJECT_STATUSES.map((status) => (
-                              <SelectItem key={status} value={status}>{status}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                <CardContent className="space-y-4">
+                  {isEditing ? (
+                    <>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-status">Status</Label>
+                          <Select value={editStatus} onValueChange={(value) => {
+                            setEditStatus(value);
+                            const phases = getAllPhases(value, editPhase);
+                            if (phases.length > 0 && !phases.includes(editPhase)) {
+                              setEditPhase(phases[0]);
+                            }
+                          }}>
+                            <SelectTrigger id="edit-status" data-testid="select-edit-status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PROJECT_STATUSES.map((status) => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-phase">Phase</Label>
+                          <Select value={editPhase} onValueChange={setEditPhase}>
+                            <SelectTrigger id="edit-phase" data-testid="select-edit-phase">
+                              <SelectValue placeholder="Select phase" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getAllPhases(editStatus, editPhase).map((phase) => (
+                                <SelectItem key={phase} value={phase}>{phase}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="edit-phase">Phase</Label>
-                        <Select value={editPhase} onValueChange={setEditPhase}>
-                          <SelectTrigger id="edit-phase" data-testid="select-edit-phase">
-                            <SelectValue placeholder="Select phase" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getAllPhases(editStatus, editPhase).map((phase) => (
-                              <SelectItem key={phase} value={phase}>{phase}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center justify-between">
+                          <Label>Progress</Label>
+                          <span className="text-sm text-muted-foreground">(Auto-calculated from milestones)</span>
+                        </div>
+                        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                          <span className="text-2xl font-bold">{project.progress}%</span>
+                          <span className="text-sm text-muted-foreground">based on completed milestones</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Progress</Label>
-                        <span className="text-sm text-muted-foreground">(Auto-calculated from milestones)</span>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-description">Description</Label>
+                        <Textarea
+                          id="edit-description"
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          placeholder="Project description..."
+                          rows={3}
+                          data-testid="textarea-edit-description"
+                        />
                       </div>
-                      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                        <span className="text-2xl font-bold">{project.progress}%</span>
-                        <span className="text-sm text-muted-foreground">based on completed milestones</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Status</Label>
+                          <div className="font-medium" data-testid="display-status">{project.status}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Current Phase</Label>
+                          <div className="font-medium" data-testid="display-phase">{project.phase}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Progress</Label>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary transition-all" 
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+                            <span className="font-medium text-sm" data-testid="display-progress">{project.progress}%</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-description">Description</Label>
-                      <Textarea
-                        id="edit-description"
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        placeholder="Project description..."
-                        rows={3}
-                        data-testid="textarea-edit-description"
-                      />
-                    </div>
-                  </CardContent>
-                )}
+                      {project.description && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Description</Label>
+                          <p className="text-sm" data-testid="display-description">{project.description}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
               </Card>
             )}
 
