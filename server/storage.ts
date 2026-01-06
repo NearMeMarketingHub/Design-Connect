@@ -22,6 +22,7 @@ import type {
   RecurringBilling, InsertRecurringBilling,
   ProjectPhase, InsertProjectPhase,
   PhaseUpdate, InsertPhaseUpdate,
+  MilestoneTask, InsertMilestoneTask,
   ActionItem, InsertActionItem,
   InspirationImage, InsertInspirationImage,
   Message, InsertMessage,
@@ -78,6 +79,13 @@ export interface IStorage {
   getProjectPhaseUpdates(projectId: string): Promise<PhaseUpdate[]>;
   createPhaseUpdate(update: InsertPhaseUpdate): Promise<PhaseUpdate>;
   deletePhaseUpdate(id: string): Promise<void>;
+  
+  // Milestone task methods
+  getMilestoneTasks(phaseId: string): Promise<MilestoneTask[]>;
+  getProjectMilestoneTasks(projectId: string): Promise<MilestoneTask[]>;
+  createMilestoneTask(task: InsertMilestoneTask): Promise<MilestoneTask>;
+  updateMilestoneTask(id: string, task: Partial<InsertMilestoneTask>): Promise<MilestoneTask | undefined>;
+  deleteMilestoneTask(id: string): Promise<void>;
   
   // Action item methods
   getActionItems(projectId: string): Promise<ActionItem[]>;
@@ -358,6 +366,36 @@ export class DatabaseStorage implements IStorage {
 
   async deletePhaseUpdate(id: string): Promise<void> {
     await db.delete(schema.phaseUpdates).where(eq(schema.phaseUpdates.id, id));
+  }
+
+  // Milestone task methods
+  async getMilestoneTasks(phaseId: string): Promise<MilestoneTask[]> {
+    return await db.select().from(schema.milestoneTasks)
+      .where(eq(schema.milestoneTasks.phaseId, phaseId))
+      .orderBy(schema.milestoneTasks.orderIndex);
+  }
+
+  async getProjectMilestoneTasks(projectId: string): Promise<MilestoneTask[]> {
+    return await db.select().from(schema.milestoneTasks)
+      .where(eq(schema.milestoneTasks.projectId, projectId))
+      .orderBy(schema.milestoneTasks.orderIndex);
+  }
+
+  async createMilestoneTask(task: InsertMilestoneTask): Promise<MilestoneTask> {
+    const [milestoneTask] = await db.insert(schema.milestoneTasks).values(task).returning();
+    return milestoneTask;
+  }
+
+  async updateMilestoneTask(id: string, task: Partial<InsertMilestoneTask>): Promise<MilestoneTask | undefined> {
+    const [milestoneTask] = await db.update(schema.milestoneTasks)
+      .set(task)
+      .where(eq(schema.milestoneTasks.id, id))
+      .returning();
+    return milestoneTask;
+  }
+
+  async deleteMilestoneTask(id: string): Promise<void> {
+    await db.delete(schema.milestoneTasks).where(eq(schema.milestoneTasks.id, id));
   }
 
   // Action item methods

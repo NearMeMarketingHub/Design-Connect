@@ -467,6 +467,60 @@ export async function registerRoutes(
     }
   });
 
+  // Milestone task routes
+  app.get("/api/projects/:projectId/milestone-tasks", requireAuth, async (req, res, next) => {
+    try {
+      const tasks = await storage.getProjectMilestoneTasks(req.params.projectId);
+      res.json(tasks);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/phases/:phaseId/tasks", requireAuth, async (req, res, next) => {
+    try {
+      const tasks = await storage.getMilestoneTasks(req.params.phaseId);
+      res.json(tasks);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/phases/:phaseId/tasks", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as any;
+      const task = await storage.createMilestoneTask({
+        ...req.body,
+        phaseId: req.params.phaseId,
+        createdBy: user.id,
+      });
+      res.json(task);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/milestone-tasks/:id", requireAuth, async (req, res, next) => {
+    try {
+      const task = await storage.updateMilestoneTask(req.params.id, req.body);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/milestone-tasks/:id", requireAuth, async (req, res, next) => {
+    try {
+      await storage.deleteMilestoneTask(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Action item routes
   app.get("/api/projects/:projectId/action-items", requireAuth, async (req, res, next) => {
     try {
