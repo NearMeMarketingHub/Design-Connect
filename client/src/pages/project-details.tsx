@@ -503,6 +503,9 @@ export default function ProjectDetails() {
   // State for adding new milestone task
   const [newTaskTitle, setNewTaskTitle] = useState<{ [phaseId: string]: string }>({});
   const [newTaskNeedsPercentage, setNewTaskNeedsPercentage] = useState<{ [phaseId: string]: boolean }>({});
+  
+  // State for tracking slider values during drag (to prevent snap-back)
+  const [sliderValues, setSliderValues] = useState<{ [taskId: string]: number }>({});
 
   // Create milestone task mutation
   const createMilestoneTaskMutation = useMutation({
@@ -2031,15 +2034,33 @@ export default function ProjectDetails() {
                                                     type="range"
                                                     min="0"
                                                     max="100"
-                                                    value={task.progressPercent || 0}
-                                                    onChange={(e) => updateMilestoneTaskMutation.mutate({ 
-                                                      taskId: task.id, 
-                                                      updates: { progressPercent: parseInt(e.target.value) } 
-                                                    })}
-                                                    className="w-20 h-1.5 accent-primary"
+                                                    value={sliderValues[task.id] ?? task.progressPercent ?? 0}
+                                                    onChange={(e) => {
+                                                      const value = parseInt(e.target.value);
+                                                      setSliderValues(prev => ({ ...prev, [task.id]: value }));
+                                                    }}
+                                                    onMouseUp={() => {
+                                                      const value = sliderValues[task.id];
+                                                      if (value !== undefined) {
+                                                        updateMilestoneTaskMutation.mutate({ 
+                                                          taskId: task.id, 
+                                                          updates: { progressPercent: value, isComplete: value === 100 } 
+                                                        });
+                                                      }
+                                                    }}
+                                                    onTouchEnd={() => {
+                                                      const value = sliderValues[task.id];
+                                                      if (value !== undefined) {
+                                                        updateMilestoneTaskMutation.mutate({ 
+                                                          taskId: task.id, 
+                                                          updates: { progressPercent: value, isComplete: value === 100 } 
+                                                        });
+                                                      }
+                                                    }}
+                                                    className="w-24 h-2 accent-primary cursor-pointer"
                                                     data-testid={`slider-task-${task.id}`}
                                                   />
-                                                  <span className="text-xs font-medium w-10 text-right">{task.progressPercent || 0}%</span>
+                                                  <span className="text-xs font-medium w-10 text-right">{sliderValues[task.id] ?? task.progressPercent ?? 0}%</span>
                                                 </div>
                                               ) : (
                                                 <div className="flex items-center gap-2">
