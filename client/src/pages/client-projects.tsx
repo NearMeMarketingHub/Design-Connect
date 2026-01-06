@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { MapPin, ArrowRight, Calendar, CheckCircle2, Loader2, FolderOpen } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapPin, ArrowRight, Calendar, CheckCircle2, Loader2, FolderOpen, ArrowUpDown, Filter } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -92,6 +94,8 @@ function ProjectCard({ project, portalPath }: { project: Project; portalPath: st
 
 export default function ClientProjects() {
   const { user, currentPortal } = useAuth();
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [phaseFilter, setPhaseFilter] = useState<string>("all");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -102,7 +106,7 @@ export default function ClientProjects() {
   });
 
   // Filter projects based on portal context
-  const myProjects = projects.filter(p => {
+  let myProjects = projects.filter(p => {
     // When logged into client portal, only show projects where user is the client
     if (currentPortal === 'client') {
       return p.clientId === user?.id;
@@ -117,8 +121,34 @@ export default function ClientProjects() {
     }
     return p.contractorId === user?.id;
   });
+  
+  // Apply phase filter
+  if (phaseFilter !== "all") {
+    myProjects = myProjects.filter(p => p.phase === phaseFilter);
+  }
+  
+  // Apply sort order (using project ID which contains date info, or just alphabetically for now)
+  myProjects = [...myProjects].sort((a, b) => {
+    // Extract date from project ID (format: name-MMYYYY-suffix)
+    const getDateFromId = (id: string) => {
+      const match = id.match(/(\d{2})(\d{4})(?:-\d+)?$/);
+      if (match) {
+        const month = parseInt(match[1]);
+        const year = parseInt(match[2]);
+        return new Date(year, month - 1);
+      }
+      return new Date(0);
+    };
+    const dateA = getDateFromId(a.id);
+    const dateB = getDateFromId(b.id);
+    return sortOrder === "newest" ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+  });
+  
   const activeProjects = myProjects.filter(p => p.status !== 'Completed');
   const completedProjects = myProjects.filter(p => p.status === 'Completed');
+  
+  // Get unique phases from all projects (before filtering) for the filter dropdown
+  const allProjectPhases = Array.from(new Set(projects.map(p => p.phase).filter(Boolean))).sort();
   
   const portalPath = currentPortal === 'contractor' ? '/contractor' : currentPortal === 'admin' ? '/admin' : '/client';
 
@@ -132,19 +162,55 @@ export default function ClientProjects() {
 
   return (
     <div className="space-y-10">
-      <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">My Projects</h1>
-        <p className="text-muted-foreground mt-1">View and manage all your properties.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-heading font-bold text-foreground">My Projects</h1>
+          <p className="text-muted-foreground mt-1">View and manage all your properties.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+            <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "newest" | "oldest")}>
+              <SelectTrigger className="w-[130px]" data-testid="select-sort">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest" data-testid="option-newest">Newest</SelectItem>
+                <SelectItem value="oldest" data-testid="option-oldest">Oldest</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Select value={phaseFilter} onValueChange={setPhaseFilter}>
+              <SelectTrigger className="w-[160px]" data-testid="select-phase-filter">
+                <SelectValue placeholder="All Phases" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="option-all-phases">All Phases</SelectItem>
+                {allProjectPhases.map((phase: string) => (
+                  <SelectItem key={phase} value={phase} data-testid={`option-phase-${phase.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {phase}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {myProjects.length === 0 ? (
         <Card className="p-12 text-center">
           <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No Projects Yet</h3>
+          <h3 className="text-xl font-semibold mb-2">
+            {phaseFilter !== "all" ? "No Projects Found" : "No Projects Yet"}
+          </h3>
           <p className="text-muted-foreground">
-            {user?.role === 'client' 
-              ? "You don't have any projects assigned to you yet. Your contractor will add you to a project soon."
-              : "You don't have any projects assigned to you yet. Create a new project to get started."}
+            {phaseFilter !== "all" 
+              ? `No projects match the "${phaseFilter}" phase filter. Try selecting a different phase.`
+              : user?.role === 'client' 
+                ? "You don't have any projects assigned to you yet. Your contractor will add you to a project soon."
+                : "You don't have any projects assigned to you yet. Create a new project to get started."}
           </p>
         </Card>
       ) : (
