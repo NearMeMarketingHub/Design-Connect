@@ -158,7 +158,7 @@ export default function NewProject() {
       return res.json();
     },
     onSuccess: async (project) => {
-      // Create phases/milestones for the project
+      // Create all phases/milestones for the project (so they're available when status changes)
       try {
         for (const phase of ALL_PHASES) {
           const milestones = phaseMilestones[phase] || [];
@@ -571,7 +571,7 @@ export default function NewProject() {
                 <CardDescription>Set the project status and customize milestones for each phase</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
                     <Select value={formData.status} onValueChange={(v) => handleChange("status", v)}>
@@ -582,21 +582,6 @@ export default function NewProject() {
                         {PROJECT_STATUSES.map((status) => (
                           <SelectItem key={status} value={status}>
                             {status}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phase">Current Phase</Label>
-                    <Select value={formData.phase} onValueChange={(v) => handleChange("phase", v)}>
-                      <SelectTrigger data-testid="select-project-phase">
-                        <SelectValue placeholder="Select phase" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePhases.map((phase: string) => (
-                          <SelectItem key={phase} value={phase}>
-                            {phase}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -618,9 +603,9 @@ export default function NewProject() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Customize Phase Milestones</CardTitle>
+                <CardTitle>Customize Milestones</CardTitle>
                 <CardDescription>
-                  Add, remove, or rename milestones for each phase. These will be used to track progress throughout the project.
+                  Add, remove, or rename milestones. These will be used to track progress throughout the project.
                 </CardDescription>
               </CardHeader>
               <CardContent>

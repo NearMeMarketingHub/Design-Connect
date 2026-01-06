@@ -596,9 +596,19 @@ export default function ProjectDetails() {
       })
     : MILESTONES;
   
-  // Filter to show only the milestone for the current phase
-  const displayMilestones = project?.phase 
-    ? allMilestones.filter((m: any) => m.name === project.phase)
+  // Filter to show milestones for the current status
+  const getStatusMilestones = (status: string) => {
+    const statusPhases: Record<string, string[]> = {
+      "Planning": ["Pre-Construction", "Design", "Permitting"],
+      "Active": ["Foundation", "Framing", "Rough-in", "Insulation", "Drywall", "Finishing", "Final Inspection", "Handover"],
+      "On Hold": ["Pre-Construction", "Design", "Permitting", "Foundation", "Framing", "Rough-in", "Insulation", "Drywall", "Finishing", "Final Inspection", "Handover"],
+      "Completed": ["Project Complete"],
+    };
+    return statusPhases[status] || [];
+  };
+  
+  const displayMilestones = project?.status 
+    ? allMilestones.filter((m: any) => getStatusMilestones(project.status).includes(m.name))
     : allMilestones;
   
   // Initialize edit state when entering edit mode
@@ -1844,45 +1854,23 @@ export default function ProjectDetails() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-status">Status</Label>
-                      <Select 
-                        value={project.status} 
-                        onValueChange={(value) => {
-                          const phases = getAllPhases(value, project.phase);
-                          const newPhase = phases.includes(project.phase) ? project.phase : phases[0];
-                          updateProjectMutation.mutate({ status: value, phase: newPhase });
-                        }}
-                      >
-                        <SelectTrigger id="edit-status" data-testid="select-edit-status">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PROJECT_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>{status}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-phase">Phase</Label>
-                      <Select 
-                        value={project.phase} 
-                        onValueChange={(value) => {
-                          updateProjectMutation.mutate({ phase: value });
-                        }}
-                      >
-                        <SelectTrigger id="edit-phase" data-testid="select-edit-phase">
-                          <SelectValue placeholder="Select phase" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAllPhases(project.status, project.phase).map((phase) => (
-                            <SelectItem key={phase} value={phase}>{phase}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select 
+                      value={project.status} 
+                      onValueChange={(value) => {
+                        updateProjectMutation.mutate({ status: value });
+                      }}
+                    >
+                      <SelectTrigger id="edit-status" data-testid="select-edit-status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROJECT_STATUSES.map((status) => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
