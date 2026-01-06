@@ -2980,7 +2980,7 @@ export default function ProjectDetails() {
             <Button 
               variant="ghost" 
               size="icon"
-              className="absolute right-10 top-4 z-50 text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="absolute right-12 top-4 z-50 rounded-sm text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={() => {
                 if (confirm('Delete this inspiration image?')) {
                   deleteInspirationMutation.mutate(selectedInspiration.id);
