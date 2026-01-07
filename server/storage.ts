@@ -86,6 +86,7 @@ export interface IStorage {
   createMilestoneTask(task: InsertMilestoneTask): Promise<MilestoneTask>;
   updateMilestoneTask(id: string, task: Partial<InsertMilestoneTask>): Promise<MilestoneTask | undefined>;
   deleteMilestoneTask(id: string): Promise<void>;
+  completeAllPhaseTasks(phaseId: string): Promise<void>;
   
   // Action item methods
   getActionItems(projectId: string): Promise<ActionItem[]>;
@@ -326,20 +327,45 @@ export class DatabaseStorage implements IStorage {
   async updateProjectPhase(id: string, updateData: Partial<InsertProjectPhase>): Promise<ProjectPhase | undefined> {
     const [phase] = await db.update(schema.projectPhases).set(updateData).where(eq(schema.projectPhases.id, id)).returning();
     if (phase) {
+      // If phase is marked as completed, also complete all tasks under it
+      if (updateData.status?.toLowerCase() === 'completed') {
+        await this.completeAllPhaseTasks(id);
+      }
       // Auto-recalculate project progress after updating a phase
       await this.recalculateProjectProgress(phase.projectId);
     }
     return phase;
   }
 
-  // Calculate project progress based on completed phases/milestones
+  // Calculate project progress based on task completion within milestones
   async recalculateProjectProgress(projectId: string): Promise<void> {
-    const phases = await this.getProjectPhases(projectId);
-    if (phases.length === 0) return;
+    const tasks = await this.getProjectMilestoneTasks(projectId);
     
-    // Handle various status formats: 'completed', 'Completed'
-    const completedPhases = phases.filter(p => p.status.toLowerCase() === 'completed').length;
-    const progress = Math.round((completedPhases / phases.length) * 100);
+    // If no tasks, fall back to phase-based calculation
+    if (tasks.length === 0) {
+      const phases = await this.getProjectPhases(projectId);
+      if (phases.length === 0) return;
+      const completedPhases = phases.filter(p => p.status.toLowerCase() === 'completed').length;
+      const progress = Math.round((completedPhases / phases.length) * 100);
+      await db.update(schema.projects)
+        .set({ progress })
+        .where(eq(schema.projects.id, projectId));
+      return;
+    }
+    
+    // Calculate progress based on tasks
+    // For tasks with percentage tracking, use their progressPercent value
+    // For simple tasks, use 100 if complete, 0 if not
+    let totalProgress = 0;
+    for (const task of tasks) {
+      if (task.requiresPercentage) {
+        totalProgress += task.progressPercent || 0;
+      } else {
+        totalProgress += task.isComplete ? 100 : 0;
+      }
+    }
+    
+    const progress = Math.round(totalProgress / tasks.length);
     
     await db.update(schema.projects)
       .set({ progress })
@@ -383,6 +409,10 @@ export class DatabaseStorage implements IStorage {
 
   async createMilestoneTask(task: InsertMilestoneTask): Promise<MilestoneTask> {
     const [milestoneTask] = await db.insert(schema.milestoneTasks).values(task).returning();
+    // Recalculate progress when task is added
+    if (milestoneTask.projectId) {
+      await this.recalculateProjectProgress(milestoneTask.projectId);
+    }
     return milestoneTask;
   }
 
@@ -391,11 +421,28 @@ export class DatabaseStorage implements IStorage {
       .set(task)
       .where(eq(schema.milestoneTasks.id, id))
       .returning();
+    // Recalculate progress when task is updated
+    if (milestoneTask?.projectId) {
+      await this.recalculateProjectProgress(milestoneTask.projectId);
+    }
     return milestoneTask;
   }
 
   async deleteMilestoneTask(id: string): Promise<void> {
+    // Get the task first to know the project ID for recalculation
+    const [task] = await db.select().from(schema.milestoneTasks).where(eq(schema.milestoneTasks.id, id));
     await db.delete(schema.milestoneTasks).where(eq(schema.milestoneTasks.id, id));
+    // Recalculate progress when task is deleted
+    if (task?.projectId) {
+      await this.recalculateProjectProgress(task.projectId);
+    }
+  }
+  
+  // Mark all tasks under a phase as complete
+  async completeAllPhaseTasks(phaseId: string): Promise<void> {
+    await db.update(schema.milestoneTasks)
+      .set({ isComplete: true, progressPercent: 100 })
+      .where(eq(schema.milestoneTasks.phaseId, phaseId));
   }
 
   // Action item methods

@@ -368,6 +368,8 @@ export default function ProjectDetails() {
       queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
       // Also invalidate the specific project endpoint to get updated progress
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      // Invalidate milestone tasks since they may have been auto-completed
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
     }
   });
 
@@ -525,6 +527,10 @@ export default function ProjectDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+      // Also invalidate project to get updated progress
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/projects', projectId, isFromAdmin] });
     }
   });
 
@@ -542,6 +548,10 @@ export default function ProjectDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+      // Also invalidate project to get updated progress
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/projects', projectId, isFromAdmin] });
     }
   });
 
@@ -557,6 +567,10 @@ export default function ProjectDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+      // Also invalidate project to get updated progress
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/projects', projectId, isFromAdmin] });
     }
   });
 
