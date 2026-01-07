@@ -570,9 +570,16 @@ export default function ProjectDetails() {
     setNewTaskNeedsPercentage(prev => ({ ...prev, [phaseId]: false }));
   };
 
-  // Get tasks for a specific phase
+  // Get tasks for a specific phase - sorted by creation time to maintain consistent order
   const getPhaseTasks = (phaseId: string) => {
-    return milestoneTasks.filter((t: any) => t.phaseId === phaseId);
+    return milestoneTasks
+      .filter((t: any) => t.phaseId === phaseId)
+      .sort((a: any, b: any) => {
+        // Sort by createdAt to maintain insertion order
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
   };
 
   // Use API phases if available, otherwise fall back to static MILESTONES
@@ -608,8 +615,17 @@ export default function ProjectDetails() {
     return statusPhases[status] || [];
   };
   
+  // Filter and sort milestones to maintain consistent order regardless of completion status
   const displayMilestones = project?.status 
-    ? allMilestones.filter((m: any) => getStatusMilestones(project.status).includes(m.name))
+    ? (() => {
+        const statusPhaseOrder = getStatusMilestones(project.status);
+        return allMilestones
+          .filter((m: any) => statusPhaseOrder.includes(m.name))
+          .sort((a: any, b: any) => {
+            // Sort by the order defined in statusPhaseOrder, not by database order
+            return statusPhaseOrder.indexOf(a.name) - statusPhaseOrder.indexOf(b.name);
+          });
+      })()
     : allMilestones;
   
   // Initialize edit state when entering edit mode
