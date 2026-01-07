@@ -141,31 +141,72 @@ const PROJECTS_DATA: Record<string, {
   }
 };
 
+// Milestone descriptions mapped to the actual phase names used in the system
+const MILESTONE_DESCRIPTIONS: Record<string, { description: string; details: string }> = {
+  "Pre-Construction": { 
+    description: "Initial planning and site preparation", 
+    details: "Meet with homeowners to review final plans and material selections. Discuss timeline expectations and communication preferences. Site access arranged and temporary utilities confirmed." 
+  },
+  "Design": { 
+    description: "Design development and finalization", 
+    details: "Complete architectural and engineering drawings. Finalize material selections and specifications." 
+  },
+  "Permitting": { 
+    description: "Building permits and approvals", 
+    details: "Submit permit applications and obtain necessary approvals from local authorities." 
+  },
+  "Foundation": { 
+    description: "Foundation and site work", 
+    details: "Excavation, footings, and foundation construction. Site grading and drainage." 
+  },
+  "Framing": { 
+    description: "Structural framing complete", 
+    details: "Wall framing, floor joists, roof trusses, and structural sheathing installed." 
+  },
+  "Rough-in": { 
+    description: "Electrical, plumbing, and HVAC rough-ins", 
+    details: "Complete all rough-in work for electrical, plumbing, and HVAC systems." 
+  },
+  "Insulation": { 
+    description: "Insulation installation", 
+    details: "Install insulation in walls, ceilings, and floors for energy efficiency." 
+  },
+  "Drywall": { 
+    description: "Drywall hanging and finishing", 
+    details: "Drywall installation including hanging, taping, mudding, and sanding." 
+  },
+  "Finishing": { 
+    description: "Cabinets, trim, and fixtures", 
+    details: "Cabinet installation, trim carpentry, painting, and fixture installation." 
+  },
+  "Final Inspection": { 
+    description: "Final city inspection", 
+    details: "City inspector will verify all permitted work meets code." 
+  },
+  "Handover": { 
+    description: "Keys delivered, warranty begins", 
+    details: "Final walkthrough with homeowners to review all completed work." 
+  },
+  "Project Complete": { 
+    description: "Project successfully completed", 
+    details: "All work finished, inspections passed, and project closed out." 
+  }
+};
+
+// Legacy MILESTONES array for backwards compatibility (not used for new phases)
 const MILESTONES = [
-  { id: 1, name: "Project Kickoff", date: "TBD", status: "upcoming", description: "Initial meeting and project scope finalized", 
-    details: "Meet with homeowners to review final plans and material selections. Discuss timeline expectations and communication preferences. Site access arranged and temporary utilities confirmed.", 
-    tasks: ["Contract signed", "Deposit received", "Permits submitted"] },
-  { id: 2, name: "Demolition Complete", date: "TBD", status: "upcoming", description: "All demo work finished, site cleared",
-    details: "Remove existing structures as needed. Haul debris and clean site for next phase.",
-    tasks: ["Demo complete", "Debris removed", "Site cleaned"] },
-  { id: 3, name: "Framing Inspection", date: "TBD", status: "upcoming", description: "Structural framing passed inspection",
-    details: "City inspector to approve all structural framing.",
-    tasks: ["Headers installed", "Joists secured", "Inspection passed"] },
-  { id: 4, name: "Rough-in Complete", date: "TBD", status: "upcoming", description: "Electrical, plumbing, and HVAC rough-ins",
-    details: "Complete all rough-in work for electrical, plumbing, and HVAC systems.",
-    tasks: ["Electrical complete", "Plumbing complete", "HVAC complete", "Awaiting inspection"] },
-  { id: 5, name: "Drywall Installation", date: "TBD", status: "upcoming", description: "Drywall hanging and mudding",
-    details: "Drywall installation including hanging, taping, mudding, and sanding.",
-    tasks: ["Order materials", "Hang drywall", "Tape and mud", "Sand and prep"] },
-  { id: 6, name: "Finish Work Begins", date: "TBD", status: "upcoming", description: "Cabinets, trim, and fixtures",
-    details: "Cabinet installation, trim carpentry, and fixture installation.",
-    tasks: ["Install cabinets", "Install trim", "Paint walls", "Install fixtures"] },
-  { id: 7, name: "Final Inspection", date: "TBD", status: "upcoming", description: "Final city inspection",
-    details: "City inspector will verify all permitted work meets code.",
-    tasks: ["Schedule inspection", "Prep checklist", "Address any corrections"] },
-  { id: 8, name: "Project Handover", date: "TBD", status: "upcoming", description: "Keys delivered, warranty begins",
-    details: "Final walkthrough with homeowners to review all completed work.",
-    tasks: ["Final cleaning", "Walkthrough scheduled", "Warranty docs prepared", "Keys delivered"] }
+  { id: 1, name: "Pre-Construction", date: "TBD", status: "upcoming", description: "Initial planning and site preparation", details: "", tasks: [] },
+  { id: 2, name: "Design", date: "TBD", status: "upcoming", description: "Design development and finalization", details: "", tasks: [] },
+  { id: 3, name: "Permitting", date: "TBD", status: "upcoming", description: "Building permits and approvals", details: "", tasks: [] },
+  { id: 4, name: "Foundation", date: "TBD", status: "upcoming", description: "Foundation and site work", details: "", tasks: [] },
+  { id: 5, name: "Framing", date: "TBD", status: "upcoming", description: "Structural framing complete", details: "", tasks: [] },
+  { id: 6, name: "Rough-in", date: "TBD", status: "upcoming", description: "Electrical, plumbing, and HVAC rough-ins", details: "", tasks: [] },
+  { id: 7, name: "Insulation", date: "TBD", status: "upcoming", description: "Insulation installation", details: "", tasks: [] },
+  { id: 8, name: "Drywall", date: "TBD", status: "upcoming", description: "Drywall hanging and finishing", details: "", tasks: [] },
+  { id: 9, name: "Finishing", date: "TBD", status: "upcoming", description: "Cabinets, trim, and fixtures", details: "", tasks: [] },
+  { id: 10, name: "Final Inspection", date: "TBD", status: "upcoming", description: "Final city inspection", details: "", tasks: [] },
+  { id: 11, name: "Handover", date: "TBD", status: "upcoming", description: "Keys delivered, warranty begins", details: "", tasks: [] },
+  { id: 12, name: "Project Complete", date: "TBD", status: "upcoming", description: "Project successfully completed", details: "", tasks: [] }
 ];
 
 type LocalMessage = {
@@ -602,17 +643,17 @@ export default function ProjectDetails() {
     ? apiPhases.map((p: any, idx: number) => {
         // Normalize status: completed stays completed, everything else is upcoming
         const normalizedStatus = p.status?.toLowerCase() === 'completed' ? 'completed' : 'upcoming';
-        // Find matching static milestone to get description and details
-        const staticMilestone = MILESTONES.find(m => m.name === p.name) || MILESTONES[idx];
+        // Get description from the MILESTONE_DESCRIPTIONS map by phase name
+        const milestoneInfo = MILESTONE_DESCRIPTIONS[p.name];
         return {
           id: p.id,
           name: p.name,
-          date: p.dateRange || staticMilestone?.date || 'TBD',
+          date: p.dateRange || 'TBD',
           status: normalizedStatus,
           originalStatus: p.status, // Keep original status for toggle
-          description: staticMilestone?.description || `Phase ${idx + 1}`,
-          details: staticMilestone?.details || '',
-          tasks: p.tasks || staticMilestone?.tasks || []
+          description: milestoneInfo?.description || `${p.name} phase`,
+          details: milestoneInfo?.details || '',
+          tasks: p.tasks || []
         };
       })
     : MILESTONES;
