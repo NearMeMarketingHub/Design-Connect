@@ -810,6 +810,81 @@ export async function registerRoutes(
     }
   });
 
+  // Contractor Photo routes (contractor-only, clients cannot access)
+  app.get("/api/projects/:projectId/contractor-photos", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      // Only contractors and admins can view contractor photos
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const photos = await storage.getContractorPhotos(req.params.projectId);
+      res.json(photos);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/contractor-photos/:photoId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const photo = await storage.getContractorPhoto(req.params.photoId);
+      if (!photo) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      res.json(photo);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/contractor-photos", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      // Only contractors and admins can create contractor photos
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can create contractor photos" });
+      }
+      
+      const photo = await storage.createContractorPhoto({
+        ...req.body,
+        projectId: req.params.projectId,
+        creatorId: user.id,
+        creatorName: user.name || 'Contractor',
+      });
+      res.json(photo);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/contractor-photos/:photoId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Check photo ownership - admins can delete any, contractors only their own
+      const photo = await storage.getContractorPhoto(req.params.photoId);
+      if (!photo) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      
+      if (user.role !== 'admin' && photo.creatorId !== user.id) {
+        return res.status(403).json({ message: "You can only delete your own photos" });
+      }
+      
+      await storage.deleteContractorPhoto(req.params.photoId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Comment routes
   app.get("/api/posts/:postId/comments", async (req, res, next) => {
     try {
