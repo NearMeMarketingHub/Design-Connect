@@ -27,6 +27,7 @@ import type {
   InspirationImage, InsertInspirationImage,
   Message, InsertMessage,
   ProgressPost, InsertProgressPost,
+  ContractorPhoto, InsertContractorPhoto,
   PostComment, InsertPostComment,
   PostReaction, InsertPostReaction,
   BudgetCategory, InsertBudgetCategory,
@@ -118,6 +119,12 @@ export interface IStorage {
   getProgressPost(id: string): Promise<ProgressPost | undefined>;
   createProgressPost(post: InsertProgressPost): Promise<ProgressPost>;
   deleteProgressPost(id: string): Promise<void>;
+
+  // Contractor photo methods (contractor-only photos)
+  getContractorPhotos(projectId: string): Promise<ContractorPhoto[]>;
+  getContractorPhoto(id: string): Promise<ContractorPhoto | undefined>;
+  createContractorPhoto(photo: InsertContractorPhoto): Promise<ContractorPhoto>;
+  deleteContractorPhoto(id: string): Promise<void>;
 
   // Post comment methods
   getPostComments(postId: string): Promise<PostComment[]>;
@@ -589,6 +596,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProgressPost(id: string): Promise<void> {
     await db.delete(schema.progressPosts).where(eq(schema.progressPosts.id, id));
+  }
+
+  // Contractor photo methods (contractor-only photos)
+  async getContractorPhotos(projectId: string): Promise<ContractorPhoto[]> {
+    return await db.select().from(schema.contractorPhotos).where(eq(schema.contractorPhotos.projectId, projectId));
+  }
+
+  async getContractorPhoto(id: string): Promise<ContractorPhoto | undefined> {
+    const [photo] = await db.select().from(schema.contractorPhotos).where(eq(schema.contractorPhotos.id, id));
+    return photo;
+  }
+
+  async createContractorPhoto(insertPhoto: InsertContractorPhoto): Promise<ContractorPhoto> {
+    const [photo] = await db.insert(schema.contractorPhotos).values(insertPhoto).returning();
+    return photo;
+  }
+
+  async deleteContractorPhoto(id: string): Promise<void> {
+    await db.delete(schema.contractorPhotos).where(eq(schema.contractorPhotos.id, id));
   }
 
   // Post comment methods
