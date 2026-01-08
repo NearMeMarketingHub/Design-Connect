@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -864,6 +865,95 @@ export async function registerRoutes(
     }
   });
 
+  // Get approved contractors for team member selection
+  app.get("/api/contractors", requireAuth, async (req, res, next) => {
+    try {
+      const contractors = await storage.getUsersByRole("contractor");
+      const approvedContractors = contractors.filter(c => c.isApproved && !c.isSandbox);
+      res.json(approvedContractors.map(c => ({ 
+        id: c.id, 
+        name: c.name, 
+        username: c.username, 
+        companyName: c.companyName,
+        companyType: c.companyType
+      })));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get project team members
+  app.get("/api/projects/:id/team", requireAuth, async (req, res, next) => {
+    try {
+      const teamMembers = await storage.getProjectTeamMembers(req.params.id);
+      res.json(teamMembers);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Add team member to project
+  app.post("/api/projects/:id/team", requireAuth, async (req, res, next) => {
+    try {
+      const { contractorId, role } = req.body;
+      const teamMember = await storage.addProjectTeamMember({
+        projectId: req.params.id,
+        contractorId,
+        role: role || null,
+      });
+      res.status(201).json(teamMember);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Remove team member from project
+  app.delete("/api/projects/:id/team/:memberId", requireAuth, async (req, res, next) => {
+    try {
+      await storage.removeProjectTeamMember(req.params.memberId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create contractor invite
+  app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
+    try {
+      const { email, companyName, companyType, projectId } = req.body;
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      
+      const invite = await storage.createContractorInvite({
+        email,
+        companyName: companyName || null,
+        companyType: companyType || null,
+        projectId: projectId || null,
+        token,
+        expiresAt,
+        invitedById: (req.user as User).id,
+      });
+      
+      res.status(201).json(invite);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Accept contractor invite
+  app.post("/api/contractor-invites/:token/accept", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const invite = await storage.acceptContractorInvite(req.params.token, user.id);
+      if (!invite) {
+        return res.status(404).json({ message: "Invite not found or expired" });
+      }
+      res.json(invite);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/admin/projects/:projectId/assign", requireAdmin, async (req, res, next) => {
     try {
       const { contractorId } = req.body;
@@ -1382,6 +1472,195 @@ export async function registerRoutes(
       });
 
       res.json({ message: "Request rejected" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Project team member routes
+  app.get("/api/projects/:projectId/team", requireAuth, async (req, res, next) => {
+    try {
+      const members = await storage.getProjectTeamMembers(req.params.projectId);
+      res.json(members);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/team", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors and admins can add team members" });
+      }
+      
+      const { contractorId, role } = req.body;
+      if (!contractorId) {
+        return res.status(400).json({ message: "Contractor ID is required" });
+      }
+      
+      const member = await storage.addProjectTeamMember({
+        projectId: req.params.projectId,
+        contractorId,
+        role,
+        addedBy: user.id
+      });
+      
+      res.json(member);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/projects/:projectId/team/:memberId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors and admins can remove team members" });
+      }
+      
+      await storage.removeProjectTeamMember(req.params.memberId);
+      res.json({ message: "Team member removed" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get all contractors for team member selection
+  app.get("/api/contractors", requireAuth, async (req, res, next) => {
+    try {
+      const contractors = await storage.getUsersByRole('contractor');
+      // Only return approved contractors, exclude passwords
+      const approvedContractors = contractors
+        .filter(c => c.isApproved)
+        .map(({ password, ...contractor }) => contractor);
+      res.json(approvedContractors);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Contractor invite routes (for inviting new contractors to join platform)
+  app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors and admins can invite contractors" });
+      }
+      
+      const { email, companyName, companyType, projectId } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      // Check if contractor already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "A user with this email already exists" });
+      }
+      
+      // Generate invite token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      
+      const invite = await storage.createContractorInvite({
+        email,
+        companyName,
+        companyType,
+        projectId: projectId || null,
+        token,
+        invitedBy: user.id,
+        expiresAt,
+        status: 'pending'
+      });
+      
+      res.json(invite);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/contractor-invites/project/:projectId", requireAuth, async (req, res, next) => {
+    try {
+      const invites = await storage.getContractorInvitesByProject(req.params.projectId);
+      res.json(invites);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/contractor-invites/token/:token", async (req, res, next) => {
+    try {
+      const invite = await storage.getContractorInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+      if (invite.status !== 'pending') {
+        return res.status(400).json({ message: "Invite has already been used or expired" });
+      }
+      if (new Date(invite.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Invite has expired" });
+      }
+      
+      // Get project info if invite is for a project
+      const project = invite.projectId ? await storage.getProject(invite.projectId) : null;
+      
+      res.json({
+        email: invite.email,
+        companyName: invite.companyName,
+        companyType: invite.companyType,
+        projectId: invite.projectId,
+        projectName: project?.name
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/contractor-invites/accept/:token", async (req, res, next) => {
+    try {
+      const invite = await storage.getContractorInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ message: "Invite not found" });
+      }
+      if (invite.status !== 'pending') {
+        return res.status(400).json({ message: "Invite has already been used" });
+      }
+      if (new Date(invite.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Invite has expired" });
+      }
+      
+      const { username, password, firstName, lastName } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+      
+      // Create the contractor account
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email: invite.email,
+        name: firstName && lastName ? `${firstName} ${lastName}` : undefined,
+        role: 'contractor',
+        companyName: invite.companyName,
+        companyType: invite.companyType,
+        isApproved: true // Auto-approved since they were invited
+      });
+      
+      // Accept the invite (this also adds them to the project team if applicable)
+      await storage.acceptContractorInvite(req.params.token, newUser.id);
+      
+      res.json({ 
+        message: "Account created successfully",
+        user: { ...newUser, password: undefined }
+      });
     } catch (error) {
       next(error);
     }

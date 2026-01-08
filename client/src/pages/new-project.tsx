@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText, Mail, UserPlus, Plus, Trash2, GripVertical } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText, Mail, UserPlus, Plus, Trash2, GripVertical, Users, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { CONTRACTOR_ROLES } from "@shared/contractor-roles";
 
 const PROJECT_TYPES = [
   "Renovation",
@@ -118,10 +119,24 @@ export default function NewProject() {
   // Track which milestones need percentage tracking (phase -> milestone index -> settings)
   const [milestoneTasks, setMilestoneTasks] = useState<Record<string, { requiresPercentage: boolean }[]>>({});
 
+  // Team member state
+  const [teamMembers, setTeamMembers] = useState<{ contractorId: string; role: string; name: string; companyName: string }[]>([]);
+  const [teamMode, setTeamMode] = useState<"existing" | "invite">("existing");
+  const [contractorInvite, setContractorInvite] = useState({ email: "", companyName: "", companyType: "" });
+
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/users/clients"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/users/clients");
+      return res.json();
+    },
+  });
+
+  // Fetch available contractors for team member selection
+  const { data: contractors = [] } = useQuery({
+    queryKey: ["/api/contractors"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/contractors");
       return res.json();
     },
   });
@@ -174,6 +189,32 @@ export default function NewProject() {
         }
       } catch (phaseError) {
         console.error("Failed to create some phases:", phaseError);
+      }
+      
+      // Add team members to the project
+      try {
+        for (const member of teamMembers) {
+          await apiRequest("POST", `/api/projects/${project.id}/team`, {
+            contractorId: member.contractorId,
+            role: member.role,
+          });
+        }
+      } catch (teamError) {
+        console.error("Failed to add some team members:", teamError);
+      }
+      
+      // Send contractor invites if any
+      if (contractorInvite.email) {
+        try {
+          await apiRequest("POST", "/api/contractor-invites", {
+            email: contractorInvite.email,
+            companyName: contractorInvite.companyName,
+            companyType: contractorInvite.companyType,
+            projectId: project.id,
+          });
+        } catch (inviteError) {
+          console.error("Failed to send contractor invite:", inviteError);
+        }
       }
       
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
@@ -529,6 +570,145 @@ export default function NewProject() {
                           An invitation will be sent after the project is created
                         </p>
                       </div>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Project Team
+                  </CardTitle>
+                  <CardDescription>Add contractors and subcontractors to this project</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Tabs value={teamMode} onValueChange={(v) => setTeamMode(v as "existing" | "invite")}>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="existing" data-testid="tab-existing-contractor">
+                        <User className="w-4 h-4 mr-2" />
+                        Existing
+                      </TabsTrigger>
+                      <TabsTrigger value="invite" data-testid="tab-invite-contractor">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Invite New
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="existing" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label>Add Team Member</Label>
+                        <div className="flex gap-2">
+                          <Select
+                            onValueChange={(contractorId) => {
+                              const contractor = contractors.find((c: any) => c.id === contractorId);
+                              if (contractor && !teamMembers.find(m => m.contractorId === contractorId)) {
+                                setTeamMembers(prev => [...prev, {
+                                  contractorId,
+                                  role: contractor.companyType || "",
+                                  name: contractor.name || contractor.username,
+                                  companyName: contractor.companyName || ""
+                                }]);
+                              }
+                            }}
+                          >
+                            <SelectTrigger data-testid="select-team-member" className="flex-1">
+                              <SelectValue placeholder="Select a contractor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {contractors
+                                .filter((c: any) => !teamMembers.find(m => m.contractorId === c.id))
+                                .map((contractor: any) => (
+                                  <SelectItem key={contractor.id} value={contractor.id}>
+                                    {contractor.name || contractor.username} {contractor.companyType && `(${contractor.companyType})`}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      
+                      {teamMembers.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Added Team Members</Label>
+                          <div className="space-y-2">
+                            {teamMembers.map((member, index) => (
+                              <div key={member.contractorId} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <User className="w-4 h-4 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm">{member.name}</p>
+                                    <p className="text-xs text-muted-foreground">{member.role || "No role specified"}</p>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setTeamMembers(prev => prev.filter((_, i) => i !== index))}
+                                  data-testid={`button-remove-team-member-${index}`}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <p className="text-xs text-muted-foreground">
+                        You can add more team members later
+                      </p>
+                    </TabsContent>
+                    <TabsContent value="invite" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="contractorEmail">Contractor Email</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="contractorEmail"
+                            type="email"
+                            placeholder="contractor@example.com"
+                            className="pl-10"
+                            value={contractorInvite.email}
+                            onChange={(e) => setContractorInvite(prev => ({ ...prev, email: e.target.value }))}
+                            data-testid="input-contractor-email"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contractorCompany">Company Name</Label>
+                        <Input
+                          id="contractorCompany"
+                          placeholder="ABC Electric"
+                          value={contractorInvite.companyName}
+                          onChange={(e) => setContractorInvite(prev => ({ ...prev, companyName: e.target.value }))}
+                          data-testid="input-contractor-company"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contractorType">Company Type</Label>
+                        <Select 
+                          value={contractorInvite.companyType} 
+                          onValueChange={(v) => setContractorInvite(prev => ({ ...prev, companyType: v }))}
+                        >
+                          <SelectTrigger data-testid="select-contractor-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CONTRACTOR_ROLES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        An invitation will be sent after the project is created
+                      </p>
                     </TabsContent>
                   </Tabs>
                 </CardContent>

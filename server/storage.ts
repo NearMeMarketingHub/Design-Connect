@@ -32,7 +32,9 @@ import type {
   BudgetCategory, InsertBudgetCategory,
   BudgetItem, InsertBudgetItem,
   ProjectInvite, InsertProjectInvite,
-  ContractorRequest, InsertContractorRequest
+  ContractorRequest, InsertContractorRequest,
+  ProjectTeamMember, InsertProjectTeamMember,
+  ContractorInvite, InsertContractorInvite
 } from "@shared/schema";
 
 export interface IStorage {
@@ -165,6 +167,20 @@ export interface IStorage {
   getPendingContractorRequests(): Promise<ContractorRequest[]>;
   getContractorRequest(id: string): Promise<ContractorRequest | undefined>;
   updateContractorRequest(id: string, data: Partial<ContractorRequest>): Promise<ContractorRequest | undefined>;
+
+  // Project team member methods
+  getProjectTeamMembers(projectId: string): Promise<(ProjectTeamMember & { contractor?: User })[]>;
+  addProjectTeamMember(member: InsertProjectTeamMember): Promise<ProjectTeamMember>;
+  removeProjectTeamMember(id: string): Promise<void>;
+  getContractorProjects(contractorId: string): Promise<Project[]>;
+
+  // Contractor invite methods
+  createContractorInvite(invite: InsertContractorInvite): Promise<ContractorInvite>;
+  getContractorInviteByToken(token: string): Promise<ContractorInvite | undefined>;
+  getContractorInvitesByProject(projectId: string): Promise<ContractorInvite[]>;
+  getPendingContractorInvites(): Promise<ContractorInvite[]>;
+  updateContractorInvite(id: string, data: Partial<InsertContractorInvite>): Promise<ContractorInvite | undefined>;
+  acceptContractorInvite(token: string, userId: string): Promise<ContractorInvite | undefined>;
   
   // Migration methods
   migrateProjectIdsToSlug(): Promise<{ migrated: number; errors: string[] }>;
@@ -1003,6 +1019,98 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { migrated, errors };
+  }
+
+  // Project team member methods
+  async getProjectTeamMembers(projectId: string): Promise<(ProjectTeamMember & { contractor?: User })[]> {
+    const members = await db.select().from(schema.projectTeamMembers)
+      .where(eq(schema.projectTeamMembers.projectId, projectId));
+    
+    // Get contractor details for each member
+    const results: (ProjectTeamMember & { contractor?: User })[] = [];
+    for (const member of members) {
+      const contractor = await this.getUser(member.contractorId);
+      results.push({ ...member, contractor });
+    }
+    return results;
+  }
+
+  async addProjectTeamMember(member: InsertProjectTeamMember): Promise<ProjectTeamMember> {
+    const [teamMember] = await db.insert(schema.projectTeamMembers).values(member).returning();
+    return teamMember;
+  }
+
+  async removeProjectTeamMember(id: string): Promise<void> {
+    await db.delete(schema.projectTeamMembers).where(eq(schema.projectTeamMembers.id, id));
+  }
+
+  async getContractorProjects(contractorId: string): Promise<Project[]> {
+    // Get projects where this contractor is a team member
+    const teamMemberships = await db.select().from(schema.projectTeamMembers)
+      .where(eq(schema.projectTeamMembers.contractorId, contractorId));
+    
+    const projectIds = teamMemberships.map(m => m.projectId);
+    if (projectIds.length === 0) return [];
+    
+    const projects: Project[] = [];
+    for (const projectId of projectIds) {
+      const project = await this.getProject(projectId);
+      if (project) projects.push(project);
+    }
+    return projects;
+  }
+
+  // Contractor invite methods
+  async createContractorInvite(invite: InsertContractorInvite): Promise<ContractorInvite> {
+    const [contractorInvite] = await db.insert(schema.contractorInvites).values(invite).returning();
+    return contractorInvite;
+  }
+
+  async getContractorInviteByToken(token: string): Promise<ContractorInvite | undefined> {
+    const [invite] = await db.select().from(schema.contractorInvites)
+      .where(eq(schema.contractorInvites.token, token));
+    return invite;
+  }
+
+  async getContractorInvitesByProject(projectId: string): Promise<ContractorInvite[]> {
+    return await db.select().from(schema.contractorInvites)
+      .where(eq(schema.contractorInvites.projectId, projectId));
+  }
+
+  async getPendingContractorInvites(): Promise<ContractorInvite[]> {
+    return await db.select().from(schema.contractorInvites)
+      .where(eq(schema.contractorInvites.status, 'pending'));
+  }
+
+  async updateContractorInvite(id: string, data: Partial<InsertContractorInvite>): Promise<ContractorInvite | undefined> {
+    const [invite] = await db.update(schema.contractorInvites)
+      .set(data)
+      .where(eq(schema.contractorInvites.id, id))
+      .returning();
+    return invite;
+  }
+
+  async acceptContractorInvite(token: string, userId: string): Promise<ContractorInvite | undefined> {
+    const invite = await this.getContractorInviteByToken(token);
+    if (!invite || invite.status !== 'pending') return undefined;
+    
+    // Mark invite as accepted
+    const [updated] = await db.update(schema.contractorInvites)
+      .set({ status: 'accepted', acceptedUserId: userId })
+      .where(eq(schema.contractorInvites.id, invite.id))
+      .returning();
+    
+    // If invite was for a specific project, add the contractor to the project team
+    if (invite.projectId) {
+      await this.addProjectTeamMember({
+        projectId: invite.projectId,
+        contractorId: userId,
+        role: invite.companyType,
+        addedBy: invite.invitedBy
+      });
+    }
+    
+    return updated;
   }
 }
 
