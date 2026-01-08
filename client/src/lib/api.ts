@@ -1,5 +1,9 @@
 import type { User, Project, Estimate, EstimateLineItem, Invoice, InvoiceLineItem, RecurringBilling, ProjectPhase, ActionItem, InspirationImage, Message, ContractorRequest } from "@shared/schema";
 
+export type ProjectWithClient = Project & {
+  client: Omit<User, "password"> | null;
+};
+
 class ApiClient {
   private baseUrl = "/api";
 
@@ -22,10 +26,10 @@ class ApiClient {
   }
 
   // Auth methods
-  async register(username: string, email: string, password: string, role: string, name?: string) {
+  async register(username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string) {
     return this.fetch<{ user: Omit<User, "password">; pendingApproval?: boolean; message?: string }>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ username, email, password, role, name }),
+      body: JSON.stringify({ username, email, password, role, name, companyName, companyType, phone }),
     });
   }
 
@@ -99,7 +103,7 @@ class ApiClient {
   }
 
   async getProject(id: string) {
-    return this.fetch<Project>(`/projects/${id}`);
+    return this.fetch<ProjectWithClient>(`/projects/${id}`);
   }
 
   async createProject(project: Partial<Project>) {

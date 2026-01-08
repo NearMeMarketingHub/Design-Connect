@@ -52,13 +52,14 @@ export default function AuthPage() {
         const lastName = formData.get("last-name") as string;
         const username = formData.get("username") as string;
         const email = formData.get("signup-email") as string;
+        const phone = formData.get("phone") as string;
         const confirmPassword = formData.get("confirm-password") as string;
 
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match");
         }
 
-        await register(username, email, password, "client", `${firstName} ${lastName}`);
+        await register(username, email, password, "client", `${firstName} ${lastName}`, undefined, undefined, phone);
         toast({
           title: "Account created!",
           description: "Welcome to BuildVision.",
@@ -217,6 +218,17 @@ export default function AuthPage() {
                             placeholder="jane@example.com"
                             required 
                             data-testid="input-signup-email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="client-phone">Phone Number</Label>
+                          <Input 
+                            id="client-phone" 
+                            name="phone"
+                            type="tel"
+                            placeholder="(555) 123-4567"
+                            required 
+                            data-testid="input-phone"
                           />
                         </div>
                       </>

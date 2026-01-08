@@ -86,7 +86,7 @@ export async function registerRoutes(
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {
-      const { username, email, password, role, name } = req.body;
+      const { username, email, password, role, name, companyName, companyType, phone } = req.body;
       
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
@@ -104,6 +104,9 @@ export async function registerRoutes(
         password: hashedPassword,
         role: role || "client",
         name,
+        phone,
+        companyName,
+        companyType,
         isApproved,
       });
 
@@ -255,7 +258,18 @@ export async function registerRoutes(
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
-      res.json(project);
+      
+      // Include client info if clientId exists
+      let client = null;
+      if (project.clientId) {
+        const clientUser = await storage.getUser(project.clientId);
+        if (clientUser) {
+          const { password: _, ...clientWithoutPassword } = clientUser;
+          client = clientWithoutPassword;
+        }
+      }
+      
+      res.json({ ...project, client });
     } catch (error) {
       next(error);
     }

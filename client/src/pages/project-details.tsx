@@ -1649,6 +1649,52 @@ export default function ProjectDetails() {
 
               {/* Right Column - Team and Quick Links */}
               <div className="space-y-6">
+                {/* Client Info Card - Only visible to contractors */}
+                {isContractorView && apiProject?.client && (
+                  <Card data-testid="card-client-info">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        Client Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={apiProject.client.profilePicture || undefined} />
+                          <AvatarFallback>{getInitials(apiProject.client.name || apiProject.client.username)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium" data-testid="text-client-name">{apiProject.client.name || apiProject.client.username}</p>
+                          <p className="text-sm text-muted-foreground">Project Client</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2 pt-2 border-t">
+                        {apiProject.client.email && (
+                          <a 
+                            href={`mailto:${apiProject.client.email}`} 
+                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                            data-testid="link-client-email"
+                          >
+                            <Mail className="h-4 w-4" />
+                            {apiProject.client.email}
+                          </a>
+                        )}
+                        {apiProject.client.phone && (
+                          <a 
+                            href={`tel:${apiProject.client.phone}`} 
+                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                            data-testid="link-client-phone"
+                          >
+                            <Phone className="h-4 w-4" />
+                            {apiProject.client.phone}
+                          </a>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Team Card */}
                 <Card>
                   <CardHeader>
