@@ -362,10 +362,6 @@ export default function ProjectDetails() {
   } : null);
   const activeTab = getTabFromPath();
   
-  // Client check - for showing ChatPanel instead of legacy messages
-  // Show ChatPanel if user role is 'client' OR if user is the project's client (by clientId)
-  const isClient = user?.role === 'client' || (apiProject?.clientId && apiProject.clientId === user?.id);
-  
   // Update project mutation for contractor editing
   const updateProjectMutation = useMutation({
     mutationFn: async (data: { status?: string; phase?: string; progress?: number; description?: string; nextMilestone?: string }) => {
@@ -2312,7 +2308,7 @@ export default function ProjectDetails() {
 
           {/* MESSAGES TAB */}
           <TabsContent value="messages" className="mt-6">
-            {isClient && user?.id ? (
+            {user?.id ? (
               <ChatPanel 
                 projectId={projectId}
                 currentUserId={user.id}

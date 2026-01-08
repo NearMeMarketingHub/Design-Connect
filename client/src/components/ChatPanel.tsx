@@ -99,7 +99,6 @@ export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const lastMessageCount = useRef(0);
-  const hasAutoSelected = useRef(false);
 
   const isAdminOrPM = currentUserRole === 'admin' || currentUserCompanyType === 'Project Manager';
 
@@ -190,21 +189,7 @@ export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUs
   const selectedChat = chats.find((c: Chat) => c.id === selectedChatId);
   const isParticipant = selectedChat?.participants.some((p: ChatParticipant) => p.userId === currentUserId);
 
-  // Auto-select the most recent chat on initial load only
-  useEffect(() => {
-    if (chats.length > 0 && !hasAutoSelected.current) {
-      hasAutoSelected.current = true;
-      const mostRecentChat = chats.reduce((latest: Chat | null, chat: Chat) => {
-        if (!latest) return chat;
-        const latestTime = latest.lastMessageAt ? new Date(latest.lastMessageAt).getTime() : 0;
-        const chatTime = chat.lastMessageAt ? new Date(chat.lastMessageAt).getTime() : 0;
-        return chatTime > latestTime ? chat : latest;
-      }, null);
-      if (mostRecentChat) {
-        setSelectedChatId(mostRecentChat.id);
-      }
-    }
-  }, [chats]);
+  // No auto-selection - show chat list by default when user opens Messages tab
 
   // Mark messages as read when viewing a chat - only if user is participant
   // Fire when new messages arrive (message count changes)
