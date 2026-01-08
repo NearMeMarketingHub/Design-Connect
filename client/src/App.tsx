@@ -121,6 +121,7 @@ function Router() {
           <Route path="/contractor/project/:id/budget" component={ProjectDetails} />
           <Route path="/contractor/project/:id/timeline" component={ProjectDetails} />
           <Route path="/contractor/project/:id/inspiration" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/contractor-photos" component={ProjectDetails} />
           <Route path="/contractor/project/:id" component={ProjectDetails} />
           <Route path="/contractor/calculator" component={ContractorCalculator} />
           <Route path="/contractor/floor-calculator" component={FloorCalculator} />

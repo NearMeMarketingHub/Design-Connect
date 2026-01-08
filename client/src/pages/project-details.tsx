@@ -305,6 +305,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/budget')) return 'budget';
     if (path.endsWith('/timeline')) return 'timeline';
     if (path.endsWith('/inspiration')) return 'inspiration';
+    if (path.endsWith('/contractor-photos')) return 'contractor-photos';
     return 'overview';
   };
   
