@@ -2,7 +2,7 @@
 // These determine what features and access levels contractors have within the platform
 
 export const CONTRACTOR_ROLES = [
-  "General Contractor",
+  "Company Employee",
   "Project Manager",
   "Lead Designer",
   "Electrician",
@@ -36,7 +36,7 @@ export interface RolePermissions {
 // Default permissions by role - to be implemented
 // Currently all contractors have full access; this will be restricted later
 export const ROLE_PERMISSIONS: Record<ContractorRole, RolePermissions> = {
-  "General Contractor": {
+  "Company Employee": {
     canCreateProjects: true,
     canEditAllProjects: true,
     canViewAllProjects: true,

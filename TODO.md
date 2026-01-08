@@ -37,7 +37,7 @@ Last Updated: December 16, 2025
 Base role structure created in `shared/contractor-roles.ts`. Implementation pending.
 
 **Role Types:**
-- General Contractor
+- Company Employee (internal staff with full access)
 - Project Manager
 - Lead Designer
 - Electrician
