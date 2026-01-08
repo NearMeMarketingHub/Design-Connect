@@ -1111,6 +1111,100 @@ export default function ProjectDetails() {
     });
   };
 
+  // Contractor photos state
+  const [createContractorPhotoOpen, setCreateContractorPhotoOpen] = useState(false);
+  const [newContractorPhotoTitle, setNewContractorPhotoTitle] = useState("");
+  const [newContractorPhotoCaption, setNewContractorPhotoCaption] = useState("");
+  const [newContractorPhotoImages, setNewContractorPhotoImages] = useState<string[]>([]);
+  const [selectedContractorPhoto, setSelectedContractorPhoto] = useState<any>(null);
+  const [contractorPhotoDetailOpen, setContractorPhotoDetailOpen] = useState(false);
+
+  // Fetch contractor photos (only for contractors/admins)
+  const { data: contractorPhotos = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'contractor-photos'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/contractor-photos`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId && canEdit,
+  });
+
+  // Create contractor photo mutation
+  const createContractorPhotoMutation = useMutation({
+    mutationFn: async (data: { title: string; caption: string; images: string[] }) => {
+      const res = await fetch(`/api/projects/${projectId}/contractor-photos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: data.title,
+          caption: data.caption,
+          coverImage: data.images[0] || '',
+          images: data.images
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to create contractor photo');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'contractor-photos'] });
+      setCreateContractorPhotoOpen(false);
+      setNewContractorPhotoTitle("");
+      setNewContractorPhotoCaption("");
+      setNewContractorPhotoImages([]);
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to create contractor photo');
+    }
+  });
+
+  // Delete contractor photo mutation
+  const deleteContractorPhotoMutation = useMutation({
+    mutationFn: async (photoId: string) => {
+      const res = await fetch(`/api/contractor-photos/${photoId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete contractor photo');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'contractor-photos'] });
+      setContractorPhotoDetailOpen(false);
+      setSelectedContractorPhoto(null);
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to delete contractor photo');
+    }
+  });
+
+  const handleCreateContractorPhoto = () => {
+    if (!newContractorPhotoTitle.trim() || newContractorPhotoImages.length === 0) return;
+    createContractorPhotoMutation.mutate({
+      title: newContractorPhotoTitle.trim(),
+      caption: newContractorPhotoCaption.trim(),
+      images: newContractorPhotoImages
+    });
+  };
+
+  const handleDeleteContractorPhoto = (photoId: string) => {
+    if (confirm('Are you sure you want to delete this photo?')) {
+      deleteContractorPhotoMutation.mutate(photoId);
+    }
+  };
+
+  const openContractorPhotoDetail = (photo: any) => {
+    setSelectedContractorPhoto(photo);
+    setContractorPhotoDetailOpen(true);
+  };
+
   const handleDeletePost = (postId: string) => {
     if (confirm('Are you sure you want to delete this post?')) {
       deletePostMutation.mutate(postId);
@@ -1119,6 +1213,7 @@ export default function ProjectDetails() {
 
   // Handle post image upload
   const postImageInputRef = useRef<HTMLInputElement>(null);
+  const contractorPhotoInputRef = useRef<HTMLInputElement>(null);
   const handlePostImageUpload = async (files: FileList) => {
     for (const file of Array.from(files)) {
       if (file.size > 5 * 1024 * 1024) {
@@ -1154,6 +1249,49 @@ export default function ProjectDetails() {
         
         // Use the object path as the public URL
         setNewPostImages(prev => [...prev, objectPath]);
+      } catch (error) {
+        console.error('Upload failed:', error);
+        alert('Failed to upload image');
+      }
+    }
+  };
+
+  // Handle contractor photo image upload
+  const handleContractorPhotoImageUpload = async (files: FileList) => {
+    for (const file of Array.from(files)) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Only image files are allowed');
+        continue;
+      }
+      
+      try {
+        // Get presigned upload URL
+        const signedRes = await fetch('/api/uploads/request-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: file.name,
+            size: file.size,
+            contentType: file.type
+          })
+        });
+        if (!signedRes.ok) throw new Error('Failed to get upload URL');
+        const { uploadURL, objectPath } = await signedRes.json();
+        
+        // Upload to object storage
+        const uploadRes = await fetch(uploadURL, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file
+        });
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        
+        // Use the object path as the public URL
+        setNewContractorPhotoImages(prev => [...prev, objectPath]);
       } catch (error) {
         console.error('Upload failed:', error);
         alert('Failed to upload image');
@@ -1524,6 +1662,15 @@ export default function ProjectDetails() {
           >
             Progress Photos
           </TabsTrigger>
+          {canEdit && (
+            <TabsTrigger 
+              value="contractor-photos"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-contractor-photos"
+            >
+              Contractor Photos
+            </TabsTrigger>
+          )}
           <TabsTrigger 
             value="documents"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
@@ -2846,6 +2993,87 @@ export default function ProjectDetails() {
             </div>
           </TabsContent>
 
+          {/* CONTRACTOR PHOTOS TAB - Only visible to contractors/admins */}
+          {canEdit && (
+            <TabsContent value="contractor-photos" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold">Contractor Photos</h3>
+                  <p className="text-sm text-muted-foreground">Internal photos for contractor documentation only - not visible to clients</p>
+                </div>
+                <Button 
+                  onClick={() => setCreateContractorPhotoOpen(true)}
+                  data-testid="button-create-contractor-photo"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Photo
+                </Button>
+              </div>
+
+              {contractorPhotos.length === 0 ? (
+                <Card className="border-dashed border-2 bg-muted/30">
+                  <CardContent className="p-12 text-center">
+                    <Camera className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <h4 className="font-semibold text-lg mb-2">No contractor photos yet</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Add photos for internal documentation. These are not visible to clients.
+                    </p>
+                    <Button 
+                      onClick={() => setCreateContractorPhotoOpen(true)}
+                      variant="outline"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Photo
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {contractorPhotos.map((photo: any) => (
+                    <Card 
+                      key={photo.id} 
+                      className="group overflow-hidden cursor-pointer hover:shadow-lg transition-all"
+                      data-testid={`card-contractor-photo-${photo.id}`}
+                      onClick={() => openContractorPhotoDetail(photo)}
+                    >
+                      <div className="aspect-square relative overflow-hidden bg-muted">
+                        <img 
+                          src={photo.coverImage}
+                          alt={photo.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                        <Badge className="absolute top-3 left-3 bg-orange-500 border-0 text-white">
+                          Internal Only
+                        </Badge>
+                        {photo.images && photo.images.length > 1 && (
+                          <Badge className="absolute top-3 right-3 bg-black/60 border-0 text-white">
+                            <ImageIcon className="w-3 h-3 mr-1" />
+                            {photo.images.length}
+                          </Badge>
+                        )}
+                      </div>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Avatar className="w-6 h-6">
+                            <AvatarFallback className="text-xs">{photo.creatorName?.split(' ').map((n: string) => n[0]).join('') || 'C'}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium">{photo.creatorName}</span>
+                        </div>
+                        <h4 className="font-semibold line-clamp-1">{photo.title}</h4>
+                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{photo.caption}</p>
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(photo.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
+
           {/* DOCUMENTS TAB */}
           <TabsContent value="documents" className="space-y-6">
             <div className="flex justify-between items-center">
@@ -3379,6 +3607,172 @@ export default function ProjectDetails() {
               {createPostMutation.isPending ? 'Creating...' : 'Create Post'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Contractor Photo Modal */}
+      <Dialog open={createContractorPhotoOpen} onOpenChange={(open) => {
+        setCreateContractorPhotoOpen(open);
+        if (!open) {
+          setNewContractorPhotoTitle("");
+          setNewContractorPhotoCaption("");
+          setNewContractorPhotoImages([]);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Contractor Photo</DialogTitle>
+            <DialogDescription>Add internal photos for contractor documentation (not visible to clients)</DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="contractor-photo-title">Title</Label>
+              <Input
+                id="contractor-photo-title"
+                placeholder="e.g., Behind Wall Documentation"
+                value={newContractorPhotoTitle}
+                onChange={(e) => setNewContractorPhotoTitle(e.target.value)}
+                data-testid="input-contractor-photo-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contractor-photo-caption">Description</Label>
+              <Textarea
+                id="contractor-photo-caption"
+                placeholder="Add notes about what's documented..."
+                value={newContractorPhotoCaption}
+                onChange={(e) => setNewContractorPhotoCaption(e.target.value)}
+                rows={3}
+                data-testid="input-contractor-photo-caption"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Photos</Label>
+              <input
+                type="file"
+                ref={contractorPhotoInputRef}
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleContractorPhotoImageUpload(e.target.files);
+                    e.target.value = '';
+                  }
+                }}
+              />
+              
+              {newContractorPhotoImages.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {newContractorPhotoImages.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                      <img src={url} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 w-6 h-6"
+                        onClick={() => setNewContractorPhotoImages(prev => prev.filter((_, i) => i !== idx))}
+                        data-testid={`button-remove-contractor-image-${idx}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => contractorPhotoInputRef.current?.click()}
+                data-testid="button-upload-contractor-photos"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {newContractorPhotoImages.length > 0 ? 'Add More Photos' : 'Upload Photos'}
+              </Button>
+              <p className="text-xs text-muted-foreground">Max 5MB per image. At least one photo required.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateContractorPhotoOpen(false)} data-testid="button-cancel-contractor-photo">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateContractorPhoto}
+              disabled={!newContractorPhotoTitle.trim() || newContractorPhotoImages.length === 0 || createContractorPhotoMutation.isPending}
+              data-testid="button-submit-contractor-photo"
+            >
+              {createContractorPhotoMutation.isPending ? 'Adding...' : 'Add Photo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Contractor Photo Detail Modal */}
+      <Dialog open={contractorPhotoDetailOpen} onOpenChange={setContractorPhotoDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedContractorPhoto && (
+            <>
+              <DialogHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <Badge className="mb-2 bg-orange-500 text-white">Internal Only</Badge>
+                    <DialogTitle>{selectedContractorPhoto.title}</DialogTitle>
+                    <DialogDescription>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Avatar className="w-5 h-5">
+                          <AvatarFallback className="text-xs">{selectedContractorPhoto.creatorName?.split(' ').map((n: string) => n[0]).join('') || 'C'}</AvatarFallback>
+                        </Avatar>
+                        <span>{selectedContractorPhoto.creatorName}</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span>{new Date(selectedContractorPhoto.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                    </DialogDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteContractorPhoto(selectedContractorPhoto.id)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    data-testid="button-delete-contractor-photo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                {selectedContractorPhoto.caption && (
+                  <p className="text-muted-foreground">{selectedContractorPhoto.caption}</p>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedContractorPhoto.images?.map((img: string, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className="aspect-video rounded-lg overflow-hidden bg-muted cursor-pointer"
+                      onClick={() => {
+                        setViewerImages(selectedContractorPhoto.images.map((url: string) => ({ url, title: selectedContractorPhoto.title })));
+                        setViewerInitialIndex(idx);
+                        setViewerOpen(true);
+                      }}
+                    >
+                      <img 
+                        src={img} 
+                        alt={`${selectedContractorPhoto.title} - Image ${idx + 1}`} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
