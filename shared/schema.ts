@@ -368,3 +368,66 @@ export const contractorInvites = pgTable("contractor_invites", {
 export const insertContractorInviteSchema = createInsertSchema(contractorInvites).omit({ id: true, createdAt: true });
 export type InsertContractorInvite = z.infer<typeof insertContractorInviteSchema>;
 export type ContractorInvite = typeof contractorInvites.$inferSelect;
+
+// Chat system - conversations within projects
+export const chats = pgTable("chats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  type: text("type").notNull().default("direct"), // "direct" or "group"
+  title: text("title"), // For group chats, e.g., "Team Chat"
+  createdById: varchar("created_by_id").references(() => users.id),
+  lastMessageAt: timestamp("last_message_at"),
+  lastMessagePreview: text("last_message_preview"),
+  lastMessageSenderId: varchar("last_message_sender_id").references(() => users.id),
+  lastMessageSenderName: text("last_message_sender_name"),
+  isDefault: boolean("is_default").default(false), // True for auto-created chats
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertChatSchema = createInsertSchema(chats).omit({ id: true, createdAt: true });
+export type InsertChat = z.infer<typeof insertChatSchema>;
+export type Chat = typeof chats.$inferSelect;
+
+// Chat participants - who is in each chat
+export const chatParticipants = pgTable("chat_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull().references(() => chats.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  lastReadAt: timestamp("last_read_at"),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+});
+
+export const insertChatParticipantSchema = createInsertSchema(chatParticipants).omit({ id: true, joinedAt: true });
+export type InsertChatParticipant = z.infer<typeof insertChatParticipantSchema>;
+export type ChatParticipant = typeof chatParticipants.$inferSelect;
+
+// Chat messages - individual messages in chats
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull().references(() => chats.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderName: text("sender_name").notNull(),
+  senderAvatar: text("sender_avatar"),
+  content: text("content").notNull(),
+  attachmentType: text("attachment_type"),
+  attachmentUrl: text("attachment_url"),
+  attachmentName: text("attachment_name"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Message read receipts - tracks who has read each message
+export const messageReads = pgTable("message_reads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull().references(() => chatMessages.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  readAt: timestamp("read_at").notNull().defaultNow(),
+});
+
+export const insertMessageReadSchema = createInsertSchema(messageReads).omit({ id: true, readAt: true });
+export type InsertMessageRead = z.infer<typeof insertMessageReadSchema>;
+export type MessageRead = typeof messageReads.$inferSelect;
