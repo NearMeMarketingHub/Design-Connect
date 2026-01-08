@@ -33,6 +33,35 @@ Last Updated: December 16, 2025
 - [ ] The ability to choose when uploading a document from the contractor side, whether it needs to be signed or its just being uploaded to have documented in the system
 - [ ] Project-type-specific default milestones - Different preset milestones based on Project Type (Renovation, Remodel, Addition, Commercial, Residential) selected during project creation. Waiting on milestone data.
 
+### Contractor Internal Roles (Company Type Access Levels)
+Base role structure created in `shared/contractor-roles.ts`. Implementation pending.
+
+**Role Types:**
+- General Contractor
+- Project Manager
+- Lead Designer
+- Electrician
+- Plumber
+- HVAC Technician
+- Carpenter
+- Roofer
+- Painter
+- Flooring Specialist
+- Mason
+- Landscaper
+- Other
+
+**Access Limitations to Implement:**
+- [ ] Define which features each company type can access
+- [ ] Restrict project creation to General Contractor and Project Manager roles
+- [ ] Restrict team management to General Contractor and Project Manager roles
+- [ ] Restrict Budget Manager access to General Contractor only
+- [ ] Restrict invoicing access based on role
+- [ ] Trade specialists (Electrician, Plumber, HVAC, etc.) - view only assigned projects
+- [ ] UI element hiding based on company type permissions
+- [ ] Route protection by company type
+- [ ] Sidebar navigation filtering based on permissions
+
 ### Client Side
 - [ ] Action required section in the client side to be built out once contractor page is done
 - [ ] Stats card in the client page to connect with data completed in the contractor side

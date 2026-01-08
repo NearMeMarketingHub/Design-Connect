@@ -10,22 +10,7 @@ import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import heroImage from "@assets/generated_images/construction_site_frame_with_sunset.png";
-
-const COMPANY_TYPES = [
-  "General Contractor",
-  "Project Manager",
-  "Lead Designer",
-  "Electrician",
-  "Plumber",
-  "HVAC Technician",
-  "Carpenter",
-  "Roofer",
-  "Painter",
-  "Flooring Specialist",
-  "Mason",
-  "Landscaper",
-  "Other"
-];
+import { CONTRACTOR_ROLES } from "@shared/contractor-roles";
 
 export default function AuthPage() {
   const [_, setLocation] = useLocation();
@@ -403,7 +388,7 @@ export default function AuthPage() {
                                   <SelectValue placeholder="Select company type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {COMPANY_TYPES.map((type) => (
+                                  {CONTRACTOR_ROLES.map((type) => (
                                     <SelectItem key={type} value={type}>
                                       {type}
                                     </SelectItem>
