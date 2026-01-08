@@ -741,6 +741,9 @@ export default function ProjectDetails() {
   const [newPostImages, setNewPostImages] = useState<string[]>([]);
   const [selectedInspiration, setSelectedInspiration] = useState<any | null>(null);
   const [inspirationDetailOpen, setInspirationDetailOpen] = useState(false);
+  const [chatPickerOpen, setChatPickerOpen] = useState(false);
+  const [pendingImageForChat, setPendingImageForChat] = useState<{ src: string; title: string; category: string } | null>(null);
+  const [selectedChatForMessage, setSelectedChatForMessage] = useState<string | null>(null);
   const [createInspirationOpen, setCreateInspirationOpen] = useState(false);
   const [newInspirationTitle, setNewInspirationTitle] = useState("");
   const [newInspirationCaption, setNewInspirationCaption] = useState("");
@@ -755,11 +758,22 @@ export default function ProjectDetails() {
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch messages from API
+  // Fetch messages from API (legacy)
   const { data: apiMessages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ['/api/projects', projectId, 'messages'],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${projectId}/messages`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Fetch chats for chat picker
+  const { data: projectChats = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'chats'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/chats`, { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
@@ -2314,6 +2328,12 @@ export default function ProjectDetails() {
                 currentUserId={user.id}
                 currentUserRole={user.role}
                 currentUserCompanyType={user.companyType}
+                initialChatId={selectedChatForMessage}
+                initialImageReference={pendingImageForChat}
+                onImageReferenceSent={() => {
+                  setPendingImageForChat(null);
+                  setSelectedChatForMessage(null);
+                }}
               />
             ) : (
             <>
@@ -3575,13 +3595,13 @@ export default function ProjectDetails() {
                     size="sm" 
                     className="gap-2"
                     onClick={() => {
-                      setReplyingToImage({
+                      setPendingImageForChat({
                         src: selectedInspiration.imageUrl,
                         title: selectedInspiration.title,
                         category: selectedInspiration.category || 'Inspiration'
                       });
                       setInspirationDetailOpen(false);
-                      handleTabChange("messages");
+                      setChatPickerOpen(true);
                     }}
                     data-testid="button-discuss-inspiration"
                   >
@@ -3659,6 +3679,84 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Picker Dialog */}
+      <Dialog open={chatPickerOpen} onOpenChange={setChatPickerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose a Chat</DialogTitle>
+            <DialogDescription>
+              Select which chat to share this inspiration in
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pendingImageForChat && (
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg mb-4">
+              <img 
+                src={pendingImageForChat.src} 
+                alt={pendingImageForChat.title}
+                className="w-16 h-16 object-cover rounded"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{pendingImageForChat.title}</p>
+                <p className="text-sm text-muted-foreground">{pendingImageForChat.category}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {projectChats.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No chats available for this project yet.
+              </p>
+            ) : (
+              projectChats.map((chat: any) => {
+                const chatName = chat.type === 'group' 
+                  ? (chat.title || 'Team Chat')
+                  : chat.participants?.find((p: any) => p.userId !== user?.id)?.user?.name || 'Chat';
+                
+                return (
+                  <button
+                    key={chat.id}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
+                    onClick={() => {
+                      setSelectedChatForMessage(chat.id);
+                      setChatPickerOpen(false);
+                      handleTabChange("messages");
+                    }}
+                    data-testid={`chat-picker-${chat.id}`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className={chat.type === 'group' ? 'bg-primary/10' : ''}>
+                        {chat.type === 'group' ? (
+                          <Users className="w-4 h-4" />
+                        ) : (
+                          chatName.charAt(0).toUpperCase()
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{chatName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {chat.type === 'group' ? `${chat.participants?.length || 0} members` : 'Direct message'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setChatPickerOpen(false);
+              setPendingImageForChat(null);
+            }}>
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

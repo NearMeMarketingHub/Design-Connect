@@ -8,14 +8,23 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Send, Plus, ArrowLeft, Users, MessageSquare, Loader2 } from "lucide-react";
+import { Send, Plus, ArrowLeft, Users, MessageSquare, Loader2, X, Image as ImageIcon } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+
+interface ImageReference {
+  src: string;
+  title: string;
+  category: string;
+}
 
 interface ChatPanelProps {
   projectId: string;
   currentUserId: string;
   currentUserRole: string;
   currentUserCompanyType?: string | null;
+  initialChatId?: string | null;
+  initialImageReference?: ImageReference | null;
+  onImageReferenceSent?: () => void;
 }
 
 interface ChatParticipant {
@@ -90,17 +99,38 @@ interface TeamMember {
   };
 }
 
-export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUserCompanyType }: ChatPanelProps) {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+export function ChatPanel({ 
+  projectId, 
+  currentUserId, 
+  currentUserRole, 
+  currentUserCompanyType,
+  initialChatId,
+  initialImageReference,
+  onImageReferenceSent
+}: ChatPanelProps) {
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(initialChatId || null);
   const [messageInput, setMessageInput] = useState("");
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [newChatTitle, setNewChatTitle] = useState("");
+  const [imageReference, setImageReference] = useState<ImageReference | null>(initialImageReference || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const lastMessageCount = useRef(0);
+  const hasProcessedInitialRef = useRef(false);
 
   const isAdminOrPM = currentUserRole === 'admin' || currentUserCompanyType === 'Project Manager';
+
+  // Handle initial chat ID and image reference from props
+  useEffect(() => {
+    if (initialChatId && !hasProcessedInitialRef.current) {
+      hasProcessedInitialRef.current = true;
+      setSelectedChatId(initialChatId);
+    }
+    if (initialImageReference) {
+      setImageReference(initialImageReference);
+    }
+  }, [initialChatId, initialImageReference]);
 
   // Fetch chats for the project
   const { data: chats = [], isLoading: chatsLoading } = useQuery<Chat[]>({
@@ -144,12 +174,21 @@ export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUs
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const res = await apiRequest("POST", `/api/chats/${selectedChatId}/messages`, { content });
+    mutationFn: async (data: { content: string; imageRef?: ImageReference | null }) => {
+      const payload: any = { content: data.content };
+      if (data.imageRef) {
+        payload.replyToImageUrl = data.imageRef.src;
+        payload.replyToImageTitle = data.imageRef.title;
+      }
+      const res = await apiRequest("POST", `/api/chats/${selectedChatId}/messages`, payload);
       return res.json();
     },
     onSuccess: () => {
       setMessageInput("");
+      setImageReference(null);
+      if (onImageReferenceSent) {
+        onImageReferenceSent();
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/chats', selectedChatId, 'messages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'chats'] });
     },
@@ -214,8 +253,11 @@ export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUs
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (messageInput.trim() && !sendMessageMutation.isPending) {
-      sendMessageMutation.mutate(messageInput.trim());
+    if ((messageInput.trim() || imageReference) && !sendMessageMutation.isPending) {
+      sendMessageMutation.mutate({ 
+        content: messageInput.trim() || `Discussing: ${imageReference?.title}`, 
+        imageRef: imageReference 
+      });
     }
   };
 
@@ -516,25 +558,51 @@ export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUs
 
             {/* Message input */}
             {isParticipant ? (
-              <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
-                <Input
-                  placeholder="Type a message..."
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  className="flex-1"
-                  data-testid="input-message"
-                />
-                <Button 
-                  type="submit" 
-                  disabled={!messageInput.trim() || sendMessageMutation.isPending}
-                  data-testid="button-send-message"
-                >
-                  {sendMessageMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </Button>
+              <form onSubmit={handleSendMessage} className="p-4 border-t">
+                {/* Image reference preview */}
+                {imageReference && (
+                  <div className="flex items-center gap-3 p-2 mb-2 bg-muted rounded-lg border border-border">
+                    <img 
+                      src={imageReference.src} 
+                      alt={imageReference.title}
+                      className="w-12 h-12 object-cover rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{imageReference.title}</p>
+                      <p className="text-xs text-muted-foreground">{imageReference.category}</p>
+                    </div>
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setImageReference(null)}
+                      data-testid="button-remove-image-reference"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={imageReference ? `Add a comment about "${imageReference.title}"...` : "Type a message..."}
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    className="flex-1"
+                    data-testid="input-message"
+                  />
+                  <Button 
+                    type="submit" 
+                    disabled={(!messageInput.trim() && !imageReference) || sendMessageMutation.isPending}
+                    data-testid="button-send-message"
+                  >
+                    {sendMessageMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
               </form>
             ) : isAdminOrPM ? (
               <div className="p-4 border-t bg-muted/50">

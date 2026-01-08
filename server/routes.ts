@@ -1052,7 +1052,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Chat not found" });
       }
       
-      const { content, attachmentType, attachmentUrl, attachmentName } = req.body;
+      const { content, attachmentType, attachmentUrl, attachmentName, replyToImageUrl, replyToImageTitle } = req.body;
       
       const message = await storage.createChatMessage({
         chatId: req.params.chatId,
@@ -1063,7 +1063,9 @@ export async function registerRoutes(
         content,
         attachmentType: attachmentType || null,
         attachmentUrl: attachmentUrl || null,
-        attachmentName: attachmentName || null
+        attachmentName: attachmentName || null,
+        replyToImageUrl: replyToImageUrl || null,
+        replyToImageTitle: replyToImageTitle || null
       });
       
       res.status(201).json(message);
