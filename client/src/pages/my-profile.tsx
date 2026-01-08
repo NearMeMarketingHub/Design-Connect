@@ -2,11 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   ArrowLeft,
   Loader2,
   Building2,
   Mail,
+  Phone,
+  Pencil,
+  Check,
+  X,
   User as UserIcon,
   Camera
 } from "lucide-react";
@@ -23,12 +29,51 @@ export default function MyProfile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [phoneValue, setPhoneValue] = useState("");
 
   useEffect(() => {
     if (!authLoading && !user) {
       setLocation("/");
     }
   }, [user, authLoading, setLocation]);
+
+  useEffect(() => {
+    if (user?.phone) {
+      setPhoneValue(user.phone);
+    }
+  }, [user?.phone]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { phone?: string }) => {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update profile");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile Updated",
+        description: "Your phone number has been updated.",
+      });
+      refetch();
+      setIsEditingPhone(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Could not update profile",
+        variant: "destructive",
+      });
+    },
+  });
 
   const updateProfilePictureMutation = useMutation({
     mutationFn: async (objectPath: string) => {
@@ -186,6 +231,58 @@ export default function MyProfile() {
                     <span className="font-medium">{user.email}</span>
                   </div>
                 )}
+
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Phone:</span>
+                  {isEditingPhone ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        type="tel"
+                        value={phoneValue}
+                        onChange={(e) => setPhoneValue(e.target.value)}
+                        placeholder="(555) 123-4567"
+                        className="h-8 max-w-[200px]"
+                        data-testid="input-phone"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => updateProfileMutation.mutate({ phone: phoneValue })}
+                        disabled={updateProfileMutation.isPending}
+                        data-testid="btn-save-phone"
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setIsEditingPhone(false);
+                          setPhoneValue(user.phone || "");
+                        }}
+                        data-testid="btn-cancel-phone"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-medium">{user.phone || "-"}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 ml-2"
+                        onClick={() => setIsEditingPhone(true)}
+                        data-testid="btn-edit-phone"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
 
                 {user.companyName && (
                   <div className="flex items-center gap-2">

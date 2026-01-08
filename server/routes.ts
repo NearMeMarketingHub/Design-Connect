@@ -1974,6 +1974,33 @@ export async function registerRoutes(
   // Register object storage routes
   registerObjectStorageRoutes(app);
 
+  // Update user profile (phone, email, name)
+  app.patch("/api/user/profile", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const { phone, email, name } = req.body;
+      
+      const updates: Partial<{ phone: string; email: string; name: string }> = {};
+      if (phone !== undefined) updates.phone = phone;
+      if (email !== undefined) updates.email = email;
+      if (name !== undefined) updates.name = name;
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+      
+      const updatedUser = await storage.updateUser(user.id, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Update user profile picture
   app.post("/api/user/profile-picture", async (req, res, next) => {
     try {
