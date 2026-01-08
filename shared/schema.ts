@@ -335,3 +335,36 @@ export const contractorRequests = pgTable("contractor_requests", {
 export const insertContractorRequestSchema = createInsertSchema(contractorRequests).omit({ id: true, createdAt: true, reviewedAt: true, reviewedBy: true });
 export type InsertContractorRequest = z.infer<typeof insertContractorRequestSchema>;
 export type ContractorRequest = typeof contractorRequests.$inferSelect;
+
+// Project team members - contractors assigned to projects
+export const projectTeamMembers = pgTable("project_team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  contractorId: varchar("contractor_id").notNull().references(() => users.id),
+  role: text("role"), // Their role/trade on this project (e.g., "Electrician", "HVAC")
+  addedBy: varchar("added_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectTeamMemberSchema = createInsertSchema(projectTeamMembers).omit({ id: true, createdAt: true });
+export type InsertProjectTeamMember = z.infer<typeof insertProjectTeamMemberSchema>;
+export type ProjectTeamMember = typeof projectTeamMembers.$inferSelect;
+
+// Contractor invitations - invite contractors to join the platform and a project
+export const contractorInvites = pgTable("contractor_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id), // Optional - may invite to platform only
+  email: text("email").notNull(),
+  companyName: text("company_name"),
+  companyType: text("company_type"), // Their trade/role type
+  token: text("token").notNull().unique(),
+  status: text("status").notNull().default("pending"), // pending, accepted, expired
+  invitedBy: varchar("invited_by").references(() => users.id),
+  acceptedUserId: varchar("accepted_user_id").references(() => users.id), // Set when invite is accepted
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContractorInviteSchema = createInsertSchema(contractorInvites).omit({ id: true, createdAt: true });
+export type InsertContractorInvite = z.infer<typeof insertContractorInviteSchema>;
+export type ContractorInvite = typeof contractorInvites.$inferSelect;
