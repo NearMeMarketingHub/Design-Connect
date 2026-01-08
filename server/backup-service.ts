@@ -3,7 +3,7 @@
 
 import { storage } from './storage';
 import { uploadToSharePoint, uploadFilesToSharePoint, downloadFileAsBuffer } from './sharepoint-client';
-import type { Project, User, ProjectPhase, PhaseUpdate, MilestoneTask, InspirationImage, Message, Invoice, Estimate, ActionItem, Chat, ChatMessage, ProgressPost, PostComment } from '@shared/schema';
+import type { Project, User, ProjectPhase, PhaseUpdate, MilestoneTask, InspirationImage, Message, Invoice, Estimate, ActionItem, Chat, ChatMessage, ProgressPost, PostComment, ContractorPhoto } from '@shared/schema';
 
 export interface BackupResult {
   success: boolean;
@@ -28,6 +28,7 @@ interface ProjectBackupData {
   chatMessages: ChatMessage[];
   progressPosts: ProgressPost[];
   postComments: PostComment[];
+  contractorPhotos: ContractorPhoto[];
   invoices: Invoice[];
   estimates: Estimate[];
   actionItems: ActionItem[];
@@ -57,7 +58,8 @@ async function collectProjectData(projectId: string): Promise<ProjectBackupData 
     invoices,
     estimates,
     actionItems,
-    progressPosts
+    progressPosts,
+    contractorPhotos
   ] = await Promise.all([
     storage.getProjectTeamMembers(projectId),
     storage.getProjectPhases(projectId),
@@ -68,7 +70,8 @@ async function collectProjectData(projectId: string): Promise<ProjectBackupData 
     storage.getInvoices().then(inv => inv.filter(i => i.projectId === projectId)),
     storage.getEstimates().then(est => est.filter(e => e.projectId === projectId)),
     storage.getActionItems(projectId),
-    storage.getProgressPosts(projectId)
+    storage.getProgressPosts(projectId),
+    storage.getContractorPhotos(projectId)
   ]);
 
   // Get all chats for this project (admin view to get all)
@@ -118,6 +121,7 @@ async function collectProjectData(projectId: string): Promise<ProjectBackupData 
     chatMessages,
     progressPosts,
     postComments,
+    contractorPhotos,
     invoices,
     estimates,
     actionItems
@@ -556,6 +560,21 @@ export async function createProjectBackup(projectId: string): Promise<BackupResu
     }
   }
 
+  // Upload contractor photos to PM package only (not client package)
+  for (let i = 0; i < data.contractorPhotos.length; i++) {
+    const photo = data.contractorPhotos[i];
+    if (photo.coverImage) {
+      const buffer = await downloadFileAsBuffer(photo.coverImage);
+      if (buffer) {
+        const ext = photo.coverImage.split('.').pop()?.split('?')[0] || 'jpg';
+        const fileName = `${sanitizeName(photo.title || `contractor_photo_${i + 1}`)}.${ext}`;
+        const result = await uploadToSharePoint(`${pmFolder}/All_Photos/Contractor_Only`, fileName, buffer, `image/${ext}`);
+        if (result.success) uploadedFiles++;
+        else errors.push(`Contractor Photo: ${fileName} - ${result.error}`);
+      }
+    }
+  }
+
   // Export raw data as JSON for PM
   const rawDataJson = JSON.stringify({
     project: data.project,
@@ -571,7 +590,8 @@ export async function createProjectBackup(projectId: string): Promise<BackupResu
     estimates: data.estimates,
     actionItems: data.actionItems,
     chats: data.chats,
-    messageCount: data.chatMessages.length + data.messages.length
+    messageCount: data.chatMessages.length + data.messages.length,
+    contractorPhotosCount: data.contractorPhotos.length
   }, null, 2);
 
   const jsonResult = await uploadToSharePoint(pmFolder, 'project_data.json', rawDataJson, 'application/json');
