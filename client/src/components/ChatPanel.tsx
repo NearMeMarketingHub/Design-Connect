@@ -465,24 +465,26 @@ export function ChatPanel({ projectId, currentUserId, currentUserRole, currentUs
                     const lastMessageReads = isLastMessage ? getLastMessageReads() : [];
                     
                     return (
-                      <div key={msg.id} className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarImage src={msg.senderAvatar || undefined} />
-                          <AvatarFallback>
-                            {msg.senderName.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className={`max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                      <div key={msg.id} className={`flex gap-3 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                        {!isOwn && (
+                          <Avatar className="h-8 w-8 flex-shrink-0">
+                            <AvatarImage src={msg.senderAvatar || undefined} />
+                            <AvatarFallback>
+                              {msg.senderName.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div className={`flex flex-col max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
                           <div className={`p-3 rounded-lg ${
                             isOwn 
-                              ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                              : 'bg-muted rounded-tl-none'
+                              ? 'bg-primary text-primary-foreground rounded-br-none' 
+                              : 'bg-muted rounded-bl-none'
                           }`}>
                             <p className="text-sm">{msg.content}</p>
                           </div>
                           <div className={`flex items-center gap-1 mt-1 text-xs text-muted-foreground ${isOwn ? 'justify-end' : ''}`}>
-                            <span>{msg.senderName}</span>
-                            <span>•</span>
+                            {!isOwn && <span>{msg.senderName}</span>}
+                            {!isOwn && <span>•</span>}
                             <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                           {/* Read receipts for last message */}
