@@ -51,10 +51,11 @@ export async function getSharePointClient(): Promise<Client> {
 }
 
 // SharePoint configuration for Avery Construction
+// Note: basePath is relative to the drive root (Documents library), not including "Shared Documents"
 const SHAREPOINT_CONFIG = {
   siteHost: 'nearmemarketing.sharepoint.com',
   sitePath: '/sites/AppStorage',
-  basePath: '/Shared Documents/Avery Construction/Contractor App/Completed Projects'
+  basePath: 'Avery Construction/Contractor App/Completed Projects'
 };
 
 export interface SharePointUploadResult {

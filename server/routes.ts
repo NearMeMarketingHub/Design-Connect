@@ -11,6 +11,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 
 const PgSession = connectPgSimple(session);
 
@@ -290,10 +291,34 @@ export async function registerRoutes(
 
   app.patch("/api/projects/:id", requireAuth, async (req, res, next) => {
     try {
+      // Get current project to check progress change
+      const currentProject = await storage.getProject(req.params.id);
+      if (!currentProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      const oldProgress = currentProject.progress || 0;
+      const newProgress = req.body.progress;
+      
       const project = await storage.updateProject(req.params.id, req.body);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
+      
+      // Trigger SharePoint backup when project reaches 100% progress
+      if (newProgress !== undefined && shouldTriggerBackup(oldProgress, newProgress)) {
+        console.log(`[Backup] Triggering backup for project ${project.id} - progress reached 100%`);
+        createProjectBackup(project.id)
+          .then(result => {
+            if (result.success) {
+              console.log(`[Backup] Successfully created backup for ${result.projectName}: ${result.uploadedFiles} files`);
+            } else {
+              console.error(`[Backup] Backup had errors:`, result.errors);
+            }
+          })
+          .catch(err => console.error('[Backup] Failed to create backup:', err));
+      }
+      
       res.json(project);
     } catch (error) {
       next(error);
@@ -2025,6 +2050,42 @@ export async function registerRoutes(
       await storage.updateUser(user.id, { profilePicture: normalizedPath });
 
       res.json({ success: true, profilePicture: normalizedPath });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // SharePoint backup routes (admin/contractor only)
+  app.post("/api/projects/:id/backup", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin' && user.role !== 'contractor') {
+        return res.status(403).json({ message: "Only contractors and admins can trigger backups" });
+      }
+      
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      console.log(`[Backup] Manual backup triggered for project ${project.id} by ${user.username}`);
+      const result = await createProjectBackup(project.id);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: `Backup created successfully with ${result.uploadedFiles} files`,
+          clientPackagePath: result.clientPackagePath,
+          pmPackagePath: result.pmPackagePath
+        });
+      } else {
+        res.json({
+          success: false,
+          message: "Backup completed with some errors",
+          uploadedFiles: result.uploadedFiles,
+          errors: result.errors
+        });
+      }
     } catch (error) {
       next(error);
     }
