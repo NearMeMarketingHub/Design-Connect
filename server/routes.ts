@@ -1208,6 +1208,64 @@ export async function registerRoutes(
     }
   });
 
+  // Backfill default chats for all existing projects that don't have them
+  app.post("/api/admin/backfill-default-chats", requireAdmin, async (req, res, next) => {
+    try {
+      const projects = await storage.getProjects();
+      const results = { processed: 0, skipped: 0, created: 0, errors: [] as string[] };
+      
+      for (const project of projects) {
+        results.processed++;
+        
+        // Skip projects without clients
+        if (!project.clientId) {
+          results.skipped++;
+          continue;
+        }
+        
+        // Check if project already has default chats
+        const existingChats = await storage.getProjectChats(project.id, project.clientId, true);
+        const hasDefaultChats = existingChats.some(chat => chat.isDefault);
+        
+        if (hasDefaultChats) {
+          results.skipped++;
+          continue;
+        }
+        
+        // Get team members for the project
+        const teamMembers = await storage.getProjectTeamMembers(project.id);
+        
+        if (teamMembers.length === 0) {
+          results.skipped++;
+          continue;
+        }
+        
+        try {
+          await storage.createDefaultChatsForProject(
+            project.id,
+            project.clientId,
+            teamMembers.map(m => ({
+              contractorId: m.contractorId,
+              role: m.role,
+              name: m.contractor?.name || 'Contractor',
+              companyName: m.contractor?.companyName || null,
+            }))
+          );
+          results.created++;
+        } catch (err: any) {
+          results.errors.push(`Project ${project.id}: ${err.message}`);
+        }
+      }
+      
+      res.json({
+        message: "Backfill complete",
+        ...results
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Sandbox routes - Admin testing environment
   app.get("/api/sandbox/data", requireAdmin, async (req, res, next) => {
     try {

@@ -232,11 +232,130 @@ async function seed() {
     });
     console.log("✓ Created recurring billing");
 
+    // Create additional test contractor accounts
+    const contractorPM = await storage.createUser({
+      username: "mike.thompson",
+      password: hashedPassword,
+      role: "contractor",
+      name: "Mike Thompson",
+      companyName: "Thompson Construction",
+      companyType: "Project Manager",
+      isApproved: true,
+    });
+    console.log("✓ Created contractor: Mike Thompson (Project Manager)");
+
+    const contractorElectrician = await storage.createUser({
+      username: "tom.electric",
+      password: hashedPassword,
+      role: "contractor",
+      name: "Tom Electric",
+      companyName: "Electric Pro Services",
+      companyType: "Electrical",
+      isApproved: true,
+    });
+    console.log("✓ Created contractor: Tom Electric (Electrician)");
+
+    const contractorPlumber = await storage.createUser({
+      username: "sarah.plumber",
+      password: hashedPassword,
+      role: "contractor",
+      name: "Sarah Plumber",
+      companyName: "Premier Plumbing LLC",
+      companyType: "Plumbing",
+      isApproved: true,
+    });
+    console.log("✓ Created contractor: Sarah Plumber (Plumber)");
+
+    const contractorHVAC = await storage.createUser({
+      username: "john.hvac",
+      password: hashedPassword,
+      role: "contractor",
+      name: "John HVAC",
+      companyName: "Cool Air Systems",
+      companyType: "HVAC",
+      isApproved: true,
+    });
+    console.log("✓ Created contractor: John HVAC (HVAC Specialist)");
+
+    // Assign contractors to Jenkins project as team members
+    await storage.addProjectTeamMember({
+      projectId: jenkinsProject.id,
+      contractorId: contractorPM.id,
+      role: "Project Manager",
+      addedBy: contractor.id,
+    });
+    await storage.addProjectTeamMember({
+      projectId: jenkinsProject.id,
+      contractorId: contractorElectrician.id,
+      role: "Electrician",
+      addedBy: contractor.id,
+    });
+    await storage.addProjectTeamMember({
+      projectId: jenkinsProject.id,
+      contractorId: contractorPlumber.id,
+      role: "Plumber",
+      addedBy: contractor.id,
+    });
+    console.log("✓ Assigned contractors to Jenkins project");
+
+    // Assign contractors to Miller project
+    await storage.addProjectTeamMember({
+      projectId: millerProject.id,
+      contractorId: contractorPM.id,
+      role: "Project Manager",
+      addedBy: contractor.id,
+    });
+    await storage.addProjectTeamMember({
+      projectId: millerProject.id,
+      contractorId: contractorPlumber.id,
+      role: "Plumber",
+      addedBy: contractor.id,
+    });
+    console.log("✓ Assigned contractors to Miller project");
+
+    // Assign contractors to Lakehouse project
+    await storage.addProjectTeamMember({
+      projectId: lakehouseProject.id,
+      contractorId: contractorPM.id,
+      role: "Project Manager",
+      addedBy: contractor.id,
+    });
+    await storage.addProjectTeamMember({
+      projectId: lakehouseProject.id,
+      contractorId: contractorHVAC.id,
+      role: "HVAC Specialist",
+      addedBy: contractor.id,
+    });
+    console.log("✓ Assigned contractors to Lakehouse project");
+
+    // Create default chats for all projects
+    const allProjects = [jenkinsProject, millerProject, lakehouseProject, loftProject];
+    for (const project of allProjects) {
+      const teamMembers = await storage.getProjectTeamMembers(project.id);
+      if (teamMembers.length > 0 && project.clientId) {
+        await storage.createDefaultChatsForProject(
+          project.id,
+          project.clientId,
+          teamMembers.map(m => ({
+            contractorId: m.contractorId,
+            role: m.role,
+            name: m.contractor?.name || 'Contractor',
+            companyName: m.contractor?.companyName || null,
+          }))
+        );
+        console.log(`✓ Created default chats for ${project.name}`);
+      }
+    }
+
     console.log("\n✓ Database seeded successfully!");
     console.log("\nTest credentials:");
     console.log("Contractor: contractor / password123");
     console.log("Client 1: sarah.jenkins / password123");
     console.log("Client 2: mike.miller / password123");
+    console.log("Project Manager: mike.thompson / password123");
+    console.log("Electrician: tom.electric / password123");
+    console.log("Plumber: sarah.plumber / password123");
+    console.log("HVAC: john.hvac / password123");
   } catch (error) {
     console.error("Error seeding database:", error);
     throw error;
