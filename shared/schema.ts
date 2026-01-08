@@ -240,6 +240,22 @@ export const insertProgressPostSchema = createInsertSchema(progressPosts).omit({
 export type InsertProgressPost = z.infer<typeof insertProgressPostSchema>;
 export type ProgressPost = typeof progressPosts.$inferSelect;
 
+export const contractorPhotos = pgTable("contractor_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull(),
+  title: text("title").notNull(),
+  caption: text("caption"),
+  coverImage: text("cover_image").notNull(),
+  images: text("images").array().notNull(),
+  creatorId: varchar("creator_id"),
+  creatorName: text("creator_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContractorPhotoSchema = createInsertSchema(contractorPhotos).omit({ id: true, createdAt: true });
+export type InsertContractorPhoto = z.infer<typeof insertContractorPhotoSchema>;
+export type ContractorPhoto = typeof contractorPhotos.$inferSelect;
+
 export const postComments = pgTable("post_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   postId: varchar("post_id").notNull(),
