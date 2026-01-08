@@ -279,9 +279,6 @@ export default function ProjectDetails() {
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
   const canEdit = isContractorView && (user?.role === 'contractor' || user?.role === 'admin');
   
-  // Client check - for showing ChatPanel instead of legacy messages
-  const isClient = user?.role === 'client';
-  
   // Get portal base path
   const getPortalPath = () => {
     if (currentPortal === 'admin') return '/admin';
@@ -360,9 +357,14 @@ export default function ProjectDetails() {
     spent: 0,
     startDate: "TBD",
     endDate: "TBD",
-    description: apiProject.description || ""
+    description: apiProject.description || "",
+    clientId: apiProject.clientId
   } : null);
   const activeTab = getTabFromPath();
+  
+  // Client check - for showing ChatPanel instead of legacy messages
+  // Show ChatPanel if user role is 'client' OR if user is the project's client (by clientId)
+  const isClient = user?.role === 'client' || (apiProject?.clientId && apiProject.clientId === user?.id);
   
   // Update project mutation for contractor editing
   const updateProjectMutation = useMutation({
