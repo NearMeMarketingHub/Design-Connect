@@ -199,6 +199,11 @@ export default function NewProject() {
             role: member.role,
           });
         }
+        
+        // Create default chats for the project after team members are added
+        if (teamMembers.length > 0 && formData.clientId) {
+          await apiRequest("POST", `/api/projects/${project.id}/create-default-chats`);
+        }
       } catch (teamError) {
         console.error("Failed to add some team members:", teamError);
       }

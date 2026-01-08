@@ -34,7 +34,11 @@ import type {
   ProjectInvite, InsertProjectInvite,
   ContractorRequest, InsertContractorRequest,
   ProjectTeamMember, InsertProjectTeamMember,
-  ContractorInvite, InsertContractorInvite
+  ContractorInvite, InsertContractorInvite,
+  Chat, InsertChat,
+  ChatParticipant, InsertChatParticipant,
+  ChatMessage, InsertChatMessage,
+  MessageRead, InsertMessageRead
 } from "@shared/schema";
 
 export interface IStorage {
@@ -184,6 +188,33 @@ export interface IStorage {
   
   // Migration methods
   migrateProjectIdsToSlug(): Promise<{ migrated: number; errors: string[] }>;
+
+  // Chat methods
+  getProjectChats(projectId: string, userId: string, isAdminOrPM: boolean): Promise<(Chat & { participants: (ChatParticipant & { user?: User })[], unreadCount: number })[]>;
+  getChat(chatId: string): Promise<Chat | undefined>;
+  createChat(chat: InsertChat): Promise<Chat>;
+  updateChat(chatId: string, data: Partial<InsertChat>): Promise<Chat | undefined>;
+
+  // Chat participant methods
+  getChatParticipants(chatId: string): Promise<(ChatParticipant & { user?: User })[]>;
+  addChatParticipant(participant: InsertChatParticipant): Promise<ChatParticipant>;
+  removeChatParticipant(chatId: string, userId: string): Promise<void>;
+  updateChatParticipantReadTime(chatId: string, userId: string): Promise<void>;
+  isUserInChat(chatId: string, userId: string): Promise<boolean>;
+
+  // Chat message methods
+  getChatMessages(chatId: string, limit?: number, before?: Date): Promise<ChatMessage[]>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getUnreadMessageCount(chatId: string, userId: string): Promise<number>;
+
+  // Message read methods
+  getMessageReads(messageId: string): Promise<(MessageRead & { user?: User })[]>;
+  getChatMessageReads(chatId: string): Promise<(MessageRead & { user?: User })[]>;
+  createMessageRead(read: InsertMessageRead): Promise<MessageRead>;
+  markMessagesAsRead(chatId: string, userId: string): Promise<void>;
+
+  // Default chat creation
+  createDefaultChatsForProject(projectId: string, clientId: string | null, teamMembers: { contractorId: string; role: string | null; name: string; companyName: string | null }[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1111,6 +1142,301 @@ export class DatabaseStorage implements IStorage {
     }
     
     return updated;
+  }
+
+  // Chat methods
+  async getProjectChats(projectId: string, userId: string, isAdminOrPM: boolean): Promise<(Chat & { participants: (ChatParticipant & { user?: User })[], unreadCount: number })[]> {
+    // Get all chats for the project
+    const allChats = await db.select().from(schema.chats)
+      .where(eq(schema.chats.projectId, projectId));
+    
+    const results: (Chat & { participants: (ChatParticipant & { user?: User })[], unreadCount: number })[] = [];
+    
+    for (const chat of allChats) {
+      const participants = await this.getChatParticipants(chat.id);
+      const isParticipant = participants.some(p => p.userId === userId);
+      
+      // Admin/PM can see all chats, others can only see chats they're part of
+      if (isAdminOrPM || isParticipant) {
+        const unreadCount = isParticipant ? await this.getUnreadMessageCount(chat.id, userId) : 0;
+        results.push({
+          ...chat,
+          participants,
+          unreadCount
+        });
+      }
+    }
+    
+    // Sort by lastMessageAt descending (most recent first)
+    results.sort((a, b) => {
+      const dateA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const dateB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    return results;
+  }
+
+  async getChat(chatId: string): Promise<Chat | undefined> {
+    const [chat] = await db.select().from(schema.chats).where(eq(schema.chats.id, chatId));
+    return chat;
+  }
+
+  async createChat(chat: InsertChat): Promise<Chat> {
+    const [newChat] = await db.insert(schema.chats).values(chat).returning();
+    return newChat;
+  }
+
+  async updateChat(chatId: string, data: Partial<InsertChat>): Promise<Chat | undefined> {
+    const [updated] = await db.update(schema.chats)
+      .set(data)
+      .where(eq(schema.chats.id, chatId))
+      .returning();
+    return updated;
+  }
+
+  // Chat participant methods
+  async getChatParticipants(chatId: string): Promise<(ChatParticipant & { user?: User })[]> {
+    const participants = await db.select().from(schema.chatParticipants)
+      .where(eq(schema.chatParticipants.chatId, chatId));
+    
+    const results: (ChatParticipant & { user?: User })[] = [];
+    for (const participant of participants) {
+      const user = await this.getUser(participant.userId);
+      results.push({ ...participant, user });
+    }
+    return results;
+  }
+
+  async addChatParticipant(participant: InsertChatParticipant): Promise<ChatParticipant> {
+    const [newParticipant] = await db.insert(schema.chatParticipants).values(participant).returning();
+    return newParticipant;
+  }
+
+  async removeChatParticipant(chatId: string, userId: string): Promise<void> {
+    await db.delete(schema.chatParticipants)
+      .where(and(
+        eq(schema.chatParticipants.chatId, chatId),
+        eq(schema.chatParticipants.userId, userId)
+      ));
+  }
+
+  async updateChatParticipantReadTime(chatId: string, userId: string): Promise<void> {
+    await db.update(schema.chatParticipants)
+      .set({ lastReadAt: new Date() })
+      .where(and(
+        eq(schema.chatParticipants.chatId, chatId),
+        eq(schema.chatParticipants.userId, userId)
+      ));
+  }
+
+  async isUserInChat(chatId: string, userId: string): Promise<boolean> {
+    const [participant] = await db.select().from(schema.chatParticipants)
+      .where(and(
+        eq(schema.chatParticipants.chatId, chatId),
+        eq(schema.chatParticipants.userId, userId)
+      ));
+    return !!participant;
+  }
+
+  // Chat message methods
+  async getChatMessages(chatId: string, limit: number = 50, before?: Date): Promise<ChatMessage[]> {
+    let query = db.select().from(schema.chatMessages)
+      .where(eq(schema.chatMessages.chatId, chatId));
+    
+    const messages = await query;
+    
+    // Filter by date if needed and sort
+    let filtered = before 
+      ? messages.filter(m => new Date(m.createdAt) < before)
+      : messages;
+    
+    // Sort by createdAt ascending (oldest first for display)
+    filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    
+    // Return last N messages
+    return filtered.slice(-limit);
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [newMessage] = await db.insert(schema.chatMessages).values(message).returning();
+    
+    // Update the chat's last message info
+    await this.updateChat(message.chatId, {
+      lastMessageAt: new Date(),
+      lastMessagePreview: message.content.substring(0, 100),
+      lastMessageSenderId: message.senderId,
+      lastMessageSenderName: message.senderName
+    });
+    
+    return newMessage;
+  }
+
+  async getUnreadMessageCount(chatId: string, userId: string): Promise<number> {
+    // Get user's last read time for this chat
+    const [participant] = await db.select().from(schema.chatParticipants)
+      .where(and(
+        eq(schema.chatParticipants.chatId, chatId),
+        eq(schema.chatParticipants.userId, userId)
+      ));
+    
+    if (!participant) return 0;
+    
+    // Count messages after last read time that weren't sent by this user
+    const messages = await db.select().from(schema.chatMessages)
+      .where(eq(schema.chatMessages.chatId, chatId));
+    
+    const lastReadAt = participant.lastReadAt ? new Date(participant.lastReadAt) : new Date(0);
+    
+    return messages.filter(m => 
+      new Date(m.createdAt) > lastReadAt && m.senderId !== userId
+    ).length;
+  }
+
+  // Message read methods
+  async getMessageReads(messageId: string): Promise<(MessageRead & { user?: User })[]> {
+    const reads = await db.select().from(schema.messageReads)
+      .where(eq(schema.messageReads.messageId, messageId));
+    
+    const results: (MessageRead & { user?: User })[] = [];
+    for (const read of reads) {
+      const user = await this.getUser(read.userId);
+      results.push({ ...read, user });
+    }
+    return results;
+  }
+
+  async getChatMessageReads(chatId: string): Promise<(MessageRead & { user?: User })[]> {
+    // Get all messages in this chat
+    const messages = await db.select().from(schema.chatMessages)
+      .where(eq(schema.chatMessages.chatId, chatId));
+    
+    const messageIds = messages.map(m => m.id);
+    if (messageIds.length === 0) return [];
+    
+    // Get all reads for these messages
+    const allReads: (MessageRead & { user?: User })[] = [];
+    for (const messageId of messageIds) {
+      const reads = await this.getMessageReads(messageId);
+      allReads.push(...reads);
+    }
+    return allReads;
+  }
+
+  async createMessageRead(read: InsertMessageRead): Promise<MessageRead> {
+    // Check if read already exists
+    const existing = await db.select().from(schema.messageReads)
+      .where(and(
+        eq(schema.messageReads.messageId, read.messageId),
+        eq(schema.messageReads.userId, read.userId)
+      ));
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    
+    const [newRead] = await db.insert(schema.messageReads).values(read).returning();
+    return newRead;
+  }
+
+  async markMessagesAsRead(chatId: string, userId: string): Promise<void> {
+    // Update participant's lastReadAt
+    await this.updateChatParticipantReadTime(chatId, userId);
+    
+    // Get all messages in this chat not by this user
+    const messages = await db.select().from(schema.chatMessages)
+      .where(and(
+        eq(schema.chatMessages.chatId, chatId),
+        not(eq(schema.chatMessages.senderId, userId))
+      ));
+    
+    // Create read receipts for all unread messages
+    for (const message of messages) {
+      await this.createMessageRead({
+        messageId: message.id,
+        userId
+      });
+    }
+  }
+
+  // Default chat creation
+  async createDefaultChatsForProject(
+    projectId: string, 
+    clientId: string | null, 
+    teamMembers: { contractorId: string; role: string | null; name: string; companyName: string | null }[]
+  ): Promise<void> {
+    if (!clientId) return;
+    
+    const client = await this.getUser(clientId);
+    if (!client) return;
+
+    // Get project for context
+    const project = await this.getProject(projectId);
+    if (!project) return;
+    
+    // Create one-on-one chats between client and each team member
+    for (const member of teamMembers) {
+      const contractor = await this.getUser(member.contractorId);
+      if (!contractor) continue;
+      
+      // Create direct chat
+      const chat = await this.createChat({
+        projectId,
+        type: 'direct',
+        title: null,
+        createdById: member.contractorId,
+        isDefault: true,
+        lastMessageAt: new Date(),
+        lastMessagePreview: `Hi! I'm ${member.name}${member.companyName ? ` with ${member.companyName}` : ''}. I'll be your ${member.role || 'contractor'} on this project. I'm looking forward to working with you!`,
+        lastMessageSenderId: member.contractorId,
+        lastMessageSenderName: member.name
+      });
+      
+      // Add participants
+      await this.addChatParticipant({ chatId: chat.id, userId: clientId });
+      await this.addChatParticipant({ chatId: chat.id, userId: member.contractorId });
+      
+      // Create welcome message
+      await this.createChatMessage({
+        chatId: chat.id,
+        projectId,
+        senderId: member.contractorId,
+        senderName: member.name,
+        senderAvatar: contractor.profilePicture,
+        content: `Hi! I'm ${member.name}${member.companyName ? ` with ${member.companyName}` : ''}. I'll be your ${member.role || 'contractor'} on this project. I'm looking forward to working with you!`
+      });
+    }
+    
+    // Create team group chat if there are team members
+    if (teamMembers.length > 0) {
+      const chat = await this.createChat({
+        projectId,
+        type: 'group',
+        title: 'Team Chat',
+        createdById: null,
+        isDefault: true,
+        lastMessageAt: new Date(),
+        lastMessagePreview: `Welcome to the team chat for ${project.name}! This is where everyone involved in the project can communicate together.`,
+        lastMessageSenderId: null,
+        lastMessageSenderName: 'BuildVision'
+      });
+      
+      // Add all participants
+      await this.addChatParticipant({ chatId: chat.id, userId: clientId });
+      for (const member of teamMembers) {
+        await this.addChatParticipant({ chatId: chat.id, userId: member.contractorId });
+      }
+      
+      // Create welcome message (system message)
+      await this.createChatMessage({
+        chatId: chat.id,
+        projectId,
+        senderId: clientId, // Use client as sender for now
+        senderName: 'BuildVision',
+        senderAvatar: null,
+        content: `Welcome to the team chat for ${project.name}! This is where everyone involved in the project can communicate together.`
+      });
+    }
   }
 }
 

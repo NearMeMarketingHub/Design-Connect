@@ -931,7 +931,7 @@ export async function registerRoutes(
         projectId: projectId || null,
         token,
         expiresAt,
-        invitedById: (req.user as User).id,
+        invitedBy: (req.user as User).id,
       });
       
       res.status(201).json(invite);
@@ -953,6 +953,237 @@ export async function registerRoutes(
       next(error);
     }
   });
+
+  // ==================== CHAT ROUTES ====================
+  
+  // Helper function to check if user is admin or project manager
+  const isAdminOrProjectManager = (user: User): boolean => {
+    return user.role === 'admin' || user.companyType === 'Project Manager';
+  };
+
+  // Get all chats for a project
+  app.get("/api/projects/:projectId/chats", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const isAdminOrPM = isAdminOrProjectManager(user);
+      const chats = await storage.getProjectChats(req.params.projectId, user.id, isAdminOrPM);
+      res.json(chats);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create a new chat in a project
+  app.post("/api/projects/:projectId/chats", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const { participantIds, title, type } = req.body;
+      
+      // Create the chat
+      const chat = await storage.createChat({
+        projectId: req.params.projectId,
+        type: type || (participantIds.length === 2 ? 'direct' : 'group'),
+        title: title || null,
+        createdById: user.id,
+        isDefault: false,
+        lastMessageAt: null,
+        lastMessagePreview: null,
+        lastMessageSenderId: null,
+        lastMessageSenderName: null
+      });
+      
+      // Add all participants including the creator
+      for (const participantId of participantIds) {
+        await storage.addChatParticipant({ chatId: chat.id, userId: participantId });
+      }
+      
+      // Make sure creator is a participant
+      const creatorIsParticipant = participantIds.includes(user.id);
+      if (!creatorIsParticipant) {
+        await storage.addChatParticipant({ chatId: chat.id, userId: user.id });
+      }
+      
+      res.status(201).json(chat);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get messages for a specific chat
+  app.get("/api/chats/:chatId/messages", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const isAdminOrPM = isAdminOrProjectManager(user);
+      
+      // Check if user can access this chat
+      const chat = await storage.getChat(req.params.chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      const isParticipant = await storage.isUserInChat(req.params.chatId, user.id);
+      if (!isAdminOrPM && !isParticipant) {
+        return res.status(403).json({ message: "You do not have access to this chat" });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 50;
+      const before = req.query.before ? new Date(req.query.before as string) : undefined;
+      
+      const messages = await storage.getChatMessages(req.params.chatId, limit, before);
+      res.json(messages);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Send a message in a chat
+  app.post("/api/chats/:chatId/messages", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      
+      // Check if user is a participant
+      const isParticipant = await storage.isUserInChat(req.params.chatId, user.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this chat" });
+      }
+      
+      const chat = await storage.getChat(req.params.chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      const { content, attachmentType, attachmentUrl, attachmentName } = req.body;
+      
+      const message = await storage.createChatMessage({
+        chatId: req.params.chatId,
+        projectId: chat.projectId,
+        senderId: user.id,
+        senderName: user.name || user.username,
+        senderAvatar: user.profilePicture,
+        content,
+        attachmentType: attachmentType || null,
+        attachmentUrl: attachmentUrl || null,
+        attachmentName: attachmentName || null
+      });
+      
+      res.status(201).json(message);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Mark messages as read in a chat
+  app.post("/api/chats/:chatId/read", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      
+      // Check if user is a participant
+      const isParticipant = await storage.isUserInChat(req.params.chatId, user.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this chat" });
+      }
+      
+      await storage.markMessagesAsRead(req.params.chatId, user.id);
+      
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get read receipts for a chat (for the last message)
+  app.get("/api/chats/:chatId/read-receipts", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const isAdminOrPM = isAdminOrProjectManager(user);
+      
+      // Check if user can access this chat
+      const isParticipant = await storage.isUserInChat(req.params.chatId, user.id);
+      if (!isAdminOrPM && !isParticipant) {
+        return res.status(403).json({ message: "You do not have access to this chat" });
+      }
+      
+      const reads = await storage.getChatMessageReads(req.params.chatId);
+      res.json(reads);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get participants of a chat
+  app.get("/api/chats/:chatId/participants", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const isAdminOrPM = isAdminOrProjectManager(user);
+      
+      // Check if user can access this chat
+      const isParticipant = await storage.isUserInChat(req.params.chatId, user.id);
+      if (!isAdminOrPM && !isParticipant) {
+        return res.status(403).json({ message: "You do not have access to this chat" });
+      }
+      
+      const participants = await storage.getChatParticipants(req.params.chatId);
+      res.json(participants);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Add participant to a chat
+  app.post("/api/chats/:chatId/participants", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const { userId } = req.body;
+      
+      // Only participants can add others
+      const isParticipant = await storage.isUserInChat(req.params.chatId, user.id);
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant in this chat" });
+      }
+      
+      // Check if already a participant
+      const alreadyParticipant = await storage.isUserInChat(req.params.chatId, userId);
+      if (alreadyParticipant) {
+        return res.status(400).json({ message: "User is already a participant" });
+      }
+      
+      const participant = await storage.addChatParticipant({ chatId: req.params.chatId, userId });
+      res.status(201).json(participant);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create default chats for a project (called after team members are added)
+  app.post("/api/projects/:projectId/create-default-chats", requireAuth, async (req, res, next) => {
+    try {
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Get team members with their details
+      const teamMembersRaw = await storage.getProjectTeamMembers(req.params.projectId);
+      const teamMembers = teamMembersRaw.map(m => ({
+        contractorId: m.contractorId,
+        role: m.role,
+        name: m.contractor?.name || m.contractor?.username || 'Team Member',
+        companyName: m.contractor?.companyName || null
+      }));
+      
+      await storage.createDefaultChatsForProject(
+        req.params.projectId,
+        project.clientId,
+        teamMembers
+      );
+      
+      res.json({ success: true, message: "Default chats created" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ==================== END CHAT ROUTES ====================
 
   app.post("/api/admin/projects/:projectId/assign", requireAdmin, async (req, res, next) => {
     try {

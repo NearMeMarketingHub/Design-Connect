@@ -72,6 +72,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { ChatPanel } from "@/components/ChatPanel";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
@@ -277,6 +278,9 @@ export default function ProjectDetails() {
   // Contractor controls - check if user can edit this project
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
   const canEdit = isContractorView && (user?.role === 'contractor' || user?.role === 'admin');
+  
+  // Client check - for showing ChatPanel instead of legacy messages
+  const isClient = user?.role === 'client';
   
   // Get portal base path
   const getPortalPath = () => {
@@ -2306,6 +2310,15 @@ export default function ProjectDetails() {
 
           {/* MESSAGES TAB */}
           <TabsContent value="messages" className="mt-6">
+            {isClient && user?.id ? (
+              <ChatPanel 
+                projectId={projectId}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+                currentUserCompanyType={user.companyType}
+              />
+            ) : (
+            <>
             <input 
               type="file" 
               ref={messageAttachmentInputRef}
@@ -2696,6 +2709,8 @@ export default function ProjectDetails() {
                 </div>
               </div>
             </Card>
+            </>
+            )}
           </TabsContent>
 
           {/* PROGRESS PHOTOS TAB */}
