@@ -1006,7 +1006,25 @@ export async function registerRoutes(
       const user = req.user as User;
       const isAdminOrPM = isAdminOrProjectManager(user);
       const chats = await storage.getProjectChats(req.params.projectId, user.id, isAdminOrPM);
-      res.json(chats);
+      
+      // Sanitize user data in participants (remove password, include role)
+      const sanitizedChats = chats.map(chat => ({
+        ...chat,
+        participants: chat.participants.map(p => ({
+          ...p,
+          user: p.user ? {
+            id: p.user.id,
+            name: p.user.name,
+            username: p.user.username,
+            profilePicture: p.user.profilePicture,
+            companyName: p.user.companyName,
+            companyType: p.user.companyType,
+            role: p.user.role
+          } : undefined
+        }))
+      }));
+      
+      res.json(sanitizedChats);
     } catch (error) {
       next(error);
     }

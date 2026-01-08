@@ -2380,6 +2380,7 @@ export default function ProjectDetails() {
                   setPendingImageForChat(null);
                   setSelectedChatForMessage(null);
                 }}
+                projectClient={apiProject?.client || null}
               />
             ) : (
             <>

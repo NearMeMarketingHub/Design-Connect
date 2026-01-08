@@ -17,6 +17,15 @@ interface ImageReference {
   category: string;
 }
 
+interface ProjectClient {
+  id: string;
+  name: string | null;
+  username: string;
+  email: string | null;
+  phone: string | null;
+  profilePicture: string | null;
+}
+
 interface ChatPanelProps {
   projectId: string;
   currentUserId: string;
@@ -25,6 +34,7 @@ interface ChatPanelProps {
   initialChatId?: string | null;
   initialImageReference?: ImageReference | null;
   onImageReferenceSent?: () => void;
+  projectClient?: ProjectClient | null;
 }
 
 interface ChatParticipant {
@@ -39,6 +49,7 @@ interface ChatParticipant {
     profilePicture: string | null;
     companyName: string | null;
     companyType: string | null;
+    role?: string;
   };
 }
 
@@ -106,7 +117,8 @@ export function ChatPanel({
   currentUserCompanyType,
   initialChatId,
   initialImageReference,
-  onImageReferenceSent
+  onImageReferenceSent,
+  projectClient
 }: ChatPanelProps) {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(initialChatId || null);
   const [messageInput, setMessageInput] = useState("");
@@ -288,9 +300,53 @@ export function ChatPanel({
     return readReceipts.filter((r: MessageRead) => r.messageId === lastMessage.id && r.userId !== currentUserId);
   };
 
-  // Get selectable participants for new chat (team members, excluding current user)
-  const getSelectableParticipants = () => {
-    return teamMembers.filter(member => member.contractorId !== currentUserId);
+  // Get selectable participants for new chat (team members + client for contractors, excluding current user)
+  type SelectableParticipant = {
+    id: string;
+    name: string | null;
+    username: string;
+    profilePicture: string | null;
+    role?: string;
+    isClient?: boolean;
+  };
+  
+  const getSelectableParticipants = (): SelectableParticipant[] => {
+    const participants: SelectableParticipant[] = [];
+    
+    // Add team members (contractors)
+    teamMembers
+      .filter(member => member.contractorId !== currentUserId)
+      .forEach(member => {
+        if (member.contractor) {
+          participants.push({
+            id: member.contractorId,
+            name: member.contractor.name,
+            username: member.contractor.username,
+            profilePicture: member.contractor.profilePicture,
+            role: member.role || undefined,
+            isClient: false
+          });
+        }
+      });
+    
+    // Add the project client for contractors/admins (if not the current user)
+    if (currentUserRole !== 'client' && projectClient && projectClient.id !== currentUserId) {
+      participants.push({
+        id: projectClient.id,
+        name: projectClient.name,
+        username: projectClient.username,
+        profilePicture: projectClient.profilePicture,
+        isClient: true
+      });
+    }
+    
+    return participants;
+  };
+
+  // Check if a chat is internal (only contractors, no clients)
+  const isInternalChat = (chat: Chat): boolean => {
+    if (!chat.participants || chat.participants.length === 0) return false;
+    return chat.participants.every(p => p.user?.role !== 'client');
   };
 
   if (chatsLoading) {
@@ -309,7 +365,7 @@ export function ChatPanel({
           <CardTitle className="text-lg">Messages</CardTitle>
           <CardDescription>Chat with your project team</CardDescription>
         </div>
-        {!selectedChatId && teamMembers.length > 0 && (
+        {!selectedChatId && (teamMembers.length > 0 || (currentUserRole !== 'client' && projectClient)) && (
           <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
             <DialogTrigger asChild>
               <Button size="sm" data-testid="button-new-chat">
@@ -325,34 +381,35 @@ export function ChatPanel({
                 <div>
                   <label className="text-sm font-medium mb-2 block">Select Participants</label>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {getSelectableParticipants().map((member: TeamMember) => (
-                      <div key={member.contractorId} className="flex items-center space-x-2">
+                    {getSelectableParticipants().map((participant) => (
+                      <div key={participant.id} className="flex items-center space-x-2">
                         <Checkbox
-                          id={member.contractorId}
-                          checked={selectedParticipants.includes(member.contractorId)}
+                          id={participant.id}
+                          checked={selectedParticipants.includes(participant.id)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedParticipants([...selectedParticipants, member.contractorId]);
+                              setSelectedParticipants([...selectedParticipants, participant.id]);
                             } else {
-                              setSelectedParticipants(selectedParticipants.filter(id => id !== member.contractorId));
+                              setSelectedParticipants(selectedParticipants.filter(id => id !== participant.id));
                             }
                           }}
                         />
-                        <label htmlFor={member.contractorId} className="text-sm cursor-pointer flex items-center gap-2">
+                        <label htmlFor={participant.id} className="text-sm cursor-pointer flex items-center gap-2">
                           <Avatar className="h-6 w-6">
-                            <AvatarImage src={member.contractor?.profilePicture || undefined} />
+                            <AvatarImage src={participant.profilePicture || undefined} />
                             <AvatarFallback className="text-xs">
-                              {(member.contractor?.name || member.contractor?.username || 'U').charAt(0).toUpperCase()}
+                              {(participant.name || participant.username || 'U').charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span>{member.contractor?.name || member.contractor?.username}</span>
-                          {member.role && <span className="text-muted-foreground">({member.role})</span>}
+                          <span>{participant.name || participant.username}</span>
+                          {participant.isClient && <Badge variant="secondary" className="text-xs">Client</Badge>}
+                          {participant.role && <span className="text-muted-foreground">({participant.role})</span>}
                         </label>
                       </div>
                     ))}
                   </div>
                   {getSelectableParticipants().length === 0 && (
-                    <p className="text-sm text-muted-foreground">No team members available to chat with.</p>
+                    <p className="text-sm text-muted-foreground">No participants available to chat with.</p>
                   )}
                 </div>
                 {selectedParticipants.length > 1 && (
@@ -440,16 +497,23 @@ export function ChatPanel({
                               {chat.lastMessagePreview}
                             </p>
                           )}
-                          {chat.type === 'group' && (
-                            <Badge variant="secondary" className="mt-1 text-xs">
-                              {chat.participants.length} members
-                            </Badge>
-                          )}
-                          {isAdminOrPM && !chat.participants.some(p => p.userId === currentUserId) && (
-                            <Badge variant="outline" className="mt-1 ml-2 text-xs">
-                              Viewing as {currentUserRole === 'admin' ? 'Admin' : 'PM'}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            {isInternalChat(chat) && currentUserRole !== 'client' && (
+                              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                Internal
+                              </Badge>
+                            )}
+                            {chat.type === 'group' && (
+                              <Badge variant="secondary" className="text-xs">
+                                {chat.participants.length} members
+                              </Badge>
+                            )}
+                            {isAdminOrPM && !chat.participants.some(p => p.userId === currentUserId) && (
+                              <Badge variant="outline" className="text-xs">
+                                Viewing as {currentUserRole === 'admin' ? 'Admin' : 'PM'}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
