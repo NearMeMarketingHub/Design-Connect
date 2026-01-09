@@ -46,6 +46,16 @@ Key data models include:
 - Estimates and line items
 - Invoices with recurring billing support
 - Inspiration images and messaging
+- E-Signature system (signing packets, participants, audit events)
+
+### E-Signature System
+BuildVision includes an in-app document e-signature system compliant with ESIGN/UETA requirements:
+- **Signing Packets**: Group documents with recipients, due dates, and custom messages
+- **Secure Token System**: SHA-256 hashed tokens stored in database; raw tokens sent only via email
+- **Signature Options**: Draw signatures on canvas or type name with 4 font styles (Dancing Script, Great Vibes, Pacifico, Allura)
+- **Audit Trail**: Comprehensive event logging (created, sent, viewed, signed, completed) with timestamps, IP addresses, user agents
+- **Email Notifications**: Signature requests sent via Resend integration with professional templates
+- **Public Signing Page**: Token-based access at `/sign/:token` for external recipients
 
 ### Authentication & Authorization
 - Session-based authentication with 30-day cookie expiration
