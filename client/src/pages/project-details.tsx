@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ImageViewerModal from "@/components/image-viewer-modal";
 import DocumentViewerModal from "@/components/document-viewer-modal";
+import SendForSignatureDialog from "@/components/send-for-signature-dialog";
 import { 
   ArrowLeft,
   Calendar,
@@ -1238,6 +1239,21 @@ export default function ProjectDetails() {
     },
     enabled: !!projectId,
   });
+
+  // Fetch signing packets
+  const { data: signingPackets = [] } = useQuery({
+    queryKey: ['/api/projects', projectId, 'signing-packets'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/signing-packets`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Send for signature state
+  const [sendForSignatureOpen, setSendForSignatureOpen] = useState(false);
+  const [documentToSign, setDocumentToSign] = useState<{ id: string; name: string } | null>(null);
 
   // Create document mutation
   const createDocumentMutation = useMutation({
@@ -3303,23 +3319,64 @@ export default function ProjectDetails() {
               )}
             </div>
 
-            {/* DocuSign Section - Coming Soon */}
-            <Card className="border-dashed border-2 bg-muted/30">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    <FileText className="w-8 h-8 text-primary" />
+            {/* Signing Packets Section */}
+            {signingPackets.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Send className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">Documents Awaiting Signature</CardTitle>
+                        <p className="text-xs text-muted-foreground">Track documents sent for electronic signature</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-lg">Digital Signatures</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Sign contracts and documents electronically - coming soon
-                    </p>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2">
+                    {signingPackets.map((packet: any) => (
+                      <div 
+                        key={packet.id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                        data-testid={`signing-packet-${packet.id}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{packet.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {packet.participants?.length || 0} recipient(s) • Created {new Date(packet.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {packet.status === 'completed' && (
+                            <Badge className="bg-green-500 text-white border-0">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Completed
+                            </Badge>
+                          )}
+                          {packet.status === 'pending' && (
+                            <Badge variant="outline" className="border-amber-500 text-amber-600">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )}
+                          {packet.status === 'cancelled' && (
+                            <Badge variant="outline" className="border-gray-400 text-gray-500">
+                              Cancelled
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Document Categories - Dynamic */}
             {documentsLoading ? (
@@ -3370,6 +3427,22 @@ export default function ProjectDetails() {
                                   <span className="text-sm truncate">{doc.name}</span>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
+                                  {canEdit && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDocumentToSign({ id: doc.id, name: doc.name });
+                                        setSendForSignatureOpen(true);
+                                      }}
+                                      title="Send for Signature"
+                                      data-testid={`button-sign-${doc.id}`}
+                                    >
+                                      <Send className="w-4 h-4 text-primary" />
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -3424,6 +3497,14 @@ export default function ProjectDetails() {
         document={documentToView}
         isOpen={documentViewerOpen}
         onClose={() => setDocumentViewerOpen(false)}
+      />
+
+      {/* Send for Signature Dialog */}
+      <SendForSignatureDialog
+        open={sendForSignatureOpen}
+        onOpenChange={setSendForSignatureOpen}
+        projectId={projectId || ""}
+        document={documentToSign}
       />
 
       {/* Upload Document Dialog */}
