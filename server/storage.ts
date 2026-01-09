@@ -40,7 +40,10 @@ import type {
   ChatParticipant, InsertChatParticipant,
   ChatMessage, InsertChatMessage,
   MessageRead, InsertMessageRead,
-  ProjectDocument, InsertProjectDocument
+  ProjectDocument, InsertProjectDocument,
+  SigningPacket, InsertSigningPacket,
+  SigningParticipant, InsertSigningParticipant,
+  SigningEvent, InsertSigningEvent
 } from "@shared/schema";
 
 export interface IStorage {
@@ -230,6 +233,22 @@ export interface IStorage {
 
   // Default chat creation
   createDefaultChatsForProject(projectId: string, clientId: string | null, teamMembers: { contractorId: string; role: string | null; name: string; companyName: string | null }[]): Promise<void>;
+
+  // Signing packet methods
+  getSigningPackets(projectId: string): Promise<SigningPacket[]>;
+  getSigningPacket(id: string): Promise<SigningPacket | undefined>;
+  createSigningPacket(packet: InsertSigningPacket): Promise<SigningPacket>;
+  updateSigningPacket(id: string, data: Partial<InsertSigningPacket>): Promise<SigningPacket | undefined>;
+
+  // Signing participant methods
+  getSigningParticipants(packetId: string): Promise<SigningParticipant[]>;
+  getSigningParticipantByToken(token: string): Promise<SigningParticipant | undefined>;
+  createSigningParticipant(participant: InsertSigningParticipant): Promise<SigningParticipant>;
+  updateSigningParticipant(id: string, data: Partial<SigningParticipant>): Promise<SigningParticipant | undefined>;
+
+  // Signing event methods
+  getSigningEvents(packetId: string): Promise<SigningEvent[]>;
+  createSigningEvent(event: InsertSigningEvent): Promise<SigningEvent>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1499,6 +1518,67 @@ export class DatabaseStorage implements IStorage {
         content: `Welcome to the team chat for ${project.name}! This is where everyone involved in the project can communicate together.`
       });
     }
+  }
+
+  // Signing packet methods
+  async getSigningPackets(projectId: string): Promise<SigningPacket[]> {
+    return await db.select().from(schema.signingPackets)
+      .where(eq(schema.signingPackets.projectId, projectId));
+  }
+
+  async getSigningPacket(id: string): Promise<SigningPacket | undefined> {
+    const [packet] = await db.select().from(schema.signingPackets)
+      .where(eq(schema.signingPackets.id, id));
+    return packet;
+  }
+
+  async createSigningPacket(packet: InsertSigningPacket): Promise<SigningPacket> {
+    const [created] = await db.insert(schema.signingPackets).values(packet).returning();
+    return created;
+  }
+
+  async updateSigningPacket(id: string, data: Partial<InsertSigningPacket>): Promise<SigningPacket | undefined> {
+    const [updated] = await db.update(schema.signingPackets)
+      .set(data)
+      .where(eq(schema.signingPackets.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Signing participant methods
+  async getSigningParticipants(packetId: string): Promise<SigningParticipant[]> {
+    return await db.select().from(schema.signingParticipants)
+      .where(eq(schema.signingParticipants.packetId, packetId));
+  }
+
+  async getSigningParticipantByToken(token: string): Promise<SigningParticipant | undefined> {
+    const [participant] = await db.select().from(schema.signingParticipants)
+      .where(eq(schema.signingParticipants.accessToken, token));
+    return participant;
+  }
+
+  async createSigningParticipant(participant: InsertSigningParticipant): Promise<SigningParticipant> {
+    const [created] = await db.insert(schema.signingParticipants).values(participant).returning();
+    return created;
+  }
+
+  async updateSigningParticipant(id: string, data: Partial<SigningParticipant>): Promise<SigningParticipant | undefined> {
+    const [updated] = await db.update(schema.signingParticipants)
+      .set(data)
+      .where(eq(schema.signingParticipants.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Signing event methods
+  async getSigningEvents(packetId: string): Promise<SigningEvent[]> {
+    return await db.select().from(schema.signingEvents)
+      .where(eq(schema.signingEvents.packetId, packetId));
+  }
+
+  async createSigningEvent(event: InsertSigningEvent): Promise<SigningEvent> {
+    const [created] = await db.insert(schema.signingEvents).values(event).returning();
+    return created;
   }
 }
 
