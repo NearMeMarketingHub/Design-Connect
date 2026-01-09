@@ -2164,6 +2164,268 @@ export async function registerRoutes(
     }
   });
 
+  // ============= Document Signing Routes =============
+  
+  // Get all signing packets for a project
+  app.get("/api/projects/:projectId/signing-packets", requireAuth, async (req, res, next) => {
+    try {
+      const packets = await storage.getSigningPackets(req.params.projectId);
+      // Get participants for each packet
+      const packetsWithParticipants = await Promise.all(
+        packets.map(async (packet) => {
+          const participants = await storage.getSigningParticipants(packet.id);
+          return { ...packet, participants };
+        })
+      );
+      res.json(packetsWithParticipants);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get single signing packet with details
+  app.get("/api/signing-packets/:id", requireAuth, async (req, res, next) => {
+    try {
+      const packet = await storage.getSigningPacket(req.params.id);
+      if (!packet) {
+        return res.status(404).json({ message: "Signing packet not found" });
+      }
+      const participants = await storage.getSigningParticipants(packet.id);
+      const events = await storage.getSigningEvents(packet.id);
+      res.json({ ...packet, participants, events });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Create a new signing packet (send document for signature)
+  app.post("/api/projects/:projectId/signing-packets", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const { documentId, title, message, dueDate, recipients } = req.body;
+      
+      if (!title || !recipients || recipients.length === 0) {
+        return res.status(400).json({ message: "Title and at least one recipient are required" });
+      }
+      
+      // Create the signing packet
+      const packet = await storage.createSigningPacket({
+        projectId: req.params.projectId,
+        documentId: documentId || null,
+        title,
+        message,
+        status: 'pending',
+        createdById: user.id,
+        createdByName: user.name || user.username,
+        dueDate: dueDate ? new Date(dueDate) : null
+      });
+      
+      // Create participants
+      const createdParticipants = await Promise.all(
+        recipients.map(async (recipient: { email: string; name: string; order?: number }, index: number) => {
+          return storage.createSigningParticipant({
+            packetId: packet.id,
+            email: recipient.email,
+            name: recipient.name,
+            role: 'signer',
+            signingOrder: recipient.order || index + 1,
+            status: 'pending'
+          });
+        })
+      );
+      
+      // Create audit event
+      await storage.createSigningEvent({
+        packetId: packet.id,
+        eventType: 'created',
+        actorName: user.name || user.username,
+        actorEmail: user.email || undefined,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+      
+      // Log sent event
+      await storage.createSigningEvent({
+        packetId: packet.id,
+        eventType: 'sent',
+        actorName: user.name || user.username,
+        actorEmail: user.email || undefined,
+        metadata: JSON.stringify({ recipientCount: recipients.length })
+      });
+      
+      res.json({ ...packet, participants: createdParticipants });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Public: Get signing packet by access token (for signing page)
+  app.get("/api/sign/:token", async (req, res, next) => {
+    try {
+      const participant = await storage.getSigningParticipantByToken(req.params.token);
+      if (!participant) {
+        return res.status(404).json({ message: "Invalid or expired signing link" });
+      }
+      
+      const packet = await storage.getSigningPacket(participant.packetId);
+      if (!packet) {
+        return res.status(404).json({ message: "Signing packet not found" });
+      }
+      
+      if (packet.status === 'cancelled') {
+        return res.status(400).json({ message: "This signing request has been cancelled" });
+      }
+      
+      if (packet.status === 'completed') {
+        return res.status(400).json({ message: "This document has already been signed" });
+      }
+      
+      // Mark as viewed if not already
+      if (!participant.viewedAt) {
+        await storage.updateSigningParticipant(participant.id, {
+          viewedAt: new Date(),
+          status: 'viewed'
+        });
+        await storage.createSigningEvent({
+          packetId: packet.id,
+          participantId: participant.id,
+          eventType: 'viewed',
+          actorName: participant.name,
+          actorEmail: participant.email,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+      }
+      
+      // Get document info if available
+      let document = null;
+      if (packet.documentId) {
+        document = await storage.getProjectDocument(packet.documentId);
+      }
+      
+      res.json({
+        packet: {
+          id: packet.id,
+          title: packet.title,
+          message: packet.message,
+          dueDate: packet.dueDate
+        },
+        participant: {
+          id: participant.id,
+          name: participant.name,
+          email: participant.email,
+          status: participant.status
+        },
+        document: document ? {
+          name: document.name,
+          fileUrl: document.fileUrl,
+          mimeType: document.mimeType
+        } : null
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Public: Submit signature
+  app.post("/api/sign/:token", async (req, res, next) => {
+    try {
+      const { signatureData, signatureType } = req.body;
+      
+      if (!signatureData) {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+      
+      const participant = await storage.getSigningParticipantByToken(req.params.token);
+      if (!participant) {
+        return res.status(404).json({ message: "Invalid or expired signing link" });
+      }
+      
+      if (participant.status === 'signed') {
+        return res.status(400).json({ message: "You have already signed this document" });
+      }
+      
+      const packet = await storage.getSigningPacket(participant.packetId);
+      if (!packet || packet.status === 'cancelled') {
+        return res.status(400).json({ message: "This signing request is no longer valid" });
+      }
+      
+      // Update participant with signature
+      await storage.updateSigningParticipant(participant.id, {
+        signatureData,
+        signatureType: signatureType || 'drawn',
+        signedAt: new Date(),
+        status: 'signed',
+        signerIp: req.ip,
+        signerAgent: req.headers['user-agent']
+      });
+      
+      // Create signed event
+      await storage.createSigningEvent({
+        packetId: packet.id,
+        participantId: participant.id,
+        eventType: 'signed',
+        actorName: participant.name,
+        actorEmail: participant.email,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: JSON.stringify({ signatureType: signatureType || 'drawn' })
+      });
+      
+      // Check if all participants have signed
+      const allParticipants = await storage.getSigningParticipants(packet.id);
+      const allSigned = allParticipants.every(p => p.status === 'signed');
+      
+      if (allSigned) {
+        await storage.updateSigningPacket(packet.id, {
+          status: 'completed',
+          completedAt: new Date()
+        });
+        await storage.createSigningEvent({
+          packetId: packet.id,
+          eventType: 'completed',
+          actorName: 'System',
+          metadata: JSON.stringify({ completedAt: new Date().toISOString() })
+        });
+      }
+      
+      res.json({ 
+        message: "Document signed successfully",
+        allSigned
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Cancel a signing packet
+  app.post("/api/signing-packets/:id/cancel", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const packet = await storage.getSigningPacket(req.params.id);
+      
+      if (!packet) {
+        return res.status(404).json({ message: "Signing packet not found" });
+      }
+      
+      if (packet.status === 'completed') {
+        return res.status(400).json({ message: "Cannot cancel a completed signing request" });
+      }
+      
+      await storage.updateSigningPacket(req.params.id, { status: 'cancelled' });
+      await storage.createSigningEvent({
+        packetId: packet.id,
+        eventType: 'cancelled',
+        actorName: user.name || user.username,
+        actorEmail: user.email || undefined
+      });
+      
+      res.json({ message: "Signing request cancelled" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Register object storage routes
   registerObjectStorageRoutes(app);
 
