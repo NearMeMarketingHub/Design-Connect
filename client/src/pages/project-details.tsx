@@ -1209,7 +1209,8 @@ export default function ProjectDetails() {
   // Document upload state
   const [uploadDocumentOpen, setUploadDocumentOpen] = useState(false);
   const [newDocumentType, setNewDocumentType] = useState<string>("");
-  const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; url: string; size: number; mimeType: string } | null>(null);
+  const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch project documents
@@ -1270,21 +1271,55 @@ export default function ProjectDetails() {
     }
   });
 
-  // Handle document file upload
+  // Handle document file upload using presigned URLs
   const handleDocumentFileUpload = async (files: FileList) => {
     const file = files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    setIsUploadingDocument(true);
+    try {
+      // Step 1: Get presigned URL from server
+      const urlResponse = await fetch('/api/uploads/request-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || 'application/octet-stream'
+        })
+      });
+      
+      if (!urlResponse.ok) {
+        throw new Error('Failed to get upload URL');
+      }
+      
+      const { uploadURL, objectPath } = await urlResponse.json();
+      
+      // Step 2: Upload file directly to cloud storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' }
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
+      }
+      
+      // Store file info for creating document record
       setNewDocumentFile({
         name: file.name,
-        url: e.target?.result as string,
+        objectPath: objectPath,
         size: file.size,
-        mimeType: file.type
+        mimeType: file.type || 'application/octet-stream'
       });
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload file. Please try again.');
+    } finally {
+      setIsUploadingDocument(false);
+    }
   };
 
   const handleCreateDocument = () => {
@@ -1292,7 +1327,7 @@ export default function ProjectDetails() {
     createDocumentMutation.mutate({
       name: newDocumentFile.name,
       type: newDocumentType,
-      fileUrl: newDocumentFile.url,
+      fileUrl: newDocumentFile.objectPath,
       fileSize: newDocumentFile.size,
       mimeType: newDocumentFile.mimeType
     });
@@ -3385,9 +3420,14 @@ export default function ProjectDetails() {
                   }
                 }}
               />
-              {newDocumentFile ? (
+              {isUploadingDocument ? (
                 <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
+                  <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full" />
+                  <span className="text-sm flex-1">Uploading file...</span>
+                </div>
+              ) : newDocumentFile ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
                   <span className="text-sm flex-1 truncate">{newDocumentFile.name}</span>
                   <Button
                     variant="ghost"
@@ -3424,10 +3464,10 @@ export default function ProjectDetails() {
             </Button>
             <Button
               onClick={handleCreateDocument}
-              disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending}
+              disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending || isUploadingDocument}
               data-testid="button-submit-document"
             >
-              {createDocumentMutation.isPending ? 'Uploading...' : 'Upload'}
+              {createDocumentMutation.isPending ? 'Saving...' : 'Save Document'}
             </Button>
           </DialogFooter>
         </DialogContent>
