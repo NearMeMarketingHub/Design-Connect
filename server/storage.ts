@@ -39,7 +39,8 @@ import type {
   Chat, InsertChat,
   ChatParticipant, InsertChatParticipant,
   ChatMessage, InsertChatMessage,
-  MessageRead, InsertMessageRead
+  MessageRead, InsertMessageRead,
+  ProjectDocument, InsertProjectDocument
 } from "@shared/schema";
 
 export interface IStorage {
@@ -125,6 +126,13 @@ export interface IStorage {
   getContractorPhoto(id: string): Promise<ContractorPhoto | undefined>;
   createContractorPhoto(photo: InsertContractorPhoto): Promise<ContractorPhoto>;
   deleteContractorPhoto(id: string): Promise<void>;
+
+  // Project document methods
+  getProjectDocuments(projectId: string): Promise<ProjectDocument[]>;
+  getProjectDocumentsByType(projectId: string, type: string): Promise<ProjectDocument[]>;
+  getProjectDocument(id: string): Promise<ProjectDocument | undefined>;
+  createProjectDocument(doc: InsertProjectDocument): Promise<ProjectDocument>;
+  deleteProjectDocument(id: string): Promise<void>;
 
   // Post comment methods
   getPostComments(postId: string): Promise<PostComment[]>;
@@ -615,6 +623,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContractorPhoto(id: string): Promise<void> {
     await db.delete(schema.contractorPhotos).where(eq(schema.contractorPhotos.id, id));
+  }
+
+  // Project document methods
+  async getProjectDocuments(projectId: string): Promise<ProjectDocument[]> {
+    return await db.select().from(schema.projectDocuments).where(eq(schema.projectDocuments.projectId, projectId));
+  }
+
+  async getProjectDocumentsByType(projectId: string, type: string): Promise<ProjectDocument[]> {
+    return await db.select().from(schema.projectDocuments).where(
+      and(
+        eq(schema.projectDocuments.projectId, projectId),
+        eq(schema.projectDocuments.type, type)
+      )
+    );
+  }
+
+  async getProjectDocument(id: string): Promise<ProjectDocument | undefined> {
+    const [doc] = await db.select().from(schema.projectDocuments).where(eq(schema.projectDocuments.id, id));
+    return doc;
+  }
+
+  async createProjectDocument(insertDoc: InsertProjectDocument): Promise<ProjectDocument> {
+    const [doc] = await db.insert(schema.projectDocuments).values(insertDoc).returning();
+    return doc;
+  }
+
+  async deleteProjectDocument(id: string): Promise<void> {
+    await db.delete(schema.projectDocuments).where(eq(schema.projectDocuments.id, id));
   }
 
   // Post comment methods

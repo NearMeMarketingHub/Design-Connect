@@ -450,3 +450,21 @@ export const messageReads = pgTable("message_reads", {
 export const insertMessageReadSchema = createInsertSchema(messageReads).omit({ id: true, readAt: true });
 export type InsertMessageRead = z.infer<typeof insertMessageReadSchema>;
 export type MessageRead = typeof messageReads.$inferSelect;
+
+// Project documents - files uploaded by contractors/admins
+export const projectDocuments = pgTable("project_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'contracts', 'plans', 'permits', 'invoices', 'warranties'
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedById: varchar("uploaded_by_id"),
+  uploadedByName: text("uploaded_by_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectDocumentSchema = createInsertSchema(projectDocuments).omit({ id: true, createdAt: true });
+export type InsertProjectDocument = z.infer<typeof insertProjectDocumentSchema>;
+export type ProjectDocument = typeof projectDocuments.$inferSelect;
