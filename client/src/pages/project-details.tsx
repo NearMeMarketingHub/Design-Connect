@@ -69,6 +69,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -1212,6 +1222,10 @@ export default function ProjectDetails() {
   const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Delete document confirmation dialog
+  const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch project documents
   const { data: projectDocuments = [], isLoading: documentsLoading } = useQuery({
@@ -1333,9 +1347,16 @@ export default function ProjectDetails() {
     });
   };
 
-  const handleDeleteDocument = (documentId: string) => {
-    if (confirm('Are you sure you want to delete this document?')) {
-      deleteDocumentMutation.mutate(documentId);
+  const handleDeleteDocument = (doc: { id: string; name: string }) => {
+    setDocumentToDelete(doc);
+    setDeleteDocumentDialogOpen(true);
+  };
+  
+  const confirmDeleteDocument = () => {
+    if (documentToDelete) {
+      deleteDocumentMutation.mutate(documentToDelete.id);
+      setDeleteDocumentDialogOpen(false);
+      setDocumentToDelete(null);
     }
   };
 
@@ -3345,7 +3366,7 @@ export default function ProjectDetails() {
                                       className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleDeleteDocument(doc.id);
+                                        handleDeleteDocument({ id: doc.id, name: doc.name });
                                       }}
                                       data-testid={`button-delete-${doc.id}`}
                                     >
@@ -3472,6 +3493,27 @@ export default function ProjectDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Document Confirmation Dialog */}
+      <AlertDialog open={deleteDocumentDialogOpen} onOpenChange={setDeleteDocumentDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{documentToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDocumentToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteDocument}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Message Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
