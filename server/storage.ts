@@ -2,6 +2,16 @@ import { eq, and, not, isNull, like, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+
+// Secure token hashing utility for signing tokens
+export function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export function generateSecureToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 // Helper function to generate project slug ID
 // Format: lowercased name (no spaces/special chars) + MMYYYY
@@ -1552,8 +1562,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSigningParticipantByToken(token: string): Promise<SigningParticipant | undefined> {
+    // Hash the incoming token and look up by the hash
+    const tokenHash = hashToken(token);
     const [participant] = await db.select().from(schema.signingParticipants)
-      .where(eq(schema.signingParticipants.accessToken, token));
+      .where(eq(schema.signingParticipants.accessToken, tokenHash));
     return participant;
   }
 

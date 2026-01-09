@@ -2166,15 +2166,29 @@ export async function registerRoutes(
 
   // ============= Document Signing Routes =============
   
+  // Helper to strip sensitive data from participant
+  const sanitizeParticipant = (p: any) => ({
+    id: p.id,
+    packetId: p.packetId,
+    name: p.name,
+    email: p.email,
+    role: p.role,
+    status: p.status,
+    signingOrder: p.signingOrder,
+    viewedAt: p.viewedAt,
+    signedAt: p.signedAt
+    // Note: accessToken, signatureData, signerIp, signerAgent are NOT returned
+  });
+
   // Get all signing packets for a project
   app.get("/api/projects/:projectId/signing-packets", requireAuth, async (req, res, next) => {
     try {
       const packets = await storage.getSigningPackets(req.params.projectId);
-      // Get participants for each packet
+      // Get participants for each packet (without sensitive data)
       const packetsWithParticipants = await Promise.all(
         packets.map(async (packet) => {
           const participants = await storage.getSigningParticipants(packet.id);
-          return { ...packet, participants };
+          return { ...packet, participants: participants.map(sanitizeParticipant) };
         })
       );
       res.json(packetsWithParticipants);
@@ -2192,7 +2206,8 @@ export async function registerRoutes(
       }
       const participants = await storage.getSigningParticipants(packet.id);
       const events = await storage.getSigningEvents(packet.id);
-      res.json({ ...packet, participants, events });
+      // Sanitize participants to not expose access tokens
+      res.json({ ...packet, participants: participants.map(sanitizeParticipant), events });
     } catch (error) {
       next(error);
     }
@@ -2220,17 +2235,29 @@ export async function registerRoutes(
         dueDate: dueDate ? new Date(dueDate) : null
       });
       
-      // Create participants
+      // Create participants with hashed tokens
+      const { generateSecureToken, hashToken } = await import("./storage");
+      const participantsWithRawTokens: Array<{ participant: any; rawToken: string }> = [];
+      
       const createdParticipants = await Promise.all(
         recipients.map(async (recipient: { email: string; name: string; order?: number }, index: number) => {
-          return storage.createSigningParticipant({
+          // Generate raw token and hash it for secure storage
+          const rawToken = generateSecureToken();
+          const tokenHash = hashToken(rawToken);
+          
+          const participant = await storage.createSigningParticipant({
             packetId: packet.id,
             email: recipient.email,
             name: recipient.name,
             role: 'signer',
             signingOrder: recipient.order || index + 1,
-            status: 'pending'
+            status: 'pending',
+            accessToken: tokenHash // Store only the hash
           });
+          
+          // Keep raw token temporarily for email sending (never stored)
+          participantsWithRawTokens.push({ participant, rawToken });
+          return participant;
         })
       );
       
@@ -2253,7 +2280,28 @@ export async function registerRoutes(
         metadata: JSON.stringify({ recipientCount: recipients.length })
       });
       
-      res.json({ ...packet, participants: createdParticipants });
+      // Send email notifications with raw tokens (never stored)
+      try {
+        const { sendSignatureRequestEmail } = await import("./email");
+        await Promise.all(
+          participantsWithRawTokens.map(async ({ participant, rawToken }) => {
+            await sendSignatureRequestEmail(participant.email, {
+              recipientName: participant.name,
+              documentTitle: title,
+              senderName: user.name || user.username,
+              message: message || undefined,
+              accessToken: rawToken, // Use raw token for email link (never stored)
+              dueDate: dueDate ? new Date(dueDate) : null
+            });
+          })
+        );
+      } catch (emailError) {
+        console.error('Failed to send signature request emails:', emailError);
+        // Don't fail the request if email fails
+      }
+      
+      // Return packet with sanitized participants (no access tokens exposed)
+      res.json({ ...packet, participants: createdParticipants.map(sanitizeParticipant) });
     } catch (error) {
       next(error);
     }
