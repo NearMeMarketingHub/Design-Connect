@@ -1221,6 +1221,7 @@ export default function ProjectDetails() {
   const [newDocumentType, setNewDocumentType] = useState<string>("");
   const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   
   // Delete document confirmation dialog
@@ -1285,14 +1286,17 @@ export default function ProjectDetails() {
     }
   });
 
-  // Handle document file upload using presigned URLs
+  // Handle document file upload using presigned URLs with progress tracking
   const handleDocumentFileUpload = async (files: FileList) => {
     const file = files[0];
     if (!file) return;
     
     setIsUploadingDocument(true);
+    setUploadProgress(0);
+    
     try {
       // Step 1: Get presigned URL from server
+      setUploadProgress(5);
       const urlResponse = await fetch('/api/uploads/request-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1309,17 +1313,35 @@ export default function ProjectDetails() {
       }
       
       const { uploadURL, objectPath } = await urlResponse.json();
+      setUploadProgress(10);
       
-      // Step 2: Upload file directly to cloud storage
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type || 'application/octet-stream' }
+      // Step 2: Upload file with XMLHttpRequest for progress tracking
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 85) + 10;
+            setUploadProgress(Math.min(percentComplete, 95));
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadProgress(100);
+            resolve();
+          } else {
+            reject(new Error('Failed to upload file'));
+          }
+        });
+        
+        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        
+        xhr.open('PUT', uploadURL);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.send(file);
       });
-      
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
       
       // Store file info for creating document record
       setNewDocumentFile({
@@ -1331,6 +1353,7 @@ export default function ProjectDetails() {
     } catch (error) {
       console.error('Upload error:', error);
       alert('Failed to upload file. Please try again.');
+      setUploadProgress(0);
     } finally {
       setIsUploadingDocument(false);
     }
@@ -3442,9 +3465,12 @@ export default function ProjectDetails() {
                 }}
               />
               {isUploadingDocument ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
-                  <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full" />
-                  <span className="text-sm flex-1">Uploading file...</span>
+                <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Uploading...</span>
+                    <span className="text-sm font-semibold text-primary">{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-2" />
                 </div>
               ) : newDocumentFile ? (
                 <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
