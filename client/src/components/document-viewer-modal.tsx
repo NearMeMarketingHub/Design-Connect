@@ -77,7 +77,7 @@ export default function DocumentViewerModal({
         ) : isPdf ? (
           <iframe
             src={document.src}
-            className="w-full max-w-7xl h-[90vh] bg-white rounded-lg shadow-2xl"
+            className="w-[95vw] h-[90vh] bg-white rounded-lg shadow-2xl"
             title={document.name}
             data-testid="iframe-pdf-viewer"
           />
