@@ -885,6 +885,81 @@ export async function registerRoutes(
     }
   });
 
+  // Project Document routes (contractor/admin can upload, all authenticated users can view)
+  app.get("/api/projects/:projectId/documents", requireAuth, async (req, res, next) => {
+    try {
+      const documents = await storage.getProjectDocuments(req.params.projectId);
+      res.json(documents);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectId/documents/type/:type", requireAuth, async (req, res, next) => {
+    try {
+      const documents = await storage.getProjectDocumentsByType(req.params.projectId, req.params.type);
+      res.json(documents);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/documents/:documentId", requireAuth, async (req, res, next) => {
+    try {
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      res.json(document);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/documents", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      // Only contractors and admins can upload documents
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can upload documents" });
+      }
+      
+      const document = await storage.createProjectDocument({
+        ...req.body,
+        projectId: req.params.projectId,
+        uploadedById: user.id,
+        uploadedByName: user.name || 'Contractor',
+      });
+      res.json(document);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/documents/:documentId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Check document ownership - admins can delete any, contractors only their own
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (user.role !== 'admin' && document.uploadedById !== user.id) {
+        return res.status(403).json({ message: "You can only delete your own documents" });
+      }
+      
+      await storage.deleteProjectDocument(req.params.documentId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Comment routes
   app.get("/api/posts/:postId/comments", async (req, res, next) => {
     try {
