@@ -1,6 +1,6 @@
 # BuildVision - Project To-Do List
 
-Last Updated: December 16, 2025
+Last Updated: January 9, 2026
 
 ---
 
@@ -69,7 +69,7 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Plans and Drawings section for Client
 
 ### Integrations
-- [ ] Implementing Docusign
+- [ ] PandaDocs Integration - Document creation from templates, e-signature collection, embedded signing in-app, webhooks for signed notifications, status tracking (viewed/signed/completed). Use for construction contracts, change orders, and client approvals.
 
 ### Branding
 - [ ] Changing the logo and app name when completed
