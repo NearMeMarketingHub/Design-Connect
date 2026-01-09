@@ -13,16 +13,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Send, FileText, CalendarIcon } from "lucide-react";
+import { Plus, Trash2, Send, FileText, CalendarIcon, PenTool, Type, CalendarDays } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Recipient {
   id: string;
   name: string;
   email: string;
+}
+
+interface SigningField {
+  id: string;
+  fieldType: "signature" | "initials" | "date" | "text";
+  pageNumber: number;
+  position: "top" | "middle" | "bottom";
+  recipientIndex: number;
 }
 
 interface SendForSignatureDialogProps {
@@ -47,6 +56,9 @@ export default function SendForSignatureDialog({
   const [recipients, setRecipients] = useState<Recipient[]>([
     { id: crypto.randomUUID(), name: "", email: "" },
   ]);
+  const [signingFields, setSigningFields] = useState<SigningField[]>([
+    { id: crypto.randomUUID(), fieldType: "signature", pageNumber: 1, position: "bottom", recipientIndex: 0 },
+  ]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -57,6 +69,7 @@ export default function SendForSignatureDialog({
       message: string;
       dueDate?: Date;
       recipients: { name: string; email: string }[];
+      fields: { fieldType: string; pageNumber: number; position: string; recipientIndex: number }[];
     }) => {
       const response = await fetch(`/api/projects/${projectId}/signing-packets`, {
         method: "POST",
@@ -93,6 +106,7 @@ export default function SendForSignatureDialog({
     setMessage("");
     setDueDate(undefined);
     setRecipients([{ id: crypto.randomUUID(), name: "", email: "" }]);
+    setSigningFields([{ id: crypto.randomUUID(), fieldType: "signature", pageNumber: 1, position: "bottom", recipientIndex: 0 }]);
   };
 
   const addRecipient = () => {
@@ -111,9 +125,29 @@ export default function SendForSignatureDialog({
     );
   };
 
+  const addSigningField = () => {
+    setSigningFields([
+      ...signingFields,
+      { id: crypto.randomUUID(), fieldType: "signature", pageNumber: 1, position: "bottom", recipientIndex: 0 },
+    ]);
+  };
+
+  const removeSigningField = (id: string) => {
+    if (signingFields.length > 1) {
+      setSigningFields(signingFields.filter((f) => f.id !== id));
+    }
+  };
+
+  const updateSigningField = (id: string, updates: Partial<SigningField>) => {
+    setSigningFields(
+      signingFields.map((f) => (f.id === id ? { ...f, ...updates } : f))
+    );
+  };
+
   const canSend =
     title.trim() &&
-    recipients.every((r) => r.name.trim() && r.email.trim() && r.email.includes("@"));
+    recipients.every((r) => r.name.trim() && r.email.trim() && r.email.includes("@")) &&
+    signingFields.length > 0;
 
   const handleSend = () => {
     if (!canSend) return;
@@ -124,12 +158,25 @@ export default function SendForSignatureDialog({
       message: message.trim(),
       dueDate,
       recipients: recipients.map((r) => ({ name: r.name.trim(), email: r.email.trim() })),
+      fields: signingFields.map((f) => ({
+        fieldType: f.fieldType,
+        pageNumber: f.pageNumber,
+        position: f.position,
+        recipientIndex: f.recipientIndex,
+      })),
     });
+  };
+
+  const fieldTypeConfig = {
+    signature: { label: "Signature", icon: PenTool, color: "text-blue-500" },
+    initials: { label: "Initials", icon: Type, color: "text-purple-500" },
+    date: { label: "Date", icon: CalendarDays, color: "text-green-500" },
+    text: { label: "Text", icon: Type, color: "text-gray-500" },
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-5 w-5" />
@@ -247,6 +294,115 @@ export default function SendForSignatureDialog({
                       onClick={() => removeRecipient(recipient.id)}
                       className="h-9 w-9 text-destructive hover:text-destructive"
                       data-testid={`button-remove-recipient-${index}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Signature Fields</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={addSigningField}
+                className="gap-1 text-xs"
+                data-testid="button-add-field"
+              >
+                <Plus className="h-3 w-3" />
+                Add Field
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Define where signers should sign, initial, or enter dates on the document.
+            </p>
+
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              {signingFields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg"
+                >
+                  <div className="flex-1 grid grid-cols-4 gap-2">
+                    <Select
+                      value={field.fieldType}
+                      onValueChange={(value: "signature" | "initials" | "date" | "text") =>
+                        updateSigningField(field.id, { fieldType: value })
+                      }
+                    >
+                      <SelectTrigger data-testid={`select-field-type-${index}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="signature">Signature</SelectItem>
+                        <SelectItem value="initials">Initials</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="text">Text</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(field.pageNumber)}
+                      onValueChange={(value) =>
+                        updateSigningField(field.id, { pageNumber: parseInt(value) })
+                      }
+                    >
+                      <SelectTrigger data-testid={`select-page-${index}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Page 1</SelectItem>
+                        <SelectItem value="2">Page 2</SelectItem>
+                        <SelectItem value="3">Page 3</SelectItem>
+                        <SelectItem value="4">Page 4</SelectItem>
+                        <SelectItem value="5">Page 5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={field.position}
+                      onValueChange={(value: "top" | "middle" | "bottom") =>
+                        updateSigningField(field.id, { position: value })
+                      }
+                    >
+                      <SelectTrigger data-testid={`select-position-${index}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="top">Top</SelectItem>
+                        <SelectItem value="middle">Middle</SelectItem>
+                        <SelectItem value="bottom">Bottom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(field.recipientIndex)}
+                      onValueChange={(value) =>
+                        updateSigningField(field.id, { recipientIndex: parseInt(value) })
+                      }
+                    >
+                      <SelectTrigger data-testid={`select-recipient-${index}`}>
+                        <SelectValue placeholder="Signer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {recipients.map((r, i) => (
+                          <SelectItem key={r.id} value={String(i)}>
+                            {r.name || `Recipient ${i + 1}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {signingFields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeSigningField(field.id)}
+                      className="h-9 w-9 text-destructive hover:text-destructive"
+                      data-testid={`button-remove-field-${index}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

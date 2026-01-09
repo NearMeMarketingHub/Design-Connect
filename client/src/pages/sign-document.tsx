@@ -19,6 +19,18 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+interface SigningField {
+  id: string;
+  fieldType: string;
+  pageNumber: number;
+  xPosition: number;
+  yPosition: number;
+  width: number;
+  height: number;
+  isRequired: boolean;
+  label?: string;
+}
+
 interface SigningData {
   packet: {
     id: string;
@@ -37,6 +49,7 @@ interface SigningData {
     fileUrl: string;
     mimeType?: string;
   } | null;
+  fields?: SigningField[];
 }
 
 export default function SignDocumentPage() {
@@ -246,6 +259,25 @@ export default function SignDocumentPage() {
                     <p>Preview not available. Please download the document to view.</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {data.fields && data.fields.length > 0 && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Required Fields</h4>
+                <div className="flex flex-wrap gap-2">
+                  {data.fields.map((field, index) => (
+                    <span 
+                      key={field.id} 
+                      className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                    >
+                      {field.fieldType === 'signature' ? 'Signature' : 
+                       field.fieldType === 'initials' ? 'Initials' : 
+                       field.fieldType === 'date' ? 'Date' : 'Text'} 
+                      {' '}(Page {field.pageNumber})
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>

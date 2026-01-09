@@ -2217,7 +2217,7 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/signing-packets", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const { documentId, title, message, dueDate, recipients } = req.body;
+      const { documentId, title, message, dueDate, recipients, fields } = req.body;
       
       if (!title || !recipients || recipients.length === 0) {
         return res.status(400).json({ message: "Title and at least one recipient are required" });
@@ -2261,6 +2261,41 @@ export async function registerRoutes(
         })
       );
       
+      // Create signing fields if provided (only if we have participants)
+      if (fields && Array.isArray(fields) && fields.length > 0 && createdParticipants.length > 0) {
+        const positionMap = { top: 10, middle: 50, bottom: 85 };
+        await Promise.all(
+          fields.map(async (field: { fieldType: string; pageNumber: number; position: string; recipientIndex: number }) => {
+            // Always use a valid participant - fallback to first if index is out of bounds
+            const recipientIdx = Math.min(field.recipientIndex || 0, createdParticipants.length - 1);
+            const participant = createdParticipants[recipientIdx];
+            
+            // Only create field if we have a valid participant with an ID
+            if (participant?.id) {
+              await storage.createSigningField({
+                packetId: packet.id,
+                participantId: participant.id,
+                fieldType: field.fieldType,
+                pageNumber: field.pageNumber,
+                xPosition: 50, // Center horizontally
+                yPosition: positionMap[field.position as keyof typeof positionMap] || 85,
+                width: field.fieldType === 'signature' ? 30 : 15,
+                height: field.fieldType === 'signature' ? 10 : 5,
+                isRequired: true
+              });
+            }
+          })
+        );
+      }
+
+      // Update document signature status if linked
+      if (documentId) {
+        await storage.updateProjectDocument(documentId, {
+          signatureStatus: 'pending_signature',
+          pendingPacketId: packet.id
+        });
+      }
+
       // Create audit event
       await storage.createSigningEvent({
         packetId: packet.id,
@@ -2351,6 +2386,10 @@ export async function registerRoutes(
         document = await storage.getProjectDocument(packet.documentId);
       }
       
+      // Get signing fields for this participant
+      const allFields = await storage.getSigningFields(packet.id);
+      const participantFields = allFields.filter(f => f.participantId === participant.id);
+      
       res.json({
         packet: {
           id: packet.id,
@@ -2368,7 +2407,18 @@ export async function registerRoutes(
           name: document.name,
           fileUrl: document.fileUrl,
           mimeType: document.mimeType
-        } : null
+        } : null,
+        fields: participantFields.map(f => ({
+          id: f.id,
+          fieldType: f.fieldType,
+          pageNumber: f.pageNumber,
+          xPosition: f.xPosition,
+          yPosition: f.yPosition,
+          width: f.width,
+          height: f.height,
+          isRequired: f.isRequired,
+          label: f.label
+        }))
       });
     } catch (error) {
       next(error);
@@ -2435,6 +2485,39 @@ export async function registerRoutes(
           actorName: 'System',
           metadata: JSON.stringify({ completedAt: new Date().toISOString() })
         });
+        
+        // Update the linked document's signature status to 'signed'
+        if (packet.documentId) {
+          await storage.updateProjectDocument(packet.documentId, {
+            signatureStatus: 'signed'
+          });
+        }
+      }
+      
+      // Send notification email to packet sender
+      try {
+        if (packet.createdById) {
+          const sender = await storage.getUser(packet.createdById);
+          if (sender?.email) {
+            let projectName: string | undefined;
+            if (packet.projectId) {
+              const project = await storage.getProject(packet.projectId);
+              projectName = project?.name;
+            }
+            
+            const { sendSignatureCompletedEmail } = await import("./email");
+            await sendSignatureCompletedEmail(sender.email, {
+              senderName: sender.name || sender.username,
+              signerName: participant.name,
+              documentTitle: packet.title,
+              isFullyComplete: allSigned,
+              projectName
+            });
+          }
+        }
+      } catch (emailError) {
+        console.error('Failed to send signature completion email:', emailError);
+        // Don't fail the request if email fails
       }
       
       res.json({ 

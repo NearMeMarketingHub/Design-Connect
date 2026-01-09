@@ -53,7 +53,8 @@ import type {
   ProjectDocument, InsertProjectDocument,
   SigningPacket, InsertSigningPacket,
   SigningParticipant, InsertSigningParticipant,
-  SigningEvent, InsertSigningEvent
+  SigningEvent, InsertSigningEvent,
+  SigningField, InsertSigningField
 } from "@shared/schema";
 
 export interface IStorage {
@@ -145,6 +146,7 @@ export interface IStorage {
   getProjectDocumentsByType(projectId: string, type: string): Promise<ProjectDocument[]>;
   getProjectDocument(id: string): Promise<ProjectDocument | undefined>;
   createProjectDocument(doc: InsertProjectDocument): Promise<ProjectDocument>;
+  updateProjectDocument(id: string, data: Partial<InsertProjectDocument>): Promise<ProjectDocument | undefined>;
   deleteProjectDocument(id: string): Promise<void>;
 
   // Post comment methods
@@ -676,6 +678,14 @@ export class DatabaseStorage implements IStorage {
   async createProjectDocument(insertDoc: InsertProjectDocument): Promise<ProjectDocument> {
     const [doc] = await db.insert(schema.projectDocuments).values(insertDoc).returning();
     return doc;
+  }
+
+  async updateProjectDocument(id: string, data: Partial<InsertProjectDocument>): Promise<ProjectDocument | undefined> {
+    const [updated] = await db.update(schema.projectDocuments)
+      .set(data)
+      .where(eq(schema.projectDocuments.id, id))
+      .returning();
+    return updated;
   }
 
   async deleteProjectDocument(id: string): Promise<void> {
@@ -1591,6 +1601,35 @@ export class DatabaseStorage implements IStorage {
   async createSigningEvent(event: InsertSigningEvent): Promise<SigningEvent> {
     const [created] = await db.insert(schema.signingEvents).values(event).returning();
     return created;
+  }
+
+  // Signing field methods
+  async getSigningFields(packetId: string): Promise<SigningField[]> {
+    return await db.select().from(schema.signingFields)
+      .where(eq(schema.signingFields.packetId, packetId));
+  }
+
+  async createSigningField(field: InsertSigningField): Promise<SigningField> {
+    const [created] = await db.insert(schema.signingFields).values(field).returning();
+    return created;
+  }
+
+  async updateSigningField(id: string, data: Partial<SigningField>): Promise<SigningField | undefined> {
+    const [updated] = await db.update(schema.signingFields)
+      .set(data)
+      .where(eq(schema.signingFields.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSigningField(id: string): Promise<void> {
+    await db.delete(schema.signingFields)
+      .where(eq(schema.signingFields.id, id));
+  }
+
+  async deleteSigningFieldsByPacketId(packetId: string): Promise<void> {
+    await db.delete(schema.signingFields)
+      .where(eq(schema.signingFields.packetId, packetId));
   }
 }
 

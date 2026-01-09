@@ -83,6 +83,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChatPanel } from "@/components/ChatPanel";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -317,6 +318,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/timeline')) return 'timeline';
     if (path.endsWith('/inspiration')) return 'inspiration';
     if (path.endsWith('/contractor-photos')) return 'contractor-photos';
+    if (path.endsWith('/action-center')) return 'action-center';
     return 'overview';
   };
   
@@ -1223,6 +1225,7 @@ export default function ProjectDetails() {
   const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [requiresSignature, setRequiresSignature] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   
   // Delete document confirmation dialog
@@ -1257,7 +1260,16 @@ export default function ProjectDetails() {
 
   // Create document mutation
   const createDocumentMutation = useMutation({
-    mutationFn: async (data: { name: string; type: string; fileUrl: string; fileSize?: number; mimeType?: string }) => {
+    mutationFn: async (data: { 
+      name: string; 
+      type: string; 
+      fileUrl: string; 
+      fileSize?: number; 
+      mimeType?: string;
+      requiresSignature?: boolean;
+      signatureStatus?: string;
+      finalDocumentType?: string;
+    }) => {
       const res = await fetch(`/api/projects/${projectId}/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1270,11 +1282,13 @@ export default function ProjectDetails() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (doc) => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'signing-packets'] });
       setUploadDocumentOpen(false);
       setNewDocumentType("");
       setNewDocumentFile(null);
+      setRequiresSignature(false);
     },
     onError: (error: Error) => {
       alert(error.message || 'Failed to upload document');
@@ -1379,10 +1393,13 @@ export default function ProjectDetails() {
     if (!newDocumentType || !newDocumentFile) return;
     createDocumentMutation.mutate({
       name: newDocumentFile.name,
-      type: newDocumentType,
+      type: requiresSignature ? 'action_center' : newDocumentType,
       fileUrl: newDocumentFile.objectPath,
       fileSize: newDocumentFile.size,
-      mimeType: newDocumentFile.mimeType
+      mimeType: newDocumentFile.mimeType,
+      requiresSignature: requiresSignature,
+      signatureStatus: requiresSignature ? 'pending_setup' : undefined,
+      finalDocumentType: requiresSignature ? newDocumentType : undefined
     });
   };
 
@@ -1431,6 +1448,19 @@ export default function ProjectDetails() {
     acc[doc.type].push(doc);
     return acc;
   }, {});
+
+  // Calculate pending action count for Action Center badge
+  const pendingActionDocs = projectDocuments.filter((doc: any) => 
+    doc.requiresSignature && (doc.signatureStatus === 'pending_setup' || doc.signatureStatus === 'pending_signature')
+  );
+  const pendingActionPackets = signingPackets.filter((packet: any) => 
+    packet.status === 'pending'
+  );
+  const pendingActionCount = isContractorView 
+    ? pendingActionDocs.length 
+    : pendingActionPackets.filter((p: any) => 
+        p.participants?.some((part: any) => part.status === 'pending' && part.email === user?.email)
+      ).length;
 
   const handleDeletePost = (postId: string) => {
     if (confirm('Are you sure you want to delete this post?')) {
@@ -1904,6 +1934,18 @@ export default function ProjectDetails() {
             data-testid="tab-documents"
           >
             Documents
+          </TabsTrigger>
+          <TabsTrigger 
+            value="action-center"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors relative"
+            data-testid="tab-action-center"
+          >
+            Action Center
+            {pendingActionCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {pendingActionCount}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -3481,6 +3523,119 @@ export default function ProjectDetails() {
               </div>
             )}
           </TabsContent>
+
+          {/* ACTION CENTER TAB */}
+          <TabsContent value="action-center" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Action Center
+                </CardTitle>
+                <CardDescription>
+                  {isContractorView 
+                    ? "Documents requiring signature setup and pending signatures"
+                    : "Documents that need your signature"
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isContractorView ? (
+                  // Contractor View - Show documents pending setup
+                  <div className="space-y-4">
+                    {pendingActionDocs.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        No documents pending signature setup
+                      </p>
+                    ) : (
+                      pendingActionDocs.map((doc: any) => (
+                        <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-8 w-8 text-blue-500" />
+                            <div>
+                              <p className="font-medium">{doc.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Will be filed under: {documentTypeConfig[doc.finalDocumentType as keyof typeof documentTypeConfig]?.label || doc.finalDocumentType}
+                              </p>
+                              <Badge variant={doc.signatureStatus === 'pending_setup' ? 'outline' : 'secondary'} className="mt-1">
+                                {doc.signatureStatus === 'pending_setup' ? 'Needs Setup' : 'Awaiting Signature'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openDocumentViewer(doc)}
+                            >
+                              View
+                            </Button>
+                            {doc.signatureStatus === 'pending_setup' && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setDocumentToSign({ id: doc.id, name: doc.name });
+                                  setSendForSignatureOpen(true);
+                                }}
+                              >
+                                Set Up Signing
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  // Client View - Show documents needing their signature
+                  <div className="space-y-4">
+                    {pendingActionPackets.filter((p: any) => 
+                      p.participants?.some((part: any) => part.status === 'pending' && part.email === user?.email)
+                    ).length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        No documents requiring your signature
+                      </p>
+                    ) : (
+                      pendingActionPackets
+                        .filter((p: any) => 
+                          p.participants?.some((part: any) => part.status === 'pending' && part.email === user?.email)
+                        )
+                        .map((packet: any) => {
+                          const myParticipant = packet.participants?.find((p: any) => p.email === user?.email);
+                          return (
+                            <div key={packet.id} className="flex items-center justify-between p-4 border rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <FileText className="h-8 w-8 text-orange-500" />
+                                <div>
+                                  <p className="font-medium">{packet.title}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    From: {packet.createdByName}
+                                  </p>
+                                  {packet.dueDate && (
+                                    <p className="text-sm text-orange-600">
+                                      Due: {new Date(packet.dueDate).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  // Navigate to signing page
+                                  window.location.href = `/sign/${myParticipant?.accessToken || ''}`;
+                                }}
+                              >
+                                Sign Document
+                              </Button>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </div>
       </Tabs>
 
@@ -3532,6 +3687,22 @@ export default function ProjectDetails() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center space-x-2 py-2">
+              <Checkbox
+                id="requires-signature"
+                checked={requiresSignature}
+                onCheckedChange={(checked) => setRequiresSignature(checked === true)}
+                data-testid="checkbox-requires-signature"
+              />
+              <Label htmlFor="requires-signature" className="text-sm font-medium cursor-pointer">
+                Signature Required
+              </Label>
+            </div>
+            {requiresSignature && (
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                This document will go to the Action Center where you can set up signature fields and send it for signing.
+              </p>
+            )}
             <div className="space-y-2">
               <Label>File</Label>
               <input

@@ -215,3 +215,86 @@ export async function sendSignatureRequestEmail(
 
   return data;
 }
+
+// Send signature completion notification to sender
+export async function sendSignatureCompletedEmail(
+  toEmail: string,
+  completionData: {
+    senderName: string;
+    signerName: string;
+    documentTitle: string;
+    isFullyComplete: boolean;
+    projectName?: string;
+  }
+) {
+  const { client, fromEmail } = await getResendClient();
+  
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : process.env.REPLIT_DOMAINS?.split(',')[0] 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : 'http://localhost:5000';
+  
+  const subject = completionData.isFullyComplete
+    ? `All signatures collected for "${completionData.documentTitle}"`
+    : `${completionData.signerName} has signed "${completionData.documentTitle}"`;
+  
+  const statusMessage = completionData.isFullyComplete
+    ? `<div style="background: #dcfce7; padding: 15px; border-radius: 8px; border-left: 4px solid #22c55e; margin: 20px 0;">
+        <p style="margin: 0; color: #166534; font-weight: 600;">
+          ✅ All signatures have been collected! The document is now complete.
+        </p>
+      </div>`
+    : `<div style="background: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+        <p style="margin: 0; color: #1e40af;">
+          ${completionData.signerName} has signed the document. Other signatures may still be pending.
+        </p>
+      </div>`;
+
+  const { data, error } = await client.emails.send({
+    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    to: toEmail,
+    subject,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <p style="color: #94a3b8; margin: 5px 0 0;">Document Signing Update</p>
+        </div>
+        
+        <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+          <p style="font-size: 16px; margin-top: 0;">Hello ${completionData.senderName},</p>
+          
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2 style="margin: 0 0 10px; color: #1a1a2e; font-size: 20px;">📄 ${completionData.documentTitle}</h2>
+            ${completionData.projectName ? `<p style="margin: 0; color: #64748b;">Project: ${completionData.projectName}</p>` : ''}
+          </div>
+          
+          ${statusMessage}
+          
+          <a href="${baseUrl}" style="display: inline-block; background: #3b82f6; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 10px 0;">
+            View in BuildVision
+          </a>
+        </div>
+        
+        <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+
+  if (error) {
+    console.error('Failed to send signature completion email:', error);
+    throw new Error(`Failed to send signature completion email: ${error.message}`);
+  }
+
+  return data;
+}

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, numeric, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -462,6 +462,10 @@ export const projectDocuments = pgTable("project_documents", {
   mimeType: text("mime_type"),
   uploadedById: varchar("uploaded_by_id"),
   uploadedByName: text("uploaded_by_name").notNull(),
+  requiresSignature: boolean("requires_signature").default(false),
+  signatureStatus: text("signature_status"), // null, 'pending_setup', 'pending_signature', 'completed'
+  finalDocumentType: text("final_document_type"), // Where to move after signing (contracts, plans, etc.)
+  pendingPacketId: varchar("pending_packet_id"), // Link to signing packet while pending
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -531,3 +535,24 @@ export const signingEvents = pgTable("signing_events", {
 export const insertSigningEventSchema = createInsertSchema(signingEvents).omit({ id: true, createdAt: true });
 export type InsertSigningEvent = z.infer<typeof insertSigningEventSchema>;
 export type SigningEvent = typeof signingEvents.$inferSelect;
+
+// Signing fields - placed signature/date/initials fields on documents
+export const signingFields = pgTable("signing_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packetId: varchar("packet_id").notNull().references(() => signingPackets.id),
+  participantId: varchar("participant_id").references(() => signingParticipants.id), // Which signer this field is for
+  fieldType: text("field_type").notNull(), // 'signature', 'initials', 'date', 'text', 'checkbox'
+  pageNumber: integer("page_number").notNull().default(1),
+  xPosition: real("x_position").notNull(), // Percentage from left (0-100)
+  yPosition: real("y_position").notNull(), // Percentage from top (0-100)
+  width: real("width").notNull(), // Percentage of page width
+  height: real("height").notNull(), // Percentage of page height
+  isRequired: boolean("is_required").default(true),
+  label: text("label"), // Optional label for text fields
+  value: text("value"), // Filled value after signing
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSigningFieldSchema = createInsertSchema(signingFields).omit({ id: true, createdAt: true });
+export type InsertSigningField = z.infer<typeof insertSigningFieldSchema>;
+export type SigningField = typeof signingFields.$inferSelect;
