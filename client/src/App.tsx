@@ -30,6 +30,7 @@ import ContractorProfile from "@/pages/contractor-profile";
 import MyProfile from "@/pages/my-profile";
 import ContractorCalculator from "@/pages/contractor-calculator";
 import FloorCalculator from "@/pages/floor-calculator";
+import SignDocumentPage from "@/pages/sign-document";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -49,6 +50,16 @@ function Router() {
     return (
       <Switch>
         <Route path="/invite/:token" component={AcceptInvite} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+  
+  // Public signing page - doesn't require auth
+  if (location.startsWith("/sign/")) {
+    return (
+      <Switch>
+        <Route path="/sign/:token" component={SignDocumentPage} />
         <Route component={NotFound} />
       </Switch>
     );
