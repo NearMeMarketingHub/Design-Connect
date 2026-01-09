@@ -1206,6 +1206,137 @@ export default function ProjectDetails() {
     setContractorPhotoDetailOpen(true);
   };
 
+  // Document upload state
+  const [uploadDocumentOpen, setUploadDocumentOpen] = useState(false);
+  const [newDocumentType, setNewDocumentType] = useState<string>("");
+  const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; url: string; size: number; mimeType: string } | null>(null);
+  const documentFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch project documents
+  const { data: projectDocuments = [], isLoading: documentsLoading } = useQuery({
+    queryKey: ['/api/projects', projectId, 'documents'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/documents`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Create document mutation
+  const createDocumentMutation = useMutation({
+    mutationFn: async (data: { name: string; type: string; fileUrl: string; fileSize?: number; mimeType?: string }) => {
+      const res = await fetch(`/api/projects/${projectId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to upload document');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+      setUploadDocumentOpen(false);
+      setNewDocumentType("");
+      setNewDocumentFile(null);
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to upload document');
+    }
+  });
+
+  // Delete document mutation
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const res = await fetch(`/api/documents/${documentId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete document');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to delete document');
+    }
+  });
+
+  // Handle document file upload
+  const handleDocumentFileUpload = async (files: FileList) => {
+    const file = files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setNewDocumentFile({
+        name: file.name,
+        url: e.target?.result as string,
+        size: file.size,
+        mimeType: file.type
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreateDocument = () => {
+    if (!newDocumentType || !newDocumentFile) return;
+    createDocumentMutation.mutate({
+      name: newDocumentFile.name,
+      type: newDocumentType,
+      fileUrl: newDocumentFile.url,
+      fileSize: newDocumentFile.size,
+      mimeType: newDocumentFile.mimeType
+    });
+  };
+
+  const handleDeleteDocument = (documentId: string) => {
+    if (confirm('Are you sure you want to delete this document?')) {
+      deleteDocumentMutation.mutate(documentId);
+    }
+  };
+
+  const openDocumentViewer = (doc: { name: string; fileUrl: string; mimeType?: string }) => {
+    const isImage = doc.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.name);
+    setDocumentToView({
+      src: doc.fileUrl,
+      name: doc.name,
+      type: isImage ? 'image' : 'file'
+    });
+    setDocumentViewerOpen(true);
+  };
+
+  const downloadDocument = (doc: { name: string; fileUrl: string }) => {
+    const link = document.createElement('a');
+    link.href = doc.fileUrl;
+    link.download = doc.name;
+    link.click();
+  };
+
+  // Document type configuration
+  const documentTypeConfig = {
+    contracts: { label: 'Contracts', icon: FileText, color: 'blue', description: 'Agreements & proposals' },
+    plans: { label: 'Plans & Drawings', icon: Layers, color: 'purple', description: 'Blueprints & designs' },
+    permits: { label: 'Permits & Approvals', icon: Shield, color: 'green', description: 'Official documents' },
+    invoices: { label: 'Invoices & Payments', icon: Receipt, color: 'amber', description: 'Billing records' },
+    warranties: { label: 'Warranties & Manuals', icon: BookOpen, color: 'cyan', description: 'Product documentation' },
+  };
+
+  // Group documents by type
+  const documentsByType = projectDocuments.reduce((acc: Record<string, any[]>, doc: any) => {
+    if (!acc[doc.type]) acc[doc.type] = [];
+    acc[doc.type].push(doc);
+    return acc;
+  }, {});
+
   const handleDeletePost = (postId: string) => {
     if (confirm('Are you sure you want to delete this post?')) {
       deletePostMutation.mutate(postId);
@@ -3082,6 +3213,15 @@ export default function ProjectDetails() {
                 <h3 className="text-lg font-semibold">Project Documents</h3>
                 <p className="text-sm text-muted-foreground">Contracts, permits, plans, and other important files</p>
               </div>
+              {canEdit && (
+                <Button 
+                  onClick={() => setUploadDocumentOpen(true)}
+                  data-testid="button-upload-document"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Document
+                </Button>
+              )}
             </div>
 
             {/* DocuSign Section - Coming Soon */}
@@ -3102,188 +3242,92 @@ export default function ProjectDetails() {
               </CardContent>
             </Card>
 
-            {/* Document Categories */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Contracts */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/10 rounded-lg">
-                      <FileText className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">Contracts</CardTitle>
-                      <p className="text-xs text-muted-foreground">Agreements & proposals</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-contract-1">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Project Contract.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-contract-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Change Order #1.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Plans & Drawings */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-500/10 rounded-lg">
-                      <Layers className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">Plans & Drawings</CardTitle>
-                      <p className="text-xs text-muted-foreground">Blueprints & designs</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-plan-1">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Floor Plan v3.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-plan-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Electrical Layout.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-plan-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Kitchen Design.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Permits & Approvals */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-500/10 rounded-lg">
-                      <Shield className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">Permits & Approvals</CardTitle>
-                      <p className="text-xs text-muted-foreground">Official documents</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-permit-1">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Building Permit.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-permit-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Electrical Inspection.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Invoices & Payments */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-500/10 rounded-lg">
-                      <Receipt className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">Invoices & Payments</CardTitle>
-                      <p className="text-xs text-muted-foreground">Billing records</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-invoice-1">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Invoice #1001.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-invoice-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Invoice #1002.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-invoice-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Payment Receipt.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Warranties & Manuals */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-cyan-500/10 rounded-lg">
-                      <BookOpen className="w-5 h-5 text-cyan-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">Warranties & Manuals</CardTitle>
-                      <p className="text-xs text-muted-foreground">Product documentation</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-warranty-1">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Appliance Warranty.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" data-testid="doc-warranty-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">HVAC Manual.pdf</span>
-                      </div>
-                      <Download className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-            </div>
+            {/* Document Categories - Dynamic */}
+            {documentsLoading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading documents...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(documentTypeConfig).map(([type, config]) => {
+                  const docs = documentsByType[type] || [];
+                  const IconComponent = config.icon;
+                  const colorClasses: Record<string, { bg: string; text: string }> = {
+                    blue: { bg: 'bg-blue-500/10', text: 'text-blue-600' },
+                    purple: { bg: 'bg-purple-500/10', text: 'text-purple-600' },
+                    green: { bg: 'bg-green-500/10', text: 'text-green-600' },
+                    amber: { bg: 'bg-amber-500/10', text: 'text-amber-600' },
+                    cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-600' },
+                  };
+                  const colors = colorClasses[config.color] || colorClasses.blue;
+                  
+                  return (
+                    <Card key={type} className="hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 ${colors.bg} rounded-lg`}>
+                            <IconComponent className={`w-5 h-5 ${colors.text}`} />
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{config.label}</CardTitle>
+                            <p className="text-xs text-muted-foreground">{config.description}</p>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2">
+                          {docs.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-2">No documents yet</p>
+                          ) : (
+                            docs.map((doc: any) => (
+                              <div 
+                                key={doc.id}
+                                className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer group" 
+                                data-testid={`doc-${type}-${doc.id}`}
+                                onClick={() => openDocumentViewer(doc)}
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <span className="text-sm truncate">{doc.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadDocument(doc);
+                                    }}
+                                    data-testid={`button-download-${doc.id}`}
+                                  >
+                                    <Download className="w-4 h-4 text-muted-foreground" />
+                                  </Button>
+                                  {canEdit && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteDocument(doc.id);
+                                      }}
+                                      data-testid={`button-delete-${doc.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
         </div>
       </Tabs>
@@ -3302,6 +3346,92 @@ export default function ProjectDetails() {
         isOpen={documentViewerOpen}
         onClose={() => setDocumentViewerOpen(false)}
       />
+
+      {/* Upload Document Dialog */}
+      <Dialog open={uploadDocumentOpen} onOpenChange={setUploadDocumentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>
+              Select a document type and upload your file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="document-type">Document Type</Label>
+              <Select value={newDocumentType} onValueChange={setNewDocumentType}>
+                <SelectTrigger id="document-type" data-testid="select-document-type">
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contracts">Contracts</SelectItem>
+                  <SelectItem value="plans">Plans & Drawings</SelectItem>
+                  <SelectItem value="permits">Permits & Approvals</SelectItem>
+                  <SelectItem value="invoices">Invoices & Payments</SelectItem>
+                  <SelectItem value="warranties">Warranties & Manuals</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>File</Label>
+              <input
+                type="file"
+                ref={documentFileInputRef}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    handleDocumentFileUpload(e.target.files);
+                  }
+                }}
+              />
+              {newDocumentFile ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                  <FileText className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm flex-1 truncate">{newDocumentFile.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setNewDocumentFile(null)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => documentFileInputRef.current?.click()}
+                  data-testid="button-select-file"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Select File
+                </Button>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setUploadDocumentOpen(false);
+                setNewDocumentType("");
+                setNewDocumentFile(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateDocument}
+              disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending}
+              data-testid="button-submit-document"
+            >
+              {createDocumentMutation.isPending ? 'Uploading...' : 'Upload'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Message Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
