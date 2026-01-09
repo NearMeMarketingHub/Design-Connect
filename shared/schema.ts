@@ -468,3 +468,66 @@ export const projectDocuments = pgTable("project_documents", {
 export const insertProjectDocumentSchema = createInsertSchema(projectDocuments).omit({ id: true, createdAt: true });
 export type InsertProjectDocument = z.infer<typeof insertProjectDocumentSchema>;
 export type ProjectDocument = typeof projectDocuments.$inferSelect;
+
+// Document Signing - Signing packets (requests to sign a document)
+export const signingPackets = pgTable("signing_packets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull(),
+  documentId: varchar("document_id").references(() => projectDocuments.id),
+  title: text("title").notNull(),
+  message: text("message"), // Optional message to recipients
+  status: text("status").notNull().default("draft"), // draft, pending, completed, cancelled, expired
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdByName: text("created_by_name").notNull(),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  signedDocumentUrl: text("signed_document_url"), // Final signed document
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSigningPacketSchema = createInsertSchema(signingPackets).omit({ id: true, createdAt: true });
+export type InsertSigningPacket = z.infer<typeof insertSigningPacketSchema>;
+export type SigningPacket = typeof signingPackets.$inferSelect;
+
+// Signing participants - who needs to sign
+export const signingParticipants = pgTable("signing_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packetId: varchar("packet_id").notNull().references(() => signingPackets.id),
+  userId: varchar("user_id").references(() => users.id), // Can be null for external signers
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("signer"), // signer, viewer, approver
+  signingOrder: integer("signing_order").notNull().default(1), // Order in which they sign
+  status: text("status").notNull().default("pending"), // pending, viewed, signed, declined
+  signatureData: text("signature_data"), // Base64 signature image
+  signatureType: text("signature_type"), // 'drawn' or 'typed'
+  signedAt: timestamp("signed_at"),
+  signerIp: text("signer_ip"),
+  signerAgent: text("signer_agent"),
+  accessToken: varchar("access_token").default(sql`gen_random_uuid()`), // Unique token for signing link
+  viewedAt: timestamp("viewed_at"),
+  declinedReason: text("declined_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSigningParticipantSchema = createInsertSchema(signingParticipants).omit({ id: true, createdAt: true });
+export type InsertSigningParticipant = z.infer<typeof insertSigningParticipantSchema>;
+export type SigningParticipant = typeof signingParticipants.$inferSelect;
+
+// Signing events - audit trail
+export const signingEvents = pgTable("signing_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packetId: varchar("packet_id").notNull().references(() => signingPackets.id),
+  participantId: varchar("participant_id").references(() => signingParticipants.id),
+  eventType: text("event_type").notNull(), // created, sent, viewed, signed, declined, completed, cancelled, reminder_sent
+  actorName: text("actor_name"),
+  actorEmail: text("actor_email"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: text("metadata"), // JSON string for additional data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSigningEventSchema = createInsertSchema(signingEvents).omit({ id: true, createdAt: true });
+export type InsertSigningEvent = z.infer<typeof insertSigningEventSchema>;
+export type SigningEvent = typeof signingEvents.$inferSelect;
