@@ -1026,7 +1026,12 @@ export async function registerRoutes(
       const [metadata] = await file.getMetadata();
       const bucketName = file.bucket.name;
       const originalObjectName = file.name;
-      const pdfObjectName = originalObjectName.replace(/\.(docx?|doc)$/i, '.pdf');
+      
+      // Generate unique PDF filename - either replace extension or append .pdf
+      const hasExtension = /\.(docx?|doc)$/i.test(originalObjectName);
+      const pdfObjectName = hasExtension 
+        ? originalObjectName.replace(/\.(docx?|doc)$/i, '.pdf')
+        : `${originalObjectName}.pdf`;
       
       const bucket = objectStorageClient.bucket(bucketName);
       const pdfFile = bucket.file(pdfObjectName);
@@ -1035,7 +1040,10 @@ export async function registerRoutes(
       });
       
       // Generate the PDF object path in the same format as the original
-      const pdfObjectPath = objectPath.replace(/\.(docx?|doc)$/i, '.pdf');
+      const hasPathExtension = /\.(docx?|doc)$/i.test(objectPath);
+      const pdfObjectPath = hasPathExtension 
+        ? objectPath.replace(/\.(docx?|doc)$/i, '.pdf')
+        : `${objectPath}.pdf`;
       
       // Cleanup temp files
       await fs.rm(tempDir, { recursive: true, force: true });
