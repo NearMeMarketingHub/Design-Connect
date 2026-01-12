@@ -14,7 +14,6 @@ const { Pool } = pkg;
 import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
-import pdf2img from "pdf-img-convert";
 
 const PgSession = connectPgSimple(session);
 
@@ -963,69 +962,21 @@ export async function registerRoutes(
     }
   });
 
-  // Helper function to get PDF buffer from document
-  async function getPdfBuffer(documentUrl: string): Promise<Buffer> {
-    if (documentUrl.startsWith('/objects/')) {
-      const objectStorage = new ObjectStorageService();
-      const objectFile = await objectStorage.getObjectEntityFile(documentUrl);
-      const [contents] = await objectFile.download();
-      return contents;
-    } else {
-      let filePath = documentUrl;
-      if (filePath.startsWith('/uploads/')) {
-        filePath = filePath.substring(1);
-      }
-      if (!fs.existsSync(filePath)) {
-        throw new Error('File not found');
-      }
-      return fs.readFileSync(filePath);
-    }
-  }
-
-  // PDF to image conversion for signature field placement
-  app.get("/api/documents/:documentId/pages/:pageNumber/image", requireAuth, async (req, res, next) => {
+  // Get document info for signature field placement
+  app.get("/api/documents/:documentId/info", requireAuth, async (req, res, next) => {
     try {
       const document = await storage.getProjectDocument(req.params.documentId);
       if (!document) {
         return res.status(404).json({ message: "Document not found" });
       }
-
-      const pageNumber = parseInt(req.params.pageNumber);
-      if (isNaN(pageNumber) || pageNumber < 1) {
-        return res.status(400).json({ message: "Invalid page number" });
-      }
-
-      const pdfBuffer = await getPdfBuffer(document.fileUrl);
-      const images = await pdf2img.convert(pdfBuffer, {
-        width: 800,
-        page_numbers: [pageNumber],
+      res.json({ 
+        id: document.id,
+        name: document.name,
+        fileUrl: document.fileUrl,
+        mimeType: document.mimeType,
+        pageCount: 1
       });
-
-      if (!images || images.length === 0) {
-        return res.status(404).json({ message: "Page not found" });
-      }
-
-      res.set('Content-Type', 'image/png');
-      res.send(Buffer.from(images[0] as Uint8Array));
     } catch (error) {
-      console.error('PDF to image conversion error:', error);
-      next(error);
-    }
-  });
-
-  // Get PDF page count
-  app.get("/api/documents/:documentId/page-count", requireAuth, async (req, res, next) => {
-    try {
-      const document = await storage.getProjectDocument(req.params.documentId);
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-
-      const pdfBuffer = await getPdfBuffer(document.fileUrl);
-      const images = await pdf2img.convert(pdfBuffer, { width: 100 });
-      res.json({ pageCount: images.length });
-    } catch (error) {
-      console.error('PDF page count error:', error);
       next(error);
     }
   });

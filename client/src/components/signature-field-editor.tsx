@@ -1,9 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Rnd } from 'react-rnd';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { PenLine, Type, Calendar, FileText, Trash2, Plus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface SignatureField {
   id: string;
@@ -17,16 +22,17 @@ export interface SignatureField {
 
 interface SignatureFieldEditorProps {
   documentId: string;
+  documentUrl: string;
   documentMimeType: string;
   fields: SignatureField[];
   onFieldsChange: (fields: SignatureField[]) => void;
 }
 
 const FIELD_COLORS = {
-  signature: 'bg-blue-200/80 border-blue-500',
-  initials: 'bg-green-200/80 border-green-500',
-  date: 'bg-yellow-200/80 border-yellow-500',
-  text: 'bg-purple-200/80 border-purple-500',
+  signature: 'bg-blue-200/90 border-blue-500',
+  initials: 'bg-green-200/90 border-green-500',
+  date: 'bg-yellow-200/90 border-yellow-500',
+  text: 'bg-purple-200/90 border-purple-500',
 };
 
 const FIELD_ICONS = {
@@ -43,92 +49,31 @@ const FIELD_LABELS = {
   text: 'Text',
 };
 
-export function SignatureFieldEditor({ documentId, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
+export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [pageSize, setPageSize] = useState({ width: 600, height: 800 });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [pageImageUrl, setPageImageUrl] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<SignatureField['fieldType']>('signature');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchPageCount = async () => {
-      try {
-        const res = await fetch(`/api/documents/${documentId}/page-count`, { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setTotalPages(data.pageCount || 1);
-        }
-      } catch (err) {
-        console.error('Error fetching page count:', err);
-      }
-    };
-    fetchPageCount();
-  }, [documentId]);
+  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+    setTotalPages(numPages);
+    setIsLoading(false);
+    setError(null);
+  }, []);
 
-  useEffect(() => {
-    const loadPageImage = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      if (documentMimeType !== 'application/pdf') {
-        setError('Only PDF documents are supported for signature placement');
-        setIsLoading(false);
-        return;
-      }
+  const onDocumentLoadError = useCallback((err: Error) => {
+    console.error('PDF load error:', err);
+    setError('Failed to load document. Please try again.');
+    setIsLoading(false);
+  }, []);
 
-      try {
-        const imageUrl = `/api/documents/${documentId}/pages/${currentPage}/image`;
-        const res = await fetch(imageUrl, { credentials: 'include' });
-        if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          setPageImageUrl(url);
-        } else {
-          setError('Failed to load document page');
-        }
-      } catch (err) {
-        console.error('Error loading page image:', err);
-        setError('Error loading document');
-      }
-      
-      setIsLoading(false);
-    };
-
-    loadPageImage();
-
-    return () => {
-      if (pageImageUrl) {
-        URL.revokeObjectURL(pageImageUrl);
-      }
-    };
-  }, [documentId, currentPage, documentMimeType]);
-
-  useEffect(() => {
-    const updateContainerSize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          setContainerSize({ width: rect.width, height: rect.height });
-        }
-      }
-    };
-    
-    updateContainerSize();
-    window.addEventListener('resize', updateContainerSize);
-    
-    const observer = new ResizeObserver(updateContainerSize);
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-    
-    return () => {
-      window.removeEventListener('resize', updateContainerSize);
-      observer.disconnect();
-    };
-  }, [pageImageUrl]);
+  const onPageLoadSuccess = useCallback((page: any) => {
+    const { width, height } = page;
+    setPageSize({ width, height });
+  }, []);
 
   const addField = () => {
     const newField: SignatureField = {
@@ -152,6 +97,17 @@ export function SignatureFieldEditor({ documentId, documentMimeType, fields, onF
   };
 
   const currentPageFields = fields.filter(f => f.pageNumber === currentPage);
+
+  if (documentMimeType !== 'application/pdf') {
+    return (
+      <div className="flex items-center justify-center h-96 border rounded-lg bg-gray-50">
+        <div className="text-center text-muted-foreground">
+          <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>Only PDF documents are supported for signature placement</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -201,105 +157,112 @@ export function SignatureFieldEditor({ documentId, documentMimeType, fields, onF
 
       <div 
         ref={containerRef}
-        className="relative border rounded-lg bg-gray-100 overflow-hidden"
+        className="relative border rounded-lg bg-gray-100 overflow-auto"
         style={{ height: '600px' }}
       >
-        {isLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
             <div className="text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
               <p className="text-sm text-muted-foreground">Loading document...</p>
             </div>
           </div>
-        ) : error ? (
+        )}
+
+        {error && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-red-500">
               <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{error}</p>
             </div>
           </div>
-        ) : pageImageUrl ? (
-          <div className="relative w-full h-full flex items-center justify-center">
-            <div className="relative">
-              <img 
-                src={pageImageUrl} 
-                alt={`Page ${currentPage}`}
-                className="max-w-full max-h-full object-contain shadow-lg"
-                style={{ maxHeight: '580px' }}
-              />
-              
-              <div className="absolute inset-0">
-                {currentPageFields.map((field) => {
-                  const Icon = FIELD_ICONS[field.fieldType];
-                  const imgWidth = containerRef.current?.querySelector('img')?.clientWidth || containerSize.width;
-                  const imgHeight = containerRef.current?.querySelector('img')?.clientHeight || containerSize.height;
-                  
-                  return (
-                    <Rnd
-                      key={field.id}
-                      position={{
-                        x: (field.x / 100) * imgWidth,
-                        y: (field.y / 100) * imgHeight,
-                      }}
-                      size={{
-                        width: (field.width / 100) * imgWidth,
-                        height: Math.max(35, (field.height / 100) * imgHeight),
-                      }}
-                      onDragStop={(_, d) => {
-                        updateField(field.id, {
-                          x: Math.max(0, Math.min(100, (d.x / imgWidth) * 100)),
-                          y: Math.max(0, Math.min(100, (d.y / imgHeight) * 100)),
-                        });
-                      }}
-                      onResizeStop={(_, __, ref, ___, position) => {
-                        updateField(field.id, {
-                          width: (parseInt(ref.style.width) / imgWidth) * 100,
-                          height: (parseInt(ref.style.height) / imgHeight) * 100,
-                          x: (position.x / imgWidth) * 100,
-                          y: (position.y / imgHeight) * 100,
-                        });
-                      }}
-                      bounds="parent"
-                      minWidth={80}
-                      minHeight={35}
-                      className={`${FIELD_COLORS[field.fieldType]} border-2 rounded cursor-move group shadow-md`}
-                      style={{ zIndex: 10 }}
-                    >
-                      <div className="flex items-center justify-between h-full px-2">
-                        <div className="flex items-center gap-1 text-xs font-medium">
-                          <Icon className="w-4 h-4" />
-                          <span>{FIELD_LABELS[field.fieldType]}</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeField(field.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
-                      </div>
-                    </Rnd>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>No document loaded</p>
-            </div>
-          </div>
         )}
+
+        <div className="flex justify-center p-4">
+          <div className="relative inline-block shadow-lg">
+            <Document
+              file={documentUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
+              loading={null}
+            >
+              <Page
+                pageNumber={currentPage}
+                width={600}
+                onLoadSuccess={onPageLoadSuccess}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+              />
+            </Document>
+
+            <div 
+              className="absolute inset-0 pointer-events-none"
+              style={{ width: pageSize.width, height: pageSize.height }}
+            >
+              {currentPageFields.map((field) => {
+                const Icon = FIELD_ICONS[field.fieldType];
+                const fieldWidth = (field.width / 100) * pageSize.width;
+                const fieldHeight = Math.max(35, (field.height / 100) * pageSize.height);
+                const fieldX = (field.x / 100) * pageSize.width;
+                const fieldY = (field.y / 100) * pageSize.height;
+
+                return (
+                  <Rnd
+                    key={field.id}
+                    position={{ x: fieldX, y: fieldY }}
+                    size={{ width: fieldWidth, height: fieldHeight }}
+                    onDragStop={(_, d) => {
+                      updateField(field.id, {
+                        x: Math.max(0, Math.min(100, (d.x / pageSize.width) * 100)),
+                        y: Math.max(0, Math.min(100, (d.y / pageSize.height) * 100)),
+                      });
+                    }}
+                    onResizeStop={(_, __, ref, ___, position) => {
+                      updateField(field.id, {
+                        width: (parseInt(ref.style.width) / pageSize.width) * 100,
+                        height: (parseInt(ref.style.height) / pageSize.height) * 100,
+                        x: (position.x / pageSize.width) * 100,
+                        y: (position.y / pageSize.height) * 100,
+                      });
+                    }}
+                    bounds="parent"
+                    minWidth={80}
+                    minHeight={35}
+                    enableResizing={{
+                      bottom: true,
+                      right: true,
+                      bottomRight: true,
+                    }}
+                    className={`${FIELD_COLORS[field.fieldType]} border-2 rounded cursor-move group shadow-md pointer-events-auto`}
+                    style={{ zIndex: 10 }}
+                  >
+                    <div className="flex items-center justify-between h-full px-2">
+                      <div className="flex items-center gap-1 text-xs font-medium">
+                        <Icon className="w-4 h-4" />
+                        <span>{FIELD_LABELS[field.fieldType]}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeField(field.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
+                  </Rnd>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
           <strong>Tip:</strong> Click "Add to Page" to add a signature field, then drag it to position on the document. 
-          Use the page navigation to place fields on different pages.
+          Resize fields by dragging the edges. Use the page navigation for multi-page documents.
         </p>
       </div>
 
