@@ -1,39 +1,61 @@
-import type { Express } from "express";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import type { Express, Request } from "express";
+import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
+import { randomUUID } from "crypto";
 
 /**
  * Register object storage routes for file uploads.
- *
- * This provides example routes for the presigned URL upload flow:
- * 1. POST /api/uploads/request-url - Get a presigned URL for uploading
- * 2. The client then uploads directly to the presigned URL
- *
- * IMPORTANT: These are example routes. Customize based on your use case:
- * - Add authentication middleware for protected uploads
- * - Add file metadata storage (save to database after upload)
- * - Add ACL policies for access control
  */
 export function registerObjectStorageRoutes(app: Express): void {
   const objectStorageService = new ObjectStorageService();
 
   /**
-   * Request a presigned URL for file upload.
-   *
-   * Request body (JSON):
-   * {
-   *   "name": "filename.jpg",
-   *   "size": 12345,
-   *   "contentType": "image/jpeg"
-   * }
-   *
-   * Response:
-   * {
-   *   "uploadURL": "https://storage.googleapis.com/...",
-   *   "objectPath": "/objects/uploads/uuid"
-   * }
-   *
-   * IMPORTANT: The client should NOT send the file to this endpoint.
-   * Send JSON metadata only, then upload the file directly to uploadURL.
+   * Direct file upload endpoint - bypasses presigned URL to avoid runtime crashes.
+   * Accepts raw binary data in the request body.
+   */
+  app.post("/api/uploads/direct", async (req: Request, res) => {
+    try {
+      const contentType = req.headers['content-type'] || 'application/octet-stream';
+      const fileName = req.headers['x-file-name'] as string || 'upload';
+      const fileSize = parseInt(req.headers['content-length'] || '0', 10);
+      
+      if (!req.rawBody) {
+        return res.status(400).json({ error: "No file data received" });
+      }
+
+      const privateObjectDir = objectStorageService.getPrivateObjectDir();
+      const objectId = randomUUID();
+      const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+      
+      // Parse bucket and object name from the path
+      const pathParts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join('/');
+      
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      
+      // Upload the file directly
+      await file.save(req.rawBody as Buffer, {
+        contentType,
+        metadata: {
+          originalName: fileName,
+        },
+      });
+      
+      const objectPath = `/objects/uploads/${objectId}`;
+      
+      res.json({
+        objectPath,
+        metadata: { name: fileName, size: fileSize, contentType },
+      });
+    } catch (error) {
+      console.error("[direct-upload] Error:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  /**
+   * Request a presigned URL for file upload (legacy - may cause crashes).
    */
   app.post("/api/uploads/request-url", async (req, res) => {
     try {
@@ -46,20 +68,12 @@ export function registerObjectStorageRoutes(app: Express): void {
       }
 
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-
-      // Extract object path from the presigned URL for later reference
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
-      const response = {
+      res.json({
         uploadURL,
         objectPath,
-        // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
-      };
-      
-      // Use setImmediate to allow event loop to process before sending response
-      setImmediate(() => {
-        res.json(response);
       });
     } catch (error) {
       console.error("[upload-url] Error generating upload URL:", error);

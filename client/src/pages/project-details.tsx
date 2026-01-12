@@ -1330,7 +1330,7 @@ export default function ProjectDetails() {
     }
   });
 
-  // Handle document file upload using presigned URLs with progress tracking
+  // Handle document file upload using direct server upload with progress tracking
   const handleDocumentFileUpload = async (files: FileList) => {
     const file = files[0];
     if (!file) return;
@@ -1350,33 +1350,17 @@ export default function ProjectDetails() {
     setUploadError(null);
     
     try {
-      // Step 1: Get presigned URL from server
-      setUploadProgress(3);
-      const urlResponse = await fetch('/api/uploads/request-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: mimeType
-        })
-      });
+      // Read file as ArrayBuffer for direct upload
+      const arrayBuffer = await file.arrayBuffer();
+      setUploadProgress(10);
       
-      if (!urlResponse.ok) {
-        throw new Error('Failed to get upload URL');
-      }
-      
-      const { uploadURL, objectPath } = await urlResponse.json();
-      setUploadProgress(5);
-      
-      // Step 2: Upload file with XMLHttpRequest for progress tracking
-      await new Promise<void>((resolve, reject) => {
+      // Upload directly to server (bypasses presigned URL crash)
+      const response = await new Promise<{ objectPath: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 90) + 5;
+            const percentComplete = Math.round((event.loaded / event.total) * 85) + 10;
             setUploadProgress(Math.min(percentComplete, 95));
           }
         });
@@ -1384,7 +1368,11 @@ export default function ProjectDetails() {
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             setUploadProgress(100);
-            resolve();
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('Invalid response'));
+            }
           } else {
             reject(new Error('Failed to upload file'));
           }
@@ -1393,15 +1381,16 @@ export default function ProjectDetails() {
         xhr.addEventListener('error', () => reject(new Error('Upload failed')));
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
         
-        xhr.open('PUT', uploadURL);
+        xhr.open('POST', '/api/uploads/direct');
         xhr.setRequestHeader('Content-Type', mimeType);
-        xhr.send(file);
+        xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+        xhr.send(arrayBuffer);
       });
       
       // Store file info
       setNewDocumentFile({
         name: file.name,
-        objectPath: objectPath,
+        objectPath: response.objectPath,
         size: file.size,
         mimeType: mimeType
       });
