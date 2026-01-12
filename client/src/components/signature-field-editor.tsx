@@ -23,6 +23,7 @@ interface SignatureFieldEditorProps {
   documentMimeType: string;
   fields: SignatureField[];
   onFieldsChange: (fields: SignatureField[]) => void;
+  onDocumentConverted?: (pdfUrl: string) => void;
 }
 
 const FIELD_COLORS = {
@@ -46,7 +47,7 @@ const FIELD_LABELS = {
   text: 'Text',
 };
 
-export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
+export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange, onDocumentConverted }: SignatureFieldEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [currentPage, setCurrentPage] = useState(1);
@@ -116,6 +117,10 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
       
       const data = await res.json();
       setConvertedPdfUrl(data.pdfPath);
+      // Notify parent that document was converted to PDF
+      if (onDocumentConverted) {
+        onDocumentConverted(data.pdfPath);
+      }
     } catch (error: any) {
       console.error('Conversion error:', error);
       setConversionError(error.message || 'Failed to convert document');
