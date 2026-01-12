@@ -10,12 +10,12 @@ export function registerObjectStorageRoutes(app: Express): void {
 
   /**
    * Direct file upload endpoint - bypasses presigned URL to avoid runtime crashes.
-   * Accepts raw binary data in the request body.
+   * Uses streaming upload to handle large files and avoid GCS client cleanup issues.
    */
   app.post("/api/uploads/direct", async (req: Request, res) => {
     try {
       const contentType = req.headers['content-type'] || 'application/octet-stream';
-      const fileName = req.headers['x-file-name'] as string || 'upload';
+      const fileName = decodeURIComponent(req.headers['x-file-name'] as string || 'upload');
       const fileSize = parseInt(req.headers['content-length'] || '0', 10);
       
       if (!req.rawBody) {
@@ -26,7 +26,6 @@ export function registerObjectStorageRoutes(app: Express): void {
       const objectId = randomUUID();
       const fullPath = `${privateObjectDir}/uploads/${objectId}`;
       
-      // Parse bucket and object name from the path
       const pathParts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
       const bucketName = pathParts[0];
       const objectName = pathParts.slice(1).join('/');
@@ -34,23 +33,39 @@ export function registerObjectStorageRoutes(app: Express): void {
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectName);
       
-      // Upload the file directly
-      await file.save(req.rawBody as Buffer, {
-        contentType,
-        metadata: {
-          originalName: fileName,
-        },
-      });
-      
       const objectPath = `/objects/uploads/${objectId}`;
       
+      // Use streaming upload with explicit end handling
+      const writeStream = file.createWriteStream({
+        contentType,
+        metadata: {
+          metadata: {
+            originalName: fileName,
+          },
+        },
+        resumable: false,
+      });
+      
+      await new Promise<void>((resolve, reject) => {
+        writeStream.on('finish', () => {
+          resolve();
+        });
+        writeStream.on('error', (err) => {
+          reject(err);
+        });
+        writeStream.end(req.rawBody as Buffer);
+      });
+      
+      // Send response immediately before any cleanup occurs
       res.json({
         objectPath,
         metadata: { name: fileName, size: fileSize, contentType },
       });
     } catch (error) {
       console.error("[direct-upload] Error:", error);
-      res.status(500).json({ error: "Failed to upload file" });
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to upload file" });
+      }
     }
   });
 
