@@ -3,10 +3,7 @@ import { Rnd } from 'react-rnd';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { PenLine, Type, Calendar, FileText, Trash2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import * as pdfjsLib from 'pdfjs-dist';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import { PenLine, Type, Calendar, FileText, Trash2, Plus } from 'lucide-react';
 
 export interface SignatureField {
   id: string;
@@ -49,76 +46,27 @@ const FIELD_LABELS = {
 
 export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [pageImageUrl, setPageImageUrl] = useState<string | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [selectedFieldType, setSelectedFieldType] = useState<SignatureField['fieldType']>('signature');
-  const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => {
-    const loadDocument = async () => {
-      setIsLoading(true);
-      
-      if (documentMimeType === 'application/pdf') {
-        try {
-          const pdf = await pdfjsLib.getDocument(documentUrl).promise;
-          setTotalPages(pdf.numPages);
-          await renderPdfPage(pdf, currentPage);
-        } catch (error) {
-          console.error('Error loading PDF:', error);
-          setPageImageUrl(null);
-        }
-      } else if (documentMimeType.startsWith('image/')) {
-        setTotalPages(1);
-        setPageImageUrl(documentUrl);
-      } else {
-        setPageImageUrl(null);
-      }
-      
-      setIsLoading(false);
-    };
-
-    loadDocument();
-  }, [documentUrl, documentMimeType, currentPage]);
-
-  const renderPdfPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number) => {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.5 });
-    
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    
-    await page.render({
-      canvasContext: context,
-      viewport: viewport,
-      canvas: canvas
-    } as any).promise;
-    
-    setPageImageUrl(canvas.toDataURL());
-  };
 
   useEffect(() => {
     const updateContainerSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setContainerSize({ width: rect.width, height: rect.height });
+        setContainerSize({ width: rect.width || 800, height: rect.height || 600 });
       }
     };
     
     updateContainerSize();
     window.addEventListener('resize', updateContainerSize);
     return () => window.removeEventListener('resize', updateContainerSize);
-  }, [pageImageUrl]);
+  }, []);
 
   const addField = () => {
     const newField: SignatureField = {
       id: `field-${Date.now()}`,
       fieldType: selectedFieldType,
-      pageNumber: currentPage,
+      pageNumber: 1,
       x: 10,
       y: 10,
       width: selectedFieldType === 'signature' ? 30 : 15,
@@ -135,11 +83,9 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
     onFieldsChange(fields.filter(f => f.id !== id));
   };
 
-  const currentPageFields = fields.filter(f => f.pageNumber === currentPage);
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Label>Add Field:</Label>
           <Select value={selectedFieldType} onValueChange={(v) => setSelectedFieldType(v as SignatureField['fieldType'])}>
@@ -157,110 +103,109 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
             <Plus className="w-4 h-4 mr-1" /> Add
           </Button>
         </div>
-        
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm">Page {currentPage} of {totalPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
       </div>
 
-      <div 
-        ref={containerRef}
-        className="relative border rounded-lg bg-gray-100 overflow-hidden"
-        style={{ minHeight: '400px' }}
-      >
-        {isLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-muted-foreground">Loading document...</div>
-          </div>
-        ) : pageImageUrl ? (
-          <>
-            <img 
-              src={pageImageUrl} 
-              alt="Document page"
-              className="max-w-full h-auto"
-              onLoad={(e) => {
-                const img = e.target as HTMLImageElement;
-                setContainerSize({ width: img.width, height: img.height });
-              }}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="border rounded-lg overflow-hidden bg-gray-100" style={{ height: '500px' }}>
+          {documentMimeType === 'application/pdf' ? (
+            <iframe 
+              src={documentUrl}
+              className="w-full h-full border-0"
+              title="Document Preview"
             />
-            {currentPageFields.map((field) => {
-              const Icon = FIELD_ICONS[field.fieldType];
-              return (
-                <Rnd
-                  key={field.id}
-                  position={{
-                    x: (field.x / 100) * containerSize.width,
-                    y: (field.y / 100) * containerSize.height,
-                  }}
-                  size={{
-                    width: (field.width / 100) * containerSize.width,
-                    height: (field.height / 100) * containerSize.height,
-                  }}
-                  onDragStop={(_, d) => {
-                    updateField(field.id, {
-                      x: (d.x / containerSize.width) * 100,
-                      y: (d.y / containerSize.height) * 100,
-                    });
-                  }}
-                  onResizeStop={(_, __, ref, ___, position) => {
-                    updateField(field.id, {
-                      width: (parseInt(ref.style.width) / containerSize.width) * 100,
-                      height: (parseInt(ref.style.height) / containerSize.height) * 100,
-                      x: (position.x / containerSize.width) * 100,
-                      y: (position.y / containerSize.height) * 100,
-                    });
-                  }}
-                  bounds="parent"
-                  minWidth={50}
-                  minHeight={25}
-                  className={`${FIELD_COLORS[field.fieldType]} border-2 rounded cursor-move group`}
-                >
-                  <div className="flex items-center justify-between h-full px-2">
-                    <div className="flex items-center gap-1 text-xs">
-                      <Icon className="w-3 h-3" />
-                      <span>{FIELD_LABELS[field.fieldType]}</span>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeField(field.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded"
-                    >
-                      <Trash2 className="w-3 h-3 text-red-500" />
-                    </button>
+          ) : documentMimeType.startsWith('image/') ? (
+            <img 
+              src={documentUrl} 
+              alt="Document preview"
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="text-center">
+                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Document preview not available</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div 
+          ref={containerRef}
+          className="relative border rounded-lg bg-white overflow-hidden"
+          style={{ height: '500px' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100">
+            <div className="p-4 border-b bg-white/80">
+              <p className="text-sm font-medium text-gray-700">Signature Field Placement</p>
+              <p className="text-xs text-muted-foreground">Drag fields to position them on the document</p>
+            </div>
+            
+            <div className="relative" style={{ height: 'calc(100% - 60px)' }}>
+              {fields.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                  <div className="text-center p-4">
+                    <PenLine className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Add signature fields using the controls above</p>
+                    <p className="text-xs mt-1">Fields will appear here for positioning</p>
                   </div>
-                </Rnd>
-              );
-            })}
-          </>
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-            <div className="text-muted-foreground text-center">
-              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p className="font-medium">Cannot preview this document type</p>
-              <p className="text-sm mt-1">Use the controls above to add signature fields.</p>
+                </div>
+              ) : (
+                fields.map((field) => {
+                  const Icon = FIELD_ICONS[field.fieldType];
+                  return (
+                    <Rnd
+                      key={field.id}
+                      default={{
+                        x: (field.x / 100) * (containerSize.width - 32),
+                        y: (field.y / 100) * (containerSize.height - 100),
+                        width: (field.width / 100) * (containerSize.width - 32),
+                        height: Math.max(40, (field.height / 100) * (containerSize.height - 100)),
+                      }}
+                      onDragStop={(_, d) => {
+                        const maxWidth = containerSize.width - 32;
+                        const maxHeight = containerSize.height - 100;
+                        updateField(field.id, {
+                          x: Math.max(0, Math.min(100, (d.x / maxWidth) * 100)),
+                          y: Math.max(0, Math.min(100, (d.y / maxHeight) * 100)),
+                        });
+                      }}
+                      onResizeStop={(_, __, ref, ___, position) => {
+                        const maxWidth = containerSize.width - 32;
+                        const maxHeight = containerSize.height - 100;
+                        updateField(field.id, {
+                          width: (parseInt(ref.style.width) / maxWidth) * 100,
+                          height: (parseInt(ref.style.height) / maxHeight) * 100,
+                          x: (position.x / maxWidth) * 100,
+                          y: (position.y / maxHeight) * 100,
+                        });
+                      }}
+                      bounds="parent"
+                      minWidth={80}
+                      minHeight={35}
+                      className={`${FIELD_COLORS[field.fieldType]} border-2 rounded cursor-move group shadow-sm`}
+                    >
+                      <div className="flex items-center justify-between h-full px-2">
+                        <div className="flex items-center gap-1 text-xs font-medium">
+                          <Icon className="w-4 h-4" />
+                          <span>{FIELD_LABELS[field.fieldType]}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeField(field.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                      </div>
+                    </Rnd>
+                  );
+                })
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {fields.length > 0 && (
@@ -275,7 +220,7 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${FIELD_COLORS[field.fieldType]}`}
                 >
                   <Icon className="w-3 h-3" />
-                  <span>{FIELD_LABELS[field.fieldType]} (Page {field.pageNumber})</span>
+                  <span>{FIELD_LABELS[field.fieldType]}</span>
                   <button onClick={() => removeField(field.id)} className="ml-1 hover:text-red-500">
                     <Trash2 className="w-3 h-3" />
                   </button>
