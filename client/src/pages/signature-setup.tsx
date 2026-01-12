@@ -138,7 +138,7 @@ export default function SignatureSetup() {
           dueDate,
           recipients,
           fields: signatureFields.map(f => ({
-            type: f.fieldType,
+            fieldType: f.fieldType,
             pageNumber: f.pageNumber,
             x: f.x,
             y: f.y,
