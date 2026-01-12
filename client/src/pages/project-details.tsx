@@ -1330,7 +1330,7 @@ export default function ProjectDetails() {
     }
   });
 
-  // Handle document file upload using direct server upload with progress tracking
+  // Handle document file upload using local server storage with progress tracking
   const handleDocumentFileUpload = async (files: FileList) => {
     const file = files[0];
     if (!file) return;
@@ -1350,11 +1350,11 @@ export default function ProjectDetails() {
     setUploadError(null);
     
     try {
-      // Read file as ArrayBuffer for direct upload
+      // Read file as ArrayBuffer for upload
       const arrayBuffer = await file.arrayBuffer();
       setUploadProgress(10);
       
-      // Upload directly to server (bypasses presigned URL crash)
+      // Upload to local storage endpoint (avoids cloud storage crashes)
       const response = await new Promise<{ objectPath: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
@@ -1381,7 +1381,7 @@ export default function ProjectDetails() {
         xhr.addEventListener('error', () => reject(new Error('Upload failed')));
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
         
-        xhr.open('POST', '/api/uploads/direct');
+        xhr.open('POST', '/api/uploads/local');
         xhr.setRequestHeader('Content-Type', mimeType);
         xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
         xhr.send(arrayBuffer);

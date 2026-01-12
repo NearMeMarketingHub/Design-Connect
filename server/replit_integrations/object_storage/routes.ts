@@ -1,6 +1,15 @@
 import type { Express, Request } from "express";
-import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
+import * as path from "path";
+
+const UPLOADS_DIR = path.join(process.cwd(), "uploads", "documents");
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 /**
  * Register object storage routes for file uploads.
@@ -9,10 +18,10 @@ export function registerObjectStorageRoutes(app: Express): void {
   const objectStorageService = new ObjectStorageService();
 
   /**
-   * Direct file upload endpoint - bypasses presigned URL to avoid runtime crashes.
-   * Uses streaming upload to handle large files and avoid GCS client cleanup issues.
+   * Local file upload endpoint - stores files on local filesystem.
+   * This bypasses cloud storage to avoid runtime crashes.
    */
-  app.post("/api/uploads/direct", async (req: Request, res) => {
+  app.post("/api/uploads/local", async (req: Request, res) => {
     try {
       const contentType = req.headers['content-type'] || 'application/octet-stream';
       const fileName = decodeURIComponent(req.headers['x-file-name'] as string || 'upload');
@@ -22,50 +31,56 @@ export function registerObjectStorageRoutes(app: Express): void {
         return res.status(400).json({ error: "No file data received" });
       }
 
-      const privateObjectDir = objectStorageService.getPrivateObjectDir();
       const objectId = randomUUID();
-      const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+      const ext = path.extname(fileName) || '.bin';
+      const storedFileName = `${objectId}${ext}`;
+      const filePath = path.join(UPLOADS_DIR, storedFileName);
       
-      const pathParts = fullPath.startsWith('/') ? fullPath.slice(1).split('/') : fullPath.split('/');
-      const bucketName = pathParts[0];
-      const objectName = pathParts.slice(1).join('/');
+      // Write file to local filesystem
+      fs.writeFileSync(filePath, req.rawBody as Buffer);
       
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
+      const objectPath = `/uploads/documents/${storedFileName}`;
       
-      const objectPath = `/objects/uploads/${objectId}`;
-      
-      // Use streaming upload with explicit end handling
-      const writeStream = file.createWriteStream({
-        contentType,
-        metadata: {
-          metadata: {
-            originalName: fileName,
-          },
-        },
-        resumable: false,
-      });
-      
-      await new Promise<void>((resolve, reject) => {
-        writeStream.on('finish', () => {
-          resolve();
-        });
-        writeStream.on('error', (err) => {
-          reject(err);
-        });
-        writeStream.end(req.rawBody as Buffer);
-      });
-      
-      // Send response immediately before any cleanup occurs
       res.json({
         objectPath,
         metadata: { name: fileName, size: fileSize, contentType },
       });
     } catch (error) {
-      console.error("[direct-upload] Error:", error);
+      console.error("[local-upload] Error:", error);
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to upload file" });
       }
+    }
+  });
+
+  /**
+   * Serve locally uploaded files
+   */
+  app.get("/uploads/documents/:filename", (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const filePath = path.join(UPLOADS_DIR, filename);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      // Determine content type from extension
+      const ext = path.extname(filename).toLowerCase();
+      const contentTypes: Record<string, string> = {
+        '.pdf': 'application/pdf',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+      };
+      
+      const contentType = contentTypes[ext] || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.sendFile(filePath);
+    } catch (error) {
+      console.error("[serve-local] Error:", error);
+      res.status(500).json({ error: "Failed to serve file" });
     }
   });
 
