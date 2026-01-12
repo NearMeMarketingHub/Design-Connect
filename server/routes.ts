@@ -1023,7 +1023,6 @@ export async function registerRoutes(
       const pdfBuffer = await fs.readFile(pdfPath);
       
       // Upload PDF to object storage - use same bucket as original
-      const [metadata] = await file.getMetadata();
       const bucketName = file.bucket.name;
       const originalObjectName = file.name;
       
@@ -1035,8 +1034,16 @@ export async function registerRoutes(
       
       const bucket = objectStorageClient.bucket(bucketName);
       const pdfFile = bucket.file(pdfObjectName);
-      await pdfFile.save(pdfBuffer, {
-        contentType: 'application/pdf',
+      
+      // Use a promise wrapper to catch any save errors
+      await new Promise<void>((resolve, reject) => {
+        const stream = pdfFile.createWriteStream({
+          contentType: 'application/pdf',
+          resumable: false,
+        });
+        stream.on('error', reject);
+        stream.on('finish', resolve);
+        stream.end(pdfBuffer);
       });
       
       // Generate the PDF object path in the same format as the original
