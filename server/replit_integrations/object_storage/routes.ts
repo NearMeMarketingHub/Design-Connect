@@ -1,5 +1,4 @@
 import type { Express, Request } from "express";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -30,14 +29,12 @@ const upload = multer({
 });
 
 /**
- * Register object storage routes for file uploads.
+ * Register file upload routes - uses local filesystem only.
  */
 export function registerObjectStorageRoutes(app: Express): void {
-  const objectStorageService = new ObjectStorageService();
 
   /**
    * Multipart form file upload endpoint - stores files on local filesystem.
-   * Uses multer for reliable file handling.
    */
   app.post("/api/uploads/file", upload.single('file'), (req: Request, res) => {
     try {
@@ -93,53 +90,4 @@ export function registerObjectStorageRoutes(app: Express): void {
       res.status(500).json({ error: "Failed to serve file" });
     }
   });
-
-  /**
-   * Request a presigned URL for file upload (legacy - may cause crashes).
-   */
-  app.post("/api/uploads/request-url", async (req, res) => {
-    try {
-      const { name, size, contentType } = req.body;
-
-      if (!name) {
-        return res.status(400).json({
-          error: "Missing required field: name",
-        });
-      }
-
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-
-      res.json({
-        uploadURL,
-        objectPath,
-        metadata: { name, size, contentType },
-      });
-    } catch (error) {
-      console.error("[upload-url] Error generating upload URL:", error);
-      res.status(500).json({ error: "Failed to generate upload URL" });
-    }
-  });
-
-  /**
-   * Serve uploaded objects.
-   *
-   * GET /objects/:objectPath(*)
-   *
-   * This serves files from object storage. For public files, no auth needed.
-   * For protected files, add authentication middleware and ACL checks.
-   */
-  app.get("/objects/:objectPath(*)", async (req, res) => {
-    try {
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      await objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
-      console.error("Error serving object:", error);
-      if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ error: "Object not found" });
-      }
-      return res.status(500).json({ error: "Failed to serve object" });
-    }
-  });
 }
-

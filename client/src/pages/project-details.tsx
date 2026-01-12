@@ -1479,7 +1479,10 @@ export default function ProjectDetails() {
       type: newDocumentType,
       fileUrl: newDocumentFile.objectPath,
       fileSize: newDocumentFile.size,
-      mimeType: newDocumentFile.mimeType
+      mimeType: newDocumentFile.mimeType,
+      requiresSignature: requiresSignature,
+      signatureStatus: requiresSignature ? 'pending_setup' : undefined,
+      finalDocumentType: requiresSignature ? newDocumentType : undefined
     });
   };
   
@@ -3918,23 +3921,13 @@ export default function ProjectDetails() {
                 >
                   Cancel
                 </Button>
-                {requiresSignature ? (
-                  <Button
-                    onClick={() => setUploadWizardStep(2)}
-                    disabled={!newDocumentType || !newDocumentFile || isUploadingDocument}
-                    data-testid="button-next-step"
-                  >
-                    Next Step
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleCreateDocument}
-                    disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending || isUploadingDocument}
-                    data-testid="button-submit-document"
-                  >
-                    {createDocumentMutation.isPending ? 'Saving...' : 'Save Document'}
-                  </Button>
-                )}
+                <Button
+                  onClick={handleCreateDocument}
+                  disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending || isUploadingDocument}
+                  data-testid="button-submit-document"
+                >
+                  {createDocumentMutation.isPending ? 'Saving...' : 'Save Document'}
+                </Button>
               </DialogFooter>
             </>
           ) : (
