@@ -3949,13 +3949,13 @@ export default function ProjectDetails() {
                       fields={signatureFields}
                       onFieldsChange={setSignatureFields}
                       onDocumentConverted={(pdfPath) => {
-                        // Update the document file to use the converted PDF
-                        setNewDocumentFile({
-                          ...newDocumentFile,
-                          name: newDocumentFile.name.replace(/\.(docx?|doc)$/i, '.pdf'),
+                        // Update the document file to use the converted PDF (functional setter for correct state)
+                        setNewDocumentFile(prev => prev ? {
+                          ...prev,
+                          name: prev.name.replace(/\.(docx?|doc)$/i, '.pdf'),
                           objectPath: pdfPath,
                           mimeType: 'application/pdf'
-                        });
+                        } : null);
                       }}
                     />
                   </div>
