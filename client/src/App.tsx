@@ -109,6 +109,7 @@ function Router() {
           <Route path="/client/project/:id/budget" component={ProjectDetails} />
           <Route path="/client/project/:id/timeline" component={ProjectDetails} />
           <Route path="/client/project/:id/inspiration" component={ProjectDetails} />
+          <Route path="/client/project/:id/action-center" component={ProjectDetails} />
           <Route path="/client/project/:id" component={ProjectDetails} />
           <Route path="/client/profile" component={MyProfile} />
           <Route path="/client/settings" component={SettingsPage} />
@@ -133,6 +134,7 @@ function Router() {
           <Route path="/contractor/project/:id/timeline" component={ProjectDetails} />
           <Route path="/contractor/project/:id/inspiration" component={ProjectDetails} />
           <Route path="/contractor/project/:id/contractor-photos" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/action-center" component={ProjectDetails} />
           <Route path="/contractor/project/:id" component={ProjectDetails} />
           <Route path="/contractor/calculator" component={ContractorCalculator} />
           <Route path="/contractor/floor-calculator" component={FloorCalculator} />

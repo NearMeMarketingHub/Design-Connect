@@ -2005,7 +2005,7 @@ export default function ProjectDetails() {
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
-        <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none h-auto overflow-x-auto flex-nowrap">
+        <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 pt-2 rounded-none h-auto overflow-x-auto overflow-y-visible flex-nowrap">
           <TabsTrigger 
             value="overview"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
@@ -2059,12 +2059,12 @@ export default function ProjectDetails() {
           </TabsTrigger>
           <TabsTrigger 
             value="action-center"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors relative"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 pr-6 whitespace-nowrap transition-colors relative overflow-visible"
             data-testid="tab-action-center"
           >
             Action Center
             {pendingActionCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute top-1 right-0 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                 {pendingActionCount}
               </span>
             )}
