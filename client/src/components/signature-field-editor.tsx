@@ -54,23 +54,36 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
   const [pageImageUrl, setPageImageUrl] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<SignatureField['fieldType']>('signature');
   const [isLoading, setIsLoading] = useState(true);
+  const [isConverting, setIsConverting] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
+  const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null);
+
+  const isWordDocument = documentMimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                         documentMimeType === 'application/msword' ||
+                         documentUrl.endsWith('.docx') ||
+                         documentUrl.endsWith('.doc');
 
   useEffect(() => {
     const loadDocument = async () => {
       setIsLoading(true);
+      setConversionError(null);
       
-      if (documentMimeType === 'application/pdf') {
+      // Use converted PDF URL if available
+      const urlToLoad = convertedPdfUrl || documentUrl;
+      const mimeToCheck = convertedPdfUrl ? 'application/pdf' : documentMimeType;
+      
+      if (mimeToCheck === 'application/pdf') {
         try {
-          const pdf = await pdfjsLib.getDocument(documentUrl).promise;
+          const pdf = await pdfjsLib.getDocument(urlToLoad).promise;
           setTotalPages(pdf.numPages);
           await renderPdfPage(pdf, currentPage);
         } catch (error) {
           console.error('Error loading PDF:', error);
           setPageImageUrl(null);
         }
-      } else if (documentMimeType.startsWith('image/')) {
+      } else if (mimeToCheck.startsWith('image/')) {
         setTotalPages(1);
-        setPageImageUrl(documentUrl);
+        setPageImageUrl(urlToLoad);
       } else {
         setPageImageUrl(null);
       }
@@ -79,7 +92,37 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
     };
 
     loadDocument();
-  }, [documentUrl, documentMimeType, currentPage]);
+  }, [documentUrl, documentMimeType, currentPage, convertedPdfUrl]);
+
+  const convertToPdf = async () => {
+    setIsConverting(true);
+    setConversionError(null);
+    
+    try {
+      const res = await fetch('/api/documents/convert-to-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          objectPath: documentUrl,
+          mimeType: documentMimeType
+        })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Conversion failed');
+      }
+      
+      const data = await res.json();
+      setConvertedPdfUrl(data.pdfPath);
+    } catch (error: any) {
+      console.error('Conversion error:', error);
+      setConversionError(error.message || 'Failed to convert document');
+    } finally {
+      setIsConverting(false);
+    }
+  };
 
   const renderPdfPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number) => {
     const page = await pdf.getPage(pageNum);
@@ -252,45 +295,45 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
               );
             })}
           </>
-        ) : (
+        ) : isWordDocument && !convertedPdfUrl ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
             <div className="text-muted-foreground text-center mb-6">
               <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p className="font-medium">Word documents can't be previewed</p>
-              <p className="text-sm mt-1">Use the controls above to add signature fields. They'll be placed at the bottom of the specified page.</p>
+              <p className="font-medium">Word Document Detected</p>
+              <p className="text-sm mt-1">Convert to PDF to enable visual field placement</p>
             </div>
             
-            {/* Fallback form for non-previewable documents */}
-            <div className="w-full max-w-md space-y-3">
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <Label className="text-xs">Field Type</Label>
-                  <Select value={selectedFieldType} onValueChange={(v) => setSelectedFieldType(v as SignatureField['fieldType'])}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="signature">Signature</SelectItem>
-                      <SelectItem value="initials">Initials</SelectItem>
-                      <SelectItem value="date">Date</SelectItem>
-                      <SelectItem value="text">Text</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-20">
-                  <Label className="text-xs">Page</Label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={currentPage}
-                    onChange={(e) => setCurrentPage(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full h-10 px-3 border rounded-md text-sm"
-                  />
-                </div>
-                <Button onClick={addField} data-testid="button-add-fallback-field">
-                  <Plus className="w-4 h-4 mr-1" /> Add
-                </Button>
+            {conversionError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {conversionError}
               </div>
+            )}
+            
+            <Button 
+              onClick={convertToPdf} 
+              disabled={isConverting}
+              data-testid="button-convert-to-pdf"
+            >
+              {isConverting ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Converting...
+                </>
+              ) : (
+                'Convert to PDF for Preview'
+              )}
+            </Button>
+            
+            <p className="text-xs text-muted-foreground mt-4">
+              This may take a few moments for larger documents
+            </p>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+            <div className="text-muted-foreground text-center">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="font-medium">Cannot preview this document type</p>
+              <p className="text-sm mt-1">Use the controls above to add signature fields.</p>
             </div>
           </div>
         )}

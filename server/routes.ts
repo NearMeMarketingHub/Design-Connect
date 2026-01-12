@@ -960,6 +960,92 @@ export async function registerRoutes(
     }
   });
 
+  // Convert document to PDF (for Word docs, etc.)
+  app.post("/api/documents/convert-to-pdf", requireAuth, async (req, res, next) => {
+    try {
+      const { objectPath, mimeType } = req.body;
+      
+      if (!objectPath) {
+        return res.status(400).json({ message: "Object path is required" });
+      }
+      
+      // Only convert Word documents
+      const isWordDoc = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                        mimeType === 'application/msword' ||
+                        objectPath.endsWith('.docx') ||
+                        objectPath.endsWith('.doc');
+      
+      if (!isWordDoc) {
+        return res.status(400).json({ message: "Only Word documents can be converted" });
+      }
+      
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const os = await import('os');
+      const { objectStorageClient } = await import('./replit_integrations/object_storage/objectStorage');
+      
+      // Parse the object path to get bucket and object name
+      // Object path format: /objects/uploads/uuid or similar
+      const objectStorage = new ObjectStorageService();
+      const file = await objectStorage.getObjectEntityFile(objectPath);
+      
+      // Create temp directory for conversion
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'docconv-'));
+      const inputPath = path.join(tempDir, 'input.docx');
+      const outputDir = tempDir;
+      
+      // Download file from object storage
+      const [fileBuffer] = await file.download();
+      await fs.writeFile(inputPath, fileBuffer);
+      
+      // Convert using LibreOffice
+      try {
+        await execAsync(`soffice --headless --convert-to pdf --outdir "${outputDir}" "${inputPath}"`, {
+          timeout: 60000 // 60 second timeout
+        });
+      } catch (convError: any) {
+        console.error('LibreOffice conversion error:', convError);
+        // Cleanup
+        await fs.rm(tempDir, { recursive: true, force: true });
+        return res.status(500).json({ message: "Failed to convert document" });
+      }
+      
+      // Read the converted PDF
+      const pdfPath = path.join(outputDir, 'input.pdf');
+      const pdfBuffer = await fs.readFile(pdfPath);
+      
+      // Upload PDF to object storage - use same bucket as original
+      const [metadata] = await file.getMetadata();
+      const bucketName = file.bucket.name;
+      const originalObjectName = file.name;
+      const pdfObjectName = originalObjectName.replace(/\.(docx?|doc)$/i, '.pdf');
+      
+      const bucket = objectStorageClient.bucket(bucketName);
+      const pdfFile = bucket.file(pdfObjectName);
+      await pdfFile.save(pdfBuffer, {
+        contentType: 'application/pdf',
+      });
+      
+      // Generate the PDF object path in the same format as the original
+      const pdfObjectPath = objectPath.replace(/\.(docx?|doc)$/i, '.pdf');
+      
+      // Cleanup temp files
+      await fs.rm(tempDir, { recursive: true, force: true });
+      
+      res.json({ 
+        success: true, 
+        pdfPath: pdfObjectPath,
+        message: "Document converted successfully" 
+      });
+    } catch (error) {
+      console.error('Document conversion error:', error);
+      next(error);
+    }
+  });
+
   // Post Comment routes
   app.get("/api/posts/:postId/comments", async (req, res, next) => {
     try {
