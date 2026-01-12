@@ -44,6 +44,7 @@ export default function SignatureSetup() {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [recipientEmails, setRecipientEmails] = useState<Record<string, string>>({});
 
   const { data: project } = useQuery({
     queryKey: ['/api/projects', projectId],
@@ -112,15 +113,18 @@ export default function SignatureSetup() {
 
       const recipients = selectedRecipients.map(id => {
         const recipient = allRecipients.find(r => r.id === id);
+        const email = recipient?.email || recipientEmails[id] || '';
         return {
+          userId: id,
           name: recipient?.name || 'Unknown',
-          email: recipient?.email || '',
+          email,
           role: 'signer' as const
         };
-      }).filter(r => r.email);
+      });
 
-      if (recipients.length === 0) {
-        throw new Error('Selected recipients must have email addresses');
+      const recipientsWithoutEmail = recipients.filter(r => !r.email);
+      if (recipientsWithoutEmail.length > 0) {
+        throw new Error(`Please enter email addresses for: ${recipientsWithoutEmail.map(r => r.name).join(', ')}`);
       }
 
       const res = await fetch(`/api/projects/${projectId}/signing-packets`, {
@@ -272,28 +276,56 @@ export default function SignatureSetup() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {allRecipients.map((recipient) => (
-                      <div 
-                        key={recipient.id}
-                        className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                        onClick={() => toggleRecipient(recipient.id)}
-                      >
-                        <Checkbox
-                          checked={selectedRecipients.includes(recipient.id)}
-                          onCheckedChange={() => toggleRecipient(recipient.id)}
-                          data-testid={`checkbox-recipient-${recipient.id}`}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{recipient.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{recipient.email || 'No email'}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            recipient.role === 'client' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                          }`}>
-                            {recipient.role === 'client' ? 'Client' : 'Contractor'}
-                          </span>
+                    {allRecipients.map((recipient) => {
+                      const isSelected = selectedRecipients.includes(recipient.id);
+                      const needsEmail = !recipient.email && isSelected;
+                      
+                      return (
+                        <div 
+                          key={recipient.id}
+                          className={`p-3 border rounded-lg ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                        >
+                          <div 
+                            className="flex items-start gap-3 cursor-pointer"
+                            onClick={() => toggleRecipient(recipient.id)}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleRecipient(recipient.id)}
+                              data-testid={`checkbox-recipient-${recipient.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{recipient.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {recipient.email || recipientEmails[recipient.id] || 'No email on file'}
+                              </p>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                recipient.role === 'client' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                              }`}>
+                                {recipient.role === 'client' ? 'Client' : 'Contractor'}
+                              </span>
+                            </div>
+                          </div>
+                          {needsEmail && (
+                            <div className="mt-3 ml-7">
+                              <Label className="text-xs text-amber-600">Enter email address for notification:</Label>
+                              <Input
+                                type="email"
+                                placeholder="email@example.com"
+                                value={recipientEmails[recipient.id] || ''}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setRecipientEmails(prev => ({ ...prev, [recipient.id]: e.target.value }));
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-1"
+                                data-testid={`input-email-${recipient.id}`}
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 {selectedRecipients.length > 0 && (
