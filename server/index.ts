@@ -30,6 +30,16 @@ app.use(
   }),
 );
 
+app.use(
+  express.raw({
+    type: ['application/pdf', 'application/octet-stream', 'image/*'],
+    limit: '100mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
 export function log(message: string, source = "express") {
