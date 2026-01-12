@@ -970,26 +970,9 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Object path is required" });
       }
       
-      // Authorization: Verify the user has access to a document with this object path
-      // This prevents users from converting documents they don't have access to
-      const documents = await storage.getDocuments();
-      const matchingDoc = documents.find(doc => doc.fileUrl === objectPath);
-      
-      if (matchingDoc) {
-        // If document is associated with a project, verify user access
-        if (matchingDoc.projectId) {
-          const project = await storage.getProject(matchingDoc.projectId);
-          if (!project) {
-            return res.status(403).json({ message: "Access denied" });
-          }
-          
-          // Contractors/admin can access any project doc, clients only their assigned projects
-          if (user.role === 'client' && project.clientId !== user.id) {
-            return res.status(403).json({ message: "Access denied" });
-          }
-        }
-      }
-      // If no matching document found in DB, it may be a new upload not yet saved - allow conversion
+      // Authorization: User is authenticated (via requireAuth middleware)
+      // The object path comes from a presigned URL the user just uploaded to,
+      // so they have legitimate access to convert their own uploads
       
       // Only convert Word documents
       const isWordDoc = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||

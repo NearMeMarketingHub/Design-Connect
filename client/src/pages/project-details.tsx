@@ -1228,6 +1228,7 @@ export default function ProjectDetails() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'upload' | 'convert'>('idle');
   const [uploadPhaseLabel, setUploadPhaseLabel] = useState('Uploading...');
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [requiresSignature, setRequiresSignature] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -1344,6 +1345,7 @@ export default function ProjectDetails() {
     setUploadProgress(0);
     setUploadPhase('upload');
     setUploadPhaseLabel('Uploading...');
+    setUploadError(null);
     
     try {
       // Step 1: Get presigned URL from server
@@ -1443,7 +1445,7 @@ export default function ProjectDetails() {
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
+      setUploadError(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
       setUploadProgress(0);
     } finally {
       setIsUploadingDocument(false);
@@ -3900,6 +3902,25 @@ export default function ProjectDetails() {
                       }
                     }}
                   />
+                  {uploadError && (
+                    <div className="p-3 rounded-lg border border-red-200 bg-red-50 mb-2">
+                      <div className="flex items-start gap-2">
+                        <X className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-700">Upload Failed</p>
+                          <p className="text-xs text-red-600 mt-1">{uploadError}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-red-600 hover:text-red-800"
+                          onClick={() => setUploadError(null)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {isUploadingDocument ? (
                     <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
                       <div className="flex items-center justify-between">
