@@ -2265,22 +2265,36 @@ export async function registerRoutes(
       if (fields && Array.isArray(fields) && fields.length > 0 && createdParticipants.length > 0) {
         const positionMap = { top: 10, middle: 50, bottom: 85 };
         await Promise.all(
-          fields.map(async (field: { fieldType: string; pageNumber: number; position: string; recipientIndex: number }) => {
-            // Always use a valid participant - fallback to first if index is out of bounds
-            const recipientIdx = Math.min(field.recipientIndex || 0, createdParticipants.length - 1);
-            const participant = createdParticipants[recipientIdx];
+          fields.map(async (field: { 
+            fieldType: string; 
+            pageNumber: number; 
+            position?: string; 
+            recipientIndex?: number;
+            x?: number;
+            y?: number;
+            width?: number;
+            height?: number;
+          }) => {
+            // Always use first participant (since we only have one recipient - the project client)
+            const participant = createdParticipants[0];
             
             // Only create field if we have a valid participant with an ID
             if (participant?.id) {
+              // Support both visual editor format (x, y, width, height) and legacy format (position)
+              const xPosition = field.x !== undefined ? field.x : 50;
+              const yPosition = field.y !== undefined ? field.y : (positionMap[field.position as keyof typeof positionMap] || 85);
+              const width = field.width !== undefined ? field.width : (field.fieldType === 'signature' ? 30 : 15);
+              const height = field.height !== undefined ? field.height : (field.fieldType === 'signature' ? 10 : 5);
+              
               await storage.createSigningField({
                 packetId: packet.id,
                 participantId: participant.id,
                 fieldType: field.fieldType,
                 pageNumber: field.pageNumber,
-                xPosition: 50, // Center horizontally
-                yPosition: positionMap[field.position as keyof typeof positionMap] || 85,
-                width: field.fieldType === 'signature' ? 30 : 15,
-                height: field.fieldType === 'signature' ? 10 : 5,
+                xPosition,
+                yPosition,
+                width,
+                height,
                 isRequired: true
               });
             }

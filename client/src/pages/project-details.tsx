@@ -85,6 +85,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChatPanel } from "@/components/ChatPanel";
+import { SignatureFieldEditor, SignatureField } from "@/components/signature-field-editor";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
 
@@ -1230,8 +1231,7 @@ export default function ProjectDetails() {
   
   // Upload wizard state for signature documents
   const [uploadWizardStep, setUploadWizardStep] = useState<1 | 2>(1);
-  const [signatureFields, setSignatureFields] = useState<Array<{ fieldType: string; pageNumber: number; position: string; recipientIndex: number }>>([]);
-  const [signatureRecipients, setSignatureRecipients] = useState<Array<{ name: string; email: string }>>([{ name: '', email: '' }]);
+  const [signatureFields, setSignatureFields] = useState<SignatureField[]>([]);
   const [signatureDueDate, setSignatureDueDate] = useState<string>("");
   const [signatureMessage, setSignatureMessage] = useState<string>("");
   
@@ -1298,7 +1298,6 @@ export default function ProjectDetails() {
       setRequiresSignature(false);
       setUploadWizardStep(1);
       setSignatureFields([]);
-      setSignatureRecipients([{ name: '', email: '' }]);
       setSignatureDueDate("");
       setSignatureMessage("");
     },
@@ -1407,8 +1406,8 @@ export default function ProjectDetails() {
     mutationFn: async (data: { 
       document: { name: string; type: string; fileUrl: string; fileSize?: number; mimeType?: string };
       recipients: Array<{ name: string; email: string }>;
-      fields: Array<{ fieldType: string; pageNumber: number; position: string; recipientIndex: number }>;
-      dueDate?: string;
+      fields: SignatureField[];
+      dueDate: string;
       message?: string;
     }) => {
       // First create the document with pending_setup status (safe rollback state)
@@ -1459,7 +1458,6 @@ export default function ProjectDetails() {
       setRequiresSignature(false);
       setUploadWizardStep(1);
       setSignatureFields([]);
-      setSignatureRecipients([{ name: '', email: '' }]);
       setSignatureDueDate("");
       setSignatureMessage("");
       setSignatureCreationError(null);
@@ -1487,10 +1485,15 @@ export default function ProjectDetails() {
     // Clear any previous error
     setSignatureCreationError(null);
     
-    // Validate recipients
-    const validRecipients = signatureRecipients.filter(r => r.name.trim() && r.email.trim());
-    if (validRecipients.length === 0) {
-      setSignatureCreationError('Please add at least one recipient with name and email');
+    // Validate client exists
+    if (!apiProject?.client) {
+      setSignatureCreationError('No client assigned to this project. Please assign a client before requesting signatures.');
+      return;
+    }
+    
+    // Validate due date
+    if (!signatureDueDate) {
+      setSignatureCreationError('Please select a due date');
       return;
     }
     
@@ -1508,9 +1511,9 @@ export default function ProjectDetails() {
         fileSize: newDocumentFile.size,
         mimeType: newDocumentFile.mimeType
       },
-      recipients: validRecipients,
+      recipients: [{ name: apiProject.client.name, email: apiProject.client.email }],
       fields: signatureFields,
-      dueDate: signatureDueDate || undefined,
+      dueDate: signatureDueDate,
       message: signatureMessage || undefined
     });
   };
@@ -3783,7 +3786,6 @@ export default function ProjectDetails() {
           setNewDocumentFile(null);
           setRequiresSignature(false);
           setSignatureFields([]);
-          setSignatureRecipients([{ name: '', email: '' }]);
           setSignatureDueDate("");
           setSignatureMessage("");
         }
@@ -3922,164 +3924,43 @@ export default function ProjectDetails() {
                   </div>
                 )}
 
-                {/* Recipients Section */}
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Recipients</Label>
-                  {signatureRecipients.map((recipient, index) => (
-                    <div key={index} className="flex gap-2 items-start">
-                      <div className="flex-1 space-y-2">
-                        <Input
-                          placeholder="Name"
-                          value={recipient.name}
-                          onChange={(e) => {
-                            const updated = [...signatureRecipients];
-                            updated[index].name = e.target.value;
-                            setSignatureRecipients(updated);
-                          }}
-                          data-testid={`input-recipient-name-${index}`}
-                        />
-                        <Input
-                          placeholder="Email"
-                          type="email"
-                          value={recipient.email}
-                          onChange={(e) => {
-                            const updated = [...signatureRecipients];
-                            updated[index].email = e.target.value;
-                            setSignatureRecipients(updated);
-                          }}
-                          data-testid={`input-recipient-email-${index}`}
-                        />
-                      </div>
-                      {signatureRecipients.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSignatureRecipients(signatureRecipients.filter((_, i) => i !== index));
-                          }}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSignatureRecipients([...signatureRecipients, { name: '', email: '' }])}
-                    data-testid="button-add-recipient"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Add Recipient
-                  </Button>
+                {/* Sending To Info */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">Sending to:</span>{' '}
+                    {apiProject?.client ? (
+                      <>{apiProject.client.name} ({apiProject.client.email})</>
+                    ) : (
+                      <span className="text-amber-600">No client assigned to this project</span>
+                    )}
+                  </p>
                 </div>
 
-                {/* Signature Fields Section */}
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Signature Fields</Label>
-                  {signatureFields.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No fields added yet. Add at least one signature field.</p>
-                  )}
-                  {signatureFields.map((field, index) => (
-                    <div key={index} className="flex gap-2 items-center p-3 border rounded-lg bg-muted/30">
-                      <div className="flex-1 grid grid-cols-4 gap-2">
-                        <Select
-                          value={field.fieldType}
-                          onValueChange={(val) => {
-                            const updated = [...signatureFields];
-                            updated[index].fieldType = val;
-                            setSignatureFields(updated);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="signature">Signature</SelectItem>
-                            <SelectItem value="initials">Initials</SelectItem>
-                            <SelectItem value="date">Date</SelectItem>
-                            <SelectItem value="text">Text</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="number"
-                          min="1"
-                          placeholder="Page"
-                          value={field.pageNumber}
-                          onChange={(e) => {
-                            const updated = [...signatureFields];
-                            updated[index].pageNumber = parseInt(e.target.value) || 1;
-                            setSignatureFields(updated);
-                          }}
-                        />
-                        <Select
-                          value={field.position}
-                          onValueChange={(val) => {
-                            const updated = [...signatureFields];
-                            updated[index].position = val;
-                            setSignatureFields(updated);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Position" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="top">Top</SelectItem>
-                            <SelectItem value="middle">Middle</SelectItem>
-                            <SelectItem value="bottom">Bottom</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={field.recipientIndex.toString()}
-                          onValueChange={(val) => {
-                            const updated = [...signatureFields];
-                            updated[index].recipientIndex = parseInt(val);
-                            setSignatureFields(updated);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Recipient" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {signatureRecipients.map((r, i) => (
-                              <SelectItem key={i} value={i.toString()}>
-                                {r.name || `Recipient ${i + 1}`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSignatureFields(signatureFields.filter((_, i) => i !== index))}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSignatureFields([...signatureFields, { 
-                      fieldType: 'signature', 
-                      pageNumber: 1, 
-                      position: 'bottom', 
-                      recipientIndex: 0 
-                    }])}
-                    data-testid="button-add-field"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Add Field
-                  </Button>
-                </div>
+                {/* Visual Signature Field Editor */}
+                {newDocumentFile && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">Place Signature Fields</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Click "Add" to place fields on the document, then drag and resize them to position.
+                    </p>
+                    <SignatureFieldEditor
+                      documentUrl={newDocumentFile.objectPath}
+                      documentMimeType={newDocumentFile.mimeType}
+                      fields={signatureFields}
+                      onFieldsChange={setSignatureFields}
+                    />
+                  </div>
+                )}
 
                 {/* Due Date & Message */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Due Date (Optional)</Label>
+                    <Label>Due Date (Required)</Label>
                     <Input
                       type="date"
                       value={signatureDueDate}
                       onChange={(e) => setSignatureDueDate(e.target.value)}
+                      required
                       data-testid="input-signature-due-date"
                     />
                   </div>
@@ -4105,7 +3986,8 @@ export default function ProjectDetails() {
                   onClick={handleCreateDocumentWithSignature}
                   disabled={
                     signatureFields.length === 0 || 
-                    signatureRecipients.filter(r => r.name.trim() && r.email.trim()).length === 0 ||
+                    !apiProject?.client ||
+                    !signatureDueDate ||
                     createDocumentWithSignatureMutation.isPending
                   }
                   data-testid="button-save-with-signature"
