@@ -1045,17 +1045,22 @@ export async function registerRoutes(
         ? objectPath.replace(/\.(docx?|doc)$/i, '.pdf')
         : `${objectPath}.pdf`;
       
-      // Cleanup temp files
-      await fs.rm(tempDir, { recursive: true, force: true });
+      // Cleanup temp files (non-blocking to avoid any issues)
+      fs.rm(tempDir, { recursive: true, force: true }).catch(cleanupErr => {
+        console.error('Cleanup error (non-fatal):', cleanupErr);
+      });
       
       res.json({ 
         success: true, 
         pdfPath: pdfObjectPath,
         message: "Document converted successfully" 
       });
-    } catch (error) {
-      console.error('Document conversion error:', error);
-      next(error);
+    } catch (error: any) {
+      console.error('Document conversion error:', error?.message || error);
+      // Return error but don't crash the server
+      if (!res.headersSent) {
+        res.status(500).json({ message: error?.message || "Failed to convert document" });
+      }
     }
   });
 
