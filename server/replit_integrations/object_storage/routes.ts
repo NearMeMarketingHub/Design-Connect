@@ -1,4 +1,5 @@
 import type { Express, Request } from "express";
+import express from "express";
 import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -61,33 +62,13 @@ export function registerObjectStorageRoutes(app: Express): void {
     }
   });
 
-  /**
-   * Serve locally uploaded files
-   */
-  app.get("/uploads/documents/:filename", (req, res) => {
-    try {
-      const filename = req.params.filename;
-      const filePath = path.join(UPLOADS_DIR, filename);
-      
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: "File not found" });
+  // Use express.static for robust file serving
+  app.use("/uploads/documents", express.static(UPLOADS_DIR, {
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.pdf') {
+        res.setHeader('Content-Type', 'application/pdf');
       }
-      
-      const ext = path.extname(filename).toLowerCase();
-      const contentTypes: Record<string, string> = {
-        '.pdf': 'application/pdf',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-      };
-      
-      const contentType = contentTypes[ext] || 'application/octet-stream';
-      res.setHeader('Content-Type', contentType);
-      res.sendFile(filePath);
-    } catch (error) {
-      console.error("[serve-local] Error:", error);
-      res.status(500).json({ error: "Failed to serve file" });
     }
-  });
+  }));
 }
