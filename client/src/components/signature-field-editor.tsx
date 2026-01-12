@@ -253,10 +253,44 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
             })}
           </>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-muted-foreground text-center">
-              <p>Cannot preview this document type.</p>
-              <p className="text-sm">Please use the form-based field editor below.</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+            <div className="text-muted-foreground text-center mb-6">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="font-medium">Word documents can't be previewed</p>
+              <p className="text-sm mt-1">Use the controls above to add signature fields. They'll be placed at the bottom of the specified page.</p>
+            </div>
+            
+            {/* Fallback form for non-previewable documents */}
+            <div className="w-full max-w-md space-y-3">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label className="text-xs">Field Type</Label>
+                  <Select value={selectedFieldType} onValueChange={(v) => setSelectedFieldType(v as SignatureField['fieldType'])}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="signature">Signature</SelectItem>
+                      <SelectItem value="initials">Initials</SelectItem>
+                      <SelectItem value="date">Date</SelectItem>
+                      <SelectItem value="text">Text</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-20">
+                  <Label className="text-xs">Page</Label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={currentPage}
+                    onChange={(e) => setCurrentPage(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full h-10 px-3 border rounded-md text-sm"
+                  />
+                </div>
+                <Button onClick={addField} data-testid="button-add-fallback-field">
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
             </div>
           </div>
         )}
