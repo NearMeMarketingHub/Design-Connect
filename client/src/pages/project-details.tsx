@@ -1226,7 +1226,7 @@ export default function ProjectDetails() {
   const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadPhase, setUploadPhase] = useState<'idle' | 'upload' | 'convert'>('idle');
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'upload'>('idle');
   const [uploadPhaseLabel, setUploadPhaseLabel] = useState('Uploading...');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [requiresSignature, setRequiresSignature] = useState(false);
@@ -1336,10 +1336,12 @@ export default function ProjectDetails() {
     if (!file) return;
     
     const mimeType = file.type || 'application/octet-stream';
-    const isWordDoc = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                      mimeType === 'application/msword' ||
-                      file.name.endsWith('.docx') ||
-                      file.name.endsWith('.doc');
+    
+    // Check if signature is required and file is not PDF
+    if (requiresSignature && mimeType !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setUploadError('Documents requiring signature must be in PDF format. Please convert your document to PDF first.');
+      return;
+    }
     
     setIsUploadingDocument(true);
     setUploadProgress(0);
@@ -1369,23 +1371,19 @@ export default function ProjectDetails() {
       setUploadProgress(5);
       
       // Step 2: Upload file with XMLHttpRequest for progress tracking
-      // If Word doc, upload phase is 0-50%; otherwise 0-100%
-      const uploadMaxProgress = isWordDoc ? 50 : 100;
-      
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            // Upload progress: 5% to uploadMaxProgress-5%
-            const percentComplete = Math.round((event.loaded / event.total) * (uploadMaxProgress - 10)) + 5;
-            setUploadProgress(Math.min(percentComplete, uploadMaxProgress - 5));
+            const percentComplete = Math.round((event.loaded / event.total) * 90) + 5;
+            setUploadProgress(Math.min(percentComplete, 95));
           }
         });
         
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadProgress(uploadMaxProgress);
+            setUploadProgress(100);
             resolve();
           } else {
             reject(new Error('Failed to upload file'));
@@ -1400,49 +1398,13 @@ export default function ProjectDetails() {
         xhr.send(file);
       });
       
-      // For Word documents, auto-convert to PDF
-      if (isWordDoc) {
-        setUploadPhase('convert');
-        setUploadPhaseLabel('Converting to PDF...');
-        setUploadProgress(55);
-        
-        // Start conversion
-        const convertRes = await fetch('/api/documents/convert-to-pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            objectPath: objectPath,
-            mimeType: mimeType
-          })
-        });
-        
-        setUploadProgress(80);
-        
-        if (!convertRes.ok) {
-          const errData = await convertRes.json().catch(() => ({}));
-          throw new Error(errData.message || 'Failed to convert document to PDF');
-        }
-        
-        const convertData = await convertRes.json();
-        setUploadProgress(100);
-        
-        // Store converted PDF info
-        setNewDocumentFile({
-          name: file.name.replace(/\.(docx?|doc)$/i, '.pdf'),
-          objectPath: convertData.pdfPath,
-          size: file.size, // We don't know the PDF size yet, keep original
-          mimeType: 'application/pdf'
-        });
-      } else {
-        // Store original file info for non-Word documents
-        setNewDocumentFile({
-          name: file.name,
-          objectPath: objectPath,
-          size: file.size,
-          mimeType: mimeType
-        });
-      }
+      // Store file info
+      setNewDocumentFile({
+        name: file.name,
+        objectPath: objectPath,
+        size: file.size,
+        mimeType: mimeType
+      });
     } catch (error) {
       console.error('Upload error:', error);
       setUploadError(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
@@ -3895,7 +3857,7 @@ export default function ProjectDetails() {
                     type="file"
                     ref={documentFileInputRef}
                     className="hidden"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
+                    accept=".pdf,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
                     onChange={(e) => {
                       if (e.target.files) {
                         handleDocumentFileUpload(e.target.files);
@@ -3928,11 +3890,6 @@ export default function ProjectDetails() {
                         <span className="text-sm font-semibold text-primary">{uploadProgress}%</span>
                       </div>
                       <Progress value={uploadProgress} className="h-2" />
-                      {uploadPhase === 'convert' && (
-                        <p className="text-xs text-muted-foreground">
-                          Converting Word document to PDF for signing...
-                        </p>
-                      )}
                     </div>
                   ) : newDocumentFile ? (
                     <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">

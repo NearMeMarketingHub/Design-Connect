@@ -47,7 +47,7 @@ const FIELD_LABELS = {
   text: 'Text',
 };
 
-export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange, onDocumentConverted }: SignatureFieldEditorProps) {
+export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,36 +55,22 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
   const [pageImageUrl, setPageImageUrl] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<SignatureField['fieldType']>('signature');
   const [isLoading, setIsLoading] = useState(true);
-  const [isConverting, setIsConverting] = useState(false);
-  const [conversionError, setConversionError] = useState<string | null>(null);
-  const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null);
-
-  const isWordDocument = documentMimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                         documentMimeType === 'application/msword' ||
-                         documentUrl.endsWith('.docx') ||
-                         documentUrl.endsWith('.doc');
-
   useEffect(() => {
     const loadDocument = async () => {
       setIsLoading(true);
-      setConversionError(null);
       
-      // Use converted PDF URL if available
-      const urlToLoad = convertedPdfUrl || documentUrl;
-      const mimeToCheck = convertedPdfUrl ? 'application/pdf' : documentMimeType;
-      
-      if (mimeToCheck === 'application/pdf') {
+      if (documentMimeType === 'application/pdf') {
         try {
-          const pdf = await pdfjsLib.getDocument(urlToLoad).promise;
+          const pdf = await pdfjsLib.getDocument(documentUrl).promise;
           setTotalPages(pdf.numPages);
           await renderPdfPage(pdf, currentPage);
         } catch (error) {
           console.error('Error loading PDF:', error);
           setPageImageUrl(null);
         }
-      } else if (mimeToCheck.startsWith('image/')) {
+      } else if (documentMimeType.startsWith('image/')) {
         setTotalPages(1);
-        setPageImageUrl(urlToLoad);
+        setPageImageUrl(documentUrl);
       } else {
         setPageImageUrl(null);
       }
@@ -93,41 +79,7 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
     };
 
     loadDocument();
-  }, [documentUrl, documentMimeType, currentPage, convertedPdfUrl]);
-
-  const convertToPdf = async () => {
-    setIsConverting(true);
-    setConversionError(null);
-    
-    try {
-      const res = await fetch('/api/documents/convert-to-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          objectPath: documentUrl,
-          mimeType: documentMimeType
-        })
-      });
-      
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || 'Conversion failed');
-      }
-      
-      const data = await res.json();
-      setConvertedPdfUrl(data.pdfPath);
-      // Notify parent that document was converted to PDF
-      if (onDocumentConverted) {
-        onDocumentConverted(data.pdfPath);
-      }
-    } catch (error: any) {
-      console.error('Conversion error:', error);
-      setConversionError(error.message || 'Failed to convert document');
-    } finally {
-      setIsConverting(false);
-    }
-  };
+  }, [documentUrl, documentMimeType, currentPage]);
 
   const renderPdfPage = async (pdf: pdfjsLib.PDFDocumentProxy, pageNum: number) => {
     const page = await pdf.getPage(pageNum);
@@ -300,39 +252,6 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
               );
             })}
           </>
-        ) : isWordDocument && !convertedPdfUrl ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-            <div className="text-muted-foreground text-center mb-6">
-              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p className="font-medium">Word Document Detected</p>
-              <p className="text-sm mt-1">Convert to PDF to enable visual field placement</p>
-            </div>
-            
-            {conversionError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {conversionError}
-              </div>
-            )}
-            
-            <Button 
-              onClick={convertToPdf} 
-              disabled={isConverting}
-              data-testid="button-convert-to-pdf"
-            >
-              {isConverting ? (
-                <>
-                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Converting...
-                </>
-              ) : (
-                'Convert to PDF for Preview'
-              )}
-            </Button>
-            
-            <p className="text-xs text-muted-foreground mt-4">
-              This may take a few moments for larger documents
-            </p>
-          </div>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
             <div className="text-muted-foreground text-center">
