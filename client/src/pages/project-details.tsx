@@ -3742,8 +3742,8 @@ export default function ProjectDetails() {
                               <Button
                                 size="sm"
                                 onClick={() => {
-                                  // Navigate to signing page
-                                  window.location.href = `/sign/${myParticipant?.accessToken || ''}`;
+                                  // Navigate to authenticated signing page using packet ID
+                                  setLocation(`/client/sign/${packet.id}`);
                                 }}
                               >
                                 Sign Document
@@ -3959,6 +3959,7 @@ export default function ProjectDetails() {
                       Click "Add" to place fields on the document, then drag and resize them to position.
                     </p>
                     <SignatureFieldEditor
+                      documentId=""
                       documentUrl={newDocumentFile.objectPath}
                       documentMimeType={newDocumentFile.mimeType}
                       fields={signatureFields}

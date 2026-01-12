@@ -31,6 +31,7 @@ import MyProfile from "@/pages/my-profile";
 import ContractorCalculator from "@/pages/contractor-calculator";
 import FloorCalculator from "@/pages/floor-calculator";
 import SignDocumentPage from "@/pages/sign-document";
+import SignAuthenticatedPage from "@/pages/sign-authenticated";
 import SignatureSetup from "@/pages/signature-setup";
 import { AuthProvider } from "@/lib/auth-context";
 
@@ -112,6 +113,7 @@ function Router() {
           <Route path="/client/project/:id/inspiration" component={ProjectDetails} />
           <Route path="/client/project/:id/action-center" component={ProjectDetails} />
           <Route path="/client/project/:id" component={ProjectDetails} />
+          <Route path="/client/sign/:packetId" component={SignAuthenticatedPage} />
           <Route path="/client/profile" component={MyProfile} />
           <Route path="/client/settings" component={SettingsPage} />
           <Route component={NotFound} />
