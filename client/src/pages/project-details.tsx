@@ -1226,6 +1226,8 @@ export default function ProjectDetails() {
   const [newDocumentFile, setNewDocumentFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'upload' | 'convert'>('idle');
+  const [uploadPhaseLabel, setUploadPhaseLabel] = useState('Uploading...');
   const [requiresSignature, setRequiresSignature] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -1332,12 +1334,20 @@ export default function ProjectDetails() {
     const file = files[0];
     if (!file) return;
     
+    const mimeType = file.type || 'application/octet-stream';
+    const isWordDoc = mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                      mimeType === 'application/msword' ||
+                      file.name.endsWith('.docx') ||
+                      file.name.endsWith('.doc');
+    
     setIsUploadingDocument(true);
     setUploadProgress(0);
+    setUploadPhase('upload');
+    setUploadPhaseLabel('Uploading...');
     
     try {
       // Step 1: Get presigned URL from server
-      setUploadProgress(5);
+      setUploadProgress(3);
       const urlResponse = await fetch('/api/uploads/request-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1345,7 +1355,7 @@ export default function ProjectDetails() {
         body: JSON.stringify({
           name: file.name,
           size: file.size,
-          contentType: file.type || 'application/octet-stream'
+          contentType: mimeType
         })
       });
       
@@ -1354,22 +1364,26 @@ export default function ProjectDetails() {
       }
       
       const { uploadURL, objectPath } = await urlResponse.json();
-      setUploadProgress(10);
+      setUploadProgress(5);
       
       // Step 2: Upload file with XMLHttpRequest for progress tracking
+      // If Word doc, upload phase is 0-50%; otherwise 0-100%
+      const uploadMaxProgress = isWordDoc ? 50 : 100;
+      
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 85) + 10;
-            setUploadProgress(Math.min(percentComplete, 95));
+            // Upload progress: 5% to uploadMaxProgress-5%
+            const percentComplete = Math.round((event.loaded / event.total) * (uploadMaxProgress - 10)) + 5;
+            setUploadProgress(Math.min(percentComplete, uploadMaxProgress - 5));
           }
         });
         
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadProgress(100);
+            setUploadProgress(uploadMaxProgress);
             resolve();
           } else {
             reject(new Error('Failed to upload file'));
@@ -1380,23 +1394,60 @@ export default function ProjectDetails() {
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
         
         xhr.open('PUT', uploadURL);
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+        xhr.setRequestHeader('Content-Type', mimeType);
         xhr.send(file);
       });
       
-      // Store file info for creating document record
-      setNewDocumentFile({
-        name: file.name,
-        objectPath: objectPath,
-        size: file.size,
-        mimeType: file.type || 'application/octet-stream'
-      });
+      // For Word documents, auto-convert to PDF
+      if (isWordDoc) {
+        setUploadPhase('convert');
+        setUploadPhaseLabel('Converting to PDF...');
+        setUploadProgress(55);
+        
+        // Start conversion
+        const convertRes = await fetch('/api/documents/convert-to-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            objectPath: objectPath,
+            mimeType: mimeType
+          })
+        });
+        
+        setUploadProgress(80);
+        
+        if (!convertRes.ok) {
+          const errData = await convertRes.json().catch(() => ({}));
+          throw new Error(errData.message || 'Failed to convert document to PDF');
+        }
+        
+        const convertData = await convertRes.json();
+        setUploadProgress(100);
+        
+        // Store converted PDF info
+        setNewDocumentFile({
+          name: file.name.replace(/\.(docx?|doc)$/i, '.pdf'),
+          objectPath: convertData.pdfPath,
+          size: file.size, // We don't know the PDF size yet, keep original
+          mimeType: 'application/pdf'
+        });
+      } else {
+        // Store original file info for non-Word documents
+        setNewDocumentFile({
+          name: file.name,
+          objectPath: objectPath,
+          size: file.size,
+          mimeType: mimeType
+        });
+      }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload file. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
       setUploadProgress(0);
     } finally {
       setIsUploadingDocument(false);
+      setUploadPhase('idle');
     }
   };
 
@@ -3852,10 +3903,15 @@ export default function ProjectDetails() {
                   {isUploadingDocument ? (
                     <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Uploading...</span>
+                        <span className="text-sm font-medium">{uploadPhaseLabel}</span>
                         <span className="text-sm font-semibold text-primary">{uploadProgress}%</span>
                       </div>
                       <Progress value={uploadProgress} className="h-2" />
+                      {uploadPhase === 'convert' && (
+                        <p className="text-xs text-muted-foreground">
+                          Converting Word document to PDF for signing...
+                        </p>
+                      )}
                     </div>
                   ) : newDocumentFile ? (
                     <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
