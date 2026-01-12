@@ -1228,6 +1228,13 @@ export default function ProjectDetails() {
   const [requiresSignature, setRequiresSignature] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   
+  // Upload wizard state for signature documents
+  const [uploadWizardStep, setUploadWizardStep] = useState<1 | 2>(1);
+  const [signatureFields, setSignatureFields] = useState<Array<{ fieldType: string; pageNumber: number; position: string; recipientIndex: number }>>([]);
+  const [signatureRecipients, setSignatureRecipients] = useState<Array<{ name: string; email: string }>>([{ name: '', email: '' }]);
+  const [signatureDueDate, setSignatureDueDate] = useState<string>("");
+  const [signatureMessage, setSignatureMessage] = useState<string>("");
+  
   // Delete document confirmation dialog
   const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -1289,6 +1296,11 @@ export default function ProjectDetails() {
       setNewDocumentType("");
       setNewDocumentFile(null);
       setRequiresSignature(false);
+      setUploadWizardStep(1);
+      setSignatureFields([]);
+      setSignatureRecipients([{ name: '', email: '' }]);
+      setSignatureDueDate("");
+      setSignatureMessage("");
     },
     onError: (error: Error) => {
       alert(error.message || 'Failed to upload document');
@@ -1389,17 +1401,117 @@ export default function ProjectDetails() {
     }
   };
 
+  // Create document with signature packet mutation
+  const [signatureCreationError, setSignatureCreationError] = useState<string | null>(null);
+  const createDocumentWithSignatureMutation = useMutation({
+    mutationFn: async (data: { 
+      document: { name: string; type: string; fileUrl: string; fileSize?: number; mimeType?: string };
+      recipients: Array<{ name: string; email: string }>;
+      fields: Array<{ fieldType: string; pageNumber: number; position: string; recipientIndex: number }>;
+      dueDate?: string;
+      message?: string;
+    }) => {
+      // First create the document with pending_setup status (safe rollback state)
+      const docRes = await fetch(`/api/projects/${projectId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...data.document,
+          requiresSignature: true,
+          signatureStatus: 'pending_setup',
+          finalDocumentType: data.document.type
+        })
+      });
+      if (!docRes.ok) {
+        const errData = await docRes.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to upload document');
+      }
+      const doc = await docRes.json();
+      
+      // Then create the signing packet (this will update doc status to pending_signature)
+      const packetRes = await fetch(`/api/projects/${projectId}/signing-packets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          documentId: doc.id,
+          title: data.document.name,
+          message: data.message || undefined,
+          dueDate: data.dueDate || undefined,
+          recipients: data.recipients,
+          fields: data.fields
+        })
+      });
+      if (!packetRes.ok) {
+        const errData = await packetRes.json().catch(() => ({}));
+        // Document was created but packet failed - it will appear in Action Center for retry
+        throw new Error(errData.message || 'Failed to create signing request. The document was saved and you can set up signatures from the Action Center.');
+      }
+      return packetRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'signing-packets'] });
+      setUploadDocumentOpen(false);
+      setNewDocumentType("");
+      setNewDocumentFile(null);
+      setRequiresSignature(false);
+      setUploadWizardStep(1);
+      setSignatureFields([]);
+      setSignatureRecipients([{ name: '', email: '' }]);
+      setSignatureDueDate("");
+      setSignatureMessage("");
+      setSignatureCreationError(null);
+    },
+    onError: (error: Error) => {
+      // Keep wizard state so user can retry or see what went wrong
+      setSignatureCreationError(error.message || 'Failed to create signature request');
+    }
+  });
+
   const handleCreateDocument = () => {
     if (!newDocumentType || !newDocumentFile) return;
     createDocumentMutation.mutate({
       name: newDocumentFile.name,
-      type: requiresSignature ? 'action_center' : newDocumentType,
+      type: newDocumentType,
       fileUrl: newDocumentFile.objectPath,
       fileSize: newDocumentFile.size,
-      mimeType: newDocumentFile.mimeType,
-      requiresSignature: requiresSignature,
-      signatureStatus: requiresSignature ? 'pending_setup' : undefined,
-      finalDocumentType: requiresSignature ? newDocumentType : undefined
+      mimeType: newDocumentFile.mimeType
+    });
+  };
+  
+  const handleCreateDocumentWithSignature = () => {
+    if (!newDocumentType || !newDocumentFile) return;
+    
+    // Clear any previous error
+    setSignatureCreationError(null);
+    
+    // Validate recipients
+    const validRecipients = signatureRecipients.filter(r => r.name.trim() && r.email.trim());
+    if (validRecipients.length === 0) {
+      setSignatureCreationError('Please add at least one recipient with name and email');
+      return;
+    }
+    
+    // Validate signature fields
+    if (signatureFields.length === 0) {
+      setSignatureCreationError('Please add at least one signature field');
+      return;
+    }
+    
+    createDocumentWithSignatureMutation.mutate({
+      document: {
+        name: newDocumentFile.name,
+        type: newDocumentType,
+        fileUrl: newDocumentFile.objectPath,
+        fileSize: newDocumentFile.size,
+        mimeType: newDocumentFile.mimeType
+      },
+      recipients: validRecipients,
+      fields: signatureFields,
+      dueDate: signatureDueDate || undefined,
+      message: signatureMessage || undefined
     });
   };
 
@@ -3662,113 +3774,347 @@ export default function ProjectDetails() {
         document={documentToSign}
       />
 
-      {/* Upload Document Dialog */}
-      <Dialog open={uploadDocumentOpen} onOpenChange={setUploadDocumentOpen}>
-        <DialogContent className="max-w-md">
+      {/* Upload Document Dialog - Multi-step wizard */}
+      <Dialog open={uploadDocumentOpen} onOpenChange={(open) => {
+        setUploadDocumentOpen(open);
+        if (!open) {
+          setUploadWizardStep(1);
+          setNewDocumentType("");
+          setNewDocumentFile(null);
+          setRequiresSignature(false);
+          setSignatureFields([]);
+          setSignatureRecipients([{ name: '', email: '' }]);
+          setSignatureDueDate("");
+          setSignatureMessage("");
+        }
+      }}>
+        <DialogContent className={uploadWizardStep === 2 ? "max-w-2xl max-h-[90vh] overflow-y-auto" : "max-w-md"}>
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
+            <DialogTitle>
+              {uploadWizardStep === 1 ? 'Upload Document' : 'Set Up Signature Fields'}
+            </DialogTitle>
             <DialogDescription>
-              Select a document type and upload your file.
+              {uploadWizardStep === 1 
+                ? 'Select a document type and upload your file.'
+                : `Set up signature requirements for "${newDocumentFile?.name}"`}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="document-type">Document Type</Label>
-              <Select value={newDocumentType} onValueChange={setNewDocumentType}>
-                <SelectTrigger id="document-type" data-testid="select-document-type">
-                  <SelectValue placeholder="Select document type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contracts">Contracts</SelectItem>
-                  <SelectItem value="plans">Plans & Drawings</SelectItem>
-                  <SelectItem value="permits">Permits & Approvals</SelectItem>
-                  <SelectItem value="invoices">Invoices & Payments</SelectItem>
-                  <SelectItem value="warranties">Warranties & Manuals</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center space-x-2 py-2">
-              <Checkbox
-                id="requires-signature"
-                checked={requiresSignature}
-                onCheckedChange={(checked) => setRequiresSignature(checked === true)}
-                data-testid="checkbox-requires-signature"
-              />
-              <Label htmlFor="requires-signature" className="text-sm font-medium cursor-pointer">
-                Signature Required
-              </Label>
-            </div>
-            {requiresSignature && (
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                This document will go to the Action Center where you can set up signature fields and send it for signing.
-              </p>
-            )}
-            <div className="space-y-2">
-              <Label>File</Label>
-              <input
-                type="file"
-                ref={documentFileInputRef}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
-                onChange={(e) => {
-                  if (e.target.files) {
-                    handleDocumentFileUpload(e.target.files);
-                  }
-                }}
-              />
-              {isUploadingDocument ? (
-                <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Uploading...</span>
-                    <span className="text-sm font-semibold text-primary">{uploadProgress}%</span>
-                  </div>
-                  <Progress value={uploadProgress} className="h-2" />
+          
+          {uploadWizardStep === 1 ? (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="document-type">Document Type</Label>
+                  <Select value={newDocumentType} onValueChange={setNewDocumentType}>
+                    <SelectTrigger id="document-type" data-testid="select-document-type">
+                      <SelectValue placeholder="Select document type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contracts">Contracts</SelectItem>
+                      <SelectItem value="plans">Plans & Drawings</SelectItem>
+                      <SelectItem value="permits">Permits & Approvals</SelectItem>
+                      <SelectItem value="invoices">Invoices & Payments</SelectItem>
+                      <SelectItem value="warranties">Warranties & Manuals</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : newDocumentFile ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <span className="text-sm flex-1 truncate">{newDocumentFile.name}</span>
+                <div className="flex items-center space-x-2 py-2">
+                  <Checkbox
+                    id="requires-signature"
+                    checked={requiresSignature}
+                    onCheckedChange={(checked) => setRequiresSignature(checked === true)}
+                    data-testid="checkbox-requires-signature"
+                  />
+                  <Label htmlFor="requires-signature" className="text-sm font-medium cursor-pointer">
+                    Signature Required
+                  </Label>
+                </div>
+                {requiresSignature && (
+                  <p className="text-xs text-muted-foreground bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
+                    After uploading, you'll set up signature fields and recipients in the next step.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <Label>File</Label>
+                  <input
+                    type="file"
+                    ref={documentFileInputRef}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        handleDocumentFileUpload(e.target.files);
+                      }
+                    }}
+                  />
+                  {isUploadingDocument ? (
+                    <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Uploading...</span>
+                        <span className="text-sm font-semibold text-primary">{uploadProgress}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  ) : newDocumentFile ? (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <span className="text-sm flex-1 truncate">{newDocumentFile.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setNewDocumentFile(null)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => documentFileInputRef.current?.click()}
+                      data-testid="button-select-file"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Select File
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setUploadDocumentOpen(false);
+                    setNewDocumentType("");
+                    setNewDocumentFile(null);
+                    setRequiresSignature(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                {requiresSignature ? (
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setNewDocumentFile(null)}
+                    onClick={() => setUploadWizardStep(2)}
+                    disabled={!newDocumentType || !newDocumentFile || isUploadingDocument}
+                    data-testid="button-next-step"
                   >
-                    <X className="w-4 h-4" />
+                    Next Step
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleCreateDocument}
+                    disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending || isUploadingDocument}
+                    data-testid="button-submit-document"
+                  >
+                    {createDocumentMutation.isPending ? 'Saving...' : 'Save Document'}
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-6 py-4">
+                {/* Error Display */}
+                {signatureCreationError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700">{signatureCreationError}</p>
+                  </div>
+                )}
+
+                {/* Recipients Section */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Recipients</Label>
+                  {signatureRecipients.map((recipient, index) => (
+                    <div key={index} className="flex gap-2 items-start">
+                      <div className="flex-1 space-y-2">
+                        <Input
+                          placeholder="Name"
+                          value={recipient.name}
+                          onChange={(e) => {
+                            const updated = [...signatureRecipients];
+                            updated[index].name = e.target.value;
+                            setSignatureRecipients(updated);
+                          }}
+                          data-testid={`input-recipient-name-${index}`}
+                        />
+                        <Input
+                          placeholder="Email"
+                          type="email"
+                          value={recipient.email}
+                          onChange={(e) => {
+                            const updated = [...signatureRecipients];
+                            updated[index].email = e.target.value;
+                            setSignatureRecipients(updated);
+                          }}
+                          data-testid={`input-recipient-email-${index}`}
+                        />
+                      </div>
+                      {signatureRecipients.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSignatureRecipients(signatureRecipients.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSignatureRecipients([...signatureRecipients, { name: '', email: '' }])}
+                    data-testid="button-add-recipient"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Recipient
                   </Button>
                 </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => documentFileInputRef.current?.click()}
-                  data-testid="button-select-file"
+
+                {/* Signature Fields Section */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Signature Fields</Label>
+                  {signatureFields.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No fields added yet. Add at least one signature field.</p>
+                  )}
+                  {signatureFields.map((field, index) => (
+                    <div key={index} className="flex gap-2 items-center p-3 border rounded-lg bg-muted/30">
+                      <div className="flex-1 grid grid-cols-4 gap-2">
+                        <Select
+                          value={field.fieldType}
+                          onValueChange={(val) => {
+                            const updated = [...signatureFields];
+                            updated[index].fieldType = val;
+                            setSignatureFields(updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="signature">Signature</SelectItem>
+                            <SelectItem value="initials">Initials</SelectItem>
+                            <SelectItem value="date">Date</SelectItem>
+                            <SelectItem value="text">Text</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="Page"
+                          value={field.pageNumber}
+                          onChange={(e) => {
+                            const updated = [...signatureFields];
+                            updated[index].pageNumber = parseInt(e.target.value) || 1;
+                            setSignatureFields(updated);
+                          }}
+                        />
+                        <Select
+                          value={field.position}
+                          onValueChange={(val) => {
+                            const updated = [...signatureFields];
+                            updated[index].position = val;
+                            setSignatureFields(updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Position" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="top">Top</SelectItem>
+                            <SelectItem value="middle">Middle</SelectItem>
+                            <SelectItem value="bottom">Bottom</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={field.recipientIndex.toString()}
+                          onValueChange={(val) => {
+                            const updated = [...signatureFields];
+                            updated[index].recipientIndex = parseInt(val);
+                            setSignatureFields(updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Recipient" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {signatureRecipients.map((r, i) => (
+                              <SelectItem key={i} value={i.toString()}>
+                                {r.name || `Recipient ${i + 1}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSignatureFields(signatureFields.filter((_, i) => i !== index))}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSignatureFields([...signatureFields, { 
+                      fieldType: 'signature', 
+                      pageNumber: 1, 
+                      position: 'bottom', 
+                      recipientIndex: 0 
+                    }])}
+                    data-testid="button-add-field"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Field
+                  </Button>
+                </div>
+
+                {/* Due Date & Message */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Due Date (Optional)</Label>
+                    <Input
+                      type="date"
+                      value={signatureDueDate}
+                      onChange={(e) => setSignatureDueDate(e.target.value)}
+                      data-testid="input-signature-due-date"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Message to Recipients (Optional)</Label>
+                  <Input
+                    placeholder="Add a message for the signers..."
+                    value={signatureMessage}
+                    onChange={(e) => setSignatureMessage(e.target.value)}
+                    data-testid="input-signature-message"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setUploadWizardStep(1)}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Select File
+                  Back
                 </Button>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setUploadDocumentOpen(false);
-                setNewDocumentType("");
-                setNewDocumentFile(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreateDocument}
-              disabled={!newDocumentType || !newDocumentFile || createDocumentMutation.isPending || isUploadingDocument}
-              data-testid="button-submit-document"
-            >
-              {createDocumentMutation.isPending ? 'Saving...' : 'Save Document'}
-            </Button>
-          </DialogFooter>
+                <Button
+                  onClick={handleCreateDocumentWithSignature}
+                  disabled={
+                    signatureFields.length === 0 || 
+                    signatureRecipients.filter(r => r.name.trim() && r.email.trim()).length === 0 ||
+                    createDocumentWithSignatureMutation.isPending
+                  }
+                  data-testid="button-save-with-signature"
+                >
+                  {createDocumentWithSignatureMutation.isPending ? 'Saving...' : 'Save Document'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
