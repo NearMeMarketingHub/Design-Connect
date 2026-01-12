@@ -3,7 +3,7 @@ import { Rnd } from 'react-rnd';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { PenLine, Type, Calendar, FileText, Trash2, Plus } from 'lucide-react';
+import { PenLine, Type, Calendar, FileText, Trash2, Plus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 export interface SignatureField {
   id: string;
@@ -16,18 +16,17 @@ export interface SignatureField {
 }
 
 interface SignatureFieldEditorProps {
-  documentUrl: string;
+  documentId: string;
   documentMimeType: string;
   fields: SignatureField[];
   onFieldsChange: (fields: SignatureField[]) => void;
-  onDocumentConverted?: (pdfUrl: string) => void;
 }
 
 const FIELD_COLORS = {
-  signature: 'bg-blue-100 border-blue-400',
-  initials: 'bg-green-100 border-green-400',
-  date: 'bg-yellow-100 border-yellow-400',
-  text: 'bg-purple-100 border-purple-400',
+  signature: 'bg-blue-200/80 border-blue-500',
+  initials: 'bg-green-200/80 border-green-500',
+  date: 'bg-yellow-200/80 border-yellow-500',
+  text: 'bg-purple-200/80 border-purple-500',
 };
 
 const FIELD_ICONS = {
@@ -44,33 +43,102 @@ const FIELD_LABELS = {
   text: 'Text',
 };
 
-export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
+export function SignatureFieldEditor({ documentId, documentMimeType, fields, onFieldsChange }: SignatureFieldEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageImageUrl, setPageImageUrl] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<SignatureField['fieldType']>('signature');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPageCount = async () => {
+      try {
+        const res = await fetch(`/api/documents/${documentId}/page-count`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setTotalPages(data.pageCount || 1);
+        }
+      } catch (err) {
+        console.error('Error fetching page count:', err);
+      }
+    };
+    fetchPageCount();
+  }, [documentId]);
+
+  useEffect(() => {
+    const loadPageImage = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      if (documentMimeType !== 'application/pdf') {
+        setError('Only PDF documents are supported for signature placement');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const imageUrl = `/api/documents/${documentId}/pages/${currentPage}/image`;
+        const res = await fetch(imageUrl, { credentials: 'include' });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          setPageImageUrl(url);
+        } else {
+          setError('Failed to load document page');
+        }
+      } catch (err) {
+        console.error('Error loading page image:', err);
+        setError('Error loading document');
+      }
+      
+      setIsLoading(false);
+    };
+
+    loadPageImage();
+
+    return () => {
+      if (pageImageUrl) {
+        URL.revokeObjectURL(pageImageUrl);
+      }
+    };
+  }, [documentId, currentPage, documentMimeType]);
 
   useEffect(() => {
     const updateContainerSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setContainerSize({ width: rect.width || 800, height: rect.height || 600 });
+        if (rect.width > 0 && rect.height > 0) {
+          setContainerSize({ width: rect.width, height: rect.height });
+        }
       }
     };
     
     updateContainerSize();
     window.addEventListener('resize', updateContainerSize);
-    return () => window.removeEventListener('resize', updateContainerSize);
-  }, []);
+    
+    const observer = new ResizeObserver(updateContainerSize);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateContainerSize);
+      observer.disconnect();
+    };
+  }, [pageImageUrl]);
 
   const addField = () => {
     const newField: SignatureField = {
       id: `field-${Date.now()}`,
       fieldType: selectedFieldType,
-      pageNumber: 1,
+      pageNumber: currentPage,
       x: 10,
       y: 10,
-      width: selectedFieldType === 'signature' ? 30 : 15,
-      height: selectedFieldType === 'signature' ? 10 : 5,
+      width: selectedFieldType === 'signature' ? 25 : 15,
+      height: selectedFieldType === 'signature' ? 8 : 5,
     };
     onFieldsChange([...fields, newField]);
   };
@@ -82,6 +150,8 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
   const removeField = (id: string) => {
     onFieldsChange(fields.filter(f => f.id !== id));
   };
+
+  const currentPageFields = fields.filter(f => f.pageNumber === currentPage);
 
   return (
     <div className="space-y-4">
@@ -100,89 +170,100 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
             </SelectContent>
           </Select>
           <Button size="sm" onClick={addField} data-testid="button-add-visual-field">
-            <Plus className="w-4 h-4 mr-1" /> Add
+            <Plus className="w-4 h-4 mr-1" /> Add to Page
           </Button>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border rounded-lg overflow-hidden bg-gray-100" style={{ height: '500px' }}>
-          {documentMimeType === 'application/pdf' ? (
-            <iframe 
-              src={documentUrl}
-              className="w-full h-full border-0"
-              title="Document Preview"
-            />
-          ) : documentMimeType.startsWith('image/') ? (
-            <img 
-              src={documentUrl} 
-              alt="Document preview"
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <div className="text-center">
-                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Document preview not available</p>
-              </div>
+      <div 
+        ref={containerRef}
+        className="relative border rounded-lg bg-gray-100 overflow-hidden"
+        style={{ height: '600px' }}
+      >
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+              <p className="text-sm text-muted-foreground">Loading document...</p>
             </div>
-          )}
-        </div>
-
-        <div 
-          ref={containerRef}
-          className="relative border rounded-lg bg-white overflow-hidden"
-          style={{ height: '500px' }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100">
-            <div className="p-4 border-b bg-white/80">
-              <p className="text-sm font-medium text-gray-700">Signature Field Placement</p>
-              <p className="text-xs text-muted-foreground">Drag fields to position them on the document</p>
+          </div>
+        ) : error ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-red-500">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>{error}</p>
             </div>
-            
-            <div className="relative" style={{ height: 'calc(100% - 60px)' }}>
-              {fields.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                  <div className="text-center p-4">
-                    <PenLine className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Add signature fields using the controls above</p>
-                    <p className="text-xs mt-1">Fields will appear here for positioning</p>
-                  </div>
-                </div>
-              ) : (
-                fields.map((field) => {
+          </div>
+        ) : pageImageUrl ? (
+          <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative">
+              <img 
+                src={pageImageUrl} 
+                alt={`Page ${currentPage}`}
+                className="max-w-full max-h-full object-contain shadow-lg"
+                style={{ maxHeight: '580px' }}
+              />
+              
+              <div className="absolute inset-0">
+                {currentPageFields.map((field) => {
                   const Icon = FIELD_ICONS[field.fieldType];
+                  const imgWidth = containerRef.current?.querySelector('img')?.clientWidth || containerSize.width;
+                  const imgHeight = containerRef.current?.querySelector('img')?.clientHeight || containerSize.height;
+                  
                   return (
                     <Rnd
                       key={field.id}
-                      default={{
-                        x: (field.x / 100) * (containerSize.width - 32),
-                        y: (field.y / 100) * (containerSize.height - 100),
-                        width: (field.width / 100) * (containerSize.width - 32),
-                        height: Math.max(40, (field.height / 100) * (containerSize.height - 100)),
+                      position={{
+                        x: (field.x / 100) * imgWidth,
+                        y: (field.y / 100) * imgHeight,
+                      }}
+                      size={{
+                        width: (field.width / 100) * imgWidth,
+                        height: Math.max(35, (field.height / 100) * imgHeight),
                       }}
                       onDragStop={(_, d) => {
-                        const maxWidth = containerSize.width - 32;
-                        const maxHeight = containerSize.height - 100;
                         updateField(field.id, {
-                          x: Math.max(0, Math.min(100, (d.x / maxWidth) * 100)),
-                          y: Math.max(0, Math.min(100, (d.y / maxHeight) * 100)),
+                          x: Math.max(0, Math.min(100, (d.x / imgWidth) * 100)),
+                          y: Math.max(0, Math.min(100, (d.y / imgHeight) * 100)),
                         });
                       }}
                       onResizeStop={(_, __, ref, ___, position) => {
-                        const maxWidth = containerSize.width - 32;
-                        const maxHeight = containerSize.height - 100;
                         updateField(field.id, {
-                          width: (parseInt(ref.style.width) / maxWidth) * 100,
-                          height: (parseInt(ref.style.height) / maxHeight) * 100,
-                          x: (position.x / maxWidth) * 100,
-                          y: (position.y / maxHeight) * 100,
+                          width: (parseInt(ref.style.width) / imgWidth) * 100,
+                          height: (parseInt(ref.style.height) / imgHeight) * 100,
+                          x: (position.x / imgWidth) * 100,
+                          y: (position.y / imgHeight) * 100,
                         });
                       }}
                       bounds="parent"
                       minWidth={80}
                       minHeight={35}
-                      className={`${FIELD_COLORS[field.fieldType]} border-2 rounded cursor-move group shadow-sm`}
+                      className={`${FIELD_COLORS[field.fieldType]} border-2 rounded cursor-move group shadow-md`}
+                      style={{ zIndex: 10 }}
                     >
                       <div className="flex items-center justify-between h-full px-2">
                         <div className="flex items-center gap-1 text-xs font-medium">
@@ -201,16 +282,30 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
                       </div>
                     </Rnd>
                   );
-                })
-              )}
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>No document loaded</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Click "Add to Page" to add a signature field, then drag it to position on the document. 
+          Use the page navigation to place fields on different pages.
+        </p>
       </div>
 
       {fields.length > 0 && (
         <div className="p-3 bg-muted/50 rounded-lg">
-          <Label className="text-sm font-medium">Fields Added: {fields.length}</Label>
+          <Label className="text-sm font-medium">All Fields ({fields.length})</Label>
           <div className="flex flex-wrap gap-2 mt-2">
             {fields.map((field) => {
               const Icon = FIELD_ICONS[field.fieldType];
@@ -220,7 +315,7 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${FIELD_COLORS[field.fieldType]}`}
                 >
                   <Icon className="w-3 h-3" />
-                  <span>{FIELD_LABELS[field.fieldType]}</span>
+                  <span>{FIELD_LABELS[field.fieldType]} (p.{field.pageNumber})</span>
                   <button onClick={() => removeField(field.id)} className="ml-1 hover:text-red-500">
                     <Trash2 className="w-3 h-3" />
                   </button>

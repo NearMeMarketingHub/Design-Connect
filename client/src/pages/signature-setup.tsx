@@ -244,7 +244,7 @@ export default function SignatureSetup() {
               </CardHeader>
               <CardContent>
                 <SignatureFieldEditor
-                  documentUrl={document.fileUrl}
+                  documentId={document.id}
                   documentMimeType={document.mimeType}
                   fields={signatureFields}
                   onFieldsChange={setSignatureFields}
