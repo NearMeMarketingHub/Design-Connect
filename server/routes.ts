@@ -1075,7 +1075,33 @@ export async function registerRoutes(
   app.get("/api/projects/:id/team", requireAuth, async (req, res, next) => {
     try {
       const teamMembers = await storage.getProjectTeamMembers(req.params.id);
-      res.json(teamMembers);
+      res.json(teamMembers.map(m => ({
+        id: m.id,
+        userId: m.contractorId,
+        name: m.contractor?.name || 'Unknown',
+        email: m.contractor?.email || null,
+        role: m.contractor?.role || 'contractor',
+        companyName: m.contractor?.companyName || null
+      })));
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get user by ID
+  app.get("/api/users/:id", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      });
     } catch (error) {
       next(error);
     }

@@ -3696,8 +3696,7 @@ export default function ProjectDetails() {
                               <Button
                                 size="sm"
                                 onClick={() => {
-                                  setDocumentToSign({ id: doc.id, name: doc.name });
-                                  setSendForSignatureOpen(true);
+                                  setLocation(`${projectBasePath}/signature-setup/${doc.id}`);
                                 }}
                               >
                                 Set Up Signing

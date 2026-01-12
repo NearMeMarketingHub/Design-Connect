@@ -31,6 +31,7 @@ import MyProfile from "@/pages/my-profile";
 import ContractorCalculator from "@/pages/contractor-calculator";
 import FloorCalculator from "@/pages/floor-calculator";
 import SignDocumentPage from "@/pages/sign-document";
+import SignatureSetup from "@/pages/signature-setup";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -135,6 +136,7 @@ function Router() {
           <Route path="/contractor/project/:id/inspiration" component={ProjectDetails} />
           <Route path="/contractor/project/:id/contractor-photos" component={ProjectDetails} />
           <Route path="/contractor/project/:id/action-center" component={ProjectDetails} />
+          <Route path="/contractor/project/:id/signature-setup/:documentId" component={SignatureSetup} />
           <Route path="/contractor/project/:id" component={ProjectDetails} />
           <Route path="/contractor/calculator" component={ContractorCalculator} />
           <Route path="/contractor/floor-calculator" component={FloorCalculator} />
