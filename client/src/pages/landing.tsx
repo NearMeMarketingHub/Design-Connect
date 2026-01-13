@@ -29,7 +29,7 @@ export default function LandingPage() {
               <Link href="/auth">
                 <Button variant="ghost" data-testid="link-login">Log In</Button>
               </Link>
-              <Link href="/auth?register=true">
+              <Link href="/auth?mode=register">
                 <Button data-testid="link-register">Get Started</Button>
               </Link>
             </div>
@@ -49,13 +49,13 @@ export default function LandingPage() {
               document management, real-time communication, and transparent budgeting.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth?register=contractor">
+              <Link href="/auth?mode=register&tab=contractor">
                 <Button size="lg" className="text-lg px-8" data-testid="button-contractor-signup">
                   <Hammer className="mr-2 h-5 w-5" />
                   I'm a Contractor
                 </Button>
               </Link>
-              <Link href="/auth?register=client">
+              <Link href="/auth?mode=register&tab=client">
                 <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-client-signup">
                   <Users className="mr-2 h-5 w-5" />
                   I'm a Client
@@ -191,7 +191,7 @@ export default function LandingPage() {
             <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
               Join contractors and homeowners across Florida who are building better together with BuildVision.
             </p>
-            <Link href="/auth?register=true">
+            <Link href="/auth?mode=register">
               <Button size="lg" variant="secondary" className="text-lg px-8" data-testid="button-get-started-cta">
                 Get Started Free
                 <ArrowRight className="ml-2 h-5 w-5" />

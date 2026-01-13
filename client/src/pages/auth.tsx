@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +14,29 @@ import { CONTRACTOR_ROLES } from "@shared/contractor-roles";
 
 export default function AuthPage() {
   const [_, setLocation] = useLocation();
-  const [isLogin, setIsLogin] = useState(true);
-  const [activeTab, setActiveTab] = useState("client");
+  
+  const getInitialState = () => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    const tab = params.get("tab");
+    return {
+      isLogin: mode !== "register",
+      activeTab: tab === "contractor" ? "contractor" : "client"
+    };
+  };
+  
+  const initialState = getInitialState();
+  const [isLogin, setIsLogin] = useState(initialState.isLogin);
+  const [activeTab, setActiveTab] = useState(initialState.activeTab);
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const { toast } = useToast();
+  
+  useEffect(() => {
+    const state = getInitialState();
+    setIsLogin(state.isLogin);
+    setActiveTab(state.activeTab);
+  }, []);
   
   // Password visibility states
   const [showPassword, setShowPassword] = useState(false);
