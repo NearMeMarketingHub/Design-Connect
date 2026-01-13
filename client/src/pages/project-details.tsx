@@ -3490,11 +3490,8 @@ export default function ProjectDetails() {
                 packet.status === 'pending' && 
                 packet.participants?.some((p: any) => p.email === user?.email && p.status === 'pending')
               );
-              const completedPackets = signingPackets.filter((packet: any) => 
-                packet.status === 'completed'
-              );
               
-              // Client view: separate pending (clickable) and completed sections
+              // Client view: show pending documents awaiting signature
               if (!isContractorView) {
                 return (
                   <>
@@ -3535,52 +3532,6 @@ export default function ProjectDetails() {
                                   <Badge variant="outline" className="border-amber-500 text-amber-600">
                                     <Clock className="w-3 h-3 mr-1" />
                                     Click to Sign
-                                  </Badge>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Signed Documents Section for clients */}
-                    {completedPackets.length > 0 && (
-                      <Card>
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-green-500/10 rounded-lg">
-                                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                              </div>
-                              <div>
-                                <CardTitle className="text-base">Signed Documents</CardTitle>
-                                <p className="text-xs text-muted-foreground">Documents you have signed</p>
-                              </div>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="space-y-2">
-                            {completedPackets.map((packet: any) => (
-                              <div 
-                                key={packet.id}
-                                className="flex items-center justify-between p-3 rounded-lg border bg-green-50"
-                                data-testid={`signed-packet-${packet.id}`}
-                              >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <FileText className="w-4 h-4 text-green-600 shrink-0" />
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium truncate">{packet.title}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Signed {packet.completedAt ? new Date(packet.completedAt).toLocaleDateString() : new Date(packet.updatedAt).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <Badge className="bg-green-500 text-white border-0">
-                                    <CheckCircle2 className="w-3 h-3 mr-1" />
-                                    Completed
                                   </Badge>
                                 </div>
                               </div>
