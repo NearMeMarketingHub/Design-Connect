@@ -1199,7 +1199,7 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
       if (user.role !== 'contractor' && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only contractors and admins can approve notarized documents" });
+        return res.status(403).json({ message: "Only Project Managers and admins can approve notarized documents" });
       }
       
       const document = await storage.getProjectDocument(req.params.documentId);
@@ -1232,7 +1232,7 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
       if (user.role !== 'contractor' && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only contractors and admins can reject notarized documents" });
+        return res.status(403).json({ message: "Only Project Managers and admins can reject notarized documents" });
       }
       
       const document = await storage.getProjectDocument(req.params.documentId);
