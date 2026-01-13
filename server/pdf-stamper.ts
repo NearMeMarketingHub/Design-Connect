@@ -36,7 +36,8 @@ export async function stampPdfWithSignatures(
 
     if (field.fieldType === 'signature' && participant.signatureData) {
       try {
-        if (participant.signatureType === 'drawn' && participant.signatureData.startsWith('data:image')) {
+        // Check if signatureData is a base64 image (drawn signature)
+        if (participant.signatureData.startsWith('data:image')) {
           const base64Data = participant.signatureData.split(',')[1];
           const imageBytes = Buffer.from(base64Data, 'base64');
           
@@ -59,6 +60,7 @@ export async function stampPdfWithSignatures(
             });
           }
         } else {
+          // Typed signature - render as styled text
           const fontSize = Math.min(fieldHeight * 0.6, 24);
           const signatureText = participant.signatureData;
           
