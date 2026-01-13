@@ -220,7 +220,8 @@ export default function NotaryPortal() {
     if (!user) {
       setLocation('/auth?tab=notary');
     }
-  }, [user, setLocation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   if (!user) {
     return (
