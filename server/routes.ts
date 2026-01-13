@@ -1193,6 +1193,73 @@ export async function registerRoutes(
     }
   });
 
+  // Approve notarized document (contractor/admin only)
+  app.post("/api/documents/:documentId/approve-notarized", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors and admins can approve notarized documents" });
+      }
+      
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (document.notarizationStatus !== 'awaiting_approval') {
+        return res.status(400).json({ message: "Document is not awaiting approval" });
+      }
+      
+      if (!document.notarizedFileUrl) {
+        return res.status(400).json({ message: "No notarized document has been uploaded" });
+      }
+      
+      // Replace original with notarized version and mark as completed
+      const updated = await storage.updateProjectDocument(req.params.documentId, {
+        fileUrl: document.notarizedFileUrl,
+        notarizationStatus: 'completed',
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Reject notarized document (contractor/admin only)
+  app.post("/api/documents/:documentId/reject-notarized", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors and admins can reject notarized documents" });
+      }
+      
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (document.notarizationStatus !== 'awaiting_approval') {
+        return res.status(400).json({ message: "Document is not awaiting approval" });
+      }
+      
+      const { reason } = req.body;
+      
+      // Clear notarized file and reset to pending
+      const updated = await storage.updateProjectDocument(req.params.documentId, {
+        notarizedFileUrl: null,
+        notarizedUploadedById: null,
+        notarizedUploadedByName: null,
+        notarizedUploadedAt: null,
+        notarizationStatus: 'pending',
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Client uploads notarized document (external notarization path)
   app.post("/api/documents/:documentId/upload-notarized", requireAuth, async (req, res, next) => {
     try {
