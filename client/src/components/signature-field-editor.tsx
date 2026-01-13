@@ -75,15 +75,31 @@ export function SignatureFieldEditor({ documentUrl, documentMimeType, fields, on
     setPageSize({ width, height });
   }, []);
 
+  const getDefaultFieldSize = (fieldType: SignatureField['fieldType']) => {
+    switch (fieldType) {
+      case 'signature':
+        return { width: 25, height: 8 };
+      case 'initials':
+        return { width: 10, height: 5 };
+      case 'date':
+        return { width: 15, height: 5 };
+      case 'text':
+        return { width: 30, height: 12 };
+      default:
+        return { width: 20, height: 6 };
+    }
+  };
+
   const addField = () => {
+    const size = getDefaultFieldSize(selectedFieldType);
     const newField: SignatureField = {
       id: `field-${Date.now()}`,
       fieldType: selectedFieldType,
       pageNumber: currentPage,
       x: 10,
       y: 10,
-      width: selectedFieldType === 'signature' ? 25 : 15,
-      height: selectedFieldType === 'signature' ? 8 : 5,
+      width: size.width,
+      height: size.height,
     };
     onFieldsChange([...fields, newField]);
   };

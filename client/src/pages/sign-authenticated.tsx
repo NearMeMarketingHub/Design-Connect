@@ -92,23 +92,26 @@ export default function SignAuthenticatedPage() {
     },
   });
 
-  const handleFieldComplete = useCallback((fieldId: string, value: string, type: 'drawn' | 'typed') => {
+  const handleFieldComplete = useCallback((fieldId: string, value: string, type: 'drawn' | 'typed', fieldType: string) => {
     setCompletedFields(prev => ({
       ...prev,
-      [fieldId]: { value, type, completedAt: new Date() }
+      [fieldId]: { value, type, fieldType, completedAt: new Date() }
     }));
     toast({
-      title: "Field Signed",
+      title: fieldType === 'signature' ? "Signature Added" : 
+             fieldType === 'initials' ? "Initials Added" :
+             fieldType === 'date' ? "Date Added" : "Text Added",
       description: "Click on remaining fields to complete signing.",
     });
   }, [toast]);
 
   const handleSubmitSignatures = () => {
-    const firstSignature = Object.values(completedFields)[0];
-    if (firstSignature) {
+    const signatureEntry = Object.values(completedFields).find(f => f.fieldType === 'signature');
+    if (signatureEntry) {
       signMutation.mutate({
-        signatureData: firstSignature.value,
-        signatureType: firstSignature.type
+        signatureData: signatureEntry.value,
+        signatureType: signatureEntry.type,
+        fieldCompletions: completedFields
       });
     }
   };
@@ -116,7 +119,8 @@ export default function SignAuthenticatedPage() {
   const fields = data?.fields || [];
   const requiredFields = fields.filter(f => f.isRequired);
   const allRequiredComplete = requiredFields.every(f => completedFields[f.id]);
-  const hasAnySignature = Object.keys(completedFields).length > 0;
+  const signatureFields = fields.filter(f => f.fieldType === 'signature');
+  const hasSignatureCompleted = signatureFields.some(f => completedFields[f.id]);
 
   if (isLoading) {
     return (
@@ -309,7 +313,7 @@ export default function SignAuthenticatedPage() {
               </Button>
               <Button 
                 onClick={handleSubmitSignatures}
-                disabled={!agreedToTerms || !allRequiredComplete || !hasAnySignature || signMutation.isPending}
+                disabled={!agreedToTerms || !allRequiredComplete || !hasSignatureCompleted || signMutation.isPending}
               >
                 {signMutation.isPending ? (
                   <>
@@ -325,9 +329,14 @@ export default function SignAuthenticatedPage() {
               </Button>
             </div>
 
-            {!allRequiredComplete && hasAnySignature && (
+            {!allRequiredComplete && hasSignatureCompleted && (
               <p className="text-sm text-amber-600 text-center">
-                Please complete all required signature fields before submitting.
+                Please complete all required fields before submitting.
+              </p>
+            )}
+            {allRequiredComplete && !hasSignatureCompleted && signatureFields.length > 0 && (
+              <p className="text-sm text-amber-600 text-center">
+                Please add your signature to complete this document.
               </p>
             )}
           </CardContent>

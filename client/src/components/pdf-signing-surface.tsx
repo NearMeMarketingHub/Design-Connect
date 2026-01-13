@@ -3,10 +3,14 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import SignaturePad from '@/components/signature-pad';
 import { PenLine, Type, Calendar, FileText, ChevronLeft, ChevronRight, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -25,6 +29,7 @@ export interface SigningField {
 export interface FieldCompletion {
   value: string;
   type: 'drawn' | 'typed';
+  fieldType: string;
   completedAt: Date;
 }
 
@@ -33,7 +38,7 @@ interface PdfSigningSurfaceProps {
   fields: SigningField[];
   signerName: string;
   completedFields: Record<string, FieldCompletion>;
-  onFieldComplete: (fieldId: string, value: string, type: 'drawn' | 'typed') => void;
+  onFieldComplete: (fieldId: string, value: string, type: 'drawn' | 'typed', fieldType: string) => void;
 }
 
 const FIELD_COLORS = {
@@ -57,6 +62,13 @@ const FIELD_LABELS = {
   text: 'Enter Text',
 };
 
+const COMPLETED_LABELS = {
+  signature: 'Signed',
+  initials: 'Initialed',
+  date: 'Dated',
+  text: 'Filled',
+};
+
 export function PdfSigningSurface({ 
   documentUrl, 
   fields, 
@@ -71,7 +83,11 @@ export function PdfSigningSurface({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<SigningField | null>(null);
-  const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  const [initialsValue, setInitialsValue] = useState('');
+  const [dateValue, setDateValue] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [textValue, setTextValue] = useState('');
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setTotalPages(numPages);
@@ -93,15 +109,54 @@ export function PdfSigningSurface({
   const handleFieldClick = (field: SigningField) => {
     if (completedFields[field.id]) return;
     setActiveField(field);
-    setSignatureDialogOpen(true);
+    
+    if (field.fieldType === 'initials') {
+      const nameParts = signerName.split(' ');
+      const defaultInitials = nameParts.map(p => p[0]?.toUpperCase() || '').join('');
+      setInitialsValue(defaultInitials);
+    } else if (field.fieldType === 'date') {
+      setDateValue(format(new Date(), 'yyyy-MM-dd'));
+    } else if (field.fieldType === 'text') {
+      setTextValue('');
+    }
+    
+    setDialogOpen(true);
   };
 
   const handleSignatureComplete = (signatureData: string, signatureType: 'drawn' | 'typed') => {
     if (activeField) {
-      onFieldComplete(activeField.id, signatureData, signatureType);
-      setSignatureDialogOpen(false);
-      setActiveField(null);
+      onFieldComplete(activeField.id, signatureData, signatureType, 'signature');
+      closeDialog();
     }
+  };
+
+  const handleInitialsSubmit = () => {
+    if (activeField && initialsValue.trim()) {
+      onFieldComplete(activeField.id, initialsValue.trim().toUpperCase(), 'typed', 'initials');
+      closeDialog();
+    }
+  };
+
+  const handleDateSubmit = () => {
+    if (activeField && dateValue) {
+      const formattedDate = format(new Date(dateValue), 'MM/dd/yyyy');
+      onFieldComplete(activeField.id, formattedDate, 'typed', 'date');
+      closeDialog();
+    }
+  };
+
+  const handleTextSubmit = () => {
+    if (activeField && textValue.trim()) {
+      onFieldComplete(activeField.id, textValue.trim(), 'typed', 'text');
+      closeDialog();
+    }
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setActiveField(null);
+    setInitialsValue('');
+    setTextValue('');
   };
 
   const currentPageFields = fields.filter(f => f.pageNumber === currentPage);
@@ -109,6 +164,40 @@ export function PdfSigningSurface({
   const completedCount = Object.keys(completedFields).length;
   const requiredCount = fields.filter(f => f.isRequired).length;
   const requiredCompleted = fields.filter(f => f.isRequired && completedFields[f.id]).length;
+
+  const renderFieldContent = (field: SigningField, isCompleted: boolean) => {
+    const fieldType = field.fieldType as keyof typeof FIELD_ICONS;
+    const Icon = FIELD_ICONS[fieldType] || PenLine;
+    const completedLabel = COMPLETED_LABELS[fieldType] || 'Done';
+    const pendingLabel = FIELD_LABELS[fieldType] || 'Click';
+
+    if (isCompleted) {
+      const completion = completedFields[field.id];
+      if (fieldType === 'date' || fieldType === 'text' || fieldType === 'initials') {
+        return (
+          <span className="text-xs font-medium text-white truncate px-1">
+            {completion.value}
+          </span>
+        );
+      }
+      return (
+        <>
+          <Check className="w-4 h-4 text-white shrink-0" />
+          <span className="text-xs font-medium text-white">{completedLabel}</span>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="text-xs font-medium">{pendingLabel}</span>
+        {field.isRequired && (
+          <span className="text-red-500 text-xs">*</span>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -193,8 +282,6 @@ export function PdfSigningSurface({
             const isCompleted = !!completedFields[field.id];
             const fieldType = field.fieldType as keyof typeof FIELD_COLORS;
             const colorScheme = FIELD_COLORS[fieldType] || FIELD_COLORS.signature;
-            const Icon = FIELD_ICONS[fieldType] || PenLine;
-            const label = FIELD_LABELS[fieldType] || 'Sign';
 
             const left = (field.xPosition / 100) * pageSize.width;
             const top = (field.yPosition / 100) * pageSize.height;
@@ -207,7 +294,7 @@ export function PdfSigningSurface({
                 onClick={() => handleFieldClick(field)}
                 disabled={isCompleted}
                 className={cn(
-                  "absolute border-2 rounded flex items-center justify-center gap-1 transition-all cursor-pointer",
+                  "absolute border-2 rounded flex items-center justify-center gap-1 transition-all cursor-pointer overflow-hidden",
                   isCompleted ? colorScheme.completed : colorScheme.pending,
                   isCompleted && "cursor-default"
                 )}
@@ -219,39 +306,121 @@ export function PdfSigningSurface({
                 }}
                 data-testid={`signing-field-${field.id}`}
               >
-                {isCompleted ? (
-                  <>
-                    <Check className="w-4 h-4 text-white" />
-                    <span className="text-xs font-medium text-white">Signed</span>
-                  </>
-                ) : (
-                  <>
-                    <Icon className="w-4 h-4" />
-                    <span className="text-xs font-medium">{label}</span>
-                    {field.isRequired && (
-                      <span className="text-red-500 text-xs">*</span>
-                    )}
-                  </>
-                )}
+                {renderFieldContent(field, isCompleted)}
               </button>
             );
           })}
         </div>
       </div>
 
-      <Dialog open={signatureDialogOpen} onOpenChange={setSignatureDialogOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className={activeField?.fieldType === 'signature' ? "max-w-2xl" : "max-w-md"}>
           <DialogHeader>
             <DialogTitle>
               {activeField?.fieldType === 'signature' ? 'Add Your Signature' : 
                activeField?.fieldType === 'initials' ? 'Add Your Initials' :
-               activeField?.fieldType === 'date' ? 'Add Date' : 'Add Your Signature'}
+               activeField?.fieldType === 'date' ? 'Select Date' : 
+               activeField?.fieldType === 'text' ? 'Enter Text' : 'Complete Field'}
             </DialogTitle>
           </DialogHeader>
-          <SignaturePad
-            onSignatureComplete={handleSignatureComplete}
-            signerName={signerName}
-          />
+
+          {activeField?.fieldType === 'signature' && (
+            <SignaturePad
+              onSignatureComplete={handleSignatureComplete}
+              signerName={signerName}
+            />
+          )}
+
+          {activeField?.fieldType === 'initials' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="initials">Your Initials</Label>
+                <Input
+                  id="initials"
+                  value={initialsValue}
+                  onChange={(e) => setInitialsValue(e.target.value.slice(0, 4).toUpperCase())}
+                  placeholder="e.g., JD"
+                  className="text-2xl font-bold text-center uppercase tracking-widest"
+                  maxLength={4}
+                  autoFocus
+                  data-testid="input-initials"
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Enter your initials (up to 4 characters)
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+                <Button 
+                  onClick={handleInitialsSubmit} 
+                  disabled={!initialsValue.trim()}
+                  data-testid="button-submit-initials"
+                >
+                  Apply Initials
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {activeField?.fieldType === 'date' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={dateValue}
+                  onChange={(e) => setDateValue(e.target.value)}
+                  className="text-lg"
+                  autoFocus
+                  data-testid="input-date"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Today's date has been pre-filled. Adjust if needed.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+                <Button 
+                  onClick={handleDateSubmit} 
+                  disabled={!dateValue}
+                  data-testid="button-submit-date"
+                >
+                  Apply Date
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {activeField?.fieldType === 'text' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="text">Enter Text</Label>
+                <Textarea
+                  id="text"
+                  value={textValue}
+                  onChange={(e) => setTextValue(e.target.value)}
+                  placeholder="Type your text here..."
+                  className="min-h-[100px] resize-none"
+                  autoFocus
+                  data-testid="input-text"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the required information in the field above.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+                <Button 
+                  onClick={handleTextSubmit} 
+                  disabled={!textValue.trim()}
+                  data-testid="button-submit-text"
+                >
+                  Apply Text
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
