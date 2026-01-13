@@ -10,6 +10,7 @@ interface NotaryDocument {
   notarizationStatus: string;
   notarizationDueDate: string | null;
   notarizedFileUrl: string | null;
+  notarizationRejectionReason: string | null;
   projectId: string;
   projectName: string;
   projectAddress: string;
@@ -248,15 +249,22 @@ export default function NotaryPortal() {
                       </td>
                       <td className="p-3">{doc.clientName}</td>
                       <td className="p-3">
-                        <span className={`px-2 py-1 text-xs rounded ${
-                          doc.notarizationStatus === 'completed' 
-                            ? 'bg-green-100 text-green-800'
-                            : doc.notarizationStatus === 'awaiting_approval'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {doc.notarizationStatus || 'Pending'}
-                        </span>
+                        <div>
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            doc.notarizationStatus === 'completed' 
+                              ? 'bg-green-100 text-green-800'
+                              : doc.notarizationStatus === 'awaiting_approval'
+                              ? 'bg-blue-100 text-blue-800'
+                              : doc.notarizationRejectionReason
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {doc.notarizationRejectionReason ? 'Rejected' : (doc.notarizationStatus || 'Pending')}
+                          </span>
+                          {doc.notarizationRejectionReason && (
+                            <p className="text-xs text-red-600 mt-1 max-w-xs">{doc.notarizationRejectionReason}</p>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3 text-gray-600">{doc.notarizationDueDate || 'No due date'}</td>
                       <td className="p-3 text-right space-x-2">
