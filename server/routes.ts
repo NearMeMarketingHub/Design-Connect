@@ -3312,9 +3312,10 @@ export async function registerRoutes(
           return res.status(404).json({ error: "Project not found" });
         }
         
-        // Check if user is project client, contractor, or admin
+        // Check if user is project client, contractor, admin, or notary with access to notarization docs
         const hasAccess = 
           user.role === 'admin' || 
+          user.role === 'notary' ||
           project.clientId === user.id || 
           project.contractorId === user.id;
         
