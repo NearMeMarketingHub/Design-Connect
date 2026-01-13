@@ -1247,6 +1247,14 @@ export default function ProjectDetails() {
   const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string } | null>(null);
 
+  // Notarization upload dialog (for clients to upload notarized documents)
+  const [notarizationUploadDialogOpen, setNotarizationUploadDialogOpen] = useState(false);
+  const [notarizationUploadDocId, setNotarizationUploadDocId] = useState<string | null>(null);
+  const [notarizedFile, setNotarizedFile] = useState<{ name: string; objectPath: string; size: number; mimeType: string } | null>(null);
+  const [isUploadingNotarized, setIsUploadingNotarized] = useState(false);
+  const [notarizedUploadProgress, setNotarizedUploadProgress] = useState(0);
+  const notarizedFileInputRef = useRef<HTMLInputElement>(null);
+
   // Fetch project documents
   const { data: projectDocuments = [], isLoading: documentsLoading } = useQuery({
     queryKey: ['/api/projects', projectId, 'documents'],
@@ -1269,7 +1277,7 @@ export default function ProjectDetails() {
     enabled: !!projectId,
   });
 
-  // Fetch notary profiles (for contractors)
+  // Fetch notary profiles (for contractors to manage, for clients to view recommended notaries)
   const { data: notaryProfiles = [] } = useQuery({
     queryKey: ['/api/notary-profiles'],
     queryFn: async () => {
@@ -1277,7 +1285,32 @@ export default function ProjectDetails() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: user?.role === 'contractor' || user?.role === 'admin',
+  });
+
+  // Upload notarized document mutation (for clients)
+  const uploadNotarizedDocMutation = useMutation({
+    mutationFn: async (data: { documentId: string; notarizedFileUrl: string }) => {
+      const res = await fetch(`/api/documents/${data.documentId}/upload-notarized`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ notarizedFileUrl: data.notarizedFileUrl })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to upload notarized document');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+      setNotarizationUploadDialogOpen(false);
+      setNotarizationUploadDocId(null);
+      setNotarizedFile(null);
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to upload notarized document');
+    }
   });
 
   // Create notary profile mutation
@@ -1450,6 +1483,67 @@ export default function ProjectDetails() {
     } finally {
       setIsUploadingDocument(false);
       setUploadPhase('idle');
+    }
+  };
+
+  // Handle notarized file upload (for clients uploading externally notarized documents)
+  const handleNotarizedFileUpload = async (files: FileList) => {
+    const file = files[0];
+    if (!file) return;
+    
+    const mimeType = file.type || 'application/octet-stream';
+    
+    setIsUploadingNotarized(true);
+    setNotarizedUploadProgress(0);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      setNotarizedUploadProgress(10);
+      
+      const response = await new Promise<{ objectPath: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 85) + 10;
+            setNotarizedUploadProgress(Math.min(percentComplete, 95));
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setNotarizedUploadProgress(100);
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('Invalid response'));
+            }
+          } else {
+            reject(new Error('Failed to upload file'));
+          }
+        });
+        
+        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        
+        xhr.open('POST', '/api/uploads/file');
+        xhr.send(formData);
+      });
+      
+      setNotarizedFile({
+        name: file.name,
+        objectPath: response.objectPath,
+        size: file.size,
+        mimeType: mimeType
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to upload file. Please try again.');
+      setNotarizedUploadProgress(0);
+    } finally {
+      setIsUploadingNotarized(false);
     }
   };
 
@@ -3600,6 +3694,110 @@ export default function ProjectDetails() {
                         </CardContent>
                       </Card>
                     )}
+                    
+                    {/* Documents Requiring Notarization - Client View */}
+                    {(() => {
+                      const docsNeedingNotarization = projectDocuments.filter((doc: any) => 
+                        doc.requiresNotarization && doc.notarizationStatus !== 'completed'
+                      );
+                      if (docsNeedingNotarization.length === 0) return null;
+                      
+                      return (
+                        <Card>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-500/10 rounded-lg">
+                                  <Shield className="w-5 h-5 text-purple-600" />
+                                </div>
+                                <div>
+                                  <CardTitle className="text-base">Documents Requiring Notarization</CardTitle>
+                                  <p className="text-xs text-muted-foreground">These documents need to be notarized</p>
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-3">
+                              {docsNeedingNotarization.map((doc: any) => {
+                                const notaryProfile = notaryProfiles.find((p: any) => p.id === doc.notaryProfileId);
+                                return (
+                                  <div 
+                                    key={doc.id}
+                                    className="p-4 rounded-lg border bg-purple-50"
+                                    data-testid={`notarization-doc-${doc.id}`}
+                                  >
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                                        <FileText className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+                                        <div className="min-w-0 space-y-1">
+                                          <p className="font-medium truncate">{doc.name}</p>
+                                          {doc.notarizationDueDate && (
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                              <Calendar className="w-3 h-3" />
+                                              Due: {new Date(doc.notarizationDueDate).toLocaleDateString()}
+                                            </p>
+                                          )}
+                                          {doc.notarizationStatus === 'awaiting_approval' && (
+                                            <Badge className="bg-amber-500 text-white border-0 text-xs">
+                                              <Clock className="w-3 h-3 mr-1" />
+                                              Awaiting Approval
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="shrink-0 flex gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => window.open(doc.fileUrl, '_blank')}
+                                        >
+                                          <Download className="w-4 h-4 mr-1" />
+                                          Download
+                                        </Button>
+                                        {doc.notarizationStatus !== 'awaiting_approval' && (
+                                          <Button
+                                            size="sm"
+                                            onClick={() => {
+                                              setNotarizationUploadDocId(doc.id);
+                                              setNotarizationUploadDialogOpen(true);
+                                            }}
+                                            data-testid={`button-upload-notarized-${doc.id}`}
+                                          >
+                                            <Upload className="w-4 h-4 mr-1" />
+                                            Upload Notarized
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {notaryProfile && (
+                                      <div className="mt-3 p-3 bg-white rounded border">
+                                        <p className="text-xs font-medium text-muted-foreground mb-1">Recommended Notary:</p>
+                                        <p className="text-sm font-medium">{notaryProfile.name}</p>
+                                        {notaryProfile.companyName && (
+                                          <p className="text-xs text-muted-foreground">{notaryProfile.companyName}</p>
+                                        )}
+                                        {notaryProfile.phone && (
+                                          <p className="text-xs text-muted-foreground">{notaryProfile.phone}</p>
+                                        )}
+                                        {notaryProfile.email && (
+                                          <p className="text-xs text-muted-foreground">{notaryProfile.email}</p>
+                                        )}
+                                        {notaryProfile.address && (
+                                          <p className="text-xs text-muted-foreground">
+                                            {notaryProfile.address}{notaryProfile.city ? `, ${notaryProfile.city}` : ''}{notaryProfile.state ? `, ${notaryProfile.state}` : ''} {notaryProfile.zipCode}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
                   </>
                 );
               }
@@ -4317,6 +4515,94 @@ export default function ProjectDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Notarization Upload Dialog (for clients to upload externally notarized documents) */}
+      <Dialog open={notarizationUploadDialogOpen} onOpenChange={(open) => {
+        setNotarizationUploadDialogOpen(open);
+        if (!open) {
+          setNotarizationUploadDocId(null);
+          setNotarizedFile(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Notarized Document</DialogTitle>
+            <DialogDescription>
+              Upload the notarized version of this document. It will be reviewed by your project manager.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <input
+              type="file"
+              ref={notarizedFileInputRef}
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e) => {
+                if (e.target.files) {
+                  handleNotarizedFileUpload(e.target.files);
+                }
+              }}
+            />
+            {isUploadingNotarized ? (
+              <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Uploading...</span>
+                  <span className="text-sm font-semibold text-primary">{notarizedUploadProgress}%</span>
+                </div>
+                <Progress value={notarizedUploadProgress} className="h-2" />
+              </div>
+            ) : notarizedFile ? (
+              <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <span className="text-sm flex-1 truncate">{notarizedFile.name}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setNotarizedFile(null)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => notarizedFileInputRef.current?.click()}
+                data-testid="button-select-notarized-file"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Select Notarized File
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setNotarizationUploadDialogOpen(false);
+                setNotarizedFile(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (notarizationUploadDocId && notarizedFile) {
+                  uploadNotarizedDocMutation.mutate({
+                    documentId: notarizationUploadDocId,
+                    notarizedFileUrl: notarizedFile.objectPath
+                  });
+                }
+              }}
+              disabled={!notarizedFile || uploadNotarizedDocMutation.isPending}
+              data-testid="button-submit-notarized-doc"
+            >
+              {uploadNotarizedDocMutation.isPending ? 'Submitting...' : 'Submit for Approval'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Message Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
