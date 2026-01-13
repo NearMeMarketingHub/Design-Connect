@@ -487,8 +487,9 @@ export const projectDocuments = pgTable("project_documents", {
   finalDocumentType: text("final_document_type"), // Where to move after signing (contracts, plans, etc.)
   pendingPacketId: varchar("pending_packet_id"), // Link to signing packet while pending
   requiresNotarization: boolean("requires_notarization").default(false),
-  notarizationStatus: text("notarization_status"), // null, 'pending', 'awaiting_approval', 'completed'
+  notarizationStatus: text("notarization_status"), // null, 'pending', 'awaiting_approval', 'completed', 'rejected'
   notarizationDueDate: text("notarization_due_date"),
+  notarizationRejectionReason: text("notarization_rejection_reason"),
   notaryProfileId: varchar("notary_profile_id").references(() => notaryProfiles.id),
   notarizedFileUrl: text("notarized_file_url"), // The uploaded notarized version
   notarizedUploadedById: varchar("notarized_uploaded_by_id"),

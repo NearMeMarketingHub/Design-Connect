@@ -1245,13 +1245,14 @@ export async function registerRoutes(
       
       const { reason } = req.body;
       
-      // Clear notarized file and reset to pending
+      // Clear notarized file and reset to pending with rejection reason
       const updated = await storage.updateProjectDocument(req.params.documentId, {
         notarizedFileUrl: null,
         notarizedUploadedById: null,
         notarizedUploadedByName: null,
         notarizedUploadedAt: null,
         notarizationStatus: 'pending',
+        notarizationRejectionReason: reason || null,
       });
       
       res.json(updated);

@@ -1247,6 +1247,11 @@ export default function ProjectDetails() {
   const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<{ id: string; name: string } | null>(null);
 
+  // Reject notarized document dialog
+  const [rejectNotarizedDialogOpen, setRejectNotarizedDialogOpen] = useState(false);
+  const [documentToReject, setDocumentToReject] = useState<{ id: string; name: string } | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+
   // Notarization upload dialog (for clients to upload notarized documents)
   const [notarizationUploadDialogOpen, setNotarizationUploadDialogOpen] = useState(false);
   const [notarizationUploadDocId, setNotarizationUploadDocId] = useState<string | null>(null);
@@ -1336,10 +1341,12 @@ export default function ProjectDetails() {
 
   // Reject notarized document mutation (for contractors)
   const rejectNotarizedDocMutation = useMutation({
-    mutationFn: async (documentId: string) => {
+    mutationFn: async ({ documentId, reason }: { documentId: string; reason: string }) => {
       const res = await fetch(`/api/documents/${documentId}/reject-notarized`, {
         method: 'POST',
-        credentials: 'include'
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -1349,6 +1356,9 @@ export default function ProjectDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+      setRejectNotarizedDialogOpen(false);
+      setDocumentToReject(null);
+      setRejectionReason("");
     },
     onError: (error: Error) => {
       alert(error.message || 'Failed to reject notarized document');
@@ -3974,9 +3984,9 @@ export default function ProjectDetails() {
                                 size="sm"
                                 className="text-red-600 border-red-300 hover:bg-red-50"
                                 onClick={() => {
-                                  if (confirm('Are you sure you want to reject this notarized document?')) {
-                                    rejectNotarizedDocMutation.mutate(doc.id);
-                                  }
+                                  setDocumentToReject({ id: doc.id, name: doc.name });
+                                  setRejectionReason("");
+                                  setRejectNotarizedDialogOpen(true);
                                 }}
                                 disabled={rejectNotarizedDocMutation.isPending}
                                 data-testid={`button-reject-notarized-${doc.id}`}
@@ -4649,6 +4659,48 @@ export default function ProjectDetails() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject Notarized Document Dialog */}
+      <AlertDialog open={rejectNotarizedDialogOpen} onOpenChange={setRejectNotarizedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Notarized Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are rejecting the notarized version of "{documentToReject?.name}". Please provide a reason for the rejection so the client can address the issue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-2 block">Rejection Reason</label>
+            <Textarea
+              placeholder="Please explain why this notarized document is being rejected..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              className="min-h-[100px]"
+              data-testid="input-rejection-reason"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDocumentToReject(null);
+              setRejectionReason("");
+            }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (documentToReject) {
+                  rejectNotarizedDocMutation.mutate({ 
+                    documentId: documentToReject.id, 
+                    reason: rejectionReason 
+                  });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={rejectNotarizedDocMutation.isPending}
+            >
+              {rejectNotarizedDocMutation.isPending ? 'Rejecting...' : 'Reject Document'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
