@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
@@ -216,9 +216,18 @@ export default function NotaryPortal() {
     return new Date(dueDate) < new Date();
   };
 
+  useEffect(() => {
+    if (!user) {
+      setLocation('/auth?tab=notary');
+    }
+  }, [user, setLocation]);
+
   if (!user) {
-    setLocation('/auth?tab=notary');
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
   }
 
   return (
