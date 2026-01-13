@@ -1064,6 +1064,7 @@ export async function registerRoutes(
   });
 
   // Notary Portal routes (for notary users to search and upload notarized documents)
+  // Returns documents (not projects) with their project details for the notary portal list view
   app.get("/api/notary/projects", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
@@ -1071,59 +1072,60 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const { search, sortBy, sortOrder } = req.query;
-      
-      // Get all non-completed projects with documents needing notarization
-      const allProjects = await storage.getProjects();
-      const activeProjects = allProjects.filter(p => p.status !== 'completed');
+      const { search, status } = req.query;
       
       // Get all documents needing notarization
       const docsNeedingNotarization = await storage.getDocumentsNeedingNotarization();
       
-      // Filter projects that have documents needing notarization
-      const projectsWithNotarizationNeeds = await Promise.all(
-        activeProjects.map(async (project) => {
-          const projectDocs = docsNeedingNotarization.filter(d => d.projectId === project.id);
-          if (projectDocs.length === 0) return null;
+      // Enrich documents with project and user details
+      const enrichedDocs = await Promise.all(
+        docsNeedingNotarization.map(async (doc) => {
+          const project = await storage.getProject(doc.projectId);
+          if (!project) return null;
           
-          // Get client info
+          // Skip completed projects
+          if (project.status === 'completed') return null;
+          
           const client = project.clientId ? await storage.getUser(project.clientId) : null;
           const contractor = project.contractorId ? await storage.getUser(project.contractorId) : null;
           
           return {
-            ...project,
+            id: doc.id,
+            name: doc.name,
+            fileUrl: doc.fileUrl,
+            notarizationStatus: doc.notarizationStatus || 'pending',
+            notarizationDueDate: doc.notarizationDueDate,
+            notarizedFileUrl: doc.notarizedFileUrl,
+            projectId: doc.projectId,
+            projectName: project.name,
+            projectAddress: project.address || '',
             clientName: client?.name || 'Unknown',
             contractorName: contractor?.name || 'Unknown',
-            documentsNeedingNotarization: projectDocs.length,
+            createdAt: doc.createdAt,
           };
         })
       );
       
-      let filteredProjects = projectsWithNotarizationNeeds.filter(p => p !== null);
+      let filteredDocs = enrichedDocs.filter(d => d !== null);
+      
+      // Apply status filter
+      if (status && typeof status === 'string' && status !== 'all') {
+        filteredDocs = filteredDocs.filter(d => d!.notarizationStatus === status);
+      }
       
       // Apply search filter
       if (search && typeof search === 'string') {
         const searchLower = search.toLowerCase();
-        filteredProjects = filteredProjects.filter(p =>
-          p!.name.toLowerCase().includes(searchLower) ||
-          p!.clientName.toLowerCase().includes(searchLower) ||
-          p!.contractorName.toLowerCase().includes(searchLower)
+        filteredDocs = filteredDocs.filter(d =>
+          d!.name.toLowerCase().includes(searchLower) ||
+          d!.projectName.toLowerCase().includes(searchLower) ||
+          d!.projectAddress.toLowerCase().includes(searchLower) ||
+          d!.clientName.toLowerCase().includes(searchLower) ||
+          d!.contractorName.toLowerCase().includes(searchLower)
         );
       }
       
-      // Apply sorting
-      if (sortBy && typeof sortBy === 'string') {
-        filteredProjects.sort((a, b) => {
-          let aVal: any = a![sortBy as keyof typeof a];
-          let bVal: any = b![sortBy as keyof typeof b];
-          if (sortOrder === 'desc') {
-            return aVal > bVal ? -1 : 1;
-          }
-          return aVal > bVal ? 1 : -1;
-        });
-      }
-      
-      res.json(filteredProjects);
+      res.json(filteredDocs);
     } catch (error) {
       next(error);
     }
