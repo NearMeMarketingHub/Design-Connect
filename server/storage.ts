@@ -145,6 +145,7 @@ export interface IStorage {
   getProjectDocuments(projectId: string): Promise<ProjectDocument[]>;
   getProjectDocumentsByType(projectId: string, type: string): Promise<ProjectDocument[]>;
   getProjectDocument(id: string): Promise<ProjectDocument | undefined>;
+  getProjectDocumentByFileUrl(fileUrl: string): Promise<ProjectDocument | undefined>;
   createProjectDocument(doc: InsertProjectDocument): Promise<ProjectDocument>;
   updateProjectDocument(id: string, data: Partial<InsertProjectDocument>): Promise<ProjectDocument | undefined>;
   deleteProjectDocument(id: string): Promise<void>;
@@ -672,6 +673,11 @@ export class DatabaseStorage implements IStorage {
 
   async getProjectDocument(id: string): Promise<ProjectDocument | undefined> {
     const [doc] = await db.select().from(schema.projectDocuments).where(eq(schema.projectDocuments.id, id));
+    return doc;
+  }
+
+  async getProjectDocumentByFileUrl(fileUrl: string): Promise<ProjectDocument | undefined> {
+    const [doc] = await db.select().from(schema.projectDocuments).where(eq(schema.projectDocuments.fileUrl, fileUrl));
     return doc;
   }
 

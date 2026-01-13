@@ -2792,17 +2792,34 @@ export async function registerRoutes(
               });
               
               if (uploadResponse.ok) {
-                // Store the object path that can be served through our app
+                // Set ACL to allow access (public visibility for project files)
+                try {
+                  await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
+                    owner: packet.createdById || 'system',
+                    visibility: 'public'
+                  });
+                } catch (aclError) {
+                  console.error('Failed to set ACL on stamped PDF:', aclError);
+                }
+                
+                // Update document with new file URL and rename to indicate signed
+                const originalName = document.name || 'document.pdf';
+                const signedName = originalName.replace(/\.pdf$/i, '') + ' (Signed).pdf';
+                
                 await storage.updateProjectDocument(packet.documentId, {
                   signatureStatus: 'signed',
-                  fileUrl: objectPath
+                  fileUrl: objectPath,
+                  name: signedName
                 });
                 console.log('Stamped PDF saved successfully:', objectPath);
               } else {
                 console.error('Failed to upload stamped PDF:', uploadResponse.status);
                 // Still mark as signed even if stamping failed
+                const originalName = document.name || 'document.pdf';
+                const signedName = originalName.replace(/\.pdf$/i, '') + ' (Signed).pdf';
                 await storage.updateProjectDocument(packet.documentId, {
-                  signatureStatus: 'signed'
+                  signatureStatus: 'signed',
+                  name: signedName
                 });
               }
             } else {
@@ -2886,7 +2903,7 @@ export async function registerRoutes(
   // Register object storage routes
   registerObjectStorageRoutes(app);
 
-  // Serve objects from GCS object storage (requires authentication and access control)
+  // Serve objects from GCS object storage (requires authentication and project access)
   app.get("/objects/*", async (req, res) => {
     try {
       if (!req.isAuthenticated()) {
@@ -2898,14 +2915,35 @@ export async function registerRoutes(
       const objectStorage = new ObjectStorageService();
       const file = await objectStorage.getObjectEntityFile(objectPath);
       
-      const canAccess = await objectStorage.canAccessObjectEntity({
-        userId: user.id,
-        objectFile: file,
-        requestedPermission: 'read',
-      });
+      // Find the document associated with this file path to verify project access
+      const document = await storage.getProjectDocumentByFileUrl(objectPath);
       
-      if (!canAccess) {
-        return res.status(403).json({ error: "Access denied" });
+      if (document) {
+        // Verify user has access to the project
+        const project = await storage.getProject(document.projectId);
+        if (!project) {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        
+        // Check if user is project client, contractor, or admin
+        const hasAccess = 
+          user.role === 'admin' || 
+          project.clientId === user.id || 
+          project.contractorId === user.id;
+        
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      } else {
+        // If no document found, check ACL or deny access
+        const canAccess = await objectStorage.canAccessObjectEntity({
+          userId: user.id,
+          objectFile: file,
+        });
+        
+        if (!canAccess) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
       
       await objectStorage.downloadObject(file, res);
