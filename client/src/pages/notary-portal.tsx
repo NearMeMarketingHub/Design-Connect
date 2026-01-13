@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
 
@@ -22,31 +21,56 @@ export default function NotaryPortal() {
   const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [documents, setDocuments] = useState<NotaryDocument[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Only fetch when user is authenticated
-  const { data: documents, isLoading: docsLoading, error } = useQuery<NotaryDocument[]>({
-    queryKey: ['/api/notary/projects', searchQuery],
-    queryFn: async () => {
-      try {
-        const params = new URLSearchParams();
-        if (searchQuery) params.set('search', searchQuery);
-        const res = await fetch(`/api/notary/projects?${params.toString()}`, {
-          credentials: 'include'
-        });
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to fetch documents');
-        }
-        return res.json();
-      } catch (err) {
-        console.error('Error fetching documents:', err);
-        throw err;
+  const fetchDocuments = useCallback(async (search: string) => {
+    if (!user) return;
+    
+    setDocsLoading(true);
+    setError(null);
+    
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      const res = await fetch(`/api/notary/projects?${params.toString()}`, {
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to fetch documents');
       }
-    },
-    enabled: !!user && !loading,
-    retry: false,
-  });
+      
+      const data = await res.json();
+      setDocuments(data);
+    } catch (err) {
+      console.error('Error fetching documents:', err);
+      setError('Failed to load documents');
+    } finally {
+      setDocsLoading(false);
+    }
+  }, [user]);
 
+  // Fetch documents when user is available
+  useEffect(() => {
+    if (user && !loading) {
+      fetchDocuments(searchQuery);
+    }
+  }, [user, loading]);
+
+  // Debounced search
+  useEffect(() => {
+    if (!user || loading) return;
+    
+    const timer = setTimeout(() => {
+      fetchDocuments(searchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Redirect if not authenticated
   useEffect(() => {
     if (!loading && !user) {
       setLocation('/auth?tab=notary');
@@ -77,8 +101,6 @@ export default function NotaryPortal() {
       console.error('Logout error:', e);
     }
   };
-
-  const docList = documents || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -117,13 +139,19 @@ export default function NotaryPortal() {
 
           {error ? (
             <div className="text-center py-12 text-red-500">
-              <p>Error loading documents. Please try again.</p>
+              <p>{error}</p>
+              <button 
+                onClick={() => fetchDocuments(searchQuery)}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Retry
+              </button>
             </div>
           ) : docsLoading ? (
             <div className="text-center py-12">
               <p>Loading documents...</p>
             </div>
-          ) : docList.length === 0 ? (
+          ) : documents.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <p>No documents found matching your criteria</p>
             </div>
@@ -141,7 +169,7 @@ export default function NotaryPortal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {docList.map((doc) => (
+                  {documents.map((doc) => (
                     <tr key={doc.id} className="border-t hover:bg-gray-50">
                       <td className="p-3 font-medium">{doc.name}</td>
                       <td className="p-3">
