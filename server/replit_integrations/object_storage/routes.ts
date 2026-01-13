@@ -62,7 +62,7 @@ export function registerObjectStorageRoutes(app: Express): void {
     }
   });
 
-  // Use express.static for robust file serving
+  // Use express.static for robust file serving (for inline viewing)
   app.use("/uploads/documents", express.static(UPLOADS_DIR, {
     setHeaders: (res, filePath) => {
       const ext = path.extname(filePath).toLowerCase();
@@ -71,4 +71,37 @@ export function registerObjectStorageRoutes(app: Express): void {
       }
     }
   }));
+
+  // Download endpoint with proper filename from database
+  app.get("/api/download/*", async (req: Request, res) => {
+    try {
+      const filePath = "/" + req.params[0];
+      
+      // Import storage to look up document name
+      const { storage } = await import("../../storage");
+      const document = await storage.getProjectDocumentByFileUrl(filePath);
+      
+      if (document) {
+        const filename = encodeURIComponent(document.name);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      }
+      
+      // Serve the file from local uploads
+      if (filePath.startsWith('/uploads/documents/')) {
+        const localPath = path.join(UPLOADS_DIR, path.basename(filePath));
+        const ext = path.extname(localPath).toLowerCase();
+        if (ext === '.pdf') {
+          res.setHeader('Content-Type', 'application/pdf');
+        }
+        return res.sendFile(localPath);
+      }
+      
+      res.status(404).json({ error: "File not found" });
+    } catch (error) {
+      console.error("[download] Error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to download file" });
+      }
+    }
+  });
 }

@@ -1743,7 +1743,15 @@ export default function ProjectDetails() {
 
   const downloadDocument = (doc: { name: string; fileUrl: string }) => {
     const link = document.createElement('a');
-    link.href = doc.fileUrl;
+    // Use the download API endpoint to get proper filename from database
+    if (doc.fileUrl.startsWith('/uploads/')) {
+      link.href = `/api/download${doc.fileUrl}`;
+    } else if (doc.fileUrl.startsWith('/objects/')) {
+      // For object storage files, use the objects route which now sets Content-Disposition
+      link.href = doc.fileUrl;
+    } else {
+      link.href = doc.fileUrl;
+    }
     link.download = doc.name;
     link.click();
   };

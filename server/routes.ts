@@ -3322,6 +3322,10 @@ export async function registerRoutes(
         if (!hasAccess) {
           return res.status(403).json({ error: "Access denied" });
         }
+        
+        // Set the Content-Disposition header with the document's display name
+        const filename = encodeURIComponent(document.name);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       } else {
         // If no document found, check ACL or deny access
         const canAccess = await objectStorage.canAccessObjectEntity({
