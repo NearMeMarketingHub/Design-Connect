@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useParams, useLocation } from "wouter";
+import { useState, useCallback } from "react";
+import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import SignaturePad from "@/components/signature-pad";
+import { PdfSigningSurface, SigningField, FieldCompletion } from "@/components/pdf-signing-surface";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,23 +14,10 @@ import {
   AlertCircle, 
   Clock, 
   Shield,
-  Download,
-  ExternalLink,
-  ArrowLeft
+  ArrowLeft,
+  Send
 } from "lucide-react";
 import { format } from "date-fns";
-
-interface SigningField {
-  id: string;
-  fieldType: string;
-  pageNumber: number;
-  xPosition: number;
-  yPosition: number;
-  width: number;
-  height: number;
-  isRequired: boolean;
-  label?: string;
-}
 
 interface SigningData {
   packet: {
@@ -55,10 +42,9 @@ interface SigningData {
 
 export default function SignAuthenticatedPage() {
   const { packetId } = useParams<{ packetId: string }>();
-  const [, setLocation] = useLocation();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [completedFields, setCompletedFields] = useState<Record<string, FieldCompletion>>({});
   const { toast } = useToast();
 
   const { data, isLoading, error, isError } = useQuery<SigningData>({
@@ -106,9 +92,31 @@ export default function SignAuthenticatedPage() {
     },
   });
 
-  const handleSignatureComplete = (signatureData: string, signatureType: 'drawn' | 'typed') => {
-    signMutation.mutate({ signatureData, signatureType });
+  const handleFieldComplete = useCallback((fieldId: string, value: string, type: 'drawn' | 'typed') => {
+    setCompletedFields(prev => ({
+      ...prev,
+      [fieldId]: { value, type, completedAt: new Date() }
+    }));
+    toast({
+      title: "Field Signed",
+      description: "Click on remaining fields to complete signing.",
+    });
+  }, [toast]);
+
+  const handleSubmitSignatures = () => {
+    const firstSignature = Object.values(completedFields)[0];
+    if (firstSignature) {
+      signMutation.mutate({
+        signatureData: firstSignature.value,
+        signatureType: firstSignature.type
+      });
+    }
   };
+
+  const fields = data?.fields || [];
+  const requiredFields = fields.filter(f => f.isRequired);
+  const allRequiredComplete = requiredFields.every(f => completedFields[f.id]);
+  const hasAnySignature = Object.keys(completedFields).length > 0;
 
   if (isLoading) {
     return (
@@ -177,56 +185,9 @@ export default function SignAuthenticatedPage() {
     );
   }
 
-  if (showSignaturePad) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4">
-        <div className="max-w-4xl mx-auto">
-          <Button 
-            variant="ghost" 
-            onClick={() => setShowSignaturePad(false)}
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Document
-          </Button>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Sign Document</CardTitle>
-              <CardDescription>
-                Create your signature to sign "{data?.packet.title}"
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SignaturePad
-                onSignatureComplete={handleSignatureComplete}
-                signerName={data?.participant.name || ""}
-              />
-              <div className="flex gap-3 justify-end mt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowSignaturePad(false)}
-                  disabled={signMutation.isPending}
-                >
-                  Cancel
-                </Button>
-              </div>
-              {signMutation.isPending && (
-                <div className="flex items-center justify-center mt-4">
-                  <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mr-2" />
-                  <span className="text-muted-foreground">Submitting signature...</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         <Button 
           variant="ghost" 
           onClick={() => window.history.back()}
@@ -244,7 +205,7 @@ export default function SignAuthenticatedPage() {
             </div>
             <CardTitle className="text-2xl">{data?.packet.title}</CardTitle>
             <CardDescription className="text-slate-300">
-              You have been asked to sign this document
+              Click on each highlighted field to add your signature
             </CardDescription>
           </CardHeader>
           
@@ -276,7 +237,27 @@ export default function SignAuthenticatedPage() {
               </Alert>
             )}
 
-            {data?.document && (
+            {data?.document && data.document.mimeType === 'application/pdf' && fields.length > 0 ? (
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <FileText className="h-6 w-6 text-blue-500" />
+                  <div>
+                    <p className="font-medium">{data.document.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Click on the highlighted areas below to sign
+                    </p>
+                  </div>
+                </div>
+                
+                <PdfSigningSurface
+                  documentUrl={data.document.fileUrl}
+                  fields={fields}
+                  signerName={data.participant.name}
+                  completedFields={completedFields}
+                  onFieldComplete={handleFieldComplete}
+                />
+              </div>
+            ) : data?.document ? (
               <div className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -288,12 +269,22 @@ export default function SignAuthenticatedPage() {
                   </div>
                   <Button variant="outline" size="sm" asChild>
                     <a href={data.document.fileUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
                       View Document
                     </a>
                   </Button>
                 </div>
+                <p className="text-sm text-amber-600">
+                  No signature fields have been placed on this document. Please contact the sender.
+                </p>
               </div>
+            ) : (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>No Document</AlertTitle>
+                <AlertDescription>
+                  No document is attached to this signing request.
+                </AlertDescription>
+              </Alert>
             )}
 
             <div className="border-t pt-6 space-y-4">
@@ -305,7 +296,7 @@ export default function SignAuthenticatedPage() {
                   onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
                 />
                 <Label htmlFor="terms" className="text-sm leading-relaxed">
-                  I agree that by clicking "Sign Document" below, I am providing my electronic signature, 
+                  I agree that by submitting my signatures below, I am providing my electronic signature, 
                   which I intend to be legally binding in accordance with the Electronic Signatures in 
                   Global and National Commerce Act (ESIGN) and the Uniform Electronic Transactions Act (UETA).
                 </Label>
@@ -317,12 +308,28 @@ export default function SignAuthenticatedPage() {
                 Cancel
               </Button>
               <Button 
-                onClick={() => setShowSignaturePad(true)}
-                disabled={!agreedToTerms}
+                onClick={handleSubmitSignatures}
+                disabled={!agreedToTerms || !allRequiredComplete || !hasAnySignature || signMutation.isPending}
               >
-                Sign Document
+                {signMutation.isPending ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit Signatures
+                  </>
+                )}
               </Button>
             </div>
+
+            {!allRequiredComplete && hasAnySignature && (
+              <p className="text-sm text-amber-600 text-center">
+                Please complete all required signature fields before submitting.
+              </p>
+            )}
           </CardContent>
         </Card>
 
