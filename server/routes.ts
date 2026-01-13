@@ -981,6 +981,324 @@ export async function registerRoutes(
     }
   });
 
+  // Notary Profile routes (contractors/admins can manage notary profiles for autofill)
+  app.get("/api/notary-profiles", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const profiles = await storage.getNotaryProfiles(user.id);
+      res.json(profiles);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/notary-profiles/:id", requireAuth, async (req, res, next) => {
+    try {
+      const profile = await storage.getNotaryProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Notary profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/notary-profiles", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can create notary profiles" });
+      }
+      const profile = await storage.createNotaryProfile({
+        ...req.body,
+        createdById: user.id,
+      });
+      res.json(profile);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/notary-profiles/:id", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const profile = await storage.getNotaryProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Notary profile not found" });
+      }
+      if (user.role !== 'admin' && profile.createdById !== user.id) {
+        return res.status(403).json({ message: "You can only edit your own notary profiles" });
+      }
+      const updated = await storage.updateNotaryProfile(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/notary-profiles/:id", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const profile = await storage.getNotaryProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Notary profile not found" });
+      }
+      if (user.role !== 'admin' && profile.createdById !== user.id) {
+        return res.status(403).json({ message: "You can only delete your own notary profiles" });
+      }
+      await storage.deleteNotaryProfile(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Notary Portal routes (for notary users to search and upload notarized documents)
+  app.get("/api/notary/projects", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'notary' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { search, sortBy, sortOrder } = req.query;
+      
+      // Get all non-completed projects with documents needing notarization
+      const allProjects = await storage.getProjects();
+      const activeProjects = allProjects.filter(p => p.status !== 'completed');
+      
+      // Get all documents needing notarization
+      const docsNeedingNotarization = await storage.getDocumentsNeedingNotarization();
+      
+      // Filter projects that have documents needing notarization
+      const projectsWithNotarizationNeeds = await Promise.all(
+        activeProjects.map(async (project) => {
+          const projectDocs = docsNeedingNotarization.filter(d => d.projectId === project.id);
+          if (projectDocs.length === 0) return null;
+          
+          // Get client info
+          const client = project.clientId ? await storage.getUser(project.clientId) : null;
+          const contractor = project.contractorId ? await storage.getUser(project.contractorId) : null;
+          
+          return {
+            ...project,
+            clientName: client?.name || 'Unknown',
+            contractorName: contractor?.name || 'Unknown',
+            documentsNeedingNotarization: projectDocs.length,
+          };
+        })
+      );
+      
+      let filteredProjects = projectsWithNotarizationNeeds.filter(p => p !== null);
+      
+      // Apply search filter
+      if (search && typeof search === 'string') {
+        const searchLower = search.toLowerCase();
+        filteredProjects = filteredProjects.filter(p =>
+          p!.name.toLowerCase().includes(searchLower) ||
+          p!.clientName.toLowerCase().includes(searchLower) ||
+          p!.contractorName.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Apply sorting
+      if (sortBy && typeof sortBy === 'string') {
+        filteredProjects.sort((a, b) => {
+          let aVal: any = a![sortBy as keyof typeof a];
+          let bVal: any = b![sortBy as keyof typeof b];
+          if (sortOrder === 'desc') {
+            return aVal > bVal ? -1 : 1;
+          }
+          return aVal > bVal ? 1 : -1;
+        });
+      }
+      
+      res.json(filteredProjects);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/notary/projects/:projectId/documents", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'notary' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const documents = await storage.getDocumentsNeedingNotarizationByProject(req.params.projectId);
+      
+      // Enrich with notary profile info
+      const enrichedDocs = await Promise.all(
+        documents.map(async (doc) => {
+          const notaryProfile = doc.notaryProfileId ? await storage.getNotaryProfile(doc.notaryProfileId) : null;
+          return {
+            ...doc,
+            recommendedNotary: notaryProfile,
+          };
+        })
+      );
+      
+      res.json(enrichedDocs);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Notary uploads notarized document
+  app.post("/api/notary/documents/:documentId/upload-notarized", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'notary' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (!document.requiresNotarization) {
+        return res.status(400).json({ message: "This document does not require notarization" });
+      }
+      
+      const { notarizedFileUrl } = req.body;
+      if (!notarizedFileUrl) {
+        return res.status(400).json({ message: "Notarized file URL is required" });
+      }
+      
+      const updated = await storage.updateProjectDocument(req.params.documentId, {
+        notarizedFileUrl,
+        notarizedUploadedById: user.id,
+        notarizedUploadedByName: user.name || 'Notary',
+        notarizedUploadedAt: new Date(),
+        notarizationStatus: 'awaiting_approval',
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Client uploads notarized document (external notarization path)
+  app.post("/api/documents/:documentId/upload-notarized", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (!document.requiresNotarization) {
+        return res.status(400).json({ message: "This document does not require notarization" });
+      }
+      
+      // Check that user has access to this project
+      const project = await storage.getProject(document.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      if (user.role === 'client' && project.clientId !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { notarizedFileUrl } = req.body;
+      if (!notarizedFileUrl) {
+        return res.status(400).json({ message: "Notarized file URL is required" });
+      }
+      
+      const updated = await storage.updateProjectDocument(req.params.documentId, {
+        notarizedFileUrl,
+        notarizedUploadedById: user.id,
+        notarizedUploadedByName: user.name || 'Client',
+        notarizedUploadedAt: new Date(),
+        notarizationStatus: 'awaiting_approval',
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Contractor approves/rejects notarized document
+  app.post("/api/documents/:documentId/approve-notarization", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can approve notarization" });
+      }
+      
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (document.notarizationStatus !== 'awaiting_approval') {
+        return res.status(400).json({ message: "Document is not awaiting approval" });
+      }
+      
+      if (!document.notarizedFileUrl) {
+        return res.status(400).json({ message: "No notarized file uploaded" });
+      }
+      
+      // Replace original file with notarized version and mark as completed
+      const updated = await storage.updateProjectDocument(req.params.documentId, {
+        fileUrl: document.notarizedFileUrl,
+        notarizationStatus: 'completed',
+        name: document.name.includes('(Notarized)') ? document.name : `${document.name} (Notarized)`,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/documents/:documentId/reject-notarization", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can reject notarization" });
+      }
+      
+      const document = await storage.getProjectDocument(req.params.documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      if (document.notarizationStatus !== 'awaiting_approval') {
+        return res.status(400).json({ message: "Document is not awaiting approval" });
+      }
+      
+      // Reset to pending, clear uploaded notarized file
+      const updated = await storage.updateProjectDocument(req.params.documentId, {
+        notarizedFileUrl: null,
+        notarizedUploadedById: null,
+        notarizedUploadedByName: null,
+        notarizedUploadedAt: null,
+        notarizationStatus: 'pending',
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Comment routes
   app.get("/api/posts/:postId/comments", async (req, res, next) => {
     try {
