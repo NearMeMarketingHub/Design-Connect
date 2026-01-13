@@ -3488,7 +3488,10 @@ export default function ProjectDetails() {
               // For clients: show only packets requiring their signature
               const clientPendingPackets = signingPackets.filter((packet: any) => 
                 packet.status === 'pending' && 
-                packet.participants?.some((p: any) => p.email === user?.email && p.status === 'pending')
+                packet.participants?.some((p: any) => 
+                  (p.recipientEmail?.toLowerCase() === user?.email?.toLowerCase() || p.userId === user?.id) && 
+                  p.status === 'pending'
+                )
               );
               
               // Client view: show pending documents awaiting signature
