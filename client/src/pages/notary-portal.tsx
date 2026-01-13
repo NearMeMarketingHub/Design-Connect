@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface NotaryDocument {
   id: string;
@@ -20,10 +21,14 @@ interface NotaryDocument {
 export default function NotaryPortal() {
   const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [documents, setDocuments] = useState<NotaryDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
   const fetchDocuments = useCallback(async (search: string) => {
     if (!user) return;
@@ -51,6 +56,66 @@ export default function NotaryPortal() {
       setDocsLoading(false);
     }
   }, [user]);
+
+  const handleUploadClick = (docId: string) => {
+    setSelectedDocId(docId);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedDocId) return;
+
+    setUploadingDocId(selectedDocId);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const { url } = await uploadRes.json();
+
+      const updateRes = await fetch(`/api/notary/documents/${selectedDocId}/upload-notarized`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notarizedFileUrl: url }),
+        credentials: 'include',
+      });
+
+      if (!updateRes.ok) {
+        throw new Error('Failed to update document');
+      }
+
+      toast({
+        title: "Success",
+        description: "Notarized document uploaded successfully",
+      });
+
+      fetchDocuments(searchQuery);
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast({
+        title: "Error",
+        description: "Failed to upload notarized document",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDocId(null);
+      setSelectedDocId(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   // Fetch documents when user is available (with small delay to let page render)
   useEffect(() => {
@@ -194,15 +259,33 @@ export default function NotaryPortal() {
                         </span>
                       </td>
                       <td className="p-3 text-gray-600">{doc.notarizationDueDate || 'No due date'}</td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right space-x-2">
                         <a 
                           href={doc.fileUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:underline text-sm"
                         >
-                          View Document
+                          View
                         </a>
+                        {doc.notarizedFileUrl ? (
+                          <a 
+                            href={doc.notarizedFileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-green-600 hover:underline text-sm"
+                          >
+                            View Notarized
+                          </a>
+                        ) : (
+                          <button
+                            onClick={() => handleUploadClick(doc.id)}
+                            disabled={uploadingDocId === doc.id}
+                            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {uploadingDocId === doc.id ? 'Uploading...' : 'Upload Notarized'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -210,6 +293,14 @@ export default function NotaryPortal() {
               </table>
             </div>
           )}
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".pdf,.doc,.docx"
+            className="hidden"
+          />
         </div>
       </main>
     </div>
