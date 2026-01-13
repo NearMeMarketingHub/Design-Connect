@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/layout";
+import LandingPage from "@/pages/landing";
 import AuthPage from "@/pages/auth";
 import ClientDashboard from "@/pages/client-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -38,8 +39,13 @@ import { AuthProvider } from "@/lib/auth-context";
 function Router() {
   const [location] = useLocation();
 
-  // Public/Auth Routes
-  if (location === "/" || location === "/auth") {
+  // Landing Page (home)
+  if (location === "/") {
+    return <LandingPage />;
+  }
+  
+  // Auth Routes
+  if (location === "/auth") {
     return <AuthPage />;
   }
   
