@@ -3483,64 +3483,179 @@ export default function ProjectDetails() {
               )}
             </div>
 
-            {/* Signing Packets Section */}
-            {signingPackets.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <Send className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Documents Awaiting Signature</CardTitle>
-                        <p className="text-xs text-muted-foreground">Track documents sent for electronic signature</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2">
-                    {signingPackets.map((packet: any) => (
-                      <div 
-                        key={packet.id}
-                        className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
-                        data-testid={`signing-packet-${packet.id}`}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{packet.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {packet.participants?.length || 0} recipient(s) • Created {new Date(packet.createdAt).toLocaleDateString()}
-                            </p>
+            {/* Signing Packets Section - Different views for client vs contractor */}
+            {(() => {
+              // For clients: show only packets requiring their signature
+              const clientPendingPackets = signingPackets.filter((packet: any) => 
+                packet.status === 'pending' && 
+                packet.participants?.some((p: any) => p.email === user?.email && p.status === 'pending')
+              );
+              const completedPackets = signingPackets.filter((packet: any) => 
+                packet.status === 'completed'
+              );
+              
+              // Client view: separate pending (clickable) and completed sections
+              if (!isContractorView) {
+                return (
+                  <>
+                    {clientPendingPackets.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-amber-500/10 rounded-lg">
+                                <Send className="w-5 h-5 text-amber-600" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-base">Documents Awaiting Your Signature</CardTitle>
+                                <p className="text-xs text-muted-foreground">Click to sign these documents</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="space-y-2">
+                            {clientPendingPackets.map((packet: any) => (
+                              <div 
+                                key={packet.id}
+                                className="flex items-center justify-between p-3 rounded-lg border bg-amber-50 hover:bg-amber-100 cursor-pointer transition-colors"
+                                data-testid={`signing-packet-${packet.id}`}
+                                onClick={() => setLocation(`/client/sign/${packet.id}`)}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <FileText className="w-4 h-4 text-amber-600 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{packet.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Created {new Date(packet.createdAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    Click to Sign
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Signed Documents Section for clients */}
+                    {completedPackets.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-green-500/10 rounded-lg">
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-base">Signed Documents</CardTitle>
+                                <p className="text-xs text-muted-foreground">Documents you have signed</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="space-y-2">
+                            {completedPackets.map((packet: any) => (
+                              <div 
+                                key={packet.id}
+                                className="flex items-center justify-between p-3 rounded-lg border bg-green-50"
+                                data-testid={`signed-packet-${packet.id}`}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <FileText className="w-4 h-4 text-green-600 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{packet.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Signed {packet.completedAt ? new Date(packet.completedAt).toLocaleDateString() : new Date(packet.updatedAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge className="bg-green-500 text-white border-0">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    Completed
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                );
+              }
+              
+              // Contractor/Admin view: show all packets with status badges
+              if (signingPackets.length > 0) {
+                return (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded-lg">
+                            <Send className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">Signature Requests</CardTitle>
+                            <p className="text-xs text-muted-foreground">Track documents sent for electronic signature</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {packet.status === 'completed' && (
-                            <Badge className="bg-green-500 text-white border-0">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Completed
-                            </Badge>
-                          )}
-                          {packet.status === 'pending' && (
-                            <Badge variant="outline" className="border-amber-500 text-amber-600">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pending
-                            </Badge>
-                          )}
-                          {packet.status === 'cancelled' && (
-                            <Badge variant="outline" className="border-gray-400 text-gray-500">
-                              Cancelled
-                            </Badge>
-                          )}
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        {signingPackets.map((packet: any) => (
+                          <div 
+                            key={packet.id}
+                            className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                            data-testid={`signing-packet-${packet.id}`}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{packet.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {packet.participants?.length || 0} recipient(s) • Created {new Date(packet.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {packet.status === 'completed' && (
+                                <Badge className="bg-green-500 text-white border-0">
+                                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                                  Completed
+                                </Badge>
+                              )}
+                              {packet.status === 'pending' && (
+                                <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              )}
+                              {packet.status === 'cancelled' && (
+                                <Badge variant="outline" className="border-gray-400 text-gray-500">
+                                  Cancelled
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              
+              return null;
+            })()}
 
             {/* Document Categories - Dynamic */}
             {documentsLoading ? (
