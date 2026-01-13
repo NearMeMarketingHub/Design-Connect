@@ -12,7 +12,8 @@ import {
   ArrowRight,
   Hammer,
   ClipboardList,
-  Shield
+  Shield,
+  Stamp
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -48,7 +49,7 @@ export default function LandingPage() {
               BuildVision connects contractors and clients with a powerful platform for project tracking, 
               document management, real-time communication, and transparent budgeting.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
               <Link href="/auth?mode=register&tab=contractor">
                 <Button size="lg" className="text-lg px-8" data-testid="button-contractor-signup">
                   <Hammer className="mr-2 h-5 w-5" />
@@ -59,6 +60,12 @@ export default function LandingPage() {
                 <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-client-signup">
                   <Users className="mr-2 h-5 w-5" />
                   I'm a Client
+                </Button>
+              </Link>
+              <Link href="/auth?mode=register&tab=notary">
+                <Button size="lg" variant="outline" className="text-lg px-8 border-purple-300 text-purple-700 hover:bg-purple-50" data-testid="button-notary-signup">
+                  <Stamp className="mr-2 h-5 w-5" />
+                  I'm a Notary
                 </Button>
               </Link>
             </div>
@@ -179,6 +186,17 @@ export default function LandingPage() {
                   </p>
                 </CardContent>
               </Card>
+              
+              <Card className="border-0 shadow-md bg-purple-50">
+                <CardContent className="p-6">
+                  <Stamp className="h-10 w-10 text-purple-600 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Notarization Services</h3>
+                  <p className="text-slate-600 text-sm">
+                    Streamlined document notarization workflow. Connect with notaries 
+                    and track notarization status in real-time.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
@@ -202,7 +220,7 @@ export default function LandingPage() {
 
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-2 gap-12">
+            <div className="grid md:grid-cols-3 gap-12">
               <div>
                 <h2 className="text-3xl font-bold text-slate-900 mb-6">
                   For Contractors
@@ -222,11 +240,11 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Keep clients informed with automatic progress updates</span>
+                    <span className="text-slate-600">Tag documents for notarization and assign notaries</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Collect signatures on contracts and change orders digitally</span>
+                    <span className="text-slate-600">Collect signatures on contracts digitally</span>
                   </li>
                 </ul>
               </div>
@@ -245,7 +263,7 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Communicate directly through the app</span>
+                    <span className="text-slate-600">Upload notarized documents directly</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
@@ -254,6 +272,33 @@ export default function LandingPage() {
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
                     <span className="text-slate-600">See exactly where your budget is being spent</span>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-purple-700 mb-6">
+                  For Notaries
+                </h2>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600">Search and find documents requiring notarization</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600">Upload notarized documents directly to projects</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600">Track pending and completed notarizations</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600">Filter documents by status and due date</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600">Streamlined workflow for Florida construction projects</span>
                   </li>
                 </ul>
               </div>
