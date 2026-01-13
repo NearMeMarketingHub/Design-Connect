@@ -3844,8 +3844,9 @@ export default function ProjectDetails() {
                 );
               }
               
-              // Contractor/Admin view: show all packets with status badges
-              if (signingPackets.length > 0) {
+              // Contractor/Admin view: show only pending packets
+              const pendingPackets = signingPackets.filter((packet: any) => packet.status === 'pending');
+              if (pendingPackets.length > 0) {
                 return (
                   <Card>
                     <CardHeader className="pb-3">
@@ -3855,15 +3856,18 @@ export default function ProjectDetails() {
                             <Send className="w-5 h-5 text-primary" />
                           </div>
                           <div>
-                            <CardTitle className="text-base">Signature Requests</CardTitle>
-                            <p className="text-xs text-muted-foreground">Track documents sent for electronic signature</p>
+                            <CardTitle className="text-base">Pending Signature Requests</CardTitle>
+                            <p className="text-xs text-muted-foreground">Documents awaiting electronic signature</p>
                           </div>
                         </div>
+                        <Badge variant="outline" className="border-amber-500 text-amber-600">
+                          {pendingPackets.length} Pending
+                        </Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="space-y-2">
-                        {signingPackets.map((packet: any) => (
+                        {pendingPackets.map((packet: any) => (
                           <div 
                             key={packet.id}
                             className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
@@ -3878,25 +3882,10 @@ export default function ProjectDetails() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {packet.status === 'completed' && (
-                                <Badge className="bg-green-500 text-white border-0">
-                                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                                  Completed
-                                </Badge>
-                              )}
-                              {packet.status === 'pending' && (
-                                <Badge variant="outline" className="border-amber-500 text-amber-600">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  Pending
-                                </Badge>
-                              )}
-                              {packet.status === 'cancelled' && (
-                                <Badge variant="outline" className="border-gray-400 text-gray-500">
-                                  Cancelled
-                                </Badge>
-                              )}
-                            </div>
+                            <Badge variant="outline" className="border-amber-500 text-amber-600">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pending
+                            </Badge>
                           </div>
                         ))}
                       </div>
