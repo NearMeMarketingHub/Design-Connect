@@ -72,7 +72,7 @@ export default function NotaryPortal() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const uploadRes = await fetch('/api/upload', {
+      const uploadRes = await fetch('/api/uploads/file', {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -82,12 +82,12 @@ export default function NotaryPortal() {
         throw new Error('Failed to upload file');
       }
 
-      const { url } = await uploadRes.json();
+      const { objectPath } = await uploadRes.json();
 
       const updateRes = await fetch(`/api/notary/documents/${selectedDocId}/upload-notarized`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notarizedFileUrl: url }),
+        body: JSON.stringify({ notarizedFileUrl: objectPath }),
         credentials: 'include',
       });
 
