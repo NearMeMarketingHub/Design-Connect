@@ -2689,7 +2689,7 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
       const packetId = req.params.id;
-      const { signatureData, signatureType } = req.body;
+      const { signatureData, signatureType, fieldCompletions } = req.body;
       
       if (!signatureData) {
         return res.status(400).json({ message: "Signature is required" });
@@ -2718,6 +2718,16 @@ export async function registerRoutes(
       
       if (participant.status === 'signed') {
         return res.status(400).json({ message: "You have already signed this document" });
+      }
+      
+      // Save field completion values
+      if (fieldCompletions && typeof fieldCompletions === 'object') {
+        for (const [fieldId, completion] of Object.entries(fieldCompletions)) {
+          const comp = completion as { value: string; fieldType: string };
+          if (comp.value) {
+            await storage.updateSigningField(fieldId, { value: comp.value });
+          }
+        }
       }
       
       // Update participant as signed
@@ -2755,11 +2765,59 @@ export async function registerRoutes(
           metadata: JSON.stringify({ allParticipantsSigned: true })
         });
         
-        // Update document status to signed
+        // Generate stamped PDF with all signatures
         if (packet.documentId) {
-          await storage.updateProjectDocument(packet.documentId, {
-            signatureStatus: 'signed'
-          });
+          try {
+            const document = await storage.getProjectDocument(packet.documentId);
+            if (document?.fileUrl && document.mimeType === 'application/pdf') {
+              const { stampPdfWithSignatures, fetchPdfFromUrl } = await import("./pdf-stamper");
+              const signingFields = await storage.getSigningFields(packet.id);
+              
+              // Fetch original PDF
+              const pdfBytes = await fetchPdfFromUrl(document.fileUrl);
+              
+              // Stamp signatures and fields onto PDF
+              const stampedPdf = await stampPdfWithSignatures(pdfBytes, signingFields, allParticipants);
+              
+              // Upload stamped PDF to object storage
+              const { ObjectStorageService } = await import("./replit_integrations/object_storage");
+              const objectStorage = new ObjectStorageService();
+              const { uploadUrl, objectPath } = await objectStorage.getObjectEntityUploadURLWithPath();
+              
+              // Upload the stamped PDF
+              const uploadResponse = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: stampedPdf,
+                headers: { 'Content-Type': 'application/pdf' }
+              });
+              
+              if (uploadResponse.ok) {
+                // Store the object path that can be served through our app
+                await storage.updateProjectDocument(packet.documentId, {
+                  signatureStatus: 'signed',
+                  fileUrl: objectPath
+                });
+                console.log('Stamped PDF saved successfully:', objectPath);
+              } else {
+                console.error('Failed to upload stamped PDF:', uploadResponse.status);
+                // Still mark as signed even if stamping failed
+                await storage.updateProjectDocument(packet.documentId, {
+                  signatureStatus: 'signed'
+                });
+              }
+            } else {
+              // Non-PDF document, just mark as signed
+              await storage.updateProjectDocument(packet.documentId, {
+                signatureStatus: 'signed'
+              });
+            }
+          } catch (stampError) {
+            console.error('Error generating stamped PDF:', stampError);
+            // Still mark as signed even if stamping failed
+            await storage.updateProjectDocument(packet.documentId, {
+              signatureStatus: 'signed'
+            });
+          }
         }
       }
       
@@ -2827,6 +2885,40 @@ export async function registerRoutes(
 
   // Register object storage routes
   registerObjectStorageRoutes(app);
+
+  // Serve objects from GCS object storage (requires authentication and access control)
+  app.get("/objects/*", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const user = req.user as User;
+      const objectPath = req.path;
+      const objectStorage = new ObjectStorageService();
+      const file = await objectStorage.getObjectEntityFile(objectPath);
+      
+      const canAccess = await objectStorage.canAccessObjectEntity({
+        userId: user.id,
+        objectFile: file,
+        requestedPermission: 'read',
+      });
+      
+      if (!canAccess) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await objectStorage.downloadObject(file, res);
+    } catch (error: any) {
+      if (error.name === 'ObjectNotFoundError') {
+        return res.status(404).json({ error: "Object not found" });
+      }
+      console.error("Error serving object:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Error serving object" });
+      }
+    }
+  });
 
   // Update user profile (phone, email, name)
   app.patch("/api/user/profile", requireAuth, async (req, res, next) => {
