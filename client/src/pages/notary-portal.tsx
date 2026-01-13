@@ -79,12 +79,12 @@ export default function NotaryPortal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: documents = [], isLoading } = useQuery<NotaryDocument[]>({
-    queryKey: ['/api/notary-portal/documents', searchQuery, statusFilter],
+    queryKey: ['/api/notary/projects', searchQuery, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('search', searchQuery);
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      const res = await fetch(`/api/notary-portal/documents?${params.toString()}`, {
+      const res = await fetch(`/api/notary/projects?${params.toString()}`, {
         credentials: 'include'
       });
       if (!res.ok) {
@@ -96,7 +96,7 @@ export default function NotaryPortal() {
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { documentId: string; notarizedFileUrl: string }) => {
-      const res = await fetch(`/api/notary-portal/documents/${data.documentId}/upload`, {
+      const res = await fetch(`/api/notary/documents/${data.documentId}/upload-notarized`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -109,7 +109,7 @@ export default function NotaryPortal() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notary-portal/documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notary/projects'] });
       setUploadDialogOpen(false);
       setSelectedDocument(null);
       setNotarizedFile(null);
