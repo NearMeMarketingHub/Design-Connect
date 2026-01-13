@@ -52,10 +52,13 @@ export default function NotaryPortal() {
     }
   }, [user]);
 
-  // Fetch documents when user is available
+  // Fetch documents when user is available (with small delay to let page render)
   useEffect(() => {
     if (user && !loading) {
-      fetchDocuments(searchQuery);
+      const timer = setTimeout(() => {
+        fetchDocuments(searchQuery);
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [user, loading]);
 
