@@ -54,7 +54,8 @@ import type {
   SigningPacket, InsertSigningPacket,
   SigningParticipant, InsertSigningParticipant,
   SigningEvent, InsertSigningEvent,
-  SigningField, InsertSigningField
+  SigningField, InsertSigningField,
+  NotaryProfile, InsertNotaryProfile
 } from "@shared/schema";
 
 export interface IStorage {
@@ -149,6 +150,15 @@ export interface IStorage {
   createProjectDocument(doc: InsertProjectDocument): Promise<ProjectDocument>;
   updateProjectDocument(id: string, data: Partial<InsertProjectDocument>): Promise<ProjectDocument | undefined>;
   deleteProjectDocument(id: string): Promise<void>;
+  getDocumentsNeedingNotarization(): Promise<ProjectDocument[]>;
+  getDocumentsNeedingNotarizationByProject(projectId: string): Promise<ProjectDocument[]>;
+
+  // Notary profile methods
+  getNotaryProfiles(createdById: string): Promise<NotaryProfile[]>;
+  getNotaryProfile(id: string): Promise<NotaryProfile | undefined>;
+  createNotaryProfile(profile: InsertNotaryProfile): Promise<NotaryProfile>;
+  updateNotaryProfile(id: string, data: Partial<InsertNotaryProfile>): Promise<NotaryProfile | undefined>;
+  deleteNotaryProfile(id: string): Promise<void>;
 
   // Post comment methods
   getPostComments(postId: string): Promise<PostComment[]>;
@@ -696,6 +706,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectDocument(id: string): Promise<void> {
     await db.delete(schema.projectDocuments).where(eq(schema.projectDocuments.id, id));
+  }
+
+  async getDocumentsNeedingNotarization(): Promise<ProjectDocument[]> {
+    return await db.select().from(schema.projectDocuments).where(
+      and(
+        eq(schema.projectDocuments.requiresNotarization, true),
+        not(eq(schema.projectDocuments.notarizationStatus, 'completed'))
+      )
+    );
+  }
+
+  async getDocumentsNeedingNotarizationByProject(projectId: string): Promise<ProjectDocument[]> {
+    return await db.select().from(schema.projectDocuments).where(
+      and(
+        eq(schema.projectDocuments.projectId, projectId),
+        eq(schema.projectDocuments.requiresNotarization, true)
+      )
+    );
+  }
+
+  async getNotaryProfiles(createdById: string): Promise<NotaryProfile[]> {
+    return await db.select().from(schema.notaryProfiles).where(eq(schema.notaryProfiles.createdById, createdById));
+  }
+
+  async getNotaryProfile(id: string): Promise<NotaryProfile | undefined> {
+    const [profile] = await db.select().from(schema.notaryProfiles).where(eq(schema.notaryProfiles.id, id));
+    return profile;
+  }
+
+  async createNotaryProfile(profile: InsertNotaryProfile): Promise<NotaryProfile> {
+    const [created] = await db.insert(schema.notaryProfiles).values(profile).returning();
+    return created;
+  }
+
+  async updateNotaryProfile(id: string, data: Partial<InsertNotaryProfile>): Promise<NotaryProfile | undefined> {
+    const [updated] = await db.update(schema.notaryProfiles)
+      .set(data)
+      .where(eq(schema.notaryProfiles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNotaryProfile(id: string): Promise<void> {
+    await db.delete(schema.notaryProfiles).where(eq(schema.notaryProfiles.id, id));
   }
 
   // Post comment methods
