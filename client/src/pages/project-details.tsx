@@ -3804,6 +3804,14 @@ export default function ProjectDetails() {
                                               Awaiting Approval
                                             </Badge>
                                           )}
+                                          {doc.notarizationRejectionReason && doc.notarizationStatus === 'pending' && (
+                                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm">
+                                              <p className="font-medium text-red-700 flex items-center gap-1">
+                                                <X className="w-3 h-3" /> Document Rejected
+                                              </p>
+                                              <p className="text-red-600 text-xs mt-1">{doc.notarizationRejectionReason}</p>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                       <div className="shrink-0 flex gap-2">
