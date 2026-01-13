@@ -1096,6 +1096,7 @@ export async function registerRoutes(
             notarizationStatus: doc.notarizationStatus || 'pending',
             notarizationDueDate: doc.notarizationDueDate,
             notarizedFileUrl: doc.notarizedFileUrl,
+            notarizationRejectionReason: doc.notarizationRejectionReason,
             projectId: doc.projectId,
             projectName: project.name,
             projectAddress: project.address || '',
