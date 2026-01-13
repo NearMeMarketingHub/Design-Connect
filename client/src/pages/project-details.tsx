@@ -1230,6 +1230,11 @@ export default function ProjectDetails() {
   const [uploadPhaseLabel, setUploadPhaseLabel] = useState('Uploading...');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [requiresSignature, setRequiresSignature] = useState(false);
+  const [requiresNotarization, setRequiresNotarization] = useState(false);
+  const [notarizationDueDate, setNotarizationDueDate] = useState<string>("");
+  const [selectedNotaryProfileId, setSelectedNotaryProfileId] = useState<string>("");
+  const [showCreateNotaryProfile, setShowCreateNotaryProfile] = useState(false);
+  const [newNotaryProfile, setNewNotaryProfile] = useState({ name: "", email: "", phone: "", companyName: "", address: "", city: "", state: "", zipCode: "" });
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   
   // Upload wizard state for signature documents
@@ -1264,6 +1269,43 @@ export default function ProjectDetails() {
     enabled: !!projectId,
   });
 
+  // Fetch notary profiles (for contractors)
+  const { data: notaryProfiles = [] } = useQuery({
+    queryKey: ['/api/notary-profiles'],
+    queryFn: async () => {
+      const res = await fetch('/api/notary-profiles', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: user?.role === 'contractor' || user?.role === 'admin',
+  });
+
+  // Create notary profile mutation
+  const createNotaryProfileMutation = useMutation({
+    mutationFn: async (data: { name: string; email?: string; phone?: string; companyName?: string; address?: string; city?: string; state?: string; zipCode?: string }) => {
+      const res = await fetch('/api/notary-profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to create notary profile');
+      }
+      return res.json();
+    },
+    onSuccess: (profile) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notary-profiles'] });
+      setSelectedNotaryProfileId(profile.id);
+      setShowCreateNotaryProfile(false);
+      setNewNotaryProfile({ name: "", email: "", phone: "", companyName: "", address: "", city: "", state: "", zipCode: "" });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to create notary profile');
+    }
+  });
+
   // Send for signature state
   const [sendForSignatureOpen, setSendForSignatureOpen] = useState(false);
   const [documentToSign, setDocumentToSign] = useState<{ id: string; name: string } | null>(null);
@@ -1279,6 +1321,10 @@ export default function ProjectDetails() {
       requiresSignature?: boolean;
       signatureStatus?: string;
       finalDocumentType?: string;
+      requiresNotarization?: boolean;
+      notarizationStatus?: string;
+      notarizationDueDate?: string;
+      notaryProfileId?: string;
     }) => {
       const res = await fetch(`/api/projects/${projectId}/documents`, {
         method: 'POST',
@@ -1299,6 +1345,9 @@ export default function ProjectDetails() {
       setNewDocumentType("");
       setNewDocumentFile(null);
       setRequiresSignature(false);
+      setRequiresNotarization(false);
+      setNotarizationDueDate("");
+      setSelectedNotaryProfileId("");
       setUploadWizardStep(1);
       setSignatureFields([]);
       setSignatureDueDate("");
@@ -1474,6 +1523,10 @@ export default function ProjectDetails() {
 
   const handleCreateDocument = () => {
     if (!newDocumentType || !newDocumentFile) return;
+    if (requiresNotarization && !selectedNotaryProfileId) {
+      alert('Please select a recommended notary');
+      return;
+    }
     createDocumentMutation.mutate({
       name: newDocumentFile.name,
       type: newDocumentType,
@@ -1482,7 +1535,11 @@ export default function ProjectDetails() {
       mimeType: newDocumentFile.mimeType,
       requiresSignature: requiresSignature,
       signatureStatus: requiresSignature ? 'pending_setup' : undefined,
-      finalDocumentType: requiresSignature ? newDocumentType : undefined
+      finalDocumentType: requiresSignature ? newDocumentType : undefined,
+      requiresNotarization: requiresNotarization,
+      notarizationStatus: requiresNotarization ? 'pending' : undefined,
+      notarizationDueDate: requiresNotarization ? notarizationDueDate : undefined,
+      notaryProfileId: requiresNotarization ? selectedNotaryProfileId : undefined
     });
   };
   
@@ -3860,6 +3917,11 @@ export default function ProjectDetails() {
           setNewDocumentType("");
           setNewDocumentFile(null);
           setRequiresSignature(false);
+          setRequiresNotarization(false);
+          setNotarizationDueDate("");
+          setSelectedNotaryProfileId("");
+          setShowCreateNotaryProfile(false);
+          setNewNotaryProfile({ name: "", email: "", phone: "", companyName: "", address: "", city: "", state: "", zipCode: "" });
           setSignatureFields([]);
           setSignatureDueDate("");
           setSignatureMessage("");
@@ -3910,6 +3972,156 @@ export default function ProjectDetails() {
                   <p className="text-xs text-muted-foreground bg-blue-50 text-blue-700 p-2 rounded border border-blue-200">
                     After uploading, you'll set up signature fields and recipients in the next step.
                   </p>
+                )}
+                <div className="flex items-center space-x-2 py-2">
+                  <Checkbox
+                    id="requires-notarization"
+                    checked={requiresNotarization}
+                    onCheckedChange={(checked) => setRequiresNotarization(checked === true)}
+                    data-testid="checkbox-requires-notarization"
+                  />
+                  <Label htmlFor="requires-notarization" className="text-sm font-medium cursor-pointer">
+                    Notarization Required
+                  </Label>
+                </div>
+                {requiresNotarization && (
+                  <div className="space-y-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs text-amber-700">
+                      The client will be notified that this document requires notarization.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="notarization-due-date">Due Date</Label>
+                      <Input
+                        type="date"
+                        id="notarization-due-date"
+                        value={notarizationDueDate}
+                        onChange={(e) => setNotarizationDueDate(e.target.value)}
+                        data-testid="input-notarization-due-date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Recommended Notary <span className="text-red-500">*</span></Label>
+                      {showCreateNotaryProfile ? (
+                        <div className="space-y-3 p-3 border rounded-lg bg-white">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs">Name *</Label>
+                              <Input
+                                placeholder="Notary name"
+                                value={newNotaryProfile.name}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, name: e.target.value})}
+                                data-testid="input-new-notary-name"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Company</Label>
+                              <Input
+                                placeholder="Company name"
+                                value={newNotaryProfile.companyName}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, companyName: e.target.value})}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs">Email</Label>
+                              <Input
+                                placeholder="email@example.com"
+                                value={newNotaryProfile.email}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, email: e.target.value})}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Phone</Label>
+                              <Input
+                                placeholder="(555) 123-4567"
+                                value={newNotaryProfile.phone}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, phone: e.target.value})}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Address</Label>
+                            <Input
+                              placeholder="Street address"
+                              value={newNotaryProfile.address}
+                              onChange={(e) => setNewNotaryProfile({...newNotaryProfile, address: e.target.value})}
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <Label className="text-xs">City</Label>
+                              <Input
+                                placeholder="City"
+                                value={newNotaryProfile.city}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, city: e.target.value})}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">State</Label>
+                              <Input
+                                placeholder="FL"
+                                value={newNotaryProfile.state}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, state: e.target.value})}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">ZIP</Label>
+                              <Input
+                                placeholder="33101"
+                                value={newNotaryProfile.zipCode}
+                                onChange={(e) => setNewNotaryProfile({...newNotaryProfile, zipCode: e.target.value})}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowCreateNotaryProfile(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={!newNotaryProfile.name || createNotaryProfileMutation.isPending}
+                              onClick={() => createNotaryProfileMutation.mutate(newNotaryProfile)}
+                              data-testid="button-save-notary-profile"
+                            >
+                              {createNotaryProfileMutation.isPending ? 'Saving...' : 'Save Notary'}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Select value={selectedNotaryProfileId} onValueChange={setSelectedNotaryProfileId}>
+                            <SelectTrigger data-testid="select-notary-profile">
+                              <SelectValue placeholder="Select a notary" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {notaryProfiles.map((profile: any) => (
+                                <SelectItem key={profile.id} value={profile.id}>
+                                  {profile.name} {profile.companyName ? `(${profile.companyName})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setShowCreateNotaryProfile(true)}
+                            data-testid="button-add-new-notary"
+                          >
+                            + Add New Notary
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
                 <div className="space-y-2">
                   <Label>File</Label>
