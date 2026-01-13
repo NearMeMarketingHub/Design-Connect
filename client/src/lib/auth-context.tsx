@@ -2,14 +2,16 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import type { User } from "@shared/schema";
 import { api } from "./api";
 
+type PortalType = 'client' | 'contractor' | 'admin' | 'notary';
+
 interface AuthContextType {
   user: Omit<User, "password"> | null;
   loading: boolean;
-  currentPortal: 'client' | 'contractor' | 'admin' | null;
-  login: (username: string, password: string, portal: 'client' | 'contractor' | 'admin') => Promise<Omit<User, "password">>;
+  currentPortal: PortalType | null;
+  login: (username: string, password: string, portal: PortalType) => Promise<Omit<User, "password">>;
   register: (username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string) => Promise<{ pendingApproval?: boolean; message?: string }>;
   logout: () => Promise<void>;
-  setPortal: (portal: 'client' | 'contractor' | 'admin') => void;
+  setPortal: (portal: PortalType) => void;
   refetch: () => Promise<void>;
 }
 
@@ -18,10 +20,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Omit<User, "password"> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentPortal, setCurrentPortal] = useState<'client' | 'contractor' | 'admin' | null>(() => {
+  const [currentPortal, setCurrentPortal] = useState<PortalType | null>(() => {
     // Restore portal from session storage
     const stored = sessionStorage.getItem('currentPortal');
-    return stored as 'client' | 'contractor' | 'admin' | null;
+    return stored as PortalType | null;
   });
 
   useEffect(() => {
@@ -48,12 +50,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setPortal = (portal: 'client' | 'contractor' | 'admin') => {
+  const setPortal = (portal: PortalType) => {
     setCurrentPortal(portal);
     sessionStorage.setItem('currentPortal', portal);
   };
 
-  const login = async (username: string, password: string, portal: 'client' | 'contractor' | 'admin') => {
+  const login = async (username: string, password: string, portal: PortalType) => {
     const { user } = await api.login(username, password, portal);
     setUser(user);
     setPortal(portal);

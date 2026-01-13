@@ -1313,6 +1313,48 @@ export default function ProjectDetails() {
     }
   });
 
+  // Approve notarized document mutation (for contractors)
+  const approveNotarizedDocMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const res = await fetch(`/api/documents/${documentId}/approve-notarized`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to approve notarized document');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to approve notarized document');
+    }
+  });
+
+  // Reject notarized document mutation (for contractors)
+  const rejectNotarizedDocMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const res = await fetch(`/api/documents/${documentId}/reject-notarized`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to reject notarized document');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'documents'] });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to reject notarized document');
+    }
+  });
+
   // Create notary profile mutation
   const createNotaryProfileMutation = useMutation({
     mutationFn: async (data: { name: string; email?: string; phone?: string; companyName?: string; address?: string; city?: string; state?: string; zipCode?: string }) => {
@@ -3864,6 +3906,105 @@ export default function ProjectDetails() {
               }
               
               return null;
+            })()}
+            
+            {/* Notarized Documents Awaiting Approval - Contractor View */}
+            {isContractorView && (() => {
+              const docsAwaitingApproval = projectDocuments.filter((doc: any) => 
+                doc.requiresNotarization && doc.notarizationStatus === 'awaiting_approval'
+              );
+              if (docsAwaitingApproval.length === 0) return null;
+              
+              return (
+                <Card className="border-amber-200 bg-amber-50/30">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/10 rounded-lg">
+                          <Shield className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">Notarized Documents Awaiting Approval</CardTitle>
+                          <p className="text-xs text-muted-foreground">Review and approve notarized documents uploaded by clients</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="border-amber-500 text-amber-600">
+                        {docsAwaitingApproval.length} Pending
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      {docsAwaitingApproval.map((doc: any) => (
+                        <div 
+                          key={doc.id}
+                          className="p-4 rounded-lg border bg-white"
+                          data-testid={`awaiting-approval-doc-${doc.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <FileText className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                              <div className="min-w-0 space-y-1">
+                                <p className="font-medium truncate">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Notarized document uploaded for review
+                                </p>
+                              </div>
+                            </div>
+                            <div className="shrink-0 flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(doc.fileUrl, '_blank')}
+                                title="View Original"
+                              >
+                                <FileText className="w-4 h-4 mr-1" />
+                                Original
+                              </Button>
+                              {doc.notarizedFileUrl && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(doc.notarizedFileUrl, '_blank')}
+                                  title="View Notarized Version"
+                                >
+                                  <Shield className="w-4 h-4 mr-1" />
+                                  Notarized
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 border-red-300 hover:bg-red-50"
+                                onClick={() => {
+                                  if (confirm('Are you sure you want to reject this notarized document?')) {
+                                    rejectNotarizedDocMutation.mutate(doc.id);
+                                  }
+                                }}
+                                disabled={rejectNotarizedDocMutation.isPending}
+                                data-testid={`button-reject-notarized-${doc.id}`}
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Reject
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => approveNotarizedDocMutation.mutate(doc.id)}
+                                disabled={approveNotarizedDocMutation.isPending}
+                                data-testid={`button-approve-notarized-${doc.id}`}
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                Approve
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
             })()}
 
             {/* Document Categories - Dynamic */}

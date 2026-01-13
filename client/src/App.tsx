@@ -34,6 +34,7 @@ import FloorCalculator from "@/pages/floor-calculator";
 import SignDocumentPage from "@/pages/sign-document";
 import SignAuthenticatedPage from "@/pages/sign-authenticated";
 import SignatureSetup from "@/pages/signature-setup";
+import NotaryPortal from "@/pages/notary-portal";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -68,6 +69,16 @@ function Router() {
     return (
       <Switch>
         <Route path="/sign/:token" component={SignDocumentPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+  
+  // Notary Portal Routes (has its own header)
+  if (location.startsWith("/notary")) {
+    return (
+      <Switch>
+        <Route path="/notary/portal" component={NotaryPortal} />
         <Route component={NotFound} />
       </Switch>
     );

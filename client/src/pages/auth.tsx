@@ -21,7 +21,7 @@ export default function AuthPage() {
     const tab = params.get("tab");
     return {
       isLogin: mode !== "register",
-      activeTab: tab === "contractor" ? "contractor" : "client"
+      activeTab: tab === "contractor" ? "contractor" : tab === "notary" ? "notary" : "client"
     };
   };
   
@@ -159,6 +159,51 @@ export default function AuthPage() {
     }
   };
 
+  const handleNotaryAuth = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const password = formData.get("notary-password") as string;
+
+    try {
+      if (isLogin) {
+        const loginId = formData.get("notary-email") as string;
+        await login(loginId, password, "notary");
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        setLocation("/notary/portal");
+      } else {
+        const firstName = formData.get("notary-first-name") as string;
+        const lastName = formData.get("notary-last-name") as string;
+        const username = formData.get("notary-username") as string;
+        const email = formData.get("notary-signup-email") as string;
+        const confirmPassword = formData.get("notary-confirm-password") as string;
+
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match");
+        }
+
+        await register(username, email, password, "notary", `${firstName} ${lastName}`);
+        toast({
+          title: "Account created!",
+          description: "Welcome to BuildVision Notary Portal.",
+        });
+        setLocation("/notary/portal");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Authentication failed",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleMode = () => setIsLogin(!isLogin);
 
   return (
@@ -176,9 +221,10 @@ export default function AuthPage() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="client" data-testid="tab-client">Client Portal</TabsTrigger>
-              <TabsTrigger value="contractor" data-testid="tab-contractor">Contractor Login</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 mb-8">
+              <TabsTrigger value="client" data-testid="tab-client">Client</TabsTrigger>
+              <TabsTrigger value="contractor" data-testid="tab-contractor">Contractor</TabsTrigger>
+              <TabsTrigger value="notary" data-testid="tab-notary">Notary</TabsTrigger>
             </TabsList>
             
             <TabsContent value="client">
@@ -504,6 +550,116 @@ export default function AuthPage() {
                     </form>
                   </>
                 )}
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="notary">
+              <Card className="border-border/50 shadow-lg">
+                <CardHeader>
+                  <CardTitle>{isLogin ? "Notary Login" : "Notary Registration"}</CardTitle>
+                  <CardDescription>
+                    {isLogin 
+                      ? "Access the notary portal to manage document notarizations." 
+                      : "Register as a notary to assist with construction document notarization."}
+                  </CardDescription>
+                </CardHeader>
+                <form onSubmit={handleNotaryAuth}>
+                  <CardContent className="space-y-4">
+                    {!isLogin && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="notary-first-name">First Name</Label>
+                            <Input 
+                              id="notary-first-name" 
+                              name="notary-first-name"
+                              placeholder="John" 
+                              required 
+                              data-testid="input-notary-first-name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="notary-last-name">Last Name</Label>
+                            <Input 
+                              id="notary-last-name" 
+                              name="notary-last-name"
+                              placeholder="Smith" 
+                              required 
+                              data-testid="input-notary-last-name"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="notary-username">Username</Label>
+                          <Input 
+                            id="notary-username" 
+                            name="notary-username"
+                            placeholder="johnsmith" 
+                            required 
+                            data-testid="input-notary-username"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="notary-signup-email">Email</Label>
+                          <Input 
+                            id="notary-signup-email" 
+                            name="notary-signup-email"
+                            type="email"
+                            placeholder="john@notary.com"
+                            required 
+                            data-testid="input-notary-signup-email"
+                          />
+                        </div>
+                      </>
+                    )}
+                    {isLogin && (
+                      <div className="space-y-2">
+                        <Label htmlFor="notary-email">Email or Username</Label>
+                        <Input 
+                          id="notary-email" 
+                          name="notary-email"
+                          type="text"
+                          placeholder="email or username"
+                          required 
+                          data-testid="input-notary-email"
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="notary-password">Password</Label>
+                      <Input 
+                        id="notary-password" 
+                        name="notary-password"
+                        type="password"
+                        required 
+                        data-testid="input-notary-password"
+                      />
+                    </div>
+                    {!isLogin && (
+                      <div className="space-y-2">
+                        <Label htmlFor="notary-confirm-password">Confirm Password</Label>
+                        <Input 
+                          id="notary-confirm-password" 
+                          name="notary-confirm-password"
+                          type="password"
+                          required 
+                          data-testid="input-notary-confirm-password"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex-col gap-4">
+                    <Button 
+                      type="submit" 
+                      className="w-full font-medium" 
+                      disabled={loading}
+                      data-testid="button-notary-submit"
+                    >
+                      {loading ? "Please wait..." : isLogin ? "Access Portal" : "Create Account"} 
+                      {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
+                    </Button>
+                  </CardFooter>
+                </form>
               </Card>
             </TabsContent>
           </Tabs>

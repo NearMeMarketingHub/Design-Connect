@@ -33,7 +33,7 @@ class ApiClient {
     });
   }
 
-  async login(username: string, password: string, portal: 'client' | 'contractor' | 'admin') {
+  async login(username: string, password: string, portal: 'client' | 'contractor' | 'admin' | 'notary') {
     return this.fetch<{ user: Omit<User, "password">; portal: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password, portal }),
