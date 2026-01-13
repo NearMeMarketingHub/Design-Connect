@@ -3485,12 +3485,12 @@ export default function ProjectDetails() {
 
             {/* Signing Packets Section - Different views for client vs contractor */}
             {(() => {
-              // For clients: show only packets requiring their signature
+              // For clients: show only packets requiring their signature (pending or viewed but not signed)
               const clientPendingPackets = signingPackets.filter((packet: any) => 
                 packet.status === 'pending' && 
                 packet.participants?.some((p: any) => 
-                  (p.recipientEmail?.toLowerCase() === user?.email?.toLowerCase() || p.userId === user?.id) && 
-                  p.status === 'pending'
+                  (p.email?.toLowerCase() === user?.email?.toLowerCase() || p.userId === user?.id) && 
+                  (p.status === 'pending' || p.status === 'viewed')
                 )
               );
               
