@@ -451,6 +451,26 @@ export const insertMessageReadSchema = createInsertSchema(messageReads).omit({ i
 export type InsertMessageRead = z.infer<typeof insertMessageReadSchema>;
 export type MessageRead = typeof messageReads.$inferSelect;
 
+// Notary Profiles - Contact info for recommended notaries (not user accounts, just autofill data)
+export const notaryProfiles = pgTable("notary_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  companyName: text("company_name"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertNotaryProfileSchema = createInsertSchema(notaryProfiles).omit({ id: true, createdAt: true });
+export type InsertNotaryProfile = z.infer<typeof insertNotaryProfileSchema>;
+export type NotaryProfile = typeof notaryProfiles.$inferSelect;
+
 // Project documents - files uploaded by contractors/admins
 export const projectDocuments = pgTable("project_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -466,6 +486,14 @@ export const projectDocuments = pgTable("project_documents", {
   signatureStatus: text("signature_status"), // null, 'pending_setup', 'pending_signature', 'completed'
   finalDocumentType: text("final_document_type"), // Where to move after signing (contracts, plans, etc.)
   pendingPacketId: varchar("pending_packet_id"), // Link to signing packet while pending
+  requiresNotarization: boolean("requires_notarization").default(false),
+  notarizationStatus: text("notarization_status"), // null, 'pending', 'awaiting_approval', 'completed'
+  notarizationDueDate: text("notarization_due_date"),
+  notaryProfileId: varchar("notary_profile_id").references(() => notaryProfiles.id),
+  notarizedFileUrl: text("notarized_file_url"), // The uploaded notarized version
+  notarizedUploadedById: varchar("notarized_uploaded_by_id"),
+  notarizedUploadedByName: text("notarized_uploaded_by_name"),
+  notarizedUploadedAt: timestamp("notarized_uploaded_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
