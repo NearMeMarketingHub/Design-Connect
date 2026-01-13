@@ -6,13 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -24,8 +17,6 @@ import {
 import { 
   Search, 
   FileText, 
-  ArrowUpDown,
-  Filter,
   Building2,
   ExternalLink,
 } from "lucide-react";
@@ -50,16 +41,12 @@ export default function NotaryPortal() {
   const [, setLocation] = useLocation();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("dueDate");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const { data: documents = [], isLoading: docsLoading } = useQuery<NotaryDocument[]>({
-    queryKey: ['/api/notary/projects', searchQuery, statusFilter],
+    queryKey: ['/api/notary/projects', searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('search', searchQuery);
-      if (statusFilter !== 'all') params.set('status', statusFilter);
       const res = await fetch(`/api/notary/projects?${params.toString()}`, {
         credentials: 'include'
       });
@@ -69,29 +56,6 @@ export default function NotaryPortal() {
       return res.json();
     },
     enabled: !!user,
-  });
-
-  const sortedDocuments = [...documents].sort((a, b) => {
-    let comparison = 0;
-    switch (sortBy) {
-      case 'dueDate':
-        const aDate = a.notarizationDueDate ? new Date(a.notarizationDueDate).getTime() : Infinity;
-        const bDate = b.notarizationDueDate ? new Date(b.notarizationDueDate).getTime() : Infinity;
-        comparison = aDate - bDate;
-        break;
-      case 'projectName':
-        comparison = (a.projectName || '').localeCompare(b.projectName || '');
-        break;
-      case 'documentName':
-        comparison = (a.name || '').localeCompare(b.name || '');
-        break;
-      case 'status':
-        comparison = (a.notarizationStatus || '').localeCompare(b.notarizationStatus || '');
-        break;
-      default:
-        comparison = 0;
-    }
-    return sortOrder === 'asc' ? comparison : -comparison;
   });
 
   const getStatusBadge = (status: string) => {
@@ -183,47 +147,13 @@ export default function NotaryPortal() {
                   data-testid="input-search-documents"
                 />
               </div>
-              <div className="flex gap-2">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="awaiting_approval">Awaiting Approval</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[160px]">
-                    <ArrowUpDown className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dueDate">Due Date</SelectItem>
-                    <SelectItem value="projectName">Project Name</SelectItem>
-                    <SelectItem value="documentName">Document Name</SelectItem>
-                    <SelectItem value="status">Status</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  data-testid="button-toggle-sort"
-                >
-                  <ArrowUpDown className="w-4 h-4" />
-                </Button>
-              </div>
             </div>
 
             {docsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
               </div>
-            ) : sortedDocuments.length === 0 ? (
+            ) : documents.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No documents found matching your criteria</p>
@@ -242,7 +172,7 @@ export default function NotaryPortal() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedDocuments.map((doc) => (
+                    {documents.map((doc) => (
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">{doc.name}</TableCell>
                         <TableCell>
