@@ -713,16 +713,6 @@ export default function FloorPlan3D() {
     return groups;
   }, [currentFloorRooms, currentFloorGroups]);
   
-  useEffect(() => {
-    const multiRoomGroupIds = roomGroups.filter(g => g.rooms.length > 1).map(g => g.id);
-    if (multiRoomGroupIds.length > 0) {
-      setExpandedGroups(prev => {
-        const next = new Set(prev);
-        multiRoomGroupIds.forEach(id => next.add(id));
-        return next;
-      });
-    }
-  }, [roomGroups.length]);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
