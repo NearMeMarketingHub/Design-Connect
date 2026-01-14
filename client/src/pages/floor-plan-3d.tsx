@@ -1470,10 +1470,10 @@ export default function FloorPlan3D() {
     }
 
     const directionToTargetWall: Record<string, "north" | "south" | "east" | "west"> = {
-      north: "south",
-      south: "north",
-      east: "west",
-      west: "east"
+      north: "north",
+      south: "south",
+      east: "east",
+      west: "west"
     };
     const targetWall = directionToTargetWall[roomDirection];
     
@@ -1493,15 +1493,15 @@ export default function FloorPlan3D() {
     
     if (roomDirection === "north") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ - targetRoom.length / 2;
+      newZ = doorWorldZ + targetRoom.length / 2;
     } else if (roomDirection === "south") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ + targetRoom.length / 2;
+      newZ = doorWorldZ - targetRoom.length / 2;
     } else if (roomDirection === "east") {
-      newX = doorWorldX + targetRoom.width / 2;
+      newX = doorWorldX - targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     } else if (roomDirection === "west") {
-      newX = doorWorldX - targetRoom.width / 2;
+      newX = doorWorldX + targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     }
 
