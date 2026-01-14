@@ -491,6 +491,7 @@ function CameraController({ view, rooms, resetTrigger }: { view: CameraView; roo
   const isAnimating = useRef(false);
   const lastView = useRef(view);
   const lastReset = useRef(resetTrigger);
+  const hasInitialized = useRef(false);
   
   const centerX = rooms.length > 0 
     ? rooms.reduce((sum, r) => sum + r.x, 0) / rooms.length 
@@ -501,27 +502,32 @@ function CameraController({ view, rooms, resetTrigger }: { view: CameraView; roo
   
   const defaultPos = { x: 30, y: 30, z: 30 };
   
-  if (lastView.current !== view || lastReset.current !== resetTrigger) {
+  // Only trigger animation on explicit view changes or reset, not on initial render
+  if (hasInitialized.current && (lastView.current !== view || lastReset.current !== resetTrigger)) {
     isAnimating.current = true;
-    lastView.current = view;
-    lastReset.current = resetTrigger;
   }
+  lastView.current = view;
+  lastReset.current = resetTrigger;
+  hasInitialized.current = true;
   
   useFrame(() => {
     if (!isAnimating.current) return;
     
     if (view === "top") {
       const targetY = 60;
+      // Position camera to the south (negative Z) looking north, so south appears at bottom
       camera.position.x += (centerX - camera.position.x) * 0.1;
       camera.position.y += (targetY - camera.position.y) * 0.1;
-      camera.position.z += (centerZ + 0.1 - camera.position.z) * 0.1;
+      camera.position.z += (centerZ - 0.1 - camera.position.z) * 0.1;
       camera.lookAt(centerX, 0, centerZ);
+      camera.up.set(0, 0, -1); // Set up vector so south is down
       if (controlsRef.current) {
         controlsRef.current.target.set(centerX, 0, centerZ);
       }
       const dist = Math.abs(camera.position.y - targetY);
       if (dist < 0.5) isAnimating.current = false;
     } else {
+      camera.up.set(0, 1, 0); // Reset up vector for 3D view
       camera.position.x += (defaultPos.x - camera.position.x) * 0.1;
       camera.position.y += (defaultPos.y - camera.position.y) * 0.1;
       camera.position.z += (defaultPos.z - camera.position.z) * 0.1;
@@ -2463,24 +2469,51 @@ export default function FloorPlan3D() {
                                 
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground">Move:</span>
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => updateDoorPosition(door.id, 0.5)}
-                                    data-testid={`button-door-left-${door.id}`}
-                                  >
-                                    <ArrowLeftIcon className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => updateDoorPosition(door.id, -0.5)}
-                                    data-testid={`button-door-right-${door.id}`}
-                                  >
-                                    <ArrowRightIcon className="h-3 w-3" />
-                                  </Button>
+                                  {(door.wall === "north" || door.wall === "south") ? (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateDoorPosition(door.id, 0.5)}
+                                        data-testid={`button-door-left-${door.id}`}
+                                      >
+                                        <ArrowLeftIcon className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateDoorPosition(door.id, -0.5)}
+                                        data-testid={`button-door-right-${door.id}`}
+                                      >
+                                        <ArrowRightIcon className="h-3 w-3" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateDoorPosition(door.id, -0.5)}
+                                        data-testid={`button-door-up-${door.id}`}
+                                        title="Move North"
+                                      >
+                                        <ArrowUp className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateDoorPosition(door.id, 0.5)}
+                                        data-testid={`button-door-down-${door.id}`}
+                                        title="Move South"
+                                      >
+                                        <ArrowDown className="h-3 w-3" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
 
                                 {door.connectedRoomId ? (
@@ -2906,6 +2939,20 @@ export default function FloorPlan3D() {
                 >
                   <ArrowRightIcon className="h-3 w-3" />
                 </Button>
+                <Separator orientation="vertical" className="h-5" />
+                {selectedRooms.size === 0 && selectedRoom && !selectedRoomData?.isStairs && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => selectedRoom && rotateRoom(selectedRoom)}
+                    disabled={selectedRoomData?.locked}
+                    data-testid="button-rotate-room"
+                    title="Rotate 90°"
+                  >
+                    <RotateCw className="h-3 w-3" />
+                  </Button>
+                )}
                 {selectedRooms.size > 0 && (
                   <Button
                     variant="ghost"
