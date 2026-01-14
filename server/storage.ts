@@ -55,7 +55,8 @@ import type {
   SigningParticipant, InsertSigningParticipant,
   SigningEvent, InsertSigningEvent,
   SigningField, InsertSigningField,
-  NotaryProfile, InsertNotaryProfile
+  NotaryProfile, InsertNotaryProfile,
+  ClientMaterialItem, InsertClientMaterialItem
 } from "@shared/schema";
 
 export interface IStorage {
@@ -272,6 +273,14 @@ export interface IStorage {
   // Signing event methods
   getSigningEvents(packetId: string): Promise<SigningEvent[]>;
   createSigningEvent(event: InsertSigningEvent): Promise<SigningEvent>;
+
+  // Client material item methods
+  getClientMaterialItems(projectId: string): Promise<ClientMaterialItem[]>;
+  getClientMaterialItem(id: string): Promise<ClientMaterialItem | undefined>;
+  createClientMaterialItem(item: InsertClientMaterialItem): Promise<ClientMaterialItem>;
+  updateClientMaterialItem(id: string, data: Partial<InsertClientMaterialItem>): Promise<ClientMaterialItem | undefined>;
+  deleteClientMaterialItem(id: string): Promise<void>;
+  hasClientMaterialItems(projectId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1690,6 +1699,45 @@ export class DatabaseStorage implements IStorage {
   async deleteSigningFieldsByPacketId(packetId: string): Promise<void> {
     await db.delete(schema.signingFields)
       .where(eq(schema.signingFields.packetId, packetId));
+  }
+
+  // Client material item methods
+  async getClientMaterialItems(projectId: string): Promise<ClientMaterialItem[]> {
+    return await db.select().from(schema.clientMaterialItems)
+      .where(eq(schema.clientMaterialItems.projectId, projectId))
+      .orderBy(schema.clientMaterialItems.createdAt);
+  }
+
+  async getClientMaterialItem(id: string): Promise<ClientMaterialItem | undefined> {
+    const [item] = await db.select().from(schema.clientMaterialItems)
+      .where(eq(schema.clientMaterialItems.id, id));
+    return item;
+  }
+
+  async createClientMaterialItem(item: InsertClientMaterialItem): Promise<ClientMaterialItem> {
+    const [created] = await db.insert(schema.clientMaterialItems).values(item).returning();
+    return created;
+  }
+
+  async updateClientMaterialItem(id: string, data: Partial<InsertClientMaterialItem>): Promise<ClientMaterialItem | undefined> {
+    const [updated] = await db.update(schema.clientMaterialItems)
+      .set(data)
+      .where(eq(schema.clientMaterialItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClientMaterialItem(id: string): Promise<void> {
+    await db.delete(schema.clientMaterialItems)
+      .where(eq(schema.clientMaterialItems.id, id));
+  }
+
+  async hasClientMaterialItems(projectId: string): Promise<boolean> {
+    const items = await db.select({ id: schema.clientMaterialItems.id })
+      .from(schema.clientMaterialItems)
+      .where(eq(schema.clientMaterialItems.projectId, projectId))
+      .limit(1);
+    return items.length > 0;
   }
 }
 
