@@ -114,9 +114,11 @@ type CameraView = "perspective" | "top";
 const ROOM_PRESETS = [
   { name: "Living Room", width: 15, length: 12, height: 9, color: "#e8e4e1", isStairs: false },
   { name: "Master Bedroom", width: 14, length: 12, height: 9, color: "#d4e5f7", isStairs: false },
+  { name: "Master Bathroom", width: 10, length: 8, height: 9, color: "#c8e8dc", isStairs: false },
   { name: "Bedroom", width: 12, length: 10, height: 9, color: "#d4e5f7", isStairs: false },
   { name: "Kitchen", width: 12, length: 10, height: 9, color: "#f5e6d3", isStairs: false },
   { name: "Bathroom", width: 8, length: 6, height: 9, color: "#e0f0e8", isStairs: false },
+  { name: "Closet", width: 6, length: 4, height: 9, color: "#e8dcd0", isStairs: false },
   { name: "Dining Room", width: 12, length: 10, height: 9, color: "#f0e8d0", isStairs: false },
   { name: "Office", width: 10, length: 10, height: 9, color: "#e8e8e8", isStairs: false },
   { name: "Hallway", width: 4, length: 15, height: 9, color: "#f5f5f5", isStairs: false },
