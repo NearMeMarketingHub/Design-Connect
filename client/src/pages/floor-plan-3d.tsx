@@ -1516,8 +1516,8 @@ export default function FloorPlan3D() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="rooms" className="flex-1 m-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="rooms" className="flex-1 m-0 overflow-hidden">
+              <ScrollArea className="h-[calc(100vh-128px)]">
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">Room Presets</h3>
@@ -1901,8 +1901,8 @@ export default function FloorPlan3D() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="doors" className="flex-1 m-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="doors" className="flex-1 m-0 overflow-hidden">
+              <ScrollArea className="h-[calc(100vh-128px)]">
                 <div className="p-4 space-y-4">
                   {selectedRoom ? (
                     <>
@@ -2058,8 +2058,8 @@ export default function FloorPlan3D() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="furniture" className="flex-1 m-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-              <ScrollArea className="flex-1">
+            <TabsContent value="furniture" className="flex-1 m-0 overflow-hidden">
+              <ScrollArea className="h-[calc(100vh-128px)]">
                 <div className="p-4 space-y-4">
                   {selectedRoom ? (
                     <>
