@@ -33,6 +33,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Collapsible,
@@ -1400,6 +1402,69 @@ export default function FloorPlan3D() {
     setDoors(doors.filter((d) => d.id !== doorId));
   };
 
+  const quickConnectRooms = (roomId1: string, roomId2: string) => {
+    const room1 = rooms.find(r => r.id === roomId1);
+    const room2 = rooms.find(r => r.id === roomId2);
+    if (!room1 || !room2) return;
+
+    const dx = room2.x - room1.x;
+    const dz = room2.z - room1.z;
+    
+    let wall1: "north" | "south" | "east" | "west";
+    let wall2: "north" | "south" | "east" | "west";
+    let pos1: number;
+    let pos2: number;
+    
+    if (Math.abs(dx) > Math.abs(dz)) {
+      if (dx > 0) {
+        wall1 = "east";
+        wall2 = "west";
+      } else {
+        wall1 = "west";
+        wall2 = "east";
+      }
+      const overlapStart = Math.max(room1.z - room1.length / 2, room2.z - room2.length / 2);
+      const overlapEnd = Math.min(room1.z + room1.length / 2, room2.z + room2.length / 2);
+      const overlapCenter = (overlapStart + overlapEnd) / 2;
+      pos1 = overlapCenter - (room1.z - room1.length / 2);
+      pos2 = overlapCenter - (room2.z - room2.length / 2);
+    } else {
+      if (dz > 0) {
+        wall1 = "south";
+        wall2 = "north";
+      } else {
+        wall1 = "north";
+        wall2 = "south";
+      }
+      const overlapStart = Math.max(room1.x - room1.width / 2, room2.x - room2.width / 2);
+      const overlapEnd = Math.min(room1.x + room1.width / 2, room2.x + room2.width / 2);
+      const overlapCenter = (overlapStart + overlapEnd) / 2;
+      pos1 = overlapCenter - (room1.x - room1.width / 2);
+      pos2 = overlapCenter - (room2.x - room2.width / 2);
+    }
+
+    const door1: Door = {
+      id: crypto.randomUUID(),
+      roomId: roomId1,
+      wall: wall1,
+      position: Math.max(1.5, Math.min(pos1, (wall1 === "north" || wall1 === "south" ? room1.width : room1.length) - 1.5)),
+      width: 3,
+      connectedRoomId: roomId2,
+    };
+
+    const door2: Door = {
+      id: crypto.randomUUID(),
+      roomId: roomId2,
+      wall: wall2,
+      position: Math.max(1.5, Math.min(pos2, (wall2 === "north" || wall2 === "south" ? room2.width : room2.length) - 1.5)),
+      width: 3,
+      connectedRoomId: roomId1,
+    };
+
+    setDoors([...doors, door1, door2]);
+    toast({ title: "Rooms Connected", description: `${room1.name} and ${room2.name} are now connected` });
+  };
+
   const addFurniture = (type: typeof FURNITURE_TYPES[0]) => {
     if (!selectedRoom) {
       toast({ title: "Select a Room", description: "Please select a room first to add furniture", variant: "destructive" });
@@ -2426,6 +2491,39 @@ export default function FloorPlan3D() {
                   >
                     Clear
                   </Button>
+                )}
+                {selectedRoom && selectedRooms.size === 0 && (
+                  <>
+                    <Separator orientation="vertical" className="h-6" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 text-xs" data-testid="button-quick-connect">
+                          <Link2 className="h-3 w-3 mr-1" />
+                          Connect
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel className="text-xs">Connect {selectedRoomData?.name} to:</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {currentFloorRooms.filter(r => r.id !== selectedRoom && !r.isStairs).length === 0 ? (
+                          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                            No other rooms on this floor
+                          </DropdownMenuItem>
+                        ) : (
+                          currentFloorRooms.filter(r => r.id !== selectedRoom && !r.isStairs).map(room => (
+                            <DropdownMenuItem
+                              key={room.id}
+                              onClick={() => quickConnectRooms(selectedRoom, room.id)}
+                              data-testid={`quick-connect-${room.id}`}
+                            >
+                              <DoorOpen className="h-3 w-3 mr-2" />
+                              {room.name}
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
                 )}
               </div>
             )}
