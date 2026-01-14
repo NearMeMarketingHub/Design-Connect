@@ -325,12 +325,25 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
       });
   };
 
+  const fontSize = Math.min(room.width, room.length) * 0.15;
+  
   return (
     <group position={[room.x, 0.05, room.z]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[room.width, room.length]} />
         <meshStandardMaterial color={room.color} />
       </mesh>
+      <Text
+        position={[0, 0.02, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={fontSize}
+        color="#333333"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={room.width * 0.9}
+      >
+        {room.name}
+      </Text>
       <Wall 
         start={[-room.width / 2, -room.length / 2]} 
         end={[room.width / 2, -room.length / 2]} 
@@ -1487,38 +1500,73 @@ export default function FloorPlan3D() {
     const targetWallLength = targetWall === "north" || targetWall === "south" ? targetRoom.width : targetRoom.length;
     const targetDoorPosition = targetWallLength / 2;
 
-    let newX = targetRoom.x;
-    let newZ = targetRoom.z;
+    // Determine which room to move: if target is locked, move source; otherwise move target
+    const moveSource = targetRoom.locked;
     
-    if (door.wall === "north") {
-      const doorX = sourceRoom.x - sourceRoom.width / 2 + door.position;
-      newX = doorX - targetDoorPosition + targetRoom.width / 2;
-      newZ = sourceRoom.z + sourceRoom.length / 2 + targetRoom.length / 2;
-    } else if (door.wall === "south") {
-      const doorX = sourceRoom.x - sourceRoom.width / 2 + door.position;
-      newX = doorX - targetDoorPosition + targetRoom.width / 2;
-      newZ = sourceRoom.z - sourceRoom.length / 2 - targetRoom.length / 2;
-    } else if (door.wall === "east") {
-      const doorZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
-      newX = sourceRoom.x - sourceRoom.width / 2 - targetRoom.width / 2;
-      newZ = doorZ - targetDoorPosition + targetRoom.length / 2;
-    } else if (door.wall === "west") {
-      const doorZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
-      newX = sourceRoom.x + sourceRoom.width / 2 + targetRoom.width / 2;
-      newZ = doorZ - targetDoorPosition + targetRoom.length / 2;
-    }
-
-    const roomToMove = sourceRoom.locked ? targetRoom : (targetRoom.locked ? null : targetRoom);
-    
-    if (roomToMove) {
-      const deltaX = newX - roomToMove.x;
-      const deltaZ = newZ - roomToMove.z;
+    if (moveSource) {
+      // Move source room to align its door with the target room
+      let newSourceX = sourceRoom.x;
+      let newSourceZ = sourceRoom.z;
+      
+      if (door.wall === "north") {
+        // Source door is on north wall, target room is to the north
+        // Align source room so its north door meets target's south wall
+        newSourceX = targetRoom.x + targetDoorPosition - targetRoom.width / 2 - door.position + sourceRoom.width / 2;
+        newSourceZ = targetRoom.z - targetRoom.length / 2 - sourceRoom.length / 2;
+      } else if (door.wall === "south") {
+        // Source door is on south wall, target room is to the south
+        newSourceX = targetRoom.x + targetDoorPosition - targetRoom.width / 2 - door.position + sourceRoom.width / 2;
+        newSourceZ = targetRoom.z + targetRoom.length / 2 + sourceRoom.length / 2;
+      } else if (door.wall === "east") {
+        // Source door is on east wall, target room is to the east
+        newSourceX = targetRoom.x + targetRoom.width / 2 + sourceRoom.width / 2;
+        newSourceZ = targetRoom.z + targetDoorPosition - targetRoom.length / 2 - door.position + sourceRoom.length / 2;
+      } else if (door.wall === "west") {
+        // Source door is on west wall, target room is to the west
+        newSourceX = targetRoom.x - targetRoom.width / 2 - sourceRoom.width / 2;
+        newSourceZ = targetRoom.z + targetDoorPosition - targetRoom.length / 2 - door.position + sourceRoom.length / 2;
+      }
+      
+      const deltaX = newSourceX - sourceRoom.x;
+      const deltaZ = newSourceZ - sourceRoom.z;
       
       setRooms(rooms.map(r => 
-        r.id === roomToMove.id ? { ...r, x: newX, z: newZ } : r
+        r.id === sourceRoom.id ? { ...r, x: newSourceX, z: newSourceZ } : r
       ));
       setFurniture(furniture.map(f => 
-        f.roomId === roomToMove.id ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+        f.roomId === sourceRoom.id ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+      ));
+    } else {
+      // Move target room to align with source's door (original logic)
+      let newTargetX = targetRoom.x;
+      let newTargetZ = targetRoom.z;
+      
+      if (door.wall === "north") {
+        const doorX = sourceRoom.x - sourceRoom.width / 2 + door.position;
+        newTargetX = doorX - targetDoorPosition + targetRoom.width / 2;
+        newTargetZ = sourceRoom.z + sourceRoom.length / 2 + targetRoom.length / 2;
+      } else if (door.wall === "south") {
+        const doorX = sourceRoom.x - sourceRoom.width / 2 + door.position;
+        newTargetX = doorX - targetDoorPosition + targetRoom.width / 2;
+        newTargetZ = sourceRoom.z - sourceRoom.length / 2 - targetRoom.length / 2;
+      } else if (door.wall === "east") {
+        const doorZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
+        newTargetX = sourceRoom.x - sourceRoom.width / 2 - targetRoom.width / 2;
+        newTargetZ = doorZ - targetDoorPosition + targetRoom.length / 2;
+      } else if (door.wall === "west") {
+        const doorZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
+        newTargetX = sourceRoom.x + sourceRoom.width / 2 + targetRoom.width / 2;
+        newTargetZ = doorZ - targetDoorPosition + targetRoom.length / 2;
+      }
+
+      const deltaX = newTargetX - targetRoom.x;
+      const deltaZ = newTargetZ - targetRoom.z;
+      
+      setRooms(rooms.map(r => 
+        r.id === targetRoom.id ? { ...r, x: newTargetX, z: newTargetZ } : r
+      ));
+      setFurniture(furniture.map(f => 
+        f.roomId === targetRoom.id ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
       ));
     }
 
