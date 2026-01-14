@@ -515,19 +515,15 @@ function CameraController({ view, rooms, resetTrigger }: { view: CameraView; roo
     
     if (view === "top") {
       const targetY = 60;
-      // Position camera to the south (negative Z) looking north, so south appears at bottom
-      camera.position.x += (centerX - camera.position.x) * 0.1;
-      camera.position.y += (targetY - camera.position.y) * 0.1;
-      camera.position.z += (centerZ - 0.1 - camera.position.z) * 0.1;
+      // Position camera directly above, slightly to the south so south appears at bottom
+      camera.position.set(centerX, targetY, centerZ - 0.1);
       camera.lookAt(centerX, 0, centerZ);
-      camera.up.set(0, 0, -1); // Set up vector so south is down
       if (controlsRef.current) {
         controlsRef.current.target.set(centerX, 0, centerZ);
+        controlsRef.current.update();
       }
-      const dist = Math.abs(camera.position.y - targetY);
-      if (dist < 0.5) isAnimating.current = false;
+      isAnimating.current = false;
     } else {
-      camera.up.set(0, 1, 0); // Reset up vector for 3D view
       camera.position.x += (defaultPos.x - camera.position.x) * 0.1;
       camera.position.y += (defaultPos.y - camera.position.y) * 0.1;
       camera.position.z += (defaultPos.z - camera.position.z) * 0.1;
@@ -2496,7 +2492,7 @@ export default function FloorPlan3D() {
                                         variant="outline"
                                         size="icon"
                                         className="h-7 w-7"
-                                        onClick={() => updateDoorPosition(door.id, -0.5)}
+                                        onClick={() => updateDoorPosition(door.id, 0.5)}
                                         data-testid={`button-door-up-${door.id}`}
                                         title="Move North"
                                       >
@@ -2506,7 +2502,7 @@ export default function FloorPlan3D() {
                                         variant="outline"
                                         size="icon"
                                         className="h-7 w-7"
-                                        onClick={() => updateDoorPosition(door.id, 0.5)}
+                                        onClick={() => updateDoorPosition(door.id, -0.5)}
                                         data-testid={`button-door-down-${door.id}`}
                                         title="Move South"
                                       >
@@ -2908,6 +2904,7 @@ export default function FloorPlan3D() {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", 1) : selectedRoom && updateRoomPosition(selectedRoom, "x", 1)}
+                  disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-left"
                 >
                   <ArrowLeftIcon className="h-3 w-3" />
@@ -2917,6 +2914,7 @@ export default function FloorPlan3D() {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", 1) : selectedRoom && updateRoomPosition(selectedRoom, "z", 1)}
+                  disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-up"
                 >
                   <ArrowUp className="h-3 w-3" />
@@ -2926,6 +2924,7 @@ export default function FloorPlan3D() {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", -1) : selectedRoom && updateRoomPosition(selectedRoom, "z", -1)}
+                  disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-down"
                 >
                   <ArrowDown className="h-3 w-3" />
@@ -2935,6 +2934,7 @@ export default function FloorPlan3D() {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", -1) : selectedRoom && updateRoomPosition(selectedRoom, "x", -1)}
+                  disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-right"
                 >
                   <ArrowRightIcon className="h-3 w-3" />
