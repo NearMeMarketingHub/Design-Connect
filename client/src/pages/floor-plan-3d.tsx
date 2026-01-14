@@ -2008,6 +2008,45 @@ export default function FloorPlan3D() {
                                     </Select>
                                   </div>
                                 )}
+                                {!group.rooms[0].isStairs && selectedRoom === group.rooms[0].id && (
+                                  (() => {
+                                    const availableDoors = doors.filter(d => 
+                                      d.roomId !== group.rooms[0].id && 
+                                      !d.connectedRoomId &&
+                                      currentFloorRooms.some(r => r.id === d.roomId)
+                                    );
+                                    if (availableDoors.length === 0) return null;
+                                    return (
+                                      <div className="mt-2 pt-2 border-t">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="sm" className="w-full text-xs" data-testid={`button-connect-to-door-${group.rooms[0].id}`}>
+                                              <Link2 className="h-3 w-3 mr-1" />
+                                              Connect to Existing Door
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="start" className="w-56">
+                                            <DropdownMenuLabel className="text-xs">Available doors:</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {availableDoors.map(door => {
+                                              const ownerRoom = rooms.find(r => r.id === door.roomId);
+                                              return (
+                                                <DropdownMenuItem
+                                                  key={door.id}
+                                                  onClick={() => connectDoorToRoom(door.id, group.rooms[0].id)}
+                                                  className="text-xs"
+                                                >
+                                                  <DoorOpen className="h-3 w-3 mr-2" />
+                                                  {ownerRoom?.name} - {door.wall} wall
+                                                </DropdownMenuItem>
+                                              );
+                                            })}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    );
+                                  })()
+                                )}
                               </CardContent>
                             </Card>
                           )
