@@ -68,6 +68,14 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Splitting up the documents tab in the client side to either have multiple tabs, or multiple tabs within the document tabs for Contracts, Plans and Drawings, Permits and Approvals, Invoices and Payments, and Warranties and Manuals
 - [ ] Plans and Drawings section for Client
 
+### Real-Time Chat Support System
+- [ ] Integrate WebSocket-based real-time messaging for instant communication
+- [ ] Add support chat widget accessible from all pages for immediate assistance
+- [ ] Implement typing indicators and online/offline status
+- [ ] Add push notifications for new messages
+- [ ] Create admin support dashboard for managing support conversations
+- [ ] Add chat history and search functionality
+
 ### Branding
 - [ ] Changing the logo and app name when completed
 
