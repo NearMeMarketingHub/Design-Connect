@@ -291,9 +291,12 @@ function FurnitureItem({ furniture, isSelected, onClick }: { furniture: Furnitur
   );
 }
 
-function CameraController({ view, rooms }: { view: CameraView; rooms: Room[] }) {
+function CameraController({ view, rooms, resetTrigger }: { view: CameraView; rooms: Room[]; resetTrigger: number }) {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
+  const isAnimating = useRef(false);
+  const lastView = useRef(view);
+  const lastReset = useRef(resetTrigger);
   
   const centerX = rooms.length > 0 
     ? rooms.reduce((sum, r) => sum + r.x, 0) / rooms.length 
@@ -304,7 +307,15 @@ function CameraController({ view, rooms }: { view: CameraView; rooms: Room[] }) 
   
   const defaultPos = { x: 30, y: 30, z: 30 };
   
+  if (lastView.current !== view || lastReset.current !== resetTrigger) {
+    isAnimating.current = true;
+    lastView.current = view;
+    lastReset.current = resetTrigger;
+  }
+  
   useFrame(() => {
+    if (!isAnimating.current) return;
+    
     if (view === "top") {
       const targetY = 60;
       camera.position.x += (centerX - camera.position.x) * 0.1;
@@ -314,13 +325,21 @@ function CameraController({ view, rooms }: { view: CameraView; rooms: Room[] }) 
       if (controlsRef.current) {
         controlsRef.current.target.set(centerX, 0, centerZ);
       }
+      const dist = Math.abs(camera.position.y - targetY);
+      if (dist < 0.5) isAnimating.current = false;
     } else {
-      camera.position.x += (defaultPos.x - camera.position.x) * 0.05;
-      camera.position.y += (defaultPos.y - camera.position.y) * 0.05;
-      camera.position.z += (defaultPos.z - camera.position.z) * 0.05;
+      camera.position.x += (defaultPos.x - camera.position.x) * 0.1;
+      camera.position.y += (defaultPos.y - camera.position.y) * 0.1;
+      camera.position.z += (defaultPos.z - camera.position.z) * 0.1;
       if (controlsRef.current) {
-        controlsRef.current.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+        controlsRef.current.target.lerp(new THREE.Vector3(0, 0, 0), 0.1);
       }
+      const dist = Math.sqrt(
+        Math.pow(camera.position.x - defaultPos.x, 2) +
+        Math.pow(camera.position.y - defaultPos.y, 2) +
+        Math.pow(camera.position.z - defaultPos.z, 2)
+      );
+      if (dist < 0.5) isAnimating.current = false;
     }
   });
   
@@ -336,13 +355,14 @@ function CameraController({ view, rooms }: { view: CameraView; rooms: Room[] }) 
   );
 }
 
-function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, cameraView }: {
+function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, cameraView, resetTrigger }: {
   rooms: Room[];
   furniture: Furniture[];
   doors: Door[];
   selectedFurniture: string | null;
   onSelectFurniture: (id: string | null) => void;
   cameraView: CameraView;
+  resetTrigger: number;
 }) {
   return (
     <>
@@ -376,7 +396,7 @@ function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, 
         />
       ))}
 
-      <CameraController view={cameraView} rooms={rooms} />
+      <CameraController view={cameraView} rooms={rooms} resetTrigger={resetTrigger} />
       <PerspectiveCamera makeDefault position={[30, 30, 30]} fov={50} />
     </>
   );
@@ -394,6 +414,7 @@ export default function FloorPlan3D() {
   const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
   const [cameraView, setCameraView] = useState<CameraView>("perspective");
+  const [cameraResetTrigger, setCameraResetTrigger] = useState(0);
   const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string }>({
     wall: "south",
     position: 50,
@@ -1227,6 +1248,7 @@ export default function FloorPlan3D() {
                   selectedFurniture={selectedFurniture}
                   onSelectFurniture={setSelectedFurniture}
                   cameraView={cameraView}
+                  resetTrigger={cameraResetTrigger}
                 />
               </Suspense>
             </Canvas>
@@ -1250,6 +1272,15 @@ export default function FloorPlan3D() {
             >
               <Eye className="h-4 w-4 mr-2" />
               Top View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCameraResetTrigger(prev => prev + 1)}
+              data-testid="button-reset-view"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset View
             </Button>
           </div>
 
