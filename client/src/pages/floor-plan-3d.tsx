@@ -1384,6 +1384,12 @@ export default function FloorPlan3D() {
     ));
   };
 
+  const updateRoomDimensions = (roomId: string, field: "width" | "length" | "height" | "name", value: number | string) => {
+    setRooms(rooms.map((r) =>
+      r.id === roomId ? { ...r, [field]: value } : r
+    ));
+  };
+
   const updateDoorPosition = (doorId: string, delta: number) => {
     const door = doors.find(d => d.id === doorId);
     if (!door) return;
@@ -1797,9 +1803,9 @@ export default function FloorPlan3D() {
   const totalSquareFeet = rooms.reduce((sum, room) => sum + room.width * room.length, 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b border-border bg-card">
-        <div className="px-4 py-4 flex items-center justify-between">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      <div className="border-b border-border bg-card flex-shrink-0">
+        <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href={dashboardPath}>
               <Button variant="ghost" size="icon" data-testid="button-back">
@@ -1828,7 +1834,7 @@ export default function FloorPlan3D() {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-80px)]">
+      <div className="flex flex-1 overflow-hidden">
         <aside className="w-80 border-r border-border bg-card overflow-hidden flex flex-col">
           <Tabs defaultValue="rooms" className="flex-1 flex flex-col">
             <TabsList className="w-full justify-start rounded-none border-b h-12 px-2">
@@ -1847,7 +1853,7 @@ export default function FloorPlan3D() {
             </TabsList>
 
             <TabsContent value="rooms" className="flex-1 m-0 overflow-hidden">
-              <ScrollArea className="h-[calc(100vh-128px)]">
+              <ScrollArea className="h-full">
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">Room Presets</h3>
@@ -2134,6 +2140,49 @@ export default function FloorPlan3D() {
                                             </Button>
                                           </div>
                                         </div>
+                                        {selectedRoom === room.id && (
+                                          <div className="mt-2 pt-2 border-t space-y-2">
+                                            <Label className="text-xs font-medium">Edit Dimensions</Label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                              <div>
+                                                <Label className="text-xs text-muted-foreground">Width</Label>
+                                                <Input
+                                                  type="number"
+                                                  min={2}
+                                                  className="h-7 text-xs"
+                                                  value={room.width}
+                                                  onChange={(e) => updateRoomDimensions(room.id, "width", parseFloat(e.target.value) || 1)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  data-testid={`input-room-width-${room.id}`}
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label className="text-xs text-muted-foreground">Length</Label>
+                                                <Input
+                                                  type="number"
+                                                  min={2}
+                                                  className="h-7 text-xs"
+                                                  value={room.length}
+                                                  onChange={(e) => updateRoomDimensions(room.id, "length", parseFloat(e.target.value) || 1)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  data-testid={`input-room-length-${room.id}`}
+                                                />
+                                              </div>
+                                              <div>
+                                                <Label className="text-xs text-muted-foreground">Height</Label>
+                                                <Input
+                                                  type="number"
+                                                  min={7}
+                                                  className="h-7 text-xs"
+                                                  value={room.height}
+                                                  onChange={(e) => updateRoomDimensions(room.id, "height", parseFloat(e.target.value) || 8)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  data-testid={`input-room-height-${room.id}`}
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
                                       </CardContent>
                                     </Card>
                                   ))}
@@ -2301,6 +2350,49 @@ export default function FloorPlan3D() {
                                     );
                                   })()
                                 )}
+                                {selectedRoom === group.rooms[0].id && (
+                                  <div className="mt-2 pt-2 border-t space-y-2">
+                                    <Label className="text-xs font-medium">Edit Dimensions</Label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                      <div>
+                                        <Label className="text-xs text-muted-foreground">Width</Label>
+                                        <Input
+                                          type="number"
+                                          min={2}
+                                          className="h-7 text-xs"
+                                          value={group.rooms[0].width}
+                                          onChange={(e) => updateRoomDimensions(group.rooms[0].id, "width", parseFloat(e.target.value) || 1)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          data-testid={`input-room-width-${group.rooms[0].id}`}
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs text-muted-foreground">Length</Label>
+                                        <Input
+                                          type="number"
+                                          min={2}
+                                          className="h-7 text-xs"
+                                          value={group.rooms[0].length}
+                                          onChange={(e) => updateRoomDimensions(group.rooms[0].id, "length", parseFloat(e.target.value) || 1)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          data-testid={`input-room-length-${group.rooms[0].id}`}
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label className="text-xs text-muted-foreground">Height</Label>
+                                        <Input
+                                          type="number"
+                                          min={7}
+                                          className="h-7 text-xs"
+                                          value={group.rooms[0].height}
+                                          onChange={(e) => updateRoomDimensions(group.rooms[0].id, "height", parseFloat(e.target.value) || 8)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          data-testid={`input-room-height-${group.rooms[0].id}`}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           )
@@ -2313,7 +2405,7 @@ export default function FloorPlan3D() {
             </TabsContent>
 
             <TabsContent value="doors" className="flex-1 m-0 overflow-hidden">
-              <ScrollArea className="h-[calc(100vh-128px)]">
+              <ScrollArea className="h-full">
                 <div className="p-4 space-y-4">
                   {selectedRoom ? (
                     <>
@@ -2566,7 +2658,7 @@ export default function FloorPlan3D() {
             </TabsContent>
 
             <TabsContent value="furniture" className="flex-1 m-0 overflow-hidden">
-              <ScrollArea className="h-[calc(100vh-128px)]">
+              <ScrollArea className="h-full">
                 <div className="p-4 space-y-4">
                   {selectedRoom ? (
                     <>
