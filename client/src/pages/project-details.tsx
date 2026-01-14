@@ -1444,6 +1444,7 @@ export default function ProjectDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'materials'] });
+      setShowAddMaterialDialog(false);
       setEditingMaterial(null);
       setNewMaterialName("");
       setNewMaterialDescription("");
