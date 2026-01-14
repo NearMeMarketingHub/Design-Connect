@@ -129,6 +129,7 @@ export const projectPhases = pgTable("project_phases", {
   dateRange: text("date_range").notNull(),
   tasks: text("tasks").array().notNull(),
   orderIndex: integer("order_index").notNull().default(0),
+  dueDate: text("due_date"),
 });
 
 export const insertProjectPhaseSchema = createInsertSchema(projectPhases).omit({ id: true });
@@ -161,6 +162,7 @@ export const milestoneTasks = pgTable("milestone_tasks", {
   orderIndex: integer("order_index").notNull().default(0),
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  dueDate: text("due_date"),
 });
 
 export const insertMilestoneTaskSchema = createInsertSchema(milestoneTasks).omit({ id: true, createdAt: true });
