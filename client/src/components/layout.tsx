@@ -12,7 +12,8 @@ import {
   Calculator,
   Grid3X3,
   Menu,
-  X
+  X,
+  Box
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -56,6 +57,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
     { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
     { label: "Floor Calc", icon: <Grid3X3 className="w-5 h-5" />, href: "/contractor/floor-calculator" },
+    { label: "3D Floor Plan", icon: <Box className="w-5 h-5" />, href: "/contractor/floor-plan-3d" },
   ];
 
   const isActiveRoute = (href: string) => {

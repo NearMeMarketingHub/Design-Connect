@@ -1,0 +1,800 @@
+import { useState, useRef, Suspense, useCallback } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, PerspectiveCamera, Grid, Text, Html } from "@react-three/drei";
+import * as THREE from "three";
+import { Link } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Move,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  Home,
+  Sofa,
+  BedDouble,
+  Bath,
+  CookingPot,
+  Tv,
+  Armchair,
+  Table,
+  Square,
+  Box,
+  Grid3X3,
+  Download,
+  Save,
+  Eye,
+  Layers,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
+
+interface Room {
+  id: string;
+  name: string;
+  width: number;
+  length: number;
+  height: number;
+  x: number;
+  z: number;
+  color: string;
+}
+
+interface Furniture {
+  id: string;
+  type: string;
+  name: string;
+  width: number;
+  depth: number;
+  height: number;
+  x: number;
+  z: number;
+  rotation: number;
+  color: string;
+  roomId: string;
+}
+
+const ROOM_PRESETS = [
+  { name: "Living Room", width: 15, length: 12, height: 9, color: "#e8e4e1" },
+  { name: "Master Bedroom", width: 14, length: 12, height: 9, color: "#d4e5f7" },
+  { name: "Bedroom", width: 12, length: 10, height: 9, color: "#d4e5f7" },
+  { name: "Kitchen", width: 12, length: 10, height: 9, color: "#f5e6d3" },
+  { name: "Bathroom", width: 8, length: 6, height: 9, color: "#e0f0e8" },
+  { name: "Dining Room", width: 12, length: 10, height: 9, color: "#f0e8d0" },
+  { name: "Office", width: 10, length: 10, height: 9, color: "#e8e8e8" },
+  { name: "Hallway", width: 4, length: 15, height: 9, color: "#f5f5f5" },
+  { name: "Laundry Room", width: 8, length: 6, height: 9, color: "#f0f0f0" },
+  { name: "Garage", width: 20, length: 20, height: 10, color: "#d0d0d0" },
+];
+
+const FURNITURE_TYPES = [
+  { type: "sofa", name: "Sofa", width: 7, depth: 3, height: 3, icon: Sofa, color: "#8B4513" },
+  { type: "armchair", name: "Armchair", width: 3, depth: 3, height: 3, icon: Armchair, color: "#A0522D" },
+  { type: "bed_king", name: "King Bed", width: 6.5, depth: 6.5, height: 2, icon: BedDouble, color: "#DEB887" },
+  { type: "bed_queen", name: "Queen Bed", width: 5, depth: 6.5, height: 2, icon: BedDouble, color: "#DEB887" },
+  { type: "dining_table", name: "Dining Table", width: 6, depth: 3, height: 2.5, icon: Table, color: "#8B4513" },
+  { type: "desk", name: "Desk", width: 5, depth: 2.5, height: 2.5, icon: Table, color: "#654321" },
+  { type: "tv_stand", name: "TV Stand", width: 5, depth: 1.5, height: 2, icon: Tv, color: "#333333" },
+  { type: "bathtub", name: "Bathtub", width: 5, depth: 2.5, height: 2, icon: Bath, color: "#FFFFFF" },
+  { type: "toilet", name: "Toilet", width: 1.5, depth: 2.5, height: 2.5, icon: Bath, color: "#FFFFFF" },
+  { type: "sink", name: "Sink", width: 2, depth: 1.5, height: 3, icon: Bath, color: "#FFFFFF" },
+  { type: "stove", name: "Stove/Oven", width: 2.5, depth: 2.5, height: 3, icon: CookingPot, color: "#404040" },
+  { type: "refrigerator", name: "Refrigerator", width: 3, depth: 2.5, height: 6, icon: Box, color: "#C0C0C0" },
+  { type: "cabinet", name: "Cabinet", width: 3, depth: 2, height: 6, icon: Square, color: "#8B4513" },
+];
+
+function Wall({ start, end, height, thickness = 0.5 }: { start: [number, number]; end: [number, number]; height: number; thickness?: number }) {
+  const length = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
+  const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
+  const midX = (start[0] + end[0]) / 2;
+  const midZ = (start[1] + end[1]) / 2;
+
+  return (
+    <mesh position={[midX, height / 2, midZ]} rotation={[0, -angle, 0]}>
+      <boxGeometry args={[length, height, thickness]} />
+      <meshStandardMaterial color="#f5f5f5" />
+    </mesh>
+  );
+}
+
+function RoomFloor({ room }: { room: Room }) {
+  return (
+    <group position={[room.x, 0.05, room.z]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[room.width, room.length]} />
+        <meshStandardMaterial color={room.color} />
+      </mesh>
+      <Wall start={[-room.width / 2, -room.length / 2]} end={[room.width / 2, -room.length / 2]} height={room.height} />
+      <Wall start={[room.width / 2, -room.length / 2]} end={[room.width / 2, room.length / 2]} height={room.height} />
+      <Wall start={[room.width / 2, room.length / 2]} end={[-room.width / 2, room.length / 2]} height={room.height} />
+      <Wall start={[-room.width / 2, room.length / 2]} end={[-room.width / 2, -room.length / 2]} height={room.height} />
+    </group>
+  );
+}
+
+function FurnitureItem({ furniture, isSelected, onClick }: { furniture: Furniture; isSelected: boolean; onClick: () => void }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  return (
+    <mesh
+      ref={meshRef}
+      position={[furniture.x, furniture.height / 2, furniture.z]}
+      rotation={[0, (furniture.rotation * Math.PI) / 180, 0]}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+    >
+      <boxGeometry args={[furniture.width, furniture.height, furniture.depth]} />
+      <meshStandardMaterial 
+        color={furniture.color} 
+        emissive={isSelected ? "#4444ff" : "#000000"}
+        emissiveIntensity={isSelected ? 0.3 : 0}
+      />
+      {isSelected && (
+        <Html center position={[0, furniture.height / 2 + 0.5, 0]}>
+          <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs whitespace-nowrap">
+            {furniture.name}
+          </div>
+        </Html>
+      )}
+    </mesh>
+  );
+}
+
+function Scene({ rooms, furniture, selectedFurniture, onSelectFurniture }: {
+  rooms: Room[];
+  furniture: Furniture[];
+  selectedFurniture: string | null;
+  onSelectFurniture: (id: string | null) => void;
+}) {
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 20, 10]} intensity={0.8} castShadow />
+      <directionalLight position={[-10, 20, -10]} intensity={0.4} />
+      
+      <Grid
+        args={[100, 100]}
+        cellSize={1}
+        cellThickness={0.5}
+        cellColor="#6e6e6e"
+        sectionSize={5}
+        sectionThickness={1}
+        sectionColor="#9d4b4b"
+        fadeDistance={50}
+        fadeStrength={1}
+        position={[0, 0, 0]}
+      />
+
+      {rooms.map((room) => (
+        <RoomFloor key={room.id} room={room} />
+      ))}
+
+      {furniture.map((item) => (
+        <FurnitureItem
+          key={item.id}
+          furniture={item}
+          isSelected={selectedFurniture === item.id}
+          onClick={() => onSelectFurniture(item.id)}
+        />
+      ))}
+
+      <OrbitControls 
+        makeDefault 
+        minDistance={5} 
+        maxDistance={100}
+        maxPolarAngle={Math.PI / 2 - 0.1}
+      />
+      <PerspectiveCamera makeDefault position={[30, 30, 30]} fov={50} />
+    </>
+  );
+}
+
+export default function FloorPlan3D() {
+  const { currentPortal } = useAuth();
+  const { toast } = useToast();
+  
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [furniture, setFurniture] = useState<Furniture[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
+  const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
+  
+  const [newRoom, setNewRoom] = useState({
+    name: "",
+    width: 12,
+    length: 10,
+    height: 9,
+    color: "#e8e4e1",
+  });
+
+  const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
+
+  const addRoom = () => {
+    if (!newRoom.name.trim()) {
+      toast({ title: "Error", description: "Please enter a room name", variant: "destructive" });
+      return;
+    }
+
+    const lastRoom = rooms[rooms.length - 1];
+    const newX = lastRoom ? lastRoom.x + lastRoom.width / 2 + newRoom.width / 2 + 2 : 0;
+
+    const room: Room = {
+      id: crypto.randomUUID(),
+      name: newRoom.name,
+      width: newRoom.width,
+      length: newRoom.length,
+      height: newRoom.height,
+      x: newX,
+      z: 0,
+      color: newRoom.color,
+    };
+
+    setRooms([...rooms, room]);
+    setShowAddRoomDialog(false);
+    setNewRoom({ name: "", width: 12, length: 10, height: 9, color: "#e8e4e1" });
+    toast({ title: "Room Added", description: `${room.name} has been added to the floor plan` });
+  };
+
+  const addPresetRoom = (preset: typeof ROOM_PRESETS[0]) => {
+    const lastRoom = rooms[rooms.length - 1];
+    const newX = lastRoom ? lastRoom.x + lastRoom.width / 2 + preset.width / 2 + 2 : 0;
+
+    const room: Room = {
+      id: crypto.randomUUID(),
+      name: preset.name,
+      width: preset.width,
+      length: preset.length,
+      height: preset.height,
+      x: newX,
+      z: 0,
+      color: preset.color,
+    };
+
+    setRooms([...rooms, room]);
+    toast({ title: "Room Added", description: `${preset.name} has been added to the floor plan` });
+  };
+
+  const removeRoom = (roomId: string) => {
+    setRooms(rooms.filter((r) => r.id !== roomId));
+    setFurniture(furniture.filter((f) => f.roomId !== roomId));
+    if (selectedRoom === roomId) setSelectedRoom(null);
+  };
+
+  const addFurniture = (type: typeof FURNITURE_TYPES[0]) => {
+    if (!selectedRoom) {
+      toast({ title: "Select a Room", description: "Please select a room first to add furniture", variant: "destructive" });
+      return;
+    }
+
+    const room = rooms.find((r) => r.id === selectedRoom);
+    if (!room) return;
+
+    const item: Furniture = {
+      id: crypto.randomUUID(),
+      type: type.type,
+      name: type.name,
+      width: type.width,
+      depth: type.depth,
+      height: type.height,
+      x: room.x,
+      z: room.z,
+      rotation: 0,
+      color: type.color,
+      roomId: selectedRoom,
+    };
+
+    setFurniture([...furniture, item]);
+    setSelectedFurniture(item.id);
+    toast({ title: "Furniture Added", description: `${type.name} has been added` });
+  };
+
+  const removeFurniture = (id: string) => {
+    setFurniture(furniture.filter((f) => f.id !== id));
+    if (selectedFurniture === id) setSelectedFurniture(null);
+  };
+
+  const updateFurniturePosition = (id: string, axis: "x" | "z", delta: number) => {
+    setFurniture(furniture.map((f) => 
+      f.id === id ? { ...f, [axis]: f[axis] + delta } : f
+    ));
+  };
+
+  const rotateFurniture = (id: string) => {
+    setFurniture(furniture.map((f) =>
+      f.id === id ? { ...f, rotation: (f.rotation + 90) % 360 } : f
+    ));
+  };
+
+  const resetScene = () => {
+    setRooms([]);
+    setFurniture([]);
+    setSelectedRoom(null);
+    setSelectedFurniture(null);
+    toast({ title: "Scene Reset", description: "All rooms and furniture have been cleared" });
+  };
+
+  const selectedFurnitureItem = furniture.find((f) => f.id === selectedFurniture);
+  const selectedRoomData = rooms.find((r) => r.id === selectedRoom);
+
+  const totalSquareFeet = rooms.reduce((sum, room) => sum + room.width * room.length, 0);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-card">
+        <div className="px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href={dashboardPath}>
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Box className="h-6 w-6" />
+                3D Floor Plan Builder
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Create and visualize room layouts in 3D
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-sm">
+              {rooms.length} Rooms | {totalSquareFeet.toLocaleString()} sq ft
+            </Badge>
+            <Button variant="outline" size="sm" onClick={resetScene} data-testid="button-reset">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex h-[calc(100vh-80px)]">
+        <aside className="w-80 border-r border-border bg-card overflow-hidden flex flex-col">
+          <Tabs defaultValue="rooms" className="flex-1 flex flex-col">
+            <TabsList className="w-full justify-start rounded-none border-b h-12 px-2">
+              <TabsTrigger value="rooms" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Rooms
+              </TabsTrigger>
+              <TabsTrigger value="furniture" className="flex items-center gap-2">
+                <Sofa className="h-4 w-4" />
+                Furniture
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="rooms" className="flex-1 m-0 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Room Presets</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ROOM_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.name}
+                        variant="outline"
+                        size="sm"
+                        className="h-auto py-2 px-3 justify-start"
+                        onClick={() => addPresetRoom(preset)}
+                        data-testid={`button-preset-${preset.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <div className="text-left">
+                          <div className="text-xs font-medium">{preset.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {preset.width}' x {preset.length}'
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Dialog open={showAddRoomDialog} onOpenChange={setShowAddRoomDialog}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full" data-testid="button-add-custom-room">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Custom Room
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add Custom Room</DialogTitle>
+                        <DialogDescription>
+                          Enter the dimensions for your custom room
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="room-name">Room Name</Label>
+                          <Input
+                            id="room-name"
+                            value={newRoom.name}
+                            onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
+                            placeholder="e.g., Master Suite"
+                            data-testid="input-room-name"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="room-width">Width (ft)</Label>
+                            <Input
+                              id="room-width"
+                              type="number"
+                              value={newRoom.width}
+                              onChange={(e) => setNewRoom({ ...newRoom, width: parseFloat(e.target.value) || 0 })}
+                              data-testid="input-room-width"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="room-length">Length (ft)</Label>
+                            <Input
+                              id="room-length"
+                              type="number"
+                              value={newRoom.length}
+                              onChange={(e) => setNewRoom({ ...newRoom, length: parseFloat(e.target.value) || 0 })}
+                              data-testid="input-room-length"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="room-height">Height (ft)</Label>
+                            <Input
+                              id="room-height"
+                              type="number"
+                              value={newRoom.height}
+                              onChange={(e) => setNewRoom({ ...newRoom, height: parseFloat(e.target.value) || 0 })}
+                              data-testid="input-room-height"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="room-color">Floor Color</Label>
+                          <div className="flex gap-2 mt-2">
+                            {["#e8e4e1", "#d4e5f7", "#f5e6d3", "#e0f0e8", "#f0e8d0", "#e8e8e8"].map((color) => (
+                              <button
+                                key={color}
+                                className={`w-8 h-8 rounded border-2 ${newRoom.color === color ? "border-primary" : "border-transparent"}`}
+                                style={{ backgroundColor: color }}
+                                onClick={() => setNewRoom({ ...newRoom, color })}
+                                data-testid={`button-color-${color.replace('#', '')}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowAddRoomDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={addRoom} data-testid="button-confirm-add-room">
+                          Add Room
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="font-semibold mb-3">Your Rooms</h3>
+                    {rooms.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No rooms added yet. Use presets above or add a custom room.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {rooms.map((room) => (
+                          <Card
+                            key={room.id}
+                            className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""}`}
+                            onClick={() => setSelectedRoom(room.id)}
+                            data-testid={`card-room-${room.id}`}
+                          >
+                            <CardContent className="p-3 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-4 h-4 rounded"
+                                  style={{ backgroundColor: room.color }}
+                                />
+                                <div>
+                                  <div className="font-medium text-sm">{room.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {room.width}' x {room.length}' x {room.height}'
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
+                                data-testid={`button-remove-room-${room.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="furniture" className="flex-1 m-0 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-4 space-y-4">
+                  {selectedRoom ? (
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Home className="h-4 w-4" />
+                        Adding to: <span className="font-medium text-foreground">{selectedRoomData?.name}</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Living Room</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FURNITURE_TYPES.filter((f) => ["sofa", "armchair", "tv_stand"].includes(f.type)).map((type) => (
+                            <Button
+                              key={type.type}
+                              variant="outline"
+                              size="sm"
+                              className="h-auto py-2 px-3 justify-start"
+                              onClick={() => addFurniture(type)}
+                              data-testid={`button-add-${type.type}`}
+                            >
+                              <type.icon className="h-4 w-4 mr-2" />
+                              <span className="text-xs">{type.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+
+                        <h4 className="text-sm font-medium">Bedroom</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FURNITURE_TYPES.filter((f) => ["bed_king", "bed_queen", "cabinet"].includes(f.type)).map((type) => (
+                            <Button
+                              key={type.type}
+                              variant="outline"
+                              size="sm"
+                              className="h-auto py-2 px-3 justify-start"
+                              onClick={() => addFurniture(type)}
+                              data-testid={`button-add-${type.type}`}
+                            >
+                              <type.icon className="h-4 w-4 mr-2" />
+                              <span className="text-xs">{type.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+
+                        <h4 className="text-sm font-medium">Kitchen</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FURNITURE_TYPES.filter((f) => ["stove", "refrigerator"].includes(f.type)).map((type) => (
+                            <Button
+                              key={type.type}
+                              variant="outline"
+                              size="sm"
+                              className="h-auto py-2 px-3 justify-start"
+                              onClick={() => addFurniture(type)}
+                              data-testid={`button-add-${type.type}`}
+                            >
+                              <type.icon className="h-4 w-4 mr-2" />
+                              <span className="text-xs">{type.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+
+                        <h4 className="text-sm font-medium">Bathroom</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FURNITURE_TYPES.filter((f) => ["bathtub", "toilet", "sink"].includes(f.type)).map((type) => (
+                            <Button
+                              key={type.type}
+                              variant="outline"
+                              size="sm"
+                              className="h-auto py-2 px-3 justify-start"
+                              onClick={() => addFurniture(type)}
+                              data-testid={`button-add-${type.type}`}
+                            >
+                              <type.icon className="h-4 w-4 mr-2" />
+                              <span className="text-xs">{type.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+
+                        <h4 className="text-sm font-medium">Office/Dining</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FURNITURE_TYPES.filter((f) => ["dining_table", "desk"].includes(f.type)).map((type) => (
+                            <Button
+                              key={type.type}
+                              variant="outline"
+                              size="sm"
+                              className="h-auto py-2 px-3 justify-start"
+                              onClick={() => addFurniture(type)}
+                              data-testid={`button-add-${type.type}`}
+                            >
+                              <type.icon className="h-4 w-4 mr-2" />
+                              <span className="text-xs">{type.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {selectedFurnitureItem && (
+                        <Card>
+                          <CardHeader className="py-3 px-4">
+                            <CardTitle className="text-sm">Selected: {selectedFurnitureItem.name}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="py-2 px-4 space-y-3">
+                            <div className="text-xs text-muted-foreground">
+                              {selectedFurnitureItem.width}' x {selectedFurnitureItem.depth}' x {selectedFurnitureItem.height}'
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateFurniturePosition(selectedFurnitureItem.id, "x", -1)}
+                                data-testid="button-move-left"
+                              >
+                                ←
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateFurniturePosition(selectedFurnitureItem.id, "z", -1)}
+                                data-testid="button-move-up"
+                              >
+                                ↑
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateFurniturePosition(selectedFurnitureItem.id, "z", 1)}
+                                data-testid="button-move-down"
+                              >
+                                ↓
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateFurniturePosition(selectedFurnitureItem.id, "x", 1)}
+                                data-testid="button-move-right"
+                              >
+                                →
+                              </Button>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                onClick={() => rotateFurniture(selectedFurnitureItem.id)}
+                                data-testid="button-rotate"
+                              >
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Rotate
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="flex-1"
+                                onClick={() => removeFurniture(selectedFurnitureItem.id)}
+                                data-testid="button-remove-furniture"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remove
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Furniture in Room</h4>
+                        {furniture.filter((f) => f.roomId === selectedRoom).length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No furniture added yet</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {furniture.filter((f) => f.roomId === selectedRoom).map((item) => (
+                              <div
+                                key={item.id}
+                                className={`flex items-center justify-between p-2 rounded border cursor-pointer ${selectedFurniture === item.id ? "border-primary bg-primary/5" : ""}`}
+                                onClick={() => setSelectedFurniture(item.id)}
+                                data-testid={`furniture-item-${item.id}`}
+                              >
+                                <span className="text-sm">{item.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => { e.stopPropagation(); removeFurniture(item.id); }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">
+                        Select a room from the Rooms tab to add furniture
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        </aside>
+
+        <main className="flex-1 relative">
+          <div className="absolute inset-0">
+            <Canvas shadows onClick={() => setSelectedFurniture(null)}>
+              <Suspense fallback={null}>
+                <Scene
+                  rooms={rooms}
+                  furniture={furniture}
+                  selectedFurniture={selectedFurniture}
+                  onSelectFurniture={setSelectedFurniture}
+                />
+              </Suspense>
+            </Canvas>
+          </div>
+
+          <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm border rounded-lg p-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4">
+              <span><strong>Rotate:</strong> Left-click drag</span>
+              <span><strong>Pan:</strong> Right-click drag</span>
+              <span><strong>Zoom:</strong> Scroll wheel</span>
+            </div>
+          </div>
+
+          {rooms.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <Card className="max-w-md pointer-events-auto">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Grid3X3 className="h-5 w-5" />
+                    Get Started
+                  </CardTitle>
+                  <CardDescription>
+                    Add rooms using the presets on the left sidebar, then furnish them to create your floor plan.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}

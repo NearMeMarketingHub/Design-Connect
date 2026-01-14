@@ -31,6 +31,7 @@ import ContractorProfile from "@/pages/contractor-profile";
 import MyProfile from "@/pages/my-profile";
 import ContractorCalculator from "@/pages/contractor-calculator";
 import FloorCalculator from "@/pages/floor-calculator";
+import FloorPlan3D from "@/pages/floor-plan-3d";
 import SignDocumentPage from "@/pages/sign-document";
 import SignAuthenticatedPage from "@/pages/sign-authenticated";
 import SignatureSetup from "@/pages/signature-setup";
@@ -161,6 +162,7 @@ function Router() {
           <Route path="/contractor/project/:id" component={ProjectDetails} />
           <Route path="/contractor/calculator" component={ContractorCalculator} />
           <Route path="/contractor/floor-calculator" component={FloorCalculator} />
+          <Route path="/contractor/floor-plan-3d" component={FloorPlan3D} />
           <Route path="/contractor/profile" component={MyProfile} />
           <Route path="/contractor/settings" component={SettingsPage} />
           <Route component={NotFound} />
