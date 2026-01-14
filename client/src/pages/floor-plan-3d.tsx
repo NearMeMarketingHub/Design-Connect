@@ -438,7 +438,57 @@ function CameraController({ view, rooms, resetTrigger }: { view: CameraView; roo
   );
 }
 
-function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, cameraView, resetTrigger }: {
+interface SceneRef {
+  captureFromAngles: (centerX: number, centerZ: number) => Promise<string[]>;
+}
+
+const SceneCapture = React.forwardRef<SceneRef, { centerX: number; centerZ: number }>(
+  function SceneCapture({ centerX, centerZ }, ref) {
+    const { camera, gl, scene } = useThree();
+    
+    React.useImperativeHandle(ref, () => ({
+      captureFromAngles: async (cx: number, cz: number) => {
+        const captures: string[] = [];
+        const distance = 45;
+        const height = 30;
+        
+        const corners = [
+          { name: "NE Corner", x: cx + distance, z: cz + distance },
+          { name: "NW Corner", x: cx - distance, z: cz + distance },
+          { name: "SE Corner", x: cx + distance, z: cz - distance },
+          { name: "SW Corner", x: cx - distance, z: cz - distance },
+        ];
+        
+        const originalPos = camera.position.clone();
+        const originalTarget = new THREE.Vector3(0, 0, 0);
+        
+        for (const corner of corners) {
+          camera.position.set(corner.x, height, corner.z);
+          camera.lookAt(cx, 0, cz);
+          camera.updateProjectionMatrix();
+          
+          gl.render(scene, camera);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          gl.render(scene, camera);
+          
+          const dataUrl = gl.domElement.toDataURL("image/png");
+          captures.push(dataUrl);
+        }
+        
+        camera.position.copy(originalPos);
+        camera.lookAt(originalTarget);
+        camera.updateProjectionMatrix();
+        gl.render(scene, camera);
+        
+        return captures;
+      }
+    }));
+    
+    return null;
+  }
+);
+
+function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, cameraView, resetTrigger, sceneRef }: {
   rooms: Room[];
   furniture: Furniture[];
   doors: Door[];
@@ -446,7 +496,11 @@ function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, 
   onSelectFurniture: (id: string | null) => void;
   cameraView: CameraView;
   resetTrigger: number;
+  sceneRef?: React.RefObject<SceneRef | null>;
 }) {
+  const centerX = rooms.length > 0 ? rooms.reduce((sum, r) => sum + r.x, 0) / rooms.length : 0;
+  const centerZ = rooms.length > 0 ? rooms.reduce((sum, r) => sum + r.z, 0) / rooms.length : 0;
+  
   return (
     <>
       <ambientLight intensity={0.6} />
@@ -485,6 +539,7 @@ function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, 
 
       <CameraController view={cameraView} rooms={rooms} resetTrigger={resetTrigger} />
       <PerspectiveCamera makeDefault position={[30, 30, 30]} fov={50} />
+      {sceneRef && <SceneCapture ref={sceneRef} centerX={centerX} centerZ={centerZ} />}
     </>
   );
 }
@@ -522,6 +577,7 @@ export default function FloorPlan3D() {
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneRef = useRef<SceneRef | null>(null);
 
   const currentFloorRooms = rooms.filter(r => r.floor === currentFloor);
 
@@ -715,35 +771,50 @@ export default function FloorPlan3D() {
   }, [rooms, doors, currentFloor, toast]);
 
   const exportAllViews = useCallback(async () => {
-    const threeCanvas = document.querySelector("canvas") as HTMLCanvasElement;
-    if (!threeCanvas) {
-      toast({ title: "Error", description: "Could not find canvas", variant: "destructive" });
-      return;
-    }
-    
     const floorRooms = rooms.filter(r => r.floor === currentFloor);
     if (floorRooms.length === 0) {
       toast({ title: "No Rooms", description: "Add some rooms before exporting", variant: "destructive" });
       return;
     }
 
-    const scale = 15;
-    const padding = 60;
+    toast({ title: "Capturing...", description: "Generating views from all 4 corners..." });
+
+    const centerX = floorRooms.reduce((sum, r) => sum + r.x, 0) / floorRooms.length;
+    const centerZ = floorRooms.reduce((sum, r) => sum + r.z, 0) / floorRooms.length;
+    
+    let cornerCaptures: string[] = [];
+    if (sceneRef.current) {
+      try {
+        cornerCaptures = await sceneRef.current.captureFromAngles(centerX, centerZ);
+      } catch (e) {
+        console.error("Failed to capture corners:", e);
+      }
+    }
+    
+    if (cornerCaptures.length === 0) {
+      const threeCanvas = document.querySelector("canvas") as HTMLCanvasElement;
+      if (threeCanvas) {
+        cornerCaptures = [threeCanvas.toDataURL("image/png")];
+      }
+    }
+
+    const scale = 12;
+    const padding = 40;
     
     const minX = Math.min(...floorRooms.map(r => r.x - r.width / 2));
     const maxX = Math.max(...floorRooms.map(r => r.x + r.width / 2));
     const minZ = Math.min(...floorRooms.map(r => r.z - r.length / 2));
     const maxZ = Math.max(...floorRooms.map(r => r.z + r.length / 2));
     
-    const topDownWidth = (maxX - minX) * scale + padding * 2;
-    const topDownHeight = (maxZ - minZ) * scale + padding * 2;
+    const topDownWidth = Math.max(300, (maxX - minX) * scale + padding * 2);
+    const topDownHeight = Math.max(200, (maxZ - minZ) * scale + padding * 2);
     
+    const viewWidth = 400;
+    const viewHeight = 300;
+    const cornerGridWidth = viewWidth * 2 + 60;
     const combinedCanvas = document.createElement("canvas");
-    const threeWidth = threeCanvas.width;
-    const threeHeight = threeCanvas.height;
-    
-    combinedCanvas.width = Math.max(threeWidth, topDownWidth + 40) + 40;
-    combinedCanvas.height = threeHeight + Math.max(400, topDownHeight + 100) + 120;
+    combinedCanvas.width = Math.max(cornerGridWidth, topDownWidth + 40);
+    combinedCanvas.height = 80 + viewHeight * 2 + 40 + topDownHeight + 100;
     const ctx = combinedCanvas.getContext("2d");
     if (!ctx) return;
     
@@ -751,33 +822,55 @@ export default function FloorPlan3D() {
     ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
     
     ctx.fillStyle = "#1e293b";
-    ctx.font = "bold 28px Arial";
+    ctx.font = "bold 24px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(`Floor Plan Export - Floor ${currentFloor}`, combinedCanvas.width / 2, 40);
+    ctx.fillText(`Floor Plan Export - Floor ${currentFloor}`, combinedCanvas.width / 2, 35);
     
-    ctx.font = "14px Arial";
+    ctx.font = "12px Arial";
     ctx.fillStyle = "#64748b";
-    ctx.fillText(`Generated: ${new Date().toLocaleString()}`, combinedCanvas.width / 2, 60);
+    ctx.fillText(`Generated: ${new Date().toLocaleString()}`, combinedCanvas.width / 2, 55);
     
+    const cornerNames = ["NE Corner View", "NW Corner View", "SE Corner View", "SW Corner View"];
+    const positions = [
+      { x: 20, y: 75 },
+      { x: viewWidth + 40, y: 75 },
+      { x: 20, y: viewHeight + 95 },
+      { x: viewWidth + 40, y: viewHeight + 95 },
+    ];
+    
+    for (let i = 0; i < Math.min(cornerCaptures.length, 4); i++) {
+      const img = new window.Image();
+      img.src = cornerCaptures[i];
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+      
+      ctx.fillStyle = "#334155";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "left";
+      ctx.fillText(cornerNames[i], positions[i].x, positions[i].y - 5);
+      
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(positions[i].x, positions[i].y, viewWidth, viewHeight);
+      ctx.drawImage(img, positions[i].x, positions[i].y, viewWidth, viewHeight);
+    }
+    
+    const topDownY = 80 + viewHeight * 2 + 30;
     ctx.fillStyle = "#334155";
-    ctx.font = "bold 18px Arial";
+    ctx.font = "bold 16px Arial";
     ctx.textAlign = "left";
-    ctx.fillText("3D Perspective View", 20, 95);
-    
-    ctx.drawImage(threeCanvas, 20, 105, threeWidth * 0.8, threeHeight * 0.8);
-    
-    const topDownY = 115 + threeHeight * 0.8 + 20;
-    ctx.fillStyle = "#334155";
-    ctx.font = "bold 18px Arial";
     ctx.fillText("Top-Down View with Measurements", 20, topDownY);
     
-    const offsetX = padding + 20;
-    const offsetZ = topDownY + 30 + padding - minZ * scale;
-    const baseOffsetX = offsetX - minX * scale;
+    const tdOffsetX = (combinedCanvas.width - topDownWidth) / 2;
+    const tdOffsetY = topDownY + 20;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(tdOffsetX - 10, tdOffsetY - 10, topDownWidth + 20, topDownHeight + 20);
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.strokeRect(tdOffsetX - 10, tdOffsetY - 10, topDownWidth + 20, topDownHeight + 20);
     
     floorRooms.forEach(room => {
-      const x = room.x * scale + baseOffsetX;
-      const z = room.z * scale + offsetZ;
+      const x = (room.x - minX) * scale + tdOffsetX + padding;
+      const z = (room.z - minZ) * scale + tdOffsetY + padding;
       const w = room.width * scale;
       const l = room.length * scale;
       
@@ -789,21 +882,20 @@ export default function FloorPlan3D() {
       ctx.strokeRect(x - w / 2, z - l / 2, w, l);
       
       ctx.fillStyle = "#1f2937";
-      ctx.font = "bold 12px Arial";
+      ctx.font = "bold 11px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(room.name, x, z - 3);
+      ctx.fillText(room.name, x, z - 2);
       
-      ctx.font = "11px Arial";
+      ctx.font = "10px Arial";
       ctx.fillStyle = "#4b5563";
       ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 10);
       
       ctx.fillStyle = "#dc2626";
-      ctx.font = "bold 10px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(`${room.width}'`, x, z - l / 2 - 5);
+      ctx.font = "bold 9px Arial";
+      ctx.fillText(`${room.width}'`, x, z - l / 2 - 4);
       
       ctx.save();
-      ctx.translate(x - w / 2 - 5, z);
+      ctx.translate(x - w / 2 - 4, z);
       ctx.rotate(-Math.PI / 2);
       ctx.fillText(`${room.length}'`, 0, 0);
       ctx.restore();
@@ -817,8 +909,8 @@ export default function FloorPlan3D() {
     a.click();
     document.body.removeChild(a);
     
-    toast({ title: "Exported", description: `Complete floor plan for Floor ${currentFloor} saved` });
-  }, [rooms, currentFloor, toast]);
+    toast({ title: "Exported", description: `Complete floor plan with 4 corner views saved!` });
+  }, [rooms, currentFloor, toast, sceneRef]);
 
   useEffect(() => {
     if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
@@ -1765,6 +1857,7 @@ export default function FloorPlan3D() {
                   onSelectFurniture={setSelectedFurniture}
                   cameraView={cameraView}
                   resetTrigger={cameraResetTrigger}
+                  sceneRef={sceneRef}
                 />
               </Suspense>
             </Canvas>
