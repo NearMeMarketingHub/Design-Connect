@@ -1493,15 +1493,15 @@ export default function FloorPlan3D() {
     
     if (roomDirection === "north") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ + targetRoom.length / 2;
+      newZ = doorWorldZ - targetRoom.length / 2;
     } else if (roomDirection === "south") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ - targetRoom.length / 2;
+      newZ = doorWorldZ + targetRoom.length / 2;
     } else if (roomDirection === "east") {
-      newX = doorWorldX - targetRoom.width / 2;
+      newX = doorWorldX + targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     } else if (roomDirection === "west") {
-      newX = doorWorldX + targetRoom.width / 2;
+      newX = doorWorldX - targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     }
 
