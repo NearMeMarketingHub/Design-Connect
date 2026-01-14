@@ -2176,7 +2176,7 @@ export default function FloorPlan3D() {
                                     variant="outline"
                                     size="icon"
                                     className="h-7 w-7"
-                                    onClick={() => updateDoorPosition(door.id, -0.5)}
+                                    onClick={() => updateDoorPosition(door.id, 0.5)}
                                     data-testid={`button-door-left-${door.id}`}
                                   >
                                     <ArrowLeftIcon className="h-3 w-3" />
@@ -2185,7 +2185,7 @@ export default function FloorPlan3D() {
                                     variant="outline"
                                     size="icon"
                                     className="h-7 w-7"
-                                    onClick={() => updateDoorPosition(door.id, 0.5)}
+                                    onClick={() => updateDoorPosition(door.id, -0.5)}
                                     data-testid={`button-door-right-${door.id}`}
                                   >
                                     <ArrowRightIcon className="h-3 w-3" />
