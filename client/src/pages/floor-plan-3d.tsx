@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -401,6 +402,7 @@ export default function FloorPlan3D() {
   const [furniture, setFurniture] = useState<Furniture[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
   const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
@@ -473,6 +475,23 @@ export default function FloorPlan3D() {
     setFurniture(furniture.filter((f) => f.roomId !== roomId));
     setDoors(doors.filter((d) => d.roomId !== roomId));
     if (selectedRoom === roomId) setSelectedRoom(null);
+    setSelectedRooms(prev => {
+      const next = new Set(prev);
+      next.delete(roomId);
+      return next;
+    });
+  };
+
+  const toggleRoomSelection = (roomId: string) => {
+    setSelectedRooms(prev => {
+      const next = new Set(prev);
+      if (next.has(roomId)) {
+        next.delete(roomId);
+      } else {
+        next.add(roomId);
+      }
+      return next;
+    });
   };
 
   const updateRoomPosition = (roomId: string, axis: "x" | "z", delta: number) => {
@@ -481,6 +500,19 @@ export default function FloorPlan3D() {
     ));
     setFurniture(furniture.map((f) =>
       f.roomId === roomId ? { ...f, [axis]: f[axis] + delta } : f
+    ));
+  };
+
+  const moveSelectedRooms = (axis: "x" | "z", delta: number) => {
+    if (selectedRooms.size === 0) {
+      toast({ title: "No Rooms Selected", description: "Check the boxes next to rooms to select them", variant: "destructive" });
+      return;
+    }
+    setRooms(rooms.map((r) =>
+      selectedRooms.has(r.id) ? { ...r, [axis]: r[axis] + delta } : r
+    ));
+    setFurniture(furniture.map((f) =>
+      selectedRooms.has(f.roomId) ? { ...f, [axis]: f[axis] + delta } : f
     ));
   };
 
@@ -774,7 +806,68 @@ export default function FloorPlan3D() {
                   <Separator />
 
                   <div>
-                    <h3 className="font-semibold mb-3">Your Rooms</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold">Your Rooms</h3>
+                      {selectedRooms.size > 0 && (
+                        <Badge variant="secondary">{selectedRooms.size} selected</Badge>
+                      )}
+                    </div>
+                    
+                    {selectedRooms.size > 0 && (
+                      <Card className="mb-3 bg-primary/5 border-primary">
+                        <CardContent className="p-3">
+                          <div className="text-xs font-medium mb-2">Move {selectedRooms.size} Selected Room{selectedRooms.size > 1 ? 's' : ''}</div>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => moveSelectedRooms("x", -1)}
+                              data-testid="button-move-selected-left"
+                            >
+                              <ArrowLeftIcon className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => moveSelectedRooms("z", -1)}
+                              data-testid="button-move-selected-up"
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => moveSelectedRooms("z", 1)}
+                              data-testid="button-move-selected-down"
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => moveSelectedRooms("x", 1)}
+                              data-testid="button-move-selected-right"
+                            >
+                              <ArrowRightIcon className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="ml-2 text-xs"
+                              onClick={() => setSelectedRooms(new Set())}
+                              data-testid="button-clear-selection"
+                            >
+                              Clear
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
                     {rooms.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         No rooms added yet. Use presets above or add a custom room.
@@ -784,13 +877,19 @@ export default function FloorPlan3D() {
                         {rooms.map((room) => (
                           <Card
                             key={room.id}
-                            className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""}`}
+                            className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""} ${selectedRooms.has(room.id) ? "bg-primary/5" : ""}`}
                             onClick={() => setSelectedRoom(room.id)}
                             data-testid={`card-room-${room.id}`}
                           >
                             <CardContent className="p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
+                                  <Checkbox
+                                    checked={selectedRooms.has(room.id)}
+                                    onCheckedChange={() => toggleRoomSelection(room.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    data-testid={`checkbox-room-${room.id}`}
+                                  />
                                   <div
                                     className="w-4 h-4 rounded"
                                     style={{ backgroundColor: room.color }}
