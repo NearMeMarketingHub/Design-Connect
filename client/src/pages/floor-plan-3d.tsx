@@ -73,6 +73,7 @@ interface Room {
   color: string;
   floor: number;
   isStairs?: boolean;
+  stairsDirection?: "up" | "down";
   connectedRoomId?: string;
 }
 
@@ -266,37 +267,75 @@ function Stairs3D({ room }: { room: Room }) {
   const stepHeight = room.height / numSteps;
   const stepDepth = room.length / numSteps;
   const stepWidth = room.width;
+  const isGoingUp = room.stairsDirection === "up";
   
-  const steps = [];
-  for (let i = 0; i < numSteps; i++) {
-    steps.push(
-      <mesh
-        key={i}
-        position={[0, stepHeight * (i + 0.5), -room.length / 2 + stepDepth * (i + 0.5)]}
-      >
-        <boxGeometry args={[stepWidth - 0.2, stepHeight, stepDepth]} />
-        <meshStandardMaterial color="#a08070" />
-      </mesh>
+  if (isGoingUp) {
+    const steps = [];
+    for (let i = 0; i < numSteps; i++) {
+      steps.push(
+        <mesh
+          key={i}
+          position={[0, stepHeight * (i + 0.5), -room.length / 2 + stepDepth * (i + 0.5)]}
+        >
+          <boxGeometry args={[stepWidth - 0.2, stepHeight, stepDepth]} />
+          <meshStandardMaterial color="#a08070" />
+        </mesh>
+      );
+    }
+    
+    return (
+      <group position={[room.x, 0, room.z]}>
+        <mesh position={[-stepWidth / 2 - 0.1, room.height / 2, 0]}>
+          <boxGeometry args={[0.2, room.height, room.length]} />
+          <meshStandardMaterial color="#8b7355" />
+        </mesh>
+        <mesh position={[stepWidth / 2 + 0.1, room.height / 2, 0]}>
+          <boxGeometry args={[0.2, room.height, room.length]} />
+          <meshStandardMaterial color="#8b7355" />
+        </mesh>
+        {steps}
+        <mesh position={[0, room.height, room.length / 2 - 0.5]}>
+          <boxGeometry args={[stepWidth, 0.3, 1]} />
+          <meshStandardMaterial color="#654321" />
+        </mesh>
+      </group>
+    );
+  } else {
+    const steps = [];
+    for (let i = 0; i < numSteps; i++) {
+      steps.push(
+        <mesh
+          key={i}
+          position={[0, -stepHeight * (i + 0.5), room.length / 2 - stepDepth * (i + 0.5)]}
+        >
+          <boxGeometry args={[stepWidth - 0.2, stepHeight, stepDepth]} />
+          <meshStandardMaterial color="#705040" />
+        </mesh>
+      );
+    }
+    
+    return (
+      <group position={[room.x, 0, room.z]}>
+        <mesh position={[-stepWidth / 2 - 0.1, -room.height / 2, 0]}>
+          <boxGeometry args={[0.2, room.height, room.length]} />
+          <meshStandardMaterial color="#5a4535" />
+        </mesh>
+        <mesh position={[stepWidth / 2 + 0.1, -room.height / 2, 0]}>
+          <boxGeometry args={[0.2, room.height, room.length]} />
+          <meshStandardMaterial color="#5a4535" />
+        </mesh>
+        {steps}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+          <planeGeometry args={[stepWidth, room.length]} />
+          <meshStandardMaterial color="#4a3a2a" />
+        </mesh>
+        <mesh position={[0, 0, -room.length / 2 + 0.25]}>
+          <boxGeometry args={[stepWidth + 0.4, 0.5, 0.5]} />
+          <meshStandardMaterial color="#654321" />
+        </mesh>
+      </group>
     );
   }
-  
-  return (
-    <group position={[room.x, 0, room.z]}>
-      <mesh position={[-stepWidth / 2 - 0.1, room.height / 2, 0]}>
-        <boxGeometry args={[0.2, room.height, room.length]} />
-        <meshStandardMaterial color="#8b7355" />
-      </mesh>
-      <mesh position={[stepWidth / 2 + 0.1, room.height / 2, 0]}>
-        <boxGeometry args={[0.2, room.height, room.length]} />
-        <meshStandardMaterial color="#8b7355" />
-      </mesh>
-      {steps}
-      <mesh position={[0, room.height, room.length / 2 - 0.5]}>
-        <boxGeometry args={[stepWidth, 0.3, 1]} />
-        <meshStandardMaterial color="#654321" />
-      </mesh>
-    </group>
-  );
 }
 
 function FurnitureItem({ furniture, isSelected, onClick }: { furniture: Furniture; isSelected: boolean; onClick: () => void }) {
@@ -532,22 +571,27 @@ export default function FloorPlan3D() {
       color: preset.color,
       floor: currentFloor,
       isStairs: preset.isStairs,
+      stairsDirection: preset.isStairs ? "up" : undefined,
     };
 
     setRooms([...rooms, room]);
-    toast({ title: "Room Added", description: `${preset.name} has been added to Floor ${currentFloor}` });
+    toast({ title: "Room Added", description: `${preset.name} has been added to Floor ${currentFloor}${preset.isStairs ? " (going up)" : ""}` });
   };
 
   const addFloor = () => {
     const newFloorNumber = totalFloors + 1;
     const stairsOnPreviousFloor = rooms.filter(r => r.floor === totalFloors && r.isStairs);
     
-    const copiedStairs: Room[] = stairsOnPreviousFloor.map(stair => ({
-      ...stair,
-      id: crypto.randomUUID(),
-      floor: newFloorNumber,
-      name: stair.name.includes("(Floor") ? stair.name.replace(/\(Floor \d+\)/, `(Floor ${newFloorNumber})`) : `${stair.name} (Floor ${newFloorNumber})`,
-    }));
+    const copiedStairs: Room[] = stairsOnPreviousFloor
+      .filter(stair => stair.stairsDirection === "up")
+      .map(stair => ({
+        ...stair,
+        id: crypto.randomUUID(),
+        floor: newFloorNumber,
+        stairsDirection: "down" as const,
+        connectedRoomId: undefined,
+        name: `Stairs from Floor ${totalFloors}`,
+      }));
     
     setRooms([...rooms, ...copiedStairs]);
     setTotalFloors(newFloorNumber);
@@ -614,7 +658,16 @@ export default function FloorPlan3D() {
       const connectedRoom = rooms.find(r => r.id === roomId);
       if (connectedRoom) {
         const newX = stairsRoom.x;
-        const newZ = stairsRoom.z + stairsRoom.length / 2 + connectedRoom.length / 2;
+        let newZ: number;
+        let positionDescription: string;
+        
+        if (stairsRoom.stairsDirection === "up") {
+          newZ = stairsRoom.z - stairsRoom.length / 2 - connectedRoom.length / 2;
+          positionDescription = "at bottom of stairs";
+        } else {
+          newZ = stairsRoom.z + stairsRoom.length / 2 + connectedRoom.length / 2;
+          positionDescription = "at top of stairs (arriving from below)";
+        }
         
         const deltaX = newX - connectedRoom.x;
         const deltaZ = newZ - connectedRoom.z;
@@ -633,7 +686,7 @@ export default function FloorPlan3D() {
           f.roomId === roomId ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
         ));
         
-        toast({ title: "Connected", description: `${connectedRoom.name} positioned at top of stairs` });
+        toast({ title: "Connected", description: `${connectedRoom.name} positioned ${positionDescription}` });
       }
     } else {
       setRooms(rooms.map(r => 
@@ -964,7 +1017,14 @@ export default function FloorPlan3D() {
                                   <div>
                                     <div className="font-medium text-sm flex items-center gap-2">
                                       {room.name}
-                                      {room.isStairs && <Badge variant="outline" className="text-xs px-1 py-0 text-amber-600">Stairs</Badge>}
+                                      {room.isStairs && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`text-xs px-1 py-0 ${room.stairsDirection === "up" ? "text-amber-600" : "text-blue-600"}`}
+                                        >
+                                          {room.stairsDirection === "up" ? "↑ Going Up" : "↓ From Below"}
+                                        </Badge>
+                                      )}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
                                       {room.width}' x {room.length}' x {room.height}'
@@ -989,7 +1049,9 @@ export default function FloorPlan3D() {
                               </div>
                               {room.isStairs && selectedRoom === room.id && (
                                 <div className="mt-2 pt-2 border-t">
-                                  <Label className="text-xs">Connect to Room (at top of stairs)</Label>
+                                  <Label className="text-xs">
+                                    Connect to Room ({room.stairsDirection === "up" ? "at bottom - where you start" : "at top - where you arrive"})
+                                  </Label>
                                   <Select
                                     value={room.connectedRoomId || "none"}
                                     onValueChange={(value) => connectStairsToRoom(room.id, value === "none" ? undefined : value)}
