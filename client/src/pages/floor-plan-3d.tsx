@@ -1,4 +1,4 @@
-import React, { useState, useRef, Suspense, useCallback, useEffect } from "react";
+import React, { useState, useRef, Suspense, useCallback, useEffect, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Grid, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -29,6 +29,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft,
   Plus,
   Trash2,
@@ -58,6 +64,9 @@ import {
   ArrowRightIcon,
   Video,
   Link2,
+  FileJson,
+  Image,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -512,8 +521,54 @@ export default function FloorPlan3D() {
   });
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const currentFloorRooms = rooms.filter(r => r.floor === currentFloor);
+
+  const exportAsJSON = useCallback(() => {
+    const floorPlanData = {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      totalFloors,
+      rooms,
+      furniture,
+      doors,
+    };
+    
+    const blob = new Blob([JSON.stringify(floorPlanData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `floor-plan-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "Exported", description: "Floor plan saved as JSON file" });
+  }, [rooms, furniture, doors, totalFloors, toast]);
+
+  const exportAsImage = useCallback(() => {
+    const canvas = document.querySelector("canvas");
+    if (!canvas) {
+      toast({ title: "Error", description: "Could not capture canvas", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `floor-plan-floor${currentFloor}-${new Date().toISOString().split("T")[0]}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast({ title: "Exported", description: `Floor ${currentFloor} saved as PNG image` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to export image", variant: "destructive" });
+    }
+  }, [currentFloor, toast]);
 
   useEffect(() => {
     if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
@@ -1450,7 +1505,7 @@ export default function FloorPlan3D() {
 
         <main className="flex-1 relative">
           <div className="absolute inset-0">
-            <Canvas shadows onClick={() => setSelectedFurniture(null)}>
+            <Canvas shadows gl={{ preserveDrawingBuffer: true }} onClick={() => setSelectedFurniture(null)}>
               <Suspense fallback={null}>
                 <Scene
                   rooms={currentFloorRooms}
@@ -1494,6 +1549,24 @@ export default function FloorPlan3D() {
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset View
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-export">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportAsImage} data-testid="menu-export-image">
+                    <Image className="h-4 w-4 mr-2" />
+                    Export as Image (PNG)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAsJSON} data-testid="menu-export-json">
+                    <FileJson className="h-4 w-4 mr-2" />
+                    Export as JSON Data
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
             {(selectedRoom || selectedRooms.size > 0) && (
