@@ -585,3 +585,23 @@ export const signingFields = pgTable("signing_fields", {
 export const insertSigningFieldSchema = createInsertSchema(signingFields).omit({ id: true, createdAt: true });
 export type InsertSigningField = z.infer<typeof insertSigningFieldSchema>;
 export type SigningField = typeof signingFields.$inferSelect;
+
+// Client Material Items - Items the client is responsible for providing
+export const clientMaterialItems = pgTable("client_material_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  dueDate: text("due_date"),
+  isCompleted: boolean("is_completed").default(false),
+  completedAt: timestamp("completed_at"),
+  completedById: varchar("completed_by_id").references(() => users.id),
+  completedByName: text("completed_by_name"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdByName: text("created_by_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertClientMaterialItemSchema = createInsertSchema(clientMaterialItems).omit({ id: true, createdAt: true });
+export type InsertClientMaterialItem = z.infer<typeof insertClientMaterialItemSchema>;
+export type ClientMaterialItem = typeof clientMaterialItems.$inferSelect;
