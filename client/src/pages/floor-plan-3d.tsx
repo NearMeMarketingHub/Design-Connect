@@ -335,7 +335,7 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
       </mesh>
       <Text
         position={[0, 0.02, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
+        rotation={[-Math.PI / 2, 0, Math.PI]}
         fontSize={fontSize}
         color="#333333"
         anchorX="center"
