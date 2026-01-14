@@ -1381,6 +1381,16 @@ export default function FloorPlan3D() {
     if (newDoor.connectedRoomId) {
       const connectedRoom = rooms.find((r) => r.id === newDoor.connectedRoomId);
       if (connectedRoom) {
+        // Check if both rooms are locked
+        if (room.locked && connectedRoom.locked) {
+          toast({ 
+            title: "Both Rooms Locked", 
+            description: "At least one room must be unlocked to connect", 
+            variant: "destructive" 
+          });
+          return;
+        }
+        
         const oppositeWall: Record<string, "north" | "south" | "east" | "west"> = {
           north: "south",
           south: "north",
@@ -1392,7 +1402,50 @@ export default function FloorPlan3D() {
           ? connectedRoom.width 
           : connectedRoom.length;
         
-        if (newDoor.snapConnectedRoom) {
+        // Determine which room to move based on lock status
+        const moveCurrentRoom = connectedRoom.locked && !room.locked;
+        const moveConnectedRoom = !connectedRoom.locked;
+        
+        if (moveCurrentRoom) {
+          // Move current room to align with locked connected room
+          let newX = room.x;
+          let newZ = room.z;
+          const connectedDoorPos = connectedWallLength / 2;
+          
+          switch (newDoor.wall) {
+            case "north":
+              // Current room's north door connects to connected room's south wall
+              newX = connectedRoom.x + connectedDoorPos - connectedRoom.width / 2 - doorPosition + room.width / 2;
+              newZ = connectedRoom.z - connectedRoom.length / 2 - room.length / 2;
+              break;
+            case "south":
+              // Current room's south door connects to connected room's north wall
+              newX = connectedRoom.x + connectedDoorPos - connectedRoom.width / 2 - doorPosition + room.width / 2;
+              newZ = connectedRoom.z + connectedRoom.length / 2 + room.length / 2;
+              break;
+            case "east":
+              // Current room's east door connects to connected room's west wall
+              newX = connectedRoom.x + connectedRoom.width / 2 + room.width / 2;
+              newZ = connectedRoom.z + connectedDoorPos - connectedRoom.length / 2 - doorPosition + room.length / 2;
+              break;
+            case "west":
+              // Current room's west door connects to connected room's east wall
+              newX = connectedRoom.x - connectedRoom.width / 2 - room.width / 2;
+              newZ = connectedRoom.z + connectedDoorPos - connectedRoom.length / 2 - doorPosition + room.length / 2;
+              break;
+          }
+          
+          const deltaX = newX - room.x;
+          const deltaZ = newZ - room.z;
+          
+          setRooms(rooms.map((r) =>
+            r.id === selectedRoom ? { ...r, x: newX, z: newZ } : r
+          ));
+          setFurniture(furniture.map((f) =>
+            f.roomId === selectedRoom ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+          ));
+        } else if (moveConnectedRoom) {
+          // Move connected room to align with current room (original logic)
           let newX = connectedRoom.x;
           let newZ = connectedRoom.z;
           
