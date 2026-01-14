@@ -74,6 +74,7 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
+  FolderPlus,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -612,71 +613,46 @@ export default function FloorPlan3D() {
     color: "#e8e4e1",
   });
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [manualGroups, setManualGroups] = useState<{ id: string; name: string; roomIds: string[]; floor: number }[]>([]);
+  const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [addingToGroupRoomId, setAddingToGroupRoomId] = useState<string | null>(null);
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<SceneRef | null>(null);
 
   const currentFloorRooms = rooms.filter(r => r.floor === currentFloor);
+  const currentFloorGroups = manualGroups.filter(g => g.floor === currentFloor);
   
   const roomGroups = useMemo(() => {
-    const groups: { id: string; name: string; rooms: Room[] }[] = [];
-    const assignedRooms = new Set<string>();
+    const groups: { id: string; name: string; rooms: Room[]; isManual: boolean }[] = [];
+    const assignedRoomIds = new Set<string>();
+    
+    currentFloorGroups.forEach(group => {
+      const groupRooms = currentFloorRooms.filter(r => group.roomIds.includes(r.id));
+      groupRooms.forEach(r => assignedRoomIds.add(r.id));
+      groups.push({
+        id: group.id,
+        name: group.name,
+        rooms: groupRooms,
+        isManual: true,
+      });
+    });
     
     currentFloorRooms.forEach(room => {
-      if (assignedRooms.has(room.id)) return;
-      
-      const connectedRoomIds = new Set<string>();
-      connectedRoomIds.add(room.id);
-      
-      const findConnected = (roomId: string) => {
-        doors.forEach(door => {
-          if (door.roomId === roomId && door.connectedRoomId && !connectedRoomIds.has(door.connectedRoomId)) {
-            const connectedRoom = currentFloorRooms.find(r => r.id === door.connectedRoomId);
-            if (connectedRoom) {
-              connectedRoomIds.add(door.connectedRoomId);
-              findConnected(door.connectedRoomId);
-            }
-          }
-          if (door.connectedRoomId === roomId && !connectedRoomIds.has(door.roomId)) {
-            const connectedRoom = currentFloorRooms.find(r => r.id === door.roomId);
-            if (connectedRoom) {
-              connectedRoomIds.add(door.roomId);
-              findConnected(door.roomId);
-            }
-          }
-        });
-      };
-      
-      findConnected(room.id);
-      
-      const groupRooms = currentFloorRooms.filter(r => connectedRoomIds.has(r.id));
-      groupRooms.forEach(r => assignedRooms.add(r.id));
-      
-      if (groupRooms.length > 1) {
-        const primaryRoom = groupRooms.find(r => 
-          r.name.toLowerCase().includes("master") || 
-          r.name.toLowerCase().includes("living") ||
-          r.name.toLowerCase().includes("kitchen")
-        ) || groupRooms[0];
-        const isBedroom = primaryRoom.name.toLowerCase().includes("bedroom") || 
-                          primaryRoom.name.toLowerCase().includes("master");
-        groups.push({
-          id: primaryRoom.id,
-          name: isBedroom ? `${primaryRoom.name} Suite` : `${primaryRoom.name} Area`,
-          rooms: groupRooms.sort((a, b) => (a.id === primaryRoom.id ? -1 : b.id === primaryRoom.id ? 1 : 0)),
-        });
-      } else {
+      if (!assignedRoomIds.has(room.id)) {
         groups.push({
           id: room.id,
           name: room.name,
           rooms: [room],
+          isManual: false,
         });
       }
     });
     
     return groups;
-  }, [currentFloorRooms, doors]);
+  }, [currentFloorRooms, currentFloorGroups]);
   
   useEffect(() => {
     const multiRoomGroupIds = roomGroups.filter(g => g.rooms.length > 1).map(g => g.id);
@@ -699,6 +675,48 @@ export default function FloorPlan3D() {
       }
       return next;
     });
+  };
+
+  const createGroup = (name: string) => {
+    const newGroup = {
+      id: `group-${Date.now()}`,
+      name,
+      roomIds: [] as string[],
+      floor: currentFloor,
+    };
+    setManualGroups(prev => [...prev, newGroup]);
+    setExpandedGroups(prev => new Set(prev).add(newGroup.id));
+    toast({ title: "Group Created", description: `Created "${name}" group` });
+  };
+
+  const addRoomToGroup = (roomId: string, groupId: string) => {
+    const targetGroup = manualGroups.find(g => g.id === groupId);
+    if (!targetGroup) return;
+    
+    setManualGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        if (!g.roomIds.includes(roomId)) {
+          return { ...g, roomIds: [...g.roomIds, roomId] };
+        }
+      } else if (g.floor === targetGroup.floor) {
+        return { ...g, roomIds: g.roomIds.filter(id => id !== roomId) };
+      }
+      return g;
+    }));
+    setAddingToGroupRoomId(null);
+    toast({ title: "Room Added", description: `Added to "${targetGroup.name}"` });
+  };
+
+  const removeRoomFromGroup = (roomId: string) => {
+    setManualGroups(prev => prev.map(g => ({
+      ...g,
+      roomIds: g.roomIds.filter(id => id !== roomId),
+    })));
+  };
+
+  const deleteGroup = (groupId: string) => {
+    setManualGroups(prev => prev.filter(g => g.id !== groupId));
+    toast({ title: "Group Deleted" });
   };
 
   const exportAsJSON = useCallback(() => {
@@ -1147,6 +1165,10 @@ export default function FloorPlan3D() {
     setRooms(rooms.filter((r) => r.id !== roomId));
     setFurniture(furniture.filter((f) => f.roomId !== roomId));
     setDoors(doors.filter((d) => d.roomId !== roomId));
+    setManualGroups(prev => prev.map(g => ({
+      ...g,
+      roomIds: g.roomIds.filter(id => id !== roomId),
+    })));
     if (selectedRoom === roomId) setSelectedRoom(null);
     setSelectedRooms(prev => {
       const next = new Set(prev);
@@ -1546,6 +1568,55 @@ export default function FloorPlan3D() {
 
                   <Separator />
 
+                  <div className="flex items-center gap-2">
+                    <Dialog open={showCreateGroupDialog} onOpenChange={setShowCreateGroupDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full">
+                          <FolderPlus className="h-4 w-4 mr-2" />
+                          Create Group
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Room Group</DialogTitle>
+                          <DialogDescription>
+                            Create a group to organize related rooms together.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="group-name">Group Name</Label>
+                            <Input
+                              id="group-name"
+                              placeholder="e.g., Master Suite, Kitchen Area"
+                              value={newGroupName}
+                              onChange={(e) => setNewGroupName(e.target.value)}
+                              data-testid="input-group-name"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowCreateGroupDialog(false)}>
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={() => {
+                              if (newGroupName.trim()) {
+                                createGroup(newGroupName.trim());
+                                setNewGroupName("");
+                                setShowCreateGroupDialog(false);
+                              }
+                            }}
+                            disabled={!newGroupName.trim()}
+                            data-testid="button-confirm-create-group"
+                          >
+                            Create Group
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-semibold">Floor {currentFloor} Rooms</h3>
@@ -1554,34 +1625,48 @@ export default function FloorPlan3D() {
                       )}
                     </div>
                     
-                    {currentFloorRooms.length === 0 ? (
+                    {currentFloorRooms.length === 0 && currentFloorGroups.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         No rooms on this floor yet. Use presets above or add a custom room.
                       </p>
                     ) : (
                       <div className="space-y-2">
                         {roomGroups.map((group) => (
-                          group.rooms.length > 1 ? (
+                          group.isManual || group.rooms.length > 1 ? (
                             <Collapsible
                               key={group.id}
                               open={expandedGroups.has(group.id)}
                               onOpenChange={() => toggleGroup(group.id)}
                             >
-                              <CollapsibleTrigger className="w-full">
-                                <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                              <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors">
+                                <CollapsibleTrigger className="flex items-center gap-2 flex-1">
                                   {expandedGroups.has(group.id) ? (
                                     <ChevronDown className="h-4 w-4" />
                                   ) : (
                                     <ChevronRight className="h-4 w-4" />
                                   )}
                                   <span className="font-medium text-sm">{group.name}</span>
-                                  <Badge variant="secondary" className="ml-auto text-xs">
+                                  <Badge variant="secondary" className="text-xs">
                                     {group.rooms.length} rooms
                                   </Badge>
-                                </div>
-                              </CollapsibleTrigger>
+                                </CollapsibleTrigger>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => { e.stopPropagation(); deleteGroup(group.id); }}
+                                  data-testid={`button-delete-group-${group.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </div>
                               <CollapsibleContent>
-                                <div className="pl-4 mt-2 space-y-2 border-l-2 border-muted ml-2">
+                                <div className="pl-4 mt-2 space-y-2 border-l-2 border-primary/30 ml-2">
+                                  {group.rooms.length === 0 && (
+                                    <p className="text-xs text-muted-foreground italic py-2">
+                                      Empty group. Use "Add to Group" on any room below to add it here.
+                                    </p>
+                                  )}
                                   {group.rooms.map((room) => (
                                     <Card
                                       key={room.id}
@@ -1618,15 +1703,26 @@ export default function FloorPlan3D() {
                                               )}
                                             </div>
                                           </div>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
-                                            data-testid={`button-remove-room-${room.id}`}
-                                          >
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                          </Button>
+                                          <div className="flex items-center gap-1">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-7 px-2 text-xs"
+                                              onClick={(e) => { e.stopPropagation(); removeRoomFromGroup(room.id); }}
+                                              data-testid={`button-ungroup-room-${room.id}`}
+                                            >
+                                              Ungroup
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-8 w-8"
+                                              onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
+                                              data-testid={`button-remove-room-${room.id}`}
+                                            >
+                                              <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                          </div>
                                         </div>
                                       </CardContent>
                                     </Card>
@@ -1670,15 +1766,46 @@ export default function FloorPlan3D() {
                                       )}
                                     </div>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={(e) => { e.stopPropagation(); removeRoom(group.rooms[0].id); }}
-                                    data-testid={`button-remove-room-${group.rooms[0].id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    {currentFloorGroups.length > 0 && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={(e) => e.stopPropagation()}
+                                            data-testid={`button-add-to-group-${group.rooms[0].id}`}
+                                          >
+                                            <FolderPlus className="h-3 w-3 mr-1" />
+                                            Add to Group
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          {currentFloorGroups.map(g => (
+                                            <DropdownMenuItem
+                                              key={g.id}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                addRoomToGroup(group.rooms[0].id, g.id);
+                                              }}
+                                            >
+                                              {g.name}
+                                            </DropdownMenuItem>
+                                          ))}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={(e) => { e.stopPropagation(); removeRoom(group.rooms[0].id); }}
+                                      data-testid={`button-remove-room-${group.rooms[0].id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
                                 </div>
                                 {group.rooms[0].isStairs && selectedRoom === group.rooms[0].id && (
                                   <div className="mt-2 pt-2 border-t">
