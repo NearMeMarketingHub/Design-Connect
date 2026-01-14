@@ -1493,15 +1493,15 @@ export default function FloorPlan3D() {
     
     if (roomDirection === "north") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ - targetRoom.length / 2;
+      newZ = doorWorldZ + targetRoom.length / 2;
     } else if (roomDirection === "south") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ + targetRoom.length / 2;
+      newZ = doorWorldZ - targetRoom.length / 2;
     } else if (roomDirection === "east") {
-      newX = doorWorldX + targetRoom.width / 2;
+      newX = doorWorldX - targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     } else if (roomDirection === "west") {
-      newX = doorWorldX - targetRoom.width / 2;
+      newX = doorWorldX + targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     }
 
@@ -2628,7 +2628,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", -1) : selectedRoom && updateRoomPosition(selectedRoom, "x", -1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", 1) : selectedRoom && updateRoomPosition(selectedRoom, "x", 1)}
                   data-testid="button-move-left"
                 >
                   <ArrowLeftIcon className="h-3 w-3" />
@@ -2637,7 +2637,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", -1) : selectedRoom && updateRoomPosition(selectedRoom, "z", -1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", 1) : selectedRoom && updateRoomPosition(selectedRoom, "z", 1)}
                   data-testid="button-move-up"
                 >
                   <ArrowUp className="h-3 w-3" />
@@ -2646,7 +2646,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", 1) : selectedRoom && updateRoomPosition(selectedRoom, "z", 1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", -1) : selectedRoom && updateRoomPosition(selectedRoom, "z", -1)}
                   data-testid="button-move-down"
                 >
                   <ArrowDown className="h-3 w-3" />
@@ -2655,7 +2655,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", 1) : selectedRoom && updateRoomPosition(selectedRoom, "x", 1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", -1) : selectedRoom && updateRoomPosition(selectedRoom, "x", -1)}
                   data-testid="button-move-right"
                 >
                   <ArrowRightIcon className="h-3 w-3" />
