@@ -319,6 +319,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/timeline')) return 'timeline';
     if (path.endsWith('/inspiration')) return 'inspiration';
     if (path.endsWith('/contractor-photos')) return 'contractor-photos';
+    if (path.endsWith('/materials')) return 'materials';
     if (path.endsWith('/action-center')) return 'action-center';
     return 'overview';
   };
