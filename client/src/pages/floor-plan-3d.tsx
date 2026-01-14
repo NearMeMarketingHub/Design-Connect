@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense, useCallback } from "react";
+import React, { useState, useRef, Suspense, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Grid, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -50,6 +50,11 @@ import {
   Save,
   Eye,
   Layers,
+  DoorOpen,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeftIcon,
+  ArrowRightIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +82,14 @@ interface Furniture {
   rotation: number;
   color: string;
   roomId: string;
+}
+
+interface Door {
+  id: string;
+  roomId: string;
+  wall: "north" | "south" | "east" | "west";
+  position: number;
+  width: number;
 }
 
 const ROOM_PRESETS = [
@@ -108,8 +121,9 @@ const FURNITURE_TYPES = [
   { type: "cabinet", name: "Cabinet", width: 3, depth: 2, height: 6, icon: Square, color: "#8B4513" },
 ];
 
-function Wall({ start, end, height, thickness = 0.5 }: { start: [number, number]; end: [number, number]; height: number; thickness?: number }) {
+function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, number]; end: [number, number]; height: number; thickness?: number }) {
   const length = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
+  if (length < 0.1) return null;
   const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
   const midX = (start[0] + end[0]) / 2;
   const midZ = (start[1] + end[1]) / 2;
@@ -122,17 +136,125 @@ function Wall({ start, end, height, thickness = 0.5 }: { start: [number, number]
   );
 }
 
-function RoomFloor({ room }: { room: Room }) {
+function DoorFrame({ position, rotation, width, height }: { position: [number, number, number]; rotation: number; width: number; height: number }) {
+  const doorHeight = 7;
+  const frameThickness = 0.3;
+  
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh position={[0, doorHeight / 2, 0]}>
+        <boxGeometry args={[width, doorHeight, 0.2]} />
+        <meshStandardMaterial color="#8B4513" />
+      </mesh>
+      <mesh position={[-width / 2 - frameThickness / 2, doorHeight / 2, 0]}>
+        <boxGeometry args={[frameThickness, doorHeight, 0.5]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+      <mesh position={[width / 2 + frameThickness / 2, doorHeight / 2, 0]}>
+        <boxGeometry args={[frameThickness, doorHeight, 0.5]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+      <mesh position={[0, doorHeight + frameThickness / 2, 0]}>
+        <boxGeometry args={[width + frameThickness * 2, frameThickness, 0.5]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+    </group>
+  );
+}
+
+function Wall({ start, end, height, thickness = 0.5, doors = [] }: { 
+  start: [number, number]; 
+  end: [number, number]; 
+  height: number; 
+  thickness?: number;
+  doors?: { position: number; width: number }[];
+}) {
+  const wallLength = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
+  const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
+  const dx = (end[0] - start[0]) / wallLength;
+  const dz = (end[1] - start[1]) / wallLength;
+
+  if (doors.length === 0) {
+    return <WallSegment start={start} end={end} height={height} thickness={thickness} />;
+  }
+
+  const sortedDoors = [...doors].sort((a, b) => a.position - b.position);
+  const segments: React.ReactNode[] = [];
+  const doorFrames: React.ReactNode[] = [];
+  let currentPos = 0;
+
+  sortedDoors.forEach((door, index) => {
+    const doorStart = door.position - door.width / 2;
+    const doorEnd = door.position + door.width / 2;
+
+    if (currentPos < doorStart) {
+      const segStart: [number, number] = [start[0] + dx * currentPos, start[1] + dz * currentPos];
+      const segEnd: [number, number] = [start[0] + dx * doorStart, start[1] + dz * doorStart];
+      segments.push(<WallSegment key={`seg-${index}-before`} start={segStart} end={segEnd} height={height} thickness={thickness} />);
+    }
+
+    const doorX = start[0] + dx * door.position;
+    const doorZ = start[1] + dz * door.position;
+    doorFrames.push(
+      <DoorFrame 
+        key={`door-${index}`} 
+        position={[doorX, 0, doorZ]} 
+        rotation={-angle} 
+        width={door.width} 
+        height={height} 
+      />
+    );
+
+    currentPos = doorEnd;
+  });
+
+  if (currentPos < wallLength) {
+    const segStart: [number, number] = [start[0] + dx * currentPos, start[1] + dz * currentPos];
+    segments.push(<WallSegment key="seg-final" start={segStart} end={end} height={height} thickness={thickness} />);
+  }
+
+  return <>{segments}{doorFrames}</>;
+}
+
+function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
+  const roomDoors = doors.filter(d => d.roomId === room.id);
+  
+  const getDoorsForWall = (wall: "north" | "south" | "east" | "west") => {
+    return roomDoors
+      .filter(d => d.wall === wall)
+      .map(d => ({ position: d.position, width: d.width }));
+  };
+
   return (
     <group position={[room.x, 0.05, room.z]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[room.width, room.length]} />
         <meshStandardMaterial color={room.color} />
       </mesh>
-      <Wall start={[-room.width / 2, -room.length / 2]} end={[room.width / 2, -room.length / 2]} height={room.height} />
-      <Wall start={[room.width / 2, -room.length / 2]} end={[room.width / 2, room.length / 2]} height={room.height} />
-      <Wall start={[room.width / 2, room.length / 2]} end={[-room.width / 2, room.length / 2]} height={room.height} />
-      <Wall start={[-room.width / 2, room.length / 2]} end={[-room.width / 2, -room.length / 2]} height={room.height} />
+      <Wall 
+        start={[-room.width / 2, -room.length / 2]} 
+        end={[room.width / 2, -room.length / 2]} 
+        height={room.height} 
+        doors={getDoorsForWall("south")}
+      />
+      <Wall 
+        start={[room.width / 2, -room.length / 2]} 
+        end={[room.width / 2, room.length / 2]} 
+        height={room.height}
+        doors={getDoorsForWall("east")}
+      />
+      <Wall 
+        start={[room.width / 2, room.length / 2]} 
+        end={[-room.width / 2, room.length / 2]} 
+        height={room.height}
+        doors={getDoorsForWall("north")}
+      />
+      <Wall 
+        start={[-room.width / 2, room.length / 2]} 
+        end={[-room.width / 2, -room.length / 2]} 
+        height={room.height}
+        doors={getDoorsForWall("west")}
+      />
     </group>
   );
 }
@@ -164,9 +286,10 @@ function FurnitureItem({ furniture, isSelected, onClick }: { furniture: Furnitur
   );
 }
 
-function Scene({ rooms, furniture, selectedFurniture, onSelectFurniture }: {
+function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture }: {
   rooms: Room[];
   furniture: Furniture[];
+  doors: Door[];
   selectedFurniture: string | null;
   onSelectFurniture: (id: string | null) => void;
 }) {
@@ -190,7 +313,7 @@ function Scene({ rooms, furniture, selectedFurniture, onSelectFurniture }: {
       />
 
       {rooms.map((room) => (
-        <RoomFloor key={room.id} room={room} />
+        <RoomFloor key={room.id} room={room} doors={doors} />
       ))}
 
       {furniture.map((item) => (
@@ -219,9 +342,16 @@ export default function FloorPlan3D() {
   
   const [rooms, setRooms] = useState<Room[]>([]);
   const [furniture, setFurniture] = useState<Furniture[]>([]);
+  const [doors, setDoors] = useState<Door[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
   const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
+  const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
+  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number }>({
+    wall: "south",
+    position: 50,
+    width: 3,
+  });
   
   const [newRoom, setNewRoom] = useState({
     name: "",
@@ -281,7 +411,46 @@ export default function FloorPlan3D() {
   const removeRoom = (roomId: string) => {
     setRooms(rooms.filter((r) => r.id !== roomId));
     setFurniture(furniture.filter((f) => f.roomId !== roomId));
+    setDoors(doors.filter((d) => d.roomId !== roomId));
     if (selectedRoom === roomId) setSelectedRoom(null);
+  };
+
+  const updateRoomPosition = (roomId: string, axis: "x" | "z", delta: number) => {
+    setRooms(rooms.map((r) =>
+      r.id === roomId ? { ...r, [axis]: r[axis] + delta } : r
+    ));
+    setFurniture(furniture.map((f) =>
+      f.roomId === roomId ? { ...f, [axis]: f[axis] + delta } : f
+    ));
+  };
+
+  const addDoor = () => {
+    if (!selectedRoom) {
+      toast({ title: "Select a Room", description: "Please select a room first to add a door", variant: "destructive" });
+      return;
+    }
+
+    const room = rooms.find((r) => r.id === selectedRoom);
+    if (!room) return;
+
+    const wallLength = newDoor.wall === "north" || newDoor.wall === "south" ? room.width : room.length;
+    const doorPosition = (newDoor.position / 100) * wallLength;
+
+    const door: Door = {
+      id: crypto.randomUUID(),
+      roomId: selectedRoom,
+      wall: newDoor.wall,
+      position: doorPosition,
+      width: newDoor.width,
+    };
+
+    setDoors([...doors, door]);
+    setShowAddDoorDialog(false);
+    toast({ title: "Door Added", description: `Door added to ${newDoor.wall} wall` });
+  };
+
+  const removeDoor = (doorId: string) => {
+    setDoors(doors.filter((d) => d.id !== doorId));
   };
 
   const addFurniture = (type: typeof FURNITURE_TYPES[0]) => {
@@ -332,9 +501,10 @@ export default function FloorPlan3D() {
   const resetScene = () => {
     setRooms([]);
     setFurniture([]);
+    setDoors([]);
     setSelectedRoom(null);
     setSelectedFurniture(null);
-    toast({ title: "Scene Reset", description: "All rooms and furniture have been cleared" });
+    toast({ title: "Scene Reset", description: "All rooms, furniture, and doors have been cleared" });
   };
 
   const selectedFurnitureItem = furniture.find((f) => f.id === selectedFurniture);
@@ -381,6 +551,10 @@ export default function FloorPlan3D() {
               <TabsTrigger value="rooms" className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
                 Rooms
+              </TabsTrigger>
+              <TabsTrigger value="doors" className="flex items-center gap-2">
+                <DoorOpen className="h-4 w-4" />
+                Doors
               </TabsTrigger>
               <TabsTrigger value="furniture" className="flex items-center gap-2">
                 <Sofa className="h-4 w-4" />
@@ -514,34 +688,202 @@ export default function FloorPlan3D() {
                             onClick={() => setSelectedRoom(room.id)}
                             data-testid={`card-room-${room.id}`}
                           >
-                            <CardContent className="p-3 flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className="w-4 h-4 rounded"
-                                  style={{ backgroundColor: room.color }}
-                                />
-                                <div>
-                                  <div className="font-medium text-sm">{room.name}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {room.width}' x {room.length}' x {room.height}'
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-4 h-4 rounded"
+                                    style={{ backgroundColor: room.color }}
+                                  />
+                                  <div>
+                                    <div className="font-medium text-sm">{room.name}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {room.width}' x {room.length}' x {room.height}'
+                                    </div>
                                   </div>
                                 </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
+                                  data-testid={`button-remove-room-${room.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
-                                data-testid={`button-remove-room-${room.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-xs text-muted-foreground mr-2">Move:</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "x", -1); }}
+                                  data-testid={`button-move-room-left-${room.id}`}
+                                >
+                                  <ArrowLeftIcon className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "z", -1); }}
+                                  data-testid={`button-move-room-up-${room.id}`}
+                                >
+                                  <ArrowUp className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "z", 1); }}
+                                  data-testid={`button-move-room-down-${room.id}`}
+                                >
+                                  <ArrowDown className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "x", 1); }}
+                                  data-testid={`button-move-room-right-${room.id}`}
+                                >
+                                  <ArrowRightIcon className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </CardContent>
                           </Card>
                         ))}
                       </div>
                     )}
                   </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="doors" className="flex-1 m-0 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-4 space-y-4">
+                  {selectedRoom ? (
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Home className="h-4 w-4" />
+                        Adding doors to: <span className="font-medium text-foreground">{selectedRoomData?.name}</span>
+                      </div>
+
+                      <Dialog open={showAddDoorDialog} onOpenChange={setShowAddDoorDialog}>
+                        <DialogTrigger asChild>
+                          <Button className="w-full" data-testid="button-add-door">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Door
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Add Door</DialogTitle>
+                            <DialogDescription>
+                              Choose which wall to place a door on
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label>Wall</Label>
+                              <Select 
+                                value={newDoor.wall} 
+                                onValueChange={(val) => setNewDoor({ ...newDoor, wall: val as "north" | "south" | "east" | "west" })}
+                              >
+                                <SelectTrigger data-testid="select-door-wall">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="north">North (Back)</SelectItem>
+                                  <SelectItem value="south">South (Front)</SelectItem>
+                                  <SelectItem value="east">East (Right)</SelectItem>
+                                  <SelectItem value="west">West (Left)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Position Along Wall (%)</Label>
+                              <Input
+                                type="number"
+                                min={10}
+                                max={90}
+                                value={newDoor.position}
+                                onChange={(e) => setNewDoor({ ...newDoor, position: parseInt(e.target.value) || 50 })}
+                                data-testid="input-door-position"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">0% = left/start, 100% = right/end</p>
+                            </div>
+                            <div>
+                              <Label>Door Width (ft)</Label>
+                              <Input
+                                type="number"
+                                min={2}
+                                max={8}
+                                value={newDoor.width}
+                                onChange={(e) => setNewDoor({ ...newDoor, width: parseFloat(e.target.value) || 3 })}
+                                data-testid="input-door-width"
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowAddDoorDialog(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={addDoor} data-testid="button-confirm-add-door">
+                              Add Door
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Separator />
+
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Doors in {selectedRoomData?.name}</h4>
+                        {doors.filter((d) => d.roomId === selectedRoom).length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            No doors added yet
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {doors.filter((d) => d.roomId === selectedRoom).map((door) => (
+                              <div
+                                key={door.id}
+                                className="flex items-center justify-between p-2 border rounded"
+                                data-testid={`door-item-${door.id}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <DoorOpen className="h-4 w-4 text-muted-foreground" />
+                                  <div>
+                                    <div className="text-sm font-medium capitalize">{door.wall} Wall</div>
+                                    <div className="text-xs text-muted-foreground">{door.width}' wide</div>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => removeDoor(door.id)}
+                                  data-testid={`button-remove-door-${door.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <DoorOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">
+                        Select a room from the Rooms tab to add doors
+                      </p>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>
@@ -763,6 +1105,7 @@ export default function FloorPlan3D() {
                 <Scene
                   rooms={rooms}
                   furniture={furniture}
+                  doors={doors}
                   selectedFurniture={selectedFurniture}
                   onSelectFurniture={setSelectedFurniture}
                 />
