@@ -35,6 +35,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ArrowLeft,
   Plus,
   Trash2,
@@ -67,9 +72,12 @@ import {
   FileJson,
   Image,
   FileText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
 
 interface Room {
   id: string;
@@ -603,12 +611,95 @@ export default function FloorPlan3D() {
     height: 9,
     color: "#e8e4e1",
   });
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<SceneRef | null>(null);
 
   const currentFloorRooms = rooms.filter(r => r.floor === currentFloor);
+  
+  const roomGroups = useMemo(() => {
+    const groups: { id: string; name: string; rooms: Room[] }[] = [];
+    const assignedRooms = new Set<string>();
+    
+    currentFloorRooms.forEach(room => {
+      if (assignedRooms.has(room.id)) return;
+      
+      const connectedRoomIds = new Set<string>();
+      connectedRoomIds.add(room.id);
+      
+      const findConnected = (roomId: string) => {
+        doors.forEach(door => {
+          if (door.roomId === roomId && door.connectedRoomId && !connectedRoomIds.has(door.connectedRoomId)) {
+            const connectedRoom = currentFloorRooms.find(r => r.id === door.connectedRoomId);
+            if (connectedRoom) {
+              connectedRoomIds.add(door.connectedRoomId);
+              findConnected(door.connectedRoomId);
+            }
+          }
+          if (door.connectedRoomId === roomId && !connectedRoomIds.has(door.roomId)) {
+            const connectedRoom = currentFloorRooms.find(r => r.id === door.roomId);
+            if (connectedRoom) {
+              connectedRoomIds.add(door.roomId);
+              findConnected(door.roomId);
+            }
+          }
+        });
+      };
+      
+      findConnected(room.id);
+      
+      const groupRooms = currentFloorRooms.filter(r => connectedRoomIds.has(r.id));
+      groupRooms.forEach(r => assignedRooms.add(r.id));
+      
+      if (groupRooms.length > 1) {
+        const primaryRoom = groupRooms.find(r => 
+          r.name.toLowerCase().includes("master") || 
+          r.name.toLowerCase().includes("living") ||
+          r.name.toLowerCase().includes("kitchen")
+        ) || groupRooms[0];
+        const isBedroom = primaryRoom.name.toLowerCase().includes("bedroom") || 
+                          primaryRoom.name.toLowerCase().includes("master");
+        groups.push({
+          id: primaryRoom.id,
+          name: isBedroom ? `${primaryRoom.name} Suite` : `${primaryRoom.name} Area`,
+          rooms: groupRooms.sort((a, b) => (a.id === primaryRoom.id ? -1 : b.id === primaryRoom.id ? 1 : 0)),
+        });
+      } else {
+        groups.push({
+          id: room.id,
+          name: room.name,
+          rooms: [room],
+        });
+      }
+    });
+    
+    return groups;
+  }, [currentFloorRooms, doors]);
+  
+  useEffect(() => {
+    const multiRoomGroupIds = roomGroups.filter(g => g.rooms.length > 1).map(g => g.id);
+    if (multiRoomGroupIds.length > 0) {
+      setExpandedGroups(prev => {
+        const next = new Set(prev);
+        multiRoomGroupIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }, [roomGroups.length]);
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
 
   const exportAsJSON = useCallback(() => {
     const floorPlanData = {
@@ -806,7 +897,7 @@ export default function FloorPlan3D() {
       return;
     }
 
-    toast({ title: "Capturing...", description: "Generating views from all 4 corners..." });
+    toast({ title: "Capturing...", description: "Generating PDF with 3D views..." });
 
     const centerX = floorRooms.reduce((sum, r) => sum + r.x, 0) / floorRooms.length;
     const centerZ = floorRooms.reduce((sum, r) => sum + r.z, 0) / floorRooms.length;
@@ -827,9 +918,46 @@ export default function FloorPlan3D() {
       }
     }
 
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    
+    pdf.setFontSize(20);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`Floor Plan - Floor ${currentFloor}`, pageWidth / 2, 20, { align: "center" });
+    
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 28, { align: "center" });
+    
+    const cornerNames = ["NE Corner View", "NW Corner View", "SE Corner View", "SW Corner View"];
+    const imgWidth = (pageWidth - margin * 3) / 2;
+    const imgHeight = imgWidth * 0.75;
+    
+    for (let i = 0; i < Math.min(cornerCaptures.length, 4); i++) {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const x = margin + col * (imgWidth + margin);
+      const y = 35 + row * (imgHeight + 12);
+      
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(cornerNames[i], x, y - 2);
+      
+      pdf.addImage(cornerCaptures[i], "PNG", x, y, imgWidth, imgHeight);
+      pdf.setDrawColor(200);
+      pdf.rect(x, y, imgWidth, imgHeight);
+    }
+    
+    pdf.addPage();
+    
+    pdf.setFontSize(16);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Top-Down View with Measurements", pageWidth / 2, 20, { align: "center" });
+    
     const scale = 12;
     const padding = 40;
-    
     const minX = Math.min(...floorRooms.map(r => r.x - r.width / 2));
     const maxX = Math.max(...floorRooms.map(r => r.x + r.width / 2));
     const minZ = Math.min(...floorRooms.map(r => r.z - r.length / 2));
@@ -838,108 +966,93 @@ export default function FloorPlan3D() {
     const topDownWidth = Math.max(300, (maxX - minX) * scale + padding * 2);
     const topDownHeight = Math.max(200, (maxZ - minZ) * scale + padding * 2);
     
-    const viewWidth = 400;
-    const viewHeight = 300;
-    const cornerGridWidth = viewWidth * 2 + 60;
-    const combinedCanvas = document.createElement("canvas");
-    combinedCanvas.width = Math.max(cornerGridWidth, topDownWidth + 40);
-    combinedCanvas.height = 80 + viewHeight * 2 + 40 + topDownHeight + 100;
-    const ctx = combinedCanvas.getContext("2d");
-    if (!ctx) return;
-    
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-    
-    ctx.fillStyle = "#1e293b";
-    ctx.font = "bold 24px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(`Floor Plan Export - Floor ${currentFloor}`, combinedCanvas.width / 2, 35);
-    
-    ctx.font = "12px Arial";
-    ctx.fillStyle = "#64748b";
-    ctx.fillText(`Generated: ${new Date().toLocaleString()}`, combinedCanvas.width / 2, 55);
-    
-    const cornerNames = ["NE Corner View", "NW Corner View", "SE Corner View", "SW Corner View"];
-    const positions = [
-      { x: 20, y: 75 },
-      { x: viewWidth + 40, y: 75 },
-      { x: 20, y: viewHeight + 95 },
-      { x: viewWidth + 40, y: viewHeight + 95 },
-    ];
-    
-    for (let i = 0; i < Math.min(cornerCaptures.length, 4); i++) {
-      const img = new window.Image();
-      img.src = cornerCaptures[i];
-      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+    const topDownCanvas = document.createElement("canvas");
+    topDownCanvas.width = topDownWidth;
+    topDownCanvas.height = topDownHeight;
+    const ctx = topDownCanvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, topDownWidth, topDownHeight);
       
-      ctx.fillStyle = "#334155";
-      ctx.font = "bold 14px Arial";
-      ctx.textAlign = "left";
-      ctx.fillText(cornerNames[i], positions[i].x, positions[i].y - 5);
+      floorRooms.forEach(room => {
+        const x = (room.x - minX) * scale + padding;
+        const z = (room.z - minZ) * scale + padding;
+        const w = room.width * scale;
+        const l = room.length * scale;
+        
+        ctx.fillStyle = room.isStairs ? "#fef3c7" : room.color;
+        ctx.fillRect(x - w / 2, z - l / 2, w, l);
+        
+        ctx.strokeStyle = room.isStairs ? "#f59e0b" : "#374151";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x - w / 2, z - l / 2, w, l);
+        
+        const floorDoors = doors.filter(d => d.roomId === room.id);
+        floorDoors.forEach(door => {
+          ctx.fillStyle = "#8b5cf6";
+          let doorX = x, doorZ = z;
+          let doorW = door.width * scale, doorH = 4;
+          
+          if (door.wall === "north") {
+            doorX = x - w / 2 + door.position * scale;
+            doorZ = z + l / 2;
+          } else if (door.wall === "south") {
+            doorX = x - w / 2 + door.position * scale;
+            doorZ = z - l / 2;
+          } else if (door.wall === "east") {
+            doorX = x - w / 2;
+            doorZ = z - l / 2 + door.position * scale;
+            doorW = 4;
+            doorH = door.width * scale;
+          } else {
+            doorX = x + w / 2;
+            doorZ = z - l / 2 + door.position * scale;
+            doorW = 4;
+            doorH = door.width * scale;
+          }
+          ctx.fillRect(doorX - doorW / 2, doorZ - doorH / 2, doorW, doorH);
+        });
+        
+        ctx.fillStyle = "#1f2937";
+        ctx.font = "bold 11px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(room.name, x, z - 2);
+        
+        ctx.font = "10px Arial";
+        ctx.fillStyle = "#4b5563";
+        ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 10);
+        
+        ctx.fillStyle = "#dc2626";
+        ctx.font = "bold 9px Arial";
+        ctx.fillText(`${room.width}'`, x, z - l / 2 - 4);
+        
+        ctx.save();
+        ctx.translate(x - w / 2 - 4, z);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText(`${room.length}'`, 0, 0);
+        ctx.restore();
+      });
       
-      ctx.strokeStyle = "#cbd5e1";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(positions[i].x, positions[i].y, viewWidth, viewHeight);
-      ctx.drawImage(img, positions[i].x, positions[i].y, viewWidth, viewHeight);
+      const topDownDataUrl = topDownCanvas.toDataURL("image/png");
+      const availableWidth = pageWidth - margin * 2;
+      const availableHeight = pageHeight - 40;
+      const aspectRatio = topDownWidth / topDownHeight;
+      
+      let finalWidth = availableWidth;
+      let finalHeight = finalWidth / aspectRatio;
+      if (finalHeight > availableHeight) {
+        finalHeight = availableHeight;
+        finalWidth = finalHeight * aspectRatio;
+      }
+      
+      const xOffset = (pageWidth - finalWidth) / 2;
+      pdf.addImage(topDownDataUrl, "PNG", xOffset, 30, finalWidth, finalHeight);
     }
     
-    const topDownY = 80 + viewHeight * 2 + 30;
-    ctx.fillStyle = "#334155";
-    ctx.font = "bold 16px Arial";
-    ctx.textAlign = "left";
-    ctx.fillText("Top-Down View with Measurements", 20, topDownY);
+    pdf.save(`floor-plan-floor${currentFloor}-${new Date().toISOString().split("T")[0]}.pdf`);
     
-    const tdOffsetX = (combinedCanvas.width - topDownWidth) / 2;
-    const tdOffsetY = topDownY + 20;
-    
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(tdOffsetX - 10, tdOffsetY - 10, topDownWidth + 20, topDownHeight + 20);
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.strokeRect(tdOffsetX - 10, tdOffsetY - 10, topDownWidth + 20, topDownHeight + 20);
-    
-    floorRooms.forEach(room => {
-      const x = (room.x - minX) * scale + tdOffsetX + padding;
-      const z = (room.z - minZ) * scale + tdOffsetY + padding;
-      const w = room.width * scale;
-      const l = room.length * scale;
-      
-      ctx.fillStyle = room.isStairs ? "#fef3c7" : room.color;
-      ctx.fillRect(x - w / 2, z - l / 2, w, l);
-      
-      ctx.strokeStyle = room.isStairs ? "#f59e0b" : "#374151";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x - w / 2, z - l / 2, w, l);
-      
-      ctx.fillStyle = "#1f2937";
-      ctx.font = "bold 11px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(room.name, x, z - 2);
-      
-      ctx.font = "10px Arial";
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 10);
-      
-      ctx.fillStyle = "#dc2626";
-      ctx.font = "bold 9px Arial";
-      ctx.fillText(`${room.width}'`, x, z - l / 2 - 4);
-      
-      ctx.save();
-      ctx.translate(x - w / 2 - 4, z);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText(`${room.length}'`, 0, 0);
-      ctx.restore();
-    });
-    
-    const dataUrl = combinedCanvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `floor-plan-floor${currentFloor}-complete-${new Date().toISOString().split("T")[0]}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    toast({ title: "Exported", description: `Complete floor plan with 4 corner views saved!` });
-  }, [rooms, currentFloor, toast, sceneRef]);
+    toast({ title: "Exported", description: `Floor plan PDF with 3D views saved!` });
+  }, [rooms, doors, currentFloor, toast, sceneRef]);
 
   useEffect(() => {
     if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
@@ -1447,81 +1560,153 @@ export default function FloorPlan3D() {
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {currentFloorRooms.map((room) => (
-                          <Card
-                            key={room.id}
-                            className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""} ${selectedRooms.has(room.id) ? "bg-primary/5" : ""} ${room.isStairs ? "border-amber-500/50" : ""}`}
-                            onClick={() => setSelectedRoom(room.id)}
-                            data-testid={`card-room-${room.id}`}
-                          >
-                            <CardContent className="p-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <Checkbox
-                                    checked={selectedRooms.has(room.id)}
-                                    onCheckedChange={() => toggleRoomSelection(room.id)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    data-testid={`checkbox-room-${room.id}`}
-                                  />
-                                  <div>
-                                    <div className="font-medium text-sm flex items-center gap-2">
-                                      {room.name}
-                                      {room.isStairs && (
-                                        <Badge 
-                                          variant="outline" 
-                                          className={`text-xs px-1 py-0 ${room.stairsDirection === "up" ? "text-amber-600" : "text-blue-600"}`}
-                                        >
-                                          {room.stairsDirection === "up" ? "↑ Going Up" : "↓ From Below"}
-                                        </Badge>
+                        {roomGroups.map((group) => (
+                          group.rooms.length > 1 ? (
+                            <Collapsible
+                              key={group.id}
+                              open={expandedGroups.has(group.id)}
+                              onOpenChange={() => toggleGroup(group.id)}
+                            >
+                              <CollapsibleTrigger className="w-full">
+                                <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                                  {expandedGroups.has(group.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <span className="font-medium text-sm">{group.name}</span>
+                                  <Badge variant="secondary" className="ml-auto text-xs">
+                                    {group.rooms.length} rooms
+                                  </Badge>
+                                </div>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="pl-4 mt-2 space-y-2 border-l-2 border-muted ml-2">
+                                  {group.rooms.map((room) => (
+                                    <Card
+                                      key={room.id}
+                                      className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""} ${selectedRooms.has(room.id) ? "bg-primary/5" : ""} ${room.isStairs ? "border-amber-500/50" : ""}`}
+                                      onClick={() => setSelectedRoom(room.id)}
+                                      data-testid={`card-room-${room.id}`}
+                                    >
+                                      <CardContent className="p-3">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            <Checkbox
+                                              checked={selectedRooms.has(room.id)}
+                                              onCheckedChange={() => toggleRoomSelection(room.id)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              data-testid={`checkbox-room-${room.id}`}
+                                            />
+                                            <div>
+                                              <div className="font-medium text-sm flex items-center gap-2">
+                                                {room.name}
+                                                {room.isStairs && (
+                                                  <Badge variant="outline" className={`text-xs px-1 py-0 ${room.stairsDirection === "up" ? "text-amber-600" : "text-blue-600"}`}>
+                                                    {room.stairsDirection === "up" ? "↑ Going Up" : "↓ From Below"}
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                {room.width}' x {room.length}' x {room.height}'
+                                              </div>
+                                              {room.isStairs && room.connectedRoomId && (
+                                                <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                                                  <Link2 className="h-3 w-3" />
+                                                  Connected to: {currentFloorRooms.find(r => r.id === room.connectedRoomId)?.name || "Room"}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
+                                            data-testid={`button-remove-room-${room.id}`}
+                                          >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                          </Button>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          ) : (
+                            <Card
+                              key={group.rooms[0].id}
+                              className={`cursor-pointer transition-colors ${selectedRoom === group.rooms[0].id ? "border-primary" : ""} ${selectedRooms.has(group.rooms[0].id) ? "bg-primary/5" : ""} ${group.rooms[0].isStairs ? "border-amber-500/50" : ""}`}
+                              onClick={() => setSelectedRoom(group.rooms[0].id)}
+                              data-testid={`card-room-${group.rooms[0].id}`}
+                            >
+                              <CardContent className="p-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Checkbox
+                                      checked={selectedRooms.has(group.rooms[0].id)}
+                                      onCheckedChange={() => toggleRoomSelection(group.rooms[0].id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      data-testid={`checkbox-room-${group.rooms[0].id}`}
+                                    />
+                                    <div>
+                                      <div className="font-medium text-sm flex items-center gap-2">
+                                        {group.rooms[0].name}
+                                        {group.rooms[0].isStairs && (
+                                          <Badge variant="outline" className={`text-xs px-1 py-0 ${group.rooms[0].stairsDirection === "up" ? "text-amber-600" : "text-blue-600"}`}>
+                                            {group.rooms[0].stairsDirection === "up" ? "↑ Going Up" : "↓ From Below"}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {group.rooms[0].width}' x {group.rooms[0].length}' x {group.rooms[0].height}'
+                                      </div>
+                                      {group.rooms[0].isStairs && group.rooms[0].connectedRoomId && (
+                                        <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                                          <Link2 className="h-3 w-3" />
+                                          Connected to: {currentFloorRooms.find(r => r.id === group.rooms[0].connectedRoomId)?.name || "Room"}
+                                        </div>
                                       )}
                                     </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {room.width}' x {room.length}' x {room.height}'
-                                    </div>
-                                    {room.isStairs && room.connectedRoomId && (
-                                      <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                                        <Link2 className="h-3 w-3" />
-                                        Connected to: {currentFloorRooms.find(r => r.id === room.connectedRoomId)?.name || "Room"}
-                                      </div>
-                                    )}
                                   </div>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => { e.stopPropagation(); removeRoom(room.id); }}
-                                  data-testid={`button-remove-room-${room.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                              {room.isStairs && selectedRoom === room.id && (
-                                <div className="mt-2 pt-2 border-t">
-                                  <Label className="text-xs">
-                                    Connect to Room ({room.stairsDirection === "up" ? "at bottom - where you start" : "at top - where you arrive"})
-                                  </Label>
-                                  <Select
-                                    value={room.connectedRoomId || "none"}
-                                    onValueChange={(value) => connectStairsToRoom(room.id, value === "none" ? undefined : value)}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => { e.stopPropagation(); removeRoom(group.rooms[0].id); }}
+                                    data-testid={`button-remove-room-${group.rooms[0].id}`}
                                   >
-                                    <SelectTrigger className="h-8 mt-1" data-testid="select-connect-room">
-                                      <SelectValue placeholder="Select room..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">No connection</SelectItem>
-                                      {currentFloorRooms
-                                        .filter(r => !r.isStairs && r.id !== room.id)
-                                        .map(r => (
-                                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                        ))
-                                      }
-                                    </SelectContent>
-                                  </Select>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
                                 </div>
-                              )}
-                            </CardContent>
-                          </Card>
+                                {group.rooms[0].isStairs && selectedRoom === group.rooms[0].id && (
+                                  <div className="mt-2 pt-2 border-t">
+                                    <Label className="text-xs">
+                                      Connect to Room ({group.rooms[0].stairsDirection === "up" ? "at bottom - where you start" : "at top - where you arrive"})
+                                    </Label>
+                                    <Select
+                                      value={group.rooms[0].connectedRoomId || "none"}
+                                      onValueChange={(value) => connectStairsToRoom(group.rooms[0].id, value === "none" ? undefined : value)}
+                                    >
+                                      <SelectTrigger className="h-8 mt-1" data-testid="select-connect-room">
+                                        <SelectValue placeholder="Select room..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">No connection</SelectItem>
+                                        {currentFloorRooms
+                                          .filter(r => !r.isStairs && r.id !== group.rooms[0].id)
+                                          .map(r => (
+                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                          ))
+                                        }
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
                         ))}
                       </div>
                     )}
