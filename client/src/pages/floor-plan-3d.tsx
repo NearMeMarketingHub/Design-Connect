@@ -559,16 +559,266 @@ export default function FloorPlan3D() {
       const dataUrl = canvas.toDataURL("image/png");
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `floor-plan-floor${currentFloor}-${new Date().toISOString().split("T")[0]}.png`;
+      a.download = `floor-plan-floor${currentFloor}-3d-${new Date().toISOString().split("T")[0]}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       
-      toast({ title: "Exported", description: `Floor ${currentFloor} saved as PNG image` });
+      toast({ title: "Exported", description: `Floor ${currentFloor} 3D view saved as PNG` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to export image", variant: "destructive" });
     }
   }, [currentFloor, toast]);
+
+  const exportTopDownWithMeasurements = useCallback(() => {
+    const floorRooms = rooms.filter(r => r.floor === currentFloor);
+    if (floorRooms.length === 0) {
+      toast({ title: "No Rooms", description: "Add some rooms before exporting", variant: "destructive" });
+      return;
+    }
+
+    const scale = 20;
+    const padding = 100;
+    
+    const minX = Math.min(...floorRooms.map(r => r.x - r.width / 2));
+    const maxX = Math.max(...floorRooms.map(r => r.x + r.width / 2));
+    const minZ = Math.min(...floorRooms.map(r => r.z - r.length / 2));
+    const maxZ = Math.max(...floorRooms.map(r => r.z + r.length / 2));
+    
+    const width = (maxX - minX) * scale + padding * 2;
+    const height = (maxZ - minZ) * scale + padding * 2;
+    
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(800, width);
+    canvas.height = Math.max(600, height + 80);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "#1a1a2e";
+    ctx.font = "bold 24px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(`Floor ${currentFloor} - Top Down View`, canvas.width / 2, 40);
+    
+    ctx.font = "14px Arial";
+    ctx.fillStyle = "#666666";
+    ctx.fillText(`Scale: 1 unit = ${scale}px | Dimensions in feet`, canvas.width / 2, 60);
+    
+    const offsetX = padding - minX * scale + (canvas.width - width) / 2;
+    const offsetZ = padding - minZ * scale + 80;
+    
+    floorRooms.forEach(room => {
+      const x = room.x * scale + offsetX;
+      const z = room.z * scale + offsetZ;
+      const w = room.width * scale;
+      const l = room.length * scale;
+      
+      ctx.fillStyle = room.isStairs ? "#fef3c7" : room.color;
+      ctx.fillRect(x - w / 2, z - l / 2, w, l);
+      
+      ctx.strokeStyle = room.isStairs ? "#f59e0b" : "#374151";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - w / 2, z - l / 2, w, l);
+      
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(room.name, x, z - 5);
+      
+      ctx.font = "12px Arial";
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 12);
+      
+      if (room.isStairs) {
+        ctx.font = "10px Arial";
+        ctx.fillStyle = "#b45309";
+        ctx.fillText(room.stairsDirection === "up" ? "↑ Going Up" : "↓ From Below", x, z + 26);
+      }
+      
+      ctx.fillStyle = "#ef4444";
+      ctx.font = "bold 11px Arial";
+      
+      ctx.save();
+      ctx.translate(x - w / 2 - 8, z);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.fillText(`${room.length}'`, 0, 0);
+      ctx.restore();
+      
+      ctx.textAlign = "center";
+      ctx.fillText(`${room.width}'`, x, z - l / 2 - 8);
+    });
+    
+    const floorDoors = doors.filter(d => floorRooms.some(r => r.id === d.roomId));
+    floorDoors.forEach(door => {
+      const room = floorRooms.find(r => r.id === door.roomId);
+      if (!room) return;
+      
+      const roomX = room.x * scale + offsetX;
+      const roomZ = room.z * scale + offsetZ;
+      const roomW = room.width * scale;
+      const roomL = room.length * scale;
+      
+      let doorX = roomX, doorZ = roomZ;
+      const doorW = door.width * scale;
+      
+      switch (door.wall) {
+        case "north": doorZ = roomZ - roomL / 2; doorX = roomX - roomW / 2 + (door.position / 100) * roomW; break;
+        case "south": doorZ = roomZ + roomL / 2; doorX = roomX - roomW / 2 + (door.position / 100) * roomW; break;
+        case "east": doorX = roomX + roomW / 2; doorZ = roomZ - roomL / 2 + (door.position / 100) * roomL; break;
+        case "west": doorX = roomX - roomW / 2; doorZ = roomZ - roomL / 2 + (door.position / 100) * roomL; break;
+      }
+      
+      ctx.fillStyle = "#8b5cf6";
+      if (door.wall === "north" || door.wall === "south") {
+        ctx.fillRect(doorX - doorW / 2, doorZ - 4, doorW, 8);
+      } else {
+        ctx.fillRect(doorX - 4, doorZ - doorW / 2, 8, doorW);
+      }
+    });
+    
+    ctx.fillStyle = "#666666";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText("Legend:", 20, canvas.height - 50);
+    
+    ctx.fillStyle = "#e8e4e1";
+    ctx.fillRect(20, canvas.height - 40, 20, 15);
+    ctx.strokeStyle = "#374151";
+    ctx.strokeRect(20, canvas.height - 40, 20, 15);
+    ctx.fillStyle = "#666666";
+    ctx.fillText("Room", 45, canvas.height - 28);
+    
+    ctx.fillStyle = "#fef3c7";
+    ctx.fillRect(100, canvas.height - 40, 20, 15);
+    ctx.strokeStyle = "#f59e0b";
+    ctx.strokeRect(100, canvas.height - 40, 20, 15);
+    ctx.fillStyle = "#666666";
+    ctx.fillText("Stairs", 125, canvas.height - 28);
+    
+    ctx.fillStyle = "#8b5cf6";
+    ctx.fillRect(180, canvas.height - 40, 20, 8);
+    ctx.fillStyle = "#666666";
+    ctx.fillText("Door", 205, canvas.height - 28);
+    
+    const dataUrl = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `floor-plan-floor${currentFloor}-topdown-${new Date().toISOString().split("T")[0]}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    toast({ title: "Exported", description: `Floor ${currentFloor} top-down view with measurements saved` });
+  }, [rooms, doors, currentFloor, toast]);
+
+  const exportAllViews = useCallback(async () => {
+    const threeCanvas = document.querySelector("canvas") as HTMLCanvasElement;
+    if (!threeCanvas) {
+      toast({ title: "Error", description: "Could not find canvas", variant: "destructive" });
+      return;
+    }
+    
+    const floorRooms = rooms.filter(r => r.floor === currentFloor);
+    if (floorRooms.length === 0) {
+      toast({ title: "No Rooms", description: "Add some rooms before exporting", variant: "destructive" });
+      return;
+    }
+
+    const scale = 15;
+    const padding = 60;
+    
+    const minX = Math.min(...floorRooms.map(r => r.x - r.width / 2));
+    const maxX = Math.max(...floorRooms.map(r => r.x + r.width / 2));
+    const minZ = Math.min(...floorRooms.map(r => r.z - r.length / 2));
+    const maxZ = Math.max(...floorRooms.map(r => r.z + r.length / 2));
+    
+    const topDownWidth = (maxX - minX) * scale + padding * 2;
+    const topDownHeight = (maxZ - minZ) * scale + padding * 2;
+    
+    const combinedCanvas = document.createElement("canvas");
+    const threeWidth = threeCanvas.width;
+    const threeHeight = threeCanvas.height;
+    
+    combinedCanvas.width = Math.max(threeWidth, topDownWidth + 40) + 40;
+    combinedCanvas.height = threeHeight + Math.max(400, topDownHeight + 100) + 120;
+    const ctx = combinedCanvas.getContext("2d");
+    if (!ctx) return;
+    
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+    
+    ctx.fillStyle = "#1e293b";
+    ctx.font = "bold 28px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(`Floor Plan Export - Floor ${currentFloor}`, combinedCanvas.width / 2, 40);
+    
+    ctx.font = "14px Arial";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText(`Generated: ${new Date().toLocaleString()}`, combinedCanvas.width / 2, 60);
+    
+    ctx.fillStyle = "#334155";
+    ctx.font = "bold 18px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText("3D Perspective View", 20, 95);
+    
+    ctx.drawImage(threeCanvas, 20, 105, threeWidth * 0.8, threeHeight * 0.8);
+    
+    const topDownY = 115 + threeHeight * 0.8 + 20;
+    ctx.fillStyle = "#334155";
+    ctx.font = "bold 18px Arial";
+    ctx.fillText("Top-Down View with Measurements", 20, topDownY);
+    
+    const offsetX = padding + 20;
+    const offsetZ = topDownY + 30 + padding - minZ * scale;
+    const baseOffsetX = offsetX - minX * scale;
+    
+    floorRooms.forEach(room => {
+      const x = room.x * scale + baseOffsetX;
+      const z = room.z * scale + offsetZ;
+      const w = room.width * scale;
+      const l = room.length * scale;
+      
+      ctx.fillStyle = room.isStairs ? "#fef3c7" : room.color;
+      ctx.fillRect(x - w / 2, z - l / 2, w, l);
+      
+      ctx.strokeStyle = room.isStairs ? "#f59e0b" : "#374151";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - w / 2, z - l / 2, w, l);
+      
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "bold 12px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(room.name, x, z - 3);
+      
+      ctx.font = "11px Arial";
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 10);
+      
+      ctx.fillStyle = "#dc2626";
+      ctx.font = "bold 10px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(`${room.width}'`, x, z - l / 2 - 5);
+      
+      ctx.save();
+      ctx.translate(x - w / 2 - 5, z);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(`${room.length}'`, 0, 0);
+      ctx.restore();
+    });
+    
+    const dataUrl = combinedCanvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `floor-plan-floor${currentFloor}-complete-${new Date().toISOString().split("T")[0]}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    toast({ title: "Exported", description: `Complete floor plan for Floor ${currentFloor} saved` });
+  }, [rooms, currentFloor, toast]);
 
   useEffect(() => {
     if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
@@ -1557,9 +1807,17 @@ export default function FloorPlan3D() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportAllViews} data-testid="menu-export-complete">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Complete Export (3D + Top-Down)
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={exportAsImage} data-testid="menu-export-image">
                     <Image className="h-4 w-4 mr-2" />
-                    Export as Image (PNG)
+                    Current 3D View Only
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportTopDownWithMeasurements} data-testid="menu-export-topdown">
+                    <Grid3X3 className="h-4 w-4 mr-2" />
+                    Top-Down with Measurements
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={exportAsJSON} data-testid="menu-export-json">
                     <FileJson className="h-4 w-4 mr-2" />
