@@ -31,6 +31,7 @@ Last Updated: January 9, 2026
 - [x] Building out the post feature for the progress photos on the contractors side of the app
 - [ ] Plans and Drawings section for Contractor
 - [ ] Project-type-specific default milestones - Different preset milestones based on Project Type (Renovation, Remodel, Addition, Commercial, Residential) selected during project creation. Waiting on milestone data.
+- [ ] Template-based timeline system - Each project type has predefined milestone durations (in days). When a project is created with a due date and project type, the system calculates actual dates for each milestone by working backwards from the due date. Duration templates would specify things like "Demolition = 3 days, Plumbing = 5 days, Tile = 4 days" and convert these into calendar dates.
 
 ### Contractor Internal Roles (Company Type Access Levels)
 Base role structure created in `shared/contractor-roles.ts`. Implementation pending.
