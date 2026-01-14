@@ -657,11 +657,12 @@ export default function FloorPlan3D() {
   const [cameraResetTrigger, setCameraResetTrigger] = useState(0);
   const [currentFloor, setCurrentFloor] = useState(1);
   const [totalFloors, setTotalFloors] = useState(1);
-  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string }>({
+  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string; snapConnectedRoom: boolean }>({
     wall: "south",
     position: 50,
     width: 3,
     connectedRoomId: undefined,
+    snapConnectedRoom: true,
   });
   
   const [newRoom, setNewRoom] = useState({
@@ -1331,9 +1332,6 @@ export default function FloorPlan3D() {
     if (newDoor.connectedRoomId) {
       const connectedRoom = rooms.find((r) => r.id === newDoor.connectedRoomId);
       if (connectedRoom) {
-        let newX = connectedRoom.x;
-        let newZ = connectedRoom.z;
-        
         const oppositeWall: Record<string, "north" | "south" | "east" | "west"> = {
           north: "south",
           south: "north",
@@ -1345,34 +1343,39 @@ export default function FloorPlan3D() {
           ? connectedRoom.width 
           : connectedRoom.length;
         
-        switch (newDoor.wall) {
-          case "north":
-            newX = room.x - room.width / 2 + doorPosition;
-            newZ = room.z + room.length / 2 + connectedRoom.length / 2;
-            break;
-          case "south":
-            newX = room.x - room.width / 2 + doorPosition;
-            newZ = room.z - room.length / 2 - connectedRoom.length / 2;
-            break;
-          case "east":
-            newX = room.x - room.width / 2 - connectedRoom.width / 2;
-            newZ = room.z - room.length / 2 + doorPosition;
-            break;
-          case "west":
-            newX = room.x + room.width / 2 + connectedRoom.width / 2;
-            newZ = room.z - room.length / 2 + doorPosition;
-            break;
+        if (newDoor.snapConnectedRoom) {
+          let newX = connectedRoom.x;
+          let newZ = connectedRoom.z;
+          
+          switch (newDoor.wall) {
+            case "north":
+              newX = room.x - room.width / 2 + doorPosition;
+              newZ = room.z + room.length / 2 + connectedRoom.length / 2;
+              break;
+            case "south":
+              newX = room.x - room.width / 2 + doorPosition;
+              newZ = room.z - room.length / 2 - connectedRoom.length / 2;
+              break;
+            case "east":
+              newX = room.x - room.width / 2 - connectedRoom.width / 2;
+              newZ = room.z - room.length / 2 + doorPosition;
+              break;
+            case "west":
+              newX = room.x + room.width / 2 + connectedRoom.width / 2;
+              newZ = room.z - room.length / 2 + doorPosition;
+              break;
+          }
+          
+          const deltaX = newX - connectedRoom.x;
+          const deltaZ = newZ - connectedRoom.z;
+          
+          setRooms(rooms.map((r) =>
+            r.id === newDoor.connectedRoomId ? { ...r, x: newX, z: newZ } : r
+          ));
+          setFurniture(furniture.map((f) =>
+            f.roomId === newDoor.connectedRoomId ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+          ));
         }
-        
-        const deltaX = newX - connectedRoom.x;
-        const deltaZ = newZ - connectedRoom.z;
-        
-        setRooms(rooms.map((r) =>
-          r.id === newDoor.connectedRoomId ? { ...r, x: newX, z: newZ } : r
-        ));
-        setFurniture(furniture.map((f) =>
-          f.roomId === newDoor.connectedRoomId ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
-        ));
         
         const connectedDoor: Door = {
           id: crypto.randomUUID(),
@@ -1389,7 +1392,7 @@ export default function FloorPlan3D() {
     setDoors([...doors, ...newDoors]);
     
     setShowAddDoorDialog(false);
-    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined });
+    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined, snapConnectedRoom: true });
     toast({ title: "Door Added", description: newDoor.connectedRoomId ? `Door added and room connected` : `Door added to ${newDoor.wall} wall` });
   };
 
@@ -1967,17 +1970,32 @@ export default function FloorPlan3D() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="none">No connection</SelectItem>
-                                  {rooms.filter((r) => r.id !== selectedRoom).map((room) => (
+                                  {rooms.filter((r) => r.id !== selectedRoom && r.floor === currentFloor).map((room) => (
                                     <SelectItem key={room.id} value={room.id}>
                                       {room.name}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Connecting will snap the selected room to this door
-                              </p>
                             </div>
+                            {newDoor.connectedRoomId && (
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="snap-room"
+                                  checked={newDoor.snapConnectedRoom}
+                                  onCheckedChange={(checked) => setNewDoor({ ...newDoor, snapConnectedRoom: checked === true })}
+                                  data-testid="checkbox-snap-room"
+                                />
+                                <Label htmlFor="snap-room" className="text-sm font-normal cursor-pointer">
+                                  Move connected room to align with door
+                                </Label>
+                              </div>
+                            )}
+                            {newDoor.connectedRoomId && !newDoor.snapConnectedRoom && (
+                              <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                                The connected room will stay in its current position. Make sure you've positioned it where you want it before adding the door.
+                              </p>
+                            )}
                           </div>
                           <DialogFooter>
                             <Button variant="outline" onClick={() => setShowAddDoorDialog(false)}>
