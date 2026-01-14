@@ -159,6 +159,9 @@ function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, 
 
 function DoorFrame({ position, rotation, width, height }: { position: [number, number, number]; rotation: number; width: number; height: number }) {
   const frameThickness = 0.3;
+  const doorThickness = 0.15;
+  const doorHeight = height - 0.5;
+  const doorWidth = width - 0.2;
   
   return (
     <group position={position} rotation={[0, rotation, 0]}>
@@ -170,6 +173,22 @@ function DoorFrame({ position, rotation, width, height }: { position: [number, n
         <boxGeometry args={[frameThickness, height, 0.5]} />
         <meshStandardMaterial color="#654321" />
       </mesh>
+      <mesh position={[0, height - 0.15, 0]}>
+        <boxGeometry args={[width + frameThickness * 2, 0.3, 0.5]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+      <group position={[-width / 2 + 0.1, 0, 0]}>
+        <group rotation={[0, Math.PI / 2, 0]}>
+          <mesh position={[doorWidth / 2, doorHeight / 2 + 0.1, 0]}>
+            <boxGeometry args={[doorWidth, doorHeight, doorThickness]} />
+            <meshStandardMaterial color="#8B4513" />
+          </mesh>
+          <mesh position={[doorWidth - 0.3, doorHeight / 2, doorThickness / 2 + 0.08]}>
+            <sphereGeometry args={[0.12, 16, 16]} />
+            <meshStandardMaterial color="#C0A000" metalness={0.8} roughness={0.2} />
+          </mesh>
+        </group>
+      </group>
     </group>
   );
 }
