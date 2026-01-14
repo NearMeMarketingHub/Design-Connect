@@ -1442,11 +1442,15 @@ export default function FloorPlan3D() {
   };
 
   const openConnectToDoorDialog = (doorId: string, targetRoomId: string) => {
-    setConnectToDoorDialog({ open: true, doorId, targetRoomId, selectedWall: "north" });
+    const door = doors.find(d => d.id === doorId);
+    const defaultDirection = door?.wall === "south" ? "south" : 
+                            door?.wall === "north" ? "north" : 
+                            door?.wall === "east" ? "east" : "west";
+    setConnectToDoorDialog({ open: true, doorId, targetRoomId, selectedWall: defaultDirection });
   };
 
   const executeConnectDoorToRoom = () => {
-    const { doorId, targetRoomId, selectedWall } = connectToDoorDialog;
+    const { doorId, targetRoomId, selectedWall: roomDirection } = connectToDoorDialog;
     if (!doorId || !targetRoomId) return;
 
     const door = doors.find(d => d.id === doorId);
@@ -1465,7 +1469,14 @@ export default function FloorPlan3D() {
       return;
     }
 
-    const targetWall = selectedWall;
+    const directionToTargetWall: Record<string, "north" | "south" | "east" | "west"> = {
+      north: "south",
+      south: "north",
+      east: "west",
+      west: "east"
+    };
+    const targetWall = directionToTargetWall[roomDirection];
+    
     const targetWallLength = targetWall === "north" || targetWall === "south" ? targetRoom.width : targetRoom.length;
     const targetDoorPosition = targetWallLength / 2;
 
@@ -1480,17 +1491,17 @@ export default function FloorPlan3D() {
     let newX = targetRoom.x;
     let newZ = targetRoom.z;
     
-    if (targetWall === "north") {
-      newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
-      newZ = doorWorldZ + targetRoom.length / 2;
-    } else if (targetWall === "south") {
+    if (roomDirection === "north") {
       newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
       newZ = doorWorldZ - targetRoom.length / 2;
-    } else if (targetWall === "east") {
-      newX = doorWorldX - targetRoom.width / 2;
-      newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
-    } else if (targetWall === "west") {
+    } else if (roomDirection === "south") {
+      newX = doorWorldX - targetDoorPosition + targetRoom.width / 2;
+      newZ = doorWorldZ + targetRoom.length / 2;
+    } else if (roomDirection === "east") {
       newX = doorWorldX + targetRoom.width / 2;
+      newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
+    } else if (roomDirection === "west") {
+      newX = doorWorldX - targetRoom.width / 2;
       newZ = doorWorldZ - targetDoorPosition + targetRoom.length / 2;
     }
 
@@ -2726,7 +2737,7 @@ export default function FloorPlan3D() {
               <DialogHeader>
                 <DialogTitle>Connect Room to Door</DialogTitle>
                 <DialogDescription>
-                  Choose which wall of your room will have the door
+                  Choose where to place your room relative to the door
                 </DialogDescription>
               </DialogHeader>
               {(() => {
@@ -2734,13 +2745,16 @@ export default function FloorPlan3D() {
                 const targetRoom = rooms.find(r => r.id === connectToDoorDialog.targetRoomId);
                 const sourceRoom = door ? rooms.find(r => r.id === door.roomId) : null;
                 if (!door || !targetRoom || !sourceRoom) return null;
+                
+                const isHorizontalDoor = door.wall === "north" || door.wall === "south";
+                
                 return (
                   <div className="space-y-4">
                     <div className="p-3 bg-muted rounded-lg text-sm">
                       <p>Connecting <strong>{targetRoom.name}</strong> to the door on <strong>{sourceRoom.name}'s {door.wall} wall</strong></p>
                     </div>
                     <div>
-                      <Label>Which wall of {targetRoom.name} should have the door?</Label>
+                      <Label>Where should {targetRoom.name} be placed?</Label>
                       <Select 
                         value={connectToDoorDialog.selectedWall} 
                         onValueChange={(val) => setConnectToDoorDialog(prev => ({ 
@@ -2752,10 +2766,17 @@ export default function FloorPlan3D() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="north">North (Back) - room goes south of door</SelectItem>
-                          <SelectItem value="south">South (Front) - room goes north of door</SelectItem>
-                          <SelectItem value="east">East (Right) - room goes west of door</SelectItem>
-                          <SelectItem value="west">West (Left) - room goes east of door</SelectItem>
+                          {isHorizontalDoor ? (
+                            <>
+                              <SelectItem value="north">Room goes NORTH of {sourceRoom.name} (door on your south wall)</SelectItem>
+                              <SelectItem value="south">Room goes SOUTH of {sourceRoom.name} (door on your north wall)</SelectItem>
+                            </>
+                          ) : (
+                            <>
+                              <SelectItem value="east">Room goes EAST of {sourceRoom.name} (door on your west wall)</SelectItem>
+                              <SelectItem value="west">Room goes WEST of {sourceRoom.name} (door on your east wall)</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
