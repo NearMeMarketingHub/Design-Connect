@@ -257,7 +257,7 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
     return roomDoors
       .filter(d => d.wall === wall)
       .map(d => {
-        const isReversedWall = wall === "north" || wall === "west";
+        const isReversedWall = wall === "north" || wall === "east";
         const adjustedPosition = isReversedWall ? (wallLength - d.position) : d.position;
         const isPrimaryDoor = !d.connectedRoomId || d.roomId < d.connectedRoomId;
         return { position: adjustedPosition, width: d.width, renderFrame: isPrimaryDoor };
@@ -280,7 +280,7 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
         start={[room.width / 2, -room.length / 2]} 
         end={[room.width / 2, room.length / 2]} 
         height={room.height}
-        doors={getDoorsForWall("east")}
+        doors={getDoorsForWall("west")}
       />
       <Wall 
         start={[room.width / 2, room.length / 2]} 
@@ -292,7 +292,7 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
         start={[-room.width / 2, room.length / 2]} 
         end={[-room.width / 2, -room.length / 2]} 
         height={room.height}
-        doors={getDoorsForWall("west")}
+        doors={getDoorsForWall("east")}
       />
     </group>
   );
@@ -1169,11 +1169,11 @@ export default function FloorPlan3D() {
             newZ = room.z - room.length / 2 - connectedRoom.length / 2;
             break;
           case "east":
-            newX = room.x + room.width / 2 + connectedRoom.width / 2;
+            newX = room.x - room.width / 2 - connectedRoom.width / 2;
             newZ = room.z - room.length / 2 + doorPosition;
             break;
           case "west":
-            newX = room.x - room.width / 2 - connectedRoom.width / 2;
+            newX = room.x + room.width / 2 + connectedRoom.width / 2;
             newZ = room.z - room.length / 2 + doorPosition;
             break;
         }
