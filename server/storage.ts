@@ -112,6 +112,10 @@ export interface IStorage {
   deleteMilestoneTask(id: string): Promise<void>;
   completeAllPhaseTasks(phaseId: string): Promise<void>;
   
+  // Timeline delay methods
+  delayPhase(phaseId: string, delayDays: number, projectId: string): Promise<{ updatedPhases: number; updatedTasks: number; newProjectDueDate?: string }>;
+  delayTask(taskId: string, delayDays: number): Promise<{ updatedTasks: number; updatedPhases: number; newProjectDueDate?: string }>;
+  
   // Action item methods
   getActionItems(projectId: string): Promise<ActionItem[]>;
   createActionItem(item: InsertActionItem): Promise<ActionItem>;
@@ -556,6 +560,149 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.milestoneTasks)
       .set({ isComplete: true, progressPercent: 100 })
       .where(eq(schema.milestoneTasks.phaseId, phaseId));
+  }
+
+  // Helper function to add days to a date string
+  private addDaysToDate(dateStr: string, days: number): string {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + days);
+    return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+  }
+
+  // Delay a phase and cascade to all subsequent phases/tasks
+  async delayPhase(phaseId: string, delayDays: number, projectId: string): Promise<{ updatedPhases: number; updatedTasks: number; newProjectDueDate?: string }> {
+    // Get the phase being delayed
+    const [targetPhase] = await db.select().from(schema.projectPhases).where(eq(schema.projectPhases.id, phaseId));
+    if (!targetPhase) {
+      throw new Error('Phase not found');
+    }
+
+    // Get all phases for the project ordered by orderIndex
+    const allPhases = await db.select().from(schema.projectPhases)
+      .where(eq(schema.projectPhases.projectId, projectId))
+      .orderBy(schema.projectPhases.orderIndex);
+
+    // Find phases at or after the target phase's orderIndex
+    const phasesToUpdate = allPhases.filter(p => p.orderIndex >= targetPhase.orderIndex);
+    
+    let updatedPhases = 0;
+    let updatedTasks = 0;
+
+    // Update each affected phase's dueDate
+    for (const phase of phasesToUpdate) {
+      if (phase.dueDate) {
+        const newDueDate = this.addDaysToDate(phase.dueDate, delayDays);
+        await db.update(schema.projectPhases)
+          .set({ dueDate: newDueDate })
+          .where(eq(schema.projectPhases.id, phase.id));
+        updatedPhases++;
+      }
+
+      // Update all tasks in this phase
+      const tasks = await db.select().from(schema.milestoneTasks)
+        .where(eq(schema.milestoneTasks.phaseId, phase.id));
+      
+      for (const task of tasks) {
+        if (task.dueDate) {
+          const newTaskDueDate = this.addDaysToDate(task.dueDate, delayDays);
+          await db.update(schema.milestoneTasks)
+            .set({ dueDate: newTaskDueDate })
+            .where(eq(schema.milestoneTasks.id, task.id));
+          updatedTasks++;
+        }
+      }
+    }
+
+    // Update project due date
+    const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, projectId));
+    let newProjectDueDate: string | undefined;
+    
+    if (project?.dueDate) {
+      newProjectDueDate = this.addDaysToDate(project.dueDate, delayDays);
+      await db.update(schema.projects)
+        .set({ dueDate: newProjectDueDate })
+        .where(eq(schema.projects.id, projectId));
+    }
+
+    return { updatedPhases, updatedTasks, newProjectDueDate };
+  }
+
+  // Delay a task and cascade to all subsequent tasks in the same and later phases
+  async delayTask(taskId: string, delayDays: number): Promise<{ updatedTasks: number; updatedPhases: number; newProjectDueDate?: string }> {
+    // Get the task being delayed
+    const [targetTask] = await db.select().from(schema.milestoneTasks).where(eq(schema.milestoneTasks.id, taskId));
+    if (!targetTask) {
+      throw new Error('Task not found');
+    }
+
+    // Get the phase this task belongs to
+    const [targetPhase] = await db.select().from(schema.projectPhases).where(eq(schema.projectPhases.id, targetTask.phaseId));
+    if (!targetPhase) {
+      throw new Error('Phase not found');
+    }
+
+    const projectId = targetTask.projectId;
+
+    // Get all phases for the project ordered by orderIndex
+    const allPhases = await db.select().from(schema.projectPhases)
+      .where(eq(schema.projectPhases.projectId, projectId))
+      .orderBy(schema.projectPhases.orderIndex);
+
+    let updatedTasks = 0;
+    let updatedPhases = 0;
+
+    // Process each phase
+    for (const phase of allPhases) {
+      if (phase.orderIndex < targetPhase.orderIndex) {
+        // Skip phases before the target phase
+        continue;
+      }
+
+      // Get all tasks in this phase
+      const tasks = await db.select().from(schema.milestoneTasks)
+        .where(eq(schema.milestoneTasks.phaseId, phase.id))
+        .orderBy(schema.milestoneTasks.orderIndex);
+
+      let shouldDelayPhase = false;
+
+      for (const task of tasks) {
+        // For the target phase, only delay tasks at or after the target task's orderIndex
+        // For subsequent phases, delay all tasks
+        const shouldDelayTask = phase.orderIndex > targetPhase.orderIndex || 
+          (phase.orderIndex === targetPhase.orderIndex && task.orderIndex >= targetTask.orderIndex);
+
+        if (shouldDelayTask && task.dueDate) {
+          const newTaskDueDate = this.addDaysToDate(task.dueDate, delayDays);
+          await db.update(schema.milestoneTasks)
+            .set({ dueDate: newTaskDueDate })
+            .where(eq(schema.milestoneTasks.id, task.id));
+          updatedTasks++;
+          shouldDelayPhase = true;
+        }
+      }
+
+      // Update the phase's dueDate if any of its tasks were delayed
+      if (shouldDelayPhase && phase.dueDate) {
+        const newPhaseDueDate = this.addDaysToDate(phase.dueDate, delayDays);
+        await db.update(schema.projectPhases)
+          .set({ dueDate: newPhaseDueDate })
+          .where(eq(schema.projectPhases.id, phase.id));
+        updatedPhases++;
+      }
+    }
+
+    // Update project due date
+    const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, projectId));
+    let newProjectDueDate: string | undefined;
+    
+    if (project?.dueDate) {
+      newProjectDueDate = this.addDaysToDate(project.dueDate, delayDays);
+      await db.update(schema.projects)
+        .set({ dueDate: newProjectDueDate })
+        .where(eq(schema.projects.id, projectId));
+    }
+
+    return { updatedTasks, updatedPhases, newProjectDueDate };
   }
 
   // Action item methods
