@@ -603,7 +603,6 @@ export async function registerRoutes(
   app.post("/api/phases/:phaseId/delay", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as any;
-      // Only contractors and admins can delay phases
       if (user.role !== 'contractor' && user.role !== 'admin') {
         return res.status(403).json({ message: "Only project managers can delay phases" });
       }
@@ -616,6 +615,24 @@ export async function registerRoutes(
         return res.status(400).json({ message: "projectId is required" });
       }
 
+      // Get the phase and verify it belongs to the specified project
+      const phase = await storage.getProjectPhase(req.params.phaseId);
+      if (!phase) {
+        return res.status(404).json({ message: "Phase not found" });
+      }
+      if (phase.projectId !== projectId) {
+        return res.status(400).json({ message: "Phase does not belong to the specified project" });
+      }
+
+      // Verify user has access to this project (must be assigned or admin)
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      if (user.role !== 'admin' && project.contractorId !== user.id) {
+        return res.status(403).json({ message: "You don't have permission to modify this project" });
+      }
+
       const result = await storage.delayPhase(req.params.phaseId, delayDays, projectId);
       res.json(result);
     } catch (error) {
@@ -626,7 +643,6 @@ export async function registerRoutes(
   app.post("/api/milestone-tasks/:taskId/delay", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as any;
-      // Only contractors and admins can delay tasks
       if (user.role !== 'contractor' && user.role !== 'admin') {
         return res.status(403).json({ message: "Only project managers can delay tasks" });
       }
@@ -636,8 +652,23 @@ export async function registerRoutes(
         return res.status(400).json({ message: "delayDays must be a positive number" });
       }
 
-      const result = await storage.delayTask(req.params.taskId, delayDays);
-      res.json(result);
+      // Get task to verify project access
+      const task = await storage.getMilestoneTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      // Verify user has access to this project (must be assigned or admin)
+      const project = await storage.getProject(task.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      if (user.role !== 'admin' && project.contractorId !== user.id) {
+        return res.status(403).json({ message: "You don't have permission to modify this project" });
+      }
+
+      const taskResult = await storage.delayTask(req.params.taskId, delayDays);
+      res.json(taskResult);
     } catch (error) {
       next(error);
     }

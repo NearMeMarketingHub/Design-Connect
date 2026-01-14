@@ -94,6 +94,7 @@ export interface IStorage {
   
   // Project phase methods
   getProjectPhases(projectId: string): Promise<ProjectPhase[]>;
+  getProjectPhase(id: string): Promise<ProjectPhase | undefined>;
   createProjectPhase(phase: InsertProjectPhase): Promise<ProjectPhase>;
   updateProjectPhase(id: string, phase: Partial<InsertProjectPhase>): Promise<ProjectPhase | undefined>;
   recalculateProjectProgress(projectId: string): Promise<void>;
@@ -107,6 +108,7 @@ export interface IStorage {
   // Milestone task methods
   getMilestoneTasks(phaseId: string): Promise<MilestoneTask[]>;
   getProjectMilestoneTasks(projectId: string): Promise<MilestoneTask[]>;
+  getMilestoneTask(id: string): Promise<MilestoneTask | undefined>;
   createMilestoneTask(task: InsertMilestoneTask): Promise<MilestoneTask>;
   updateMilestoneTask(id: string, task: Partial<InsertMilestoneTask>): Promise<MilestoneTask | undefined>;
   deleteMilestoneTask(id: string): Promise<void>;
@@ -434,6 +436,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.projectPhases).where(eq(schema.projectPhases.projectId, projectId)).orderBy(schema.projectPhases.orderIndex);
   }
 
+  async getProjectPhase(id: string): Promise<ProjectPhase | undefined> {
+    const [phase] = await db.select().from(schema.projectPhases).where(eq(schema.projectPhases.id, id));
+    return phase;
+  }
+
   async createProjectPhase(insertPhase: InsertProjectPhase): Promise<ProjectPhase> {
     const [phase] = await db.insert(schema.projectPhases).values(insertPhase).returning();
     // Auto-recalculate project progress after adding a phase
@@ -522,6 +529,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.milestoneTasks)
       .where(eq(schema.milestoneTasks.projectId, projectId))
       .orderBy(schema.milestoneTasks.orderIndex);
+  }
+
+  async getMilestoneTask(id: string): Promise<MilestoneTask | undefined> {
+    const [task] = await db.select().from(schema.milestoneTasks).where(eq(schema.milestoneTasks.id, id));
+    return task;
   }
 
   async createMilestoneTask(task: InsertMilestoneTask): Promise<MilestoneTask> {

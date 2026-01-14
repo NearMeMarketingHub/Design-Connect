@@ -571,6 +571,11 @@ export default function ProjectDetails() {
   // State for tracking which task's percentage is being edited via text input
   const [editingPercentTask, setEditingPercentTask] = useState<string | null>(null);
   const [editingPercentValue, setEditingPercentValue] = useState<string>("");
+  
+  // State for timeline delay dialog
+  const [delayDialogOpen, setDelayDialogOpen] = useState(false);
+  const [delayTarget, setDelayTarget] = useState<{ type: 'phase' | 'task'; id: string; name: string } | null>(null);
+  const [delayDays, setDelayDays] = useState<string>("1");
 
   // Create milestone task mutation
   const createMilestoneTaskMutation = useMutation({
@@ -632,6 +637,77 @@ export default function ProjectDetails() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/projects', projectId, isFromAdmin] });
     }
   });
+
+  // Delay phase mutation
+  const delayPhaseMutation = useMutation({
+    mutationFn: async ({ phaseId, delayDays }: { phaseId: string; delayDays: number }) => {
+      const res = await fetch(`/api/phases/${phaseId}/delay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ delayDays, projectId })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to delay phase');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phases'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      setDelayDialogOpen(false);
+      setDelayTarget(null);
+      setDelayDays("1");
+    }
+  });
+
+  // Delay task mutation
+  const delayTaskMutation = useMutation({
+    mutationFn: async ({ taskId, delayDays }: { taskId: string; delayDays: number }) => {
+      const res = await fetch(`/api/milestone-tasks/${taskId}/delay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ delayDays })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to delay task');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'phases'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'milestone-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      setDelayDialogOpen(false);
+      setDelayTarget(null);
+      setDelayDays("1");
+    }
+  });
+
+  // Open delay dialog for a phase or task
+  const openDelayDialog = (type: 'phase' | 'task', id: string, name: string) => {
+    setDelayTarget({ type, id, name });
+    setDelayDays("1");
+    setDelayDialogOpen(true);
+  };
+
+  // Execute the delay
+  const handleDelay = () => {
+    const days = parseInt(delayDays);
+    if (!days || days <= 0 || !delayTarget) return;
+    
+    if (delayTarget.type === 'phase') {
+      delayPhaseMutation.mutate({ phaseId: delayTarget.id, delayDays: days });
+    } else {
+      delayTaskMutation.mutate({ taskId: delayTarget.id, delayDays: days });
+    }
+  };
 
   // Add a milestone task
   const addMilestoneTask = (phaseId: string) => {
@@ -2979,20 +3055,36 @@ export default function ProjectDetails() {
                                 <p className="text-sm text-muted-foreground">{milestone.description}</p>
                               </div>
                             </div>
-                            <div className="text-right flex-shrink-0 ml-4">
-                              <p className="text-sm font-medium">{milestone.date}</p>
-                              <Badge 
-                                variant={milestone.status === 'completed' ? 'default' : 'outline'}
-                                className={`text-xs mt-1 ${
-                                  milestone.status === 'completed' ? 'bg-green-500' :
-                                  milestone.status === 'in_progress' ? 'border-primary text-primary' :
-                                  ''
-                                }`}
-                                data-testid={`badge-milestone-status-${milestone.id}`}
-                              >
-                                {milestone.status === 'completed' ? 'Complete' :
-                                 milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
-                              </Badge>
+                            <div className="text-right flex-shrink-0 ml-4 flex items-start gap-2">
+                              <div>
+                                <p className="text-sm font-medium">{milestone.date}</p>
+                                <Badge 
+                                  variant={milestone.status === 'completed' ? 'default' : 'outline'}
+                                  className={`text-xs mt-1 ${
+                                    milestone.status === 'completed' ? 'bg-green-500' :
+                                    milestone.status === 'in_progress' ? 'border-primary text-primary' :
+                                    ''
+                                  }`}
+                                  data-testid={`badge-milestone-status-${milestone.id}`}
+                                >
+                                  {milestone.status === 'completed' ? 'Complete' :
+                                   milestone.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                                </Badge>
+                              </div>
+                              {/* Delay button for contractors/admins */}
+                              {canEdit && isApiPhase && milestone.status !== 'completed' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDelayDialog('phase', milestone.id, milestone.name);
+                                  }}
+                                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                  title="Delay this milestone and all subsequent items"
+                                  data-testid={`button-delay-phase-${milestone.id}`}
+                                >
+                                  <Clock className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
                           
@@ -3142,15 +3234,29 @@ export default function ProjectDetails() {
                                             </div>
                                           )}
                                           
-                                          {/* Delete button for contractors */}
+                                          {/* Task action buttons for contractors */}
                                           {canEdit && (
-                                            <button
-                                              onClick={() => deleteMilestoneTaskMutation.mutate(task.id)}
-                                              className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity p-1"
-                                              data-testid={`button-delete-task-${task.id}`}
-                                            >
-                                              <X className="w-3 h-3" />
-                                            </button>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              {/* Delay button - only show if task is not complete */}
+                                              {!task.isComplete && (
+                                                <button
+                                                  onClick={() => openDelayDialog('task', task.id, task.title)}
+                                                  className="text-muted-foreground hover:text-foreground p-1"
+                                                  title="Delay this task and all subsequent items"
+                                                  data-testid={`button-delay-task-${task.id}`}
+                                                >
+                                                  <Clock className="w-3 h-3" />
+                                                </button>
+                                              )}
+                                              {/* Delete button */}
+                                              <button
+                                                onClick={() => deleteMilestoneTaskMutation.mutate(task.id)}
+                                                className="text-destructive hover:text-destructive/80 p-1"
+                                                data-testid={`button-delete-task-${task.id}`}
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
                                           )}
                                         </div>
                                       ))}
@@ -6053,6 +6159,58 @@ export default function ProjectDetails() {
               setPendingImageForChat(null);
             }}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Timeline Delay Dialog */}
+      <Dialog open={delayDialogOpen} onOpenChange={setDelayDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Delay {delayTarget?.type === 'phase' ? 'Milestone' : 'Task'}
+            </DialogTitle>
+            <DialogDescription>
+              Push back "{delayTarget?.name}" and all subsequent items by the specified number of days.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="delay-days" className="text-sm font-medium">Number of days to delay</label>
+              <Input
+                id="delay-days"
+                type="number"
+                min="1"
+                value={delayDays}
+                onChange={(e) => setDelayDays(e.target.value)}
+                placeholder="Enter days"
+                data-testid="input-delay-days"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This will cascade the delay to all subsequent {delayTarget?.type === 'phase' ? 'milestones, tasks,' : 'tasks, milestones,'} and update the project due date.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDelayDialogOpen(false);
+                setDelayTarget(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDelay}
+              disabled={!delayDays || parseInt(delayDays) <= 0 || delayPhaseMutation.isPending || delayTaskMutation.isPending}
+              data-testid="button-confirm-delay"
+            >
+              {(delayPhaseMutation.isPending || delayTaskMutation.isPending) ? 'Delaying...' : 'Delay Timeline'}
             </Button>
           </DialogFooter>
         </DialogContent>
