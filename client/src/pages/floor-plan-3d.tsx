@@ -1456,26 +1456,28 @@ export default function FloorPlan3D() {
       north: "south", south: "north", east: "west", west: "east"
     };
     const targetWall = oppositeWall[door.wall];
+    const targetWallLength = targetWall === "north" || targetWall === "south" ? targetRoom.width : targetRoom.length;
+    const targetDoorPosition = targetWallLength / 2;
 
     let newX = targetRoom.x;
     let newZ = targetRoom.z;
     
     switch (door.wall) {
       case "south":
-        newX = sourceRoom.x - sourceRoom.width / 2 + door.position;
+        newX = sourceRoom.x - sourceRoom.width / 2 + door.position - targetDoorPosition + targetRoom.width / 2;
         newZ = sourceRoom.z + sourceRoom.length / 2 + targetRoom.length / 2;
         break;
       case "north":
-        newX = sourceRoom.x - sourceRoom.width / 2 + door.position;
+        newX = sourceRoom.x - sourceRoom.width / 2 + door.position - targetDoorPosition + targetRoom.width / 2;
         newZ = sourceRoom.z - sourceRoom.length / 2 - targetRoom.length / 2;
         break;
       case "east":
         newX = sourceRoom.x + sourceRoom.width / 2 + targetRoom.width / 2;
-        newZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
+        newZ = sourceRoom.z - sourceRoom.length / 2 + door.position - targetDoorPosition + targetRoom.length / 2;
         break;
       case "west":
         newX = sourceRoom.x - sourceRoom.width / 2 - targetRoom.width / 2;
-        newZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
+        newZ = sourceRoom.z - sourceRoom.length / 2 + door.position - targetDoorPosition + targetRoom.length / 2;
         break;
     }
 
@@ -1493,12 +1495,11 @@ export default function FloorPlan3D() {
       ));
     }
 
-    const targetWallLength = targetWall === "north" || targetWall === "south" ? targetRoom.width : targetRoom.length;
     const targetDoor: Door = {
       id: crypto.randomUUID(),
       roomId: targetRoomId,
       wall: targetWall,
-      position: targetWallLength / 2,
+      position: targetDoorPosition,
       width: door.width,
       connectedRoomId: door.roomId,
     };
