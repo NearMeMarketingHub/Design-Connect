@@ -73,6 +73,7 @@ interface Room {
   color: string;
   floor: number;
   isStairs?: boolean;
+  connectedRoomId?: string;
 }
 
 interface Furniture {
@@ -109,6 +110,7 @@ const ROOM_PRESETS = [
   { name: "Dining Room", width: 12, length: 10, height: 9, color: "#f0e8d0", isStairs: false },
   { name: "Office", width: 10, length: 10, height: 9, color: "#e8e8e8", isStairs: false },
   { name: "Hallway", width: 4, length: 15, height: 9, color: "#f5f5f5", isStairs: false },
+  { name: "Landing", width: 6, length: 6, height: 9, color: "#d8d0c8", isStairs: false },
   { name: "Laundry Room", width: 8, length: 6, height: 9, color: "#f0f0f0", isStairs: false },
   { name: "Garage", width: 20, length: 20, height: 10, color: "#d0d0d0", isStairs: false },
   { name: "Stairs", width: 4, length: 10, height: 9, color: "#b8a090", isStairs: true },
@@ -604,6 +606,42 @@ export default function FloorPlan3D() {
     ));
   };
 
+  const connectStairsToRoom = (stairsId: string, roomId: string | undefined) => {
+    const stairsRoom = rooms.find(r => r.id === stairsId);
+    if (!stairsRoom) return;
+
+    if (roomId) {
+      const connectedRoom = rooms.find(r => r.id === roomId);
+      if (connectedRoom) {
+        const newX = stairsRoom.x;
+        const newZ = stairsRoom.z + stairsRoom.length / 2 + connectedRoom.length / 2;
+        
+        const deltaX = newX - connectedRoom.x;
+        const deltaZ = newZ - connectedRoom.z;
+        
+        setRooms(rooms.map(r => {
+          if (r.id === stairsId) {
+            return { ...r, connectedRoomId: roomId };
+          }
+          if (r.id === roomId) {
+            return { ...r, x: newX, z: newZ };
+          }
+          return r;
+        }));
+        
+        setFurniture(furniture.map(f => 
+          f.roomId === roomId ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+        ));
+        
+        toast({ title: "Connected", description: `${connectedRoom.name} positioned at top of stairs` });
+      }
+    } else {
+      setRooms(rooms.map(r => 
+        r.id === stairsId ? { ...r, connectedRoomId: undefined } : r
+      ));
+    }
+  };
+
   const addDoor = () => {
     if (!selectedRoom) {
       toast({ title: "Select a Room", description: "Please select a room first to add a door", variant: "destructive" });
@@ -931,6 +969,12 @@ export default function FloorPlan3D() {
                                     <div className="text-xs text-muted-foreground">
                                       {room.width}' x {room.length}' x {room.height}'
                                     </div>
+                                    {room.isStairs && room.connectedRoomId && (
+                                      <div className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                                        <Link2 className="h-3 w-3" />
+                                        Connected to: {currentFloorRooms.find(r => r.id === room.connectedRoomId)?.name || "Room"}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <Button
@@ -943,6 +987,28 @@ export default function FloorPlan3D() {
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
+                              {room.isStairs && selectedRoom === room.id && (
+                                <div className="mt-2 pt-2 border-t">
+                                  <Label className="text-xs">Connect to Room (at top of stairs)</Label>
+                                  <Select
+                                    value={room.connectedRoomId || "none"}
+                                    onValueChange={(value) => connectStairsToRoom(room.id, value === "none" ? undefined : value)}
+                                  >
+                                    <SelectTrigger className="h-8 mt-1" data-testid="select-connect-room">
+                                      <SelectValue placeholder="Select room..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No connection</SelectItem>
+                                      {currentFloorRooms
+                                        .filter(r => !r.isStairs && r.id !== room.id)
+                                        .map(r => (
+                                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                        ))
+                                      }
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                         ))}
