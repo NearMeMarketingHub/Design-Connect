@@ -80,6 +80,9 @@ import {
   FolderPlus,
   Lock,
   Unlock,
+  Undo,
+  Redo,
+  RotateCw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -95,10 +98,17 @@ interface Room {
   z: number;
   color: string;
   floor: number;
+  rotation?: number; // 0, 90, 180, 270 degrees
   isStairs?: boolean;
   stairsDirection?: "up" | "down";
   connectedRoomId?: string;
   locked?: boolean;
+}
+
+interface HistoryState {
+  rooms: Room[];
+  doors: Door[];
+  furniture: Furniture[];
 }
 
 interface Furniture {
@@ -667,6 +677,9 @@ export default function FloorPlan3D() {
   }, []);
   const [furniture, setFurniture] = useState<Furniture[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
+  const [historyStack, setHistoryStack] = useState<HistoryState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isUndoRedoAction, setIsUndoRedoAction] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
@@ -787,6 +800,92 @@ export default function FloorPlan3D() {
     setManualGroups(prev => prev.filter(g => g.id !== groupId));
     toast({ title: "Group Deleted" });
   };
+
+  // Save current state to history
+  const saveToHistory = useCallback(() => {
+    if (isUndoRedoAction) return;
+    
+    const newState: HistoryState = {
+      rooms: JSON.parse(JSON.stringify(rooms)),
+      doors: JSON.parse(JSON.stringify(doors)),
+      furniture: JSON.parse(JSON.stringify(furniture)),
+    };
+    
+    setHistoryStack(prev => {
+      const newStack = prev.slice(0, historyIndex + 1);
+      newStack.push(newState);
+      // Keep max 50 history entries
+      if (newStack.length > 50) newStack.shift();
+      return newStack;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, 49));
+  }, [rooms, doors, furniture, historyIndex, isUndoRedoAction]);
+
+  // Track state changes and save to history
+  useEffect(() => {
+    if (isUndoRedoAction) {
+      setIsUndoRedoAction(false);
+      return;
+    }
+    // Only save if we have meaningful state
+    if (rooms.length > 0 || doors.length > 0 || furniture.length > 0) {
+      const timer = setTimeout(() => {
+        saveToHistory();
+      }, 500); // Debounce to avoid too many saves
+      return () => clearTimeout(timer);
+    }
+  }, [rooms, doors, furniture]);
+
+  const undo = useCallback(() => {
+    if (historyIndex <= 0) {
+      toast({ title: "Nothing to Undo", variant: "destructive" });
+      return;
+    }
+    
+    setIsUndoRedoAction(true);
+    const prevState = historyStack[historyIndex - 1];
+    setRooms(prevState.rooms);
+    setDoors(prevState.doors);
+    setFurniture(prevState.furniture);
+    setHistoryIndex(prev => prev - 1);
+    toast({ title: "Undone" });
+  }, [historyIndex, historyStack, toast]);
+
+  const redo = useCallback(() => {
+    if (historyIndex >= historyStack.length - 1) {
+      toast({ title: "Nothing to Redo", variant: "destructive" });
+      return;
+    }
+    
+    setIsUndoRedoAction(true);
+    const nextState = historyStack[historyIndex + 1];
+    setRooms(nextState.rooms);
+    setDoors(nextState.doors);
+    setFurniture(nextState.furniture);
+    setHistoryIndex(prev => prev + 1);
+    toast({ title: "Redone" });
+  }, [historyIndex, historyStack, toast]);
+
+  const rotateRoom = (roomId: string) => {
+    setRooms(rooms.map(r => {
+      if (r.id === roomId) {
+        const currentRotation = r.rotation || 0;
+        const newRotation = (currentRotation + 90) % 360;
+        // Swap width and length when rotating
+        return { 
+          ...r, 
+          rotation: newRotation,
+          width: r.length,
+          length: r.width,
+        };
+      }
+      return r;
+    }));
+    toast({ title: "Room Rotated", description: "Rotated 90° clockwise" });
+  };
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < historyStack.length - 1;
 
   const exportAsJSON = useCallback(() => {
     const floorPlanData = {
@@ -1992,6 +2091,18 @@ export default function FloorPlan3D() {
                                             </div>
                                           </div>
                                           <div className="flex items-center gap-1">
+                                            {!room.isStairs && (
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={(e) => { e.stopPropagation(); rotateRoom(room.id); }}
+                                                data-testid={`button-rotate-room-${room.id}`}
+                                                title="Rotate 90°"
+                                              >
+                                                <RotateCw className="h-4 w-4" />
+                                              </Button>
+                                            )}
                                             <Button
                                               variant="ghost"
                                               size="icon"
@@ -2064,6 +2175,18 @@ export default function FloorPlan3D() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
+                                    {!group.rooms[0].isStairs && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={(e) => { e.stopPropagation(); rotateRoom(group.rooms[0].id); }}
+                                        data-testid={`button-rotate-room-${group.rooms[0].id}`}
+                                        title="Rotate 90°"
+                                      >
+                                        <RotateCw className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -2667,6 +2790,26 @@ export default function FloorPlan3D() {
 
           <div className="absolute top-4 right-4 flex flex-col gap-2">
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={undo}
+                disabled={!canUndo}
+                data-testid="button-undo"
+              >
+                <Undo className="h-4 w-4 mr-2" />
+                Undo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={redo}
+                disabled={!canRedo}
+                data-testid="button-redo"
+              >
+                <Redo className="h-4 w-4 mr-2" />
+                Redo
+              </Button>
               <Button
                 variant={cameraView === "perspective" ? "default" : "outline"}
                 size="sm"
