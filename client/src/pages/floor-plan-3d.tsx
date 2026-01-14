@@ -890,10 +890,6 @@ export default function FloorPlan3D() {
                                     onClick={(e) => e.stopPropagation()}
                                     data-testid={`checkbox-room-${room.id}`}
                                   />
-                                  <div
-                                    className="w-4 h-4 rounded"
-                                    style={{ backgroundColor: room.color }}
-                                  />
                                   <div>
                                     <div className="font-medium text-sm">{room.name}</div>
                                     <div className="text-xs text-muted-foreground">
