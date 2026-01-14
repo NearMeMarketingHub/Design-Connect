@@ -813,107 +813,6 @@ export default function FloorPlan3D() {
                       )}
                     </div>
                     
-                    {selectedRooms.size > 0 && (
-                      <Card className="mb-3 bg-primary/5 border-primary">
-                        <CardContent className="p-3">
-                          <div className="text-xs font-medium mb-2">Move {selectedRooms.size} Selected Room{selectedRooms.size > 1 ? 's' : ''}</div>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveSelectedRooms("x", -1)}
-                              data-testid="button-move-selected-left"
-                            >
-                              <ArrowLeftIcon className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveSelectedRooms("z", -1)}
-                              data-testid="button-move-selected-up"
-                            >
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveSelectedRooms("z", 1)}
-                              data-testid="button-move-selected-down"
-                            >
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => moveSelectedRooms("x", 1)}
-                              data-testid="button-move-selected-right"
-                            >
-                              <ArrowRightIcon className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="ml-2 text-xs"
-                              onClick={() => setSelectedRooms(new Set())}
-                              data-testid="button-clear-selection"
-                            >
-                              Clear
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
-                    {selectedRoom && selectedRooms.size === 0 && (
-                      <Card className="mb-3 border-primary">
-                        <CardContent className="p-3">
-                          <div className="text-xs font-medium mb-2">Move: {selectedRoomData?.name}</div>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => updateRoomPosition(selectedRoom, "x", -1)}
-                              data-testid="button-move-single-left"
-                            >
-                              <ArrowLeftIcon className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => updateRoomPosition(selectedRoom, "z", -1)}
-                              data-testid="button-move-single-up"
-                            >
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => updateRoomPosition(selectedRoom, "z", 1)}
-                              data-testid="button-move-single-down"
-                            >
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => updateRoomPosition(selectedRoom, "x", 1)}
-                              data-testid="button-move-single-right"
-                            >
-                              <ArrowRightIcon className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
                     {rooms.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         No rooms added yet. Use presets above or add a custom room.
@@ -1347,34 +1246,91 @@ export default function FloorPlan3D() {
             </Canvas>
           </div>
 
-          <div className="absolute top-4 right-4 flex gap-2">
-            <Button
-              variant={cameraView === "perspective" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setCameraView("perspective")}
-              data-testid="button-perspective-view"
-            >
-              <Video className="h-4 w-4 mr-2" />
-              3D View
-            </Button>
-            <Button
-              variant={cameraView === "top" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setCameraView("top")}
-              data-testid="button-top-view"
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Top View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCameraResetTrigger(prev => prev + 1)}
-              data-testid="button-reset-view"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset View
-            </Button>
+          <div className="absolute top-4 right-4 flex flex-col gap-2">
+            <div className="flex gap-2">
+              <Button
+                variant={cameraView === "perspective" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCameraView("perspective")}
+                data-testid="button-perspective-view"
+              >
+                <Video className="h-4 w-4 mr-2" />
+                3D View
+              </Button>
+              <Button
+                variant={cameraView === "top" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCameraView("top")}
+                data-testid="button-top-view"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Top View
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCameraResetTrigger(prev => prev + 1)}
+                data-testid="button-reset-view"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset View
+              </Button>
+            </div>
+            
+            {(selectedRoom || selectedRooms.size > 0) && (
+              <div className="bg-card/90 backdrop-blur-sm border rounded-lg p-2 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  Move {selectedRooms.size > 0 ? `${selectedRooms.size} rooms` : selectedRoomData?.name}:
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", -1) : selectedRoom && updateRoomPosition(selectedRoom, "x", -1)}
+                  data-testid="button-move-left"
+                >
+                  <ArrowLeftIcon className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", -1) : selectedRoom && updateRoomPosition(selectedRoom, "z", -1)}
+                  data-testid="button-move-up"
+                >
+                  <ArrowUp className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", 1) : selectedRoom && updateRoomPosition(selectedRoom, "z", 1)}
+                  data-testid="button-move-down"
+                >
+                  <ArrowDown className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", 1) : selectedRoom && updateRoomPosition(selectedRoom, "x", 1)}
+                  data-testid="button-move-right"
+                >
+                  <ArrowRightIcon className="h-3 w-3" />
+                </Button>
+                {selectedRooms.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setSelectedRooms(new Set())}
+                    data-testid="button-clear-selection"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm border rounded-lg p-3 text-xs text-muted-foreground">
