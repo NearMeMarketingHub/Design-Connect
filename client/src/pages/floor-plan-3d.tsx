@@ -142,7 +142,7 @@ const FURNITURE_TYPES = [
   { type: "cabinet", name: "Cabinet", width: 3, depth: 2, height: 6, icon: Square, color: "#8B4513" },
 ];
 
-function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, number]; end: [number, number]; height: number; thickness?: number }) {
+function WallSegment({ start, end, height, thickness = 0.5, debugColor }: { start: [number, number]; end: [number, number]; height: number; thickness?: number; debugColor?: string }) {
   const length = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
   if (length < 0.1) return null;
   const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
@@ -152,7 +152,7 @@ function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, 
   return (
     <mesh position={[midX, height / 2, midZ]} rotation={[0, -angle, 0]}>
       <boxGeometry args={[length, height, thickness]} />
-      <meshStandardMaterial color="#f5f5f5" />
+      <meshStandardMaterial color={debugColor || "#f5f5f5"} />
     </mesh>
   );
 }
@@ -208,11 +208,12 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
   if (doors.length === 0) {
     return <WallSegment start={start} end={end} height={height} thickness={thickness} />;
   }
-
+  
   const sortedDoors = [...doors].sort((a, b) => a.position - b.position);
   const segments: React.ReactNode[] = [];
   const doorFrames: React.ReactNode[] = [];
   let currentPos = 0;
+  const debugColors = ["#ff9999", "#99ff99", "#9999ff", "#ffff99"];
 
   sortedDoors.forEach((door, index) => {
     const doorStart = door.position - door.width / 2;
@@ -221,7 +222,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
     if (currentPos < doorStart) {
       const segStart: [number, number] = [start[0] + dx * currentPos, start[1] + dz * currentPos];
       const segEnd: [number, number] = [start[0] + dx * doorStart, start[1] + dz * doorStart];
-      segments.push(<WallSegment key={`seg-${index}-before`} start={segStart} end={segEnd} height={height} thickness={thickness} />);
+      segments.push(<WallSegment key={`seg-${index}-before`} start={segStart} end={segEnd} height={height} thickness={thickness} debugColor={debugColors[index % debugColors.length]} />);
     }
 
     const doorX = start[0] + dx * door.position;
@@ -241,7 +242,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
 
   if (currentPos < wallLength) {
     const segStart: [number, number] = [start[0] + dx * currentPos, start[1] + dz * currentPos];
-    segments.push(<WallSegment key="seg-final" start={segStart} end={end} height={height} thickness={thickness} />);
+    segments.push(<WallSegment key="seg-final" start={segStart} end={end} height={height} thickness={thickness} debugColor={debugColors[(sortedDoors.length) % debugColors.length]} />);
   }
 
   return <>{segments}{doorFrames}</>;
