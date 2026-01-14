@@ -2260,21 +2260,9 @@ export default function FloorPlan3D() {
                                 </div>
 
                                 {door.connectedRoomId ? (
-                                  <div className="space-y-2">
-                                    <div className="text-xs text-green-600 flex items-center gap-1 bg-green-50 dark:bg-green-950 p-2 rounded">
-                                      <Link2 className="h-3 w-3" />
-                                      Connected to: {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Room"}
-                                    </div>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="w-full text-xs text-destructive hover:text-destructive"
-                                      onClick={() => disconnectDoor(door.id)}
-                                      data-testid={`button-disconnect-door-${door.id}`}
-                                    >
-                                      <Unlink className="h-3 w-3 mr-1" />
-                                      Disconnect & Close Wall
-                                    </Button>
+                                  <div className="text-xs text-green-600 flex items-center gap-1 bg-green-50 dark:bg-green-950 p-2 rounded">
+                                    <Link2 className="h-3 w-3" />
+                                    Connected to: {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Room"}
                                   </div>
                                 ) : (
                                   <DropdownMenu>
