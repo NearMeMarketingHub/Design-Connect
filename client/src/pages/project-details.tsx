@@ -1252,6 +1252,13 @@ export default function ProjectDetails() {
   const [documentToReject, setDocumentToReject] = useState<{ id: string; name: string } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Client materials state
+  const [showAddMaterialDialog, setShowAddMaterialDialog] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<{ id: string; name: string; description: string | null; dueDate: string | null } | null>(null);
+  const [newMaterialName, setNewMaterialName] = useState("");
+  const [newMaterialDescription, setNewMaterialDescription] = useState("");
+  const [newMaterialDueDate, setNewMaterialDueDate] = useState("");
+
   // Notarization upload dialog (for clients to upload notarized documents)
   const [notarizationUploadDialogOpen, setNotarizationUploadDialogOpen] = useState(false);
   const [notarizationUploadDocId, setNotarizationUploadDocId] = useState<string | null>(null);
@@ -1291,6 +1298,33 @@ export default function ProjectDetails() {
       return res.json();
     },
   });
+
+  // Fetch client material items
+  const { data: clientMaterials = [] } = useQuery<Array<{
+    id: string;
+    projectId: string;
+    name: string;
+    description: string | null;
+    dueDate: string | null;
+    isCompleted: boolean;
+    completedAt: string | null;
+    completedById: string | null;
+    completedByName: string | null;
+    createdById: string;
+    createdByName: string;
+    createdAt: string;
+  }>>({
+    queryKey: ['/api/projects', projectId, 'materials'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/materials`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Check if project has any materials (for client tab visibility)
+  const hasMaterialItems = clientMaterials.length > 0;
 
   // Upload notarized document mutation (for clients)
   const uploadNotarizedDocMutation = useMutation({
@@ -1362,6 +1396,81 @@ export default function ProjectDetails() {
     },
     onError: (error: Error) => {
       alert(error.message || 'Failed to reject notarized document');
+    }
+  });
+
+  // Add client material item mutation
+  const addMaterialMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string; dueDate?: string }) => {
+      const res = await fetch(`/api/projects/${projectId}/materials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to add material item');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'materials'] });
+      setShowAddMaterialDialog(false);
+      setNewMaterialName("");
+      setNewMaterialDescription("");
+      setNewMaterialDueDate("");
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to add material item');
+    }
+  });
+
+  // Update client material item mutation
+  const updateMaterialMutation = useMutation({
+    mutationFn: async (data: { itemId: string; name?: string; description?: string; dueDate?: string; isCompleted?: boolean }) => {
+      const { itemId, ...updateData } = data;
+      const res = await fetch(`/api/materials/${itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updateData)
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to update material item');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'materials'] });
+      setEditingMaterial(null);
+      setNewMaterialName("");
+      setNewMaterialDescription("");
+      setNewMaterialDueDate("");
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to update material item');
+    }
+  });
+
+  // Delete client material item mutation
+  const deleteMaterialMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const res = await fetch(`/api/materials/${itemId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to delete material item');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'materials'] });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to delete material item');
     }
   });
 
@@ -2268,6 +2377,15 @@ export default function ProjectDetails() {
           >
             Documents
           </TabsTrigger>
+          {(canEdit || hasMaterialItems) && (
+            <TabsTrigger 
+              value="materials"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-materials"
+            >
+              Client Materials
+            </TabsTrigger>
+          )}
           <TabsTrigger 
             value="action-center"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 pr-6 whitespace-nowrap transition-colors relative overflow-visible"
@@ -4126,6 +4244,156 @@ export default function ProjectDetails() {
             )}
           </TabsContent>
 
+          {/* CLIENT MATERIALS TAB */}
+          <TabsContent value="materials" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Layers className="h-5 w-5" />
+                      Client-Provided Materials
+                    </CardTitle>
+                    <CardDescription>
+                      {canEdit 
+                        ? "Items the client is responsible for providing for this project"
+                        : "Materials you need to provide for your project"
+                      }
+                    </CardDescription>
+                  </div>
+                  {canEdit && (
+                    <Button 
+                      onClick={() => {
+                        setShowAddMaterialDialog(true);
+                        setEditingMaterial(null);
+                        setNewMaterialName("");
+                        setNewMaterialDescription("");
+                        setNewMaterialDueDate("");
+                      }}
+                      data-testid="button-add-material"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Item
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {clientMaterials.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      {canEdit 
+                        ? "No materials assigned to the client yet. Click 'Add Item' to start adding items."
+                        : "No materials have been assigned to you for this project."
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Progress summary */}
+                    <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Progress</span>
+                        <span className="text-sm text-muted-foreground">
+                          {clientMaterials.filter(m => m.isCompleted).length} of {clientMaterials.length} items complete
+                        </span>
+                      </div>
+                      <Progress 
+                        value={clientMaterials.length > 0 ? (clientMaterials.filter(m => m.isCompleted).length / clientMaterials.length) * 100 : 0} 
+                        className="h-2"
+                      />
+                    </div>
+
+                    {/* Material items list */}
+                    {clientMaterials.map((item) => {
+                      const isOverdue = item.dueDate && !item.isCompleted && new Date(item.dueDate) < new Date();
+                      return (
+                        <div 
+                          key={item.id}
+                          className={`flex items-center justify-between p-4 border rounded-lg ${isOverdue ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/20' : ''} ${item.isCompleted ? 'bg-muted/30' : ''}`}
+                          data-testid={`material-item-${item.id}`}
+                        >
+                          <div className="flex items-center gap-4 flex-1">
+                            <Checkbox
+                              checked={item.isCompleted}
+                              onCheckedChange={(checked) => {
+                                updateMaterialMutation.mutate({
+                                  itemId: item.id,
+                                  isCompleted: checked as boolean
+                                });
+                              }}
+                              data-testid={`checkbox-material-${item.id}`}
+                            />
+                            <div className="flex-1">
+                              <p className={`font-medium ${item.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                                {item.name}
+                              </p>
+                              {item.description && (
+                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                              )}
+                              <div className="flex items-center gap-3 mt-1">
+                                {item.dueDate && (
+                                  <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                    <Calendar className="h-3 w-3" />
+                                    Due: {new Date(item.dueDate).toLocaleDateString()}
+                                    {isOverdue && <span className="ml-1">(Overdue)</span>}
+                                  </span>
+                                )}
+                                {item.isCompleted && item.completedByName && (
+                                  <span className="text-xs text-green-600 flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Completed by {item.completedByName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditingMaterial({
+                                    id: item.id,
+                                    name: item.name,
+                                    description: item.description,
+                                    dueDate: item.dueDate
+                                  });
+                                  setNewMaterialName(item.name);
+                                  setNewMaterialDescription(item.description || "");
+                                  setNewMaterialDueDate(item.dueDate || "");
+                                  setShowAddMaterialDialog(true);
+                                }}
+                                data-testid={`button-edit-material-${item.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm('Delete this material item?')) {
+                                    deleteMaterialMutation.mutate(item.id);
+                                  }
+                                }}
+                                data-testid={`button-delete-material-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* ACTION CENTER TAB */}
           <TabsContent value="action-center" className="space-y-6">
             <Card>
@@ -4713,6 +4981,93 @@ export default function ProjectDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add/Edit Material Item Dialog */}
+      <Dialog open={showAddMaterialDialog} onOpenChange={(open) => {
+        setShowAddMaterialDialog(open);
+        if (!open) {
+          setEditingMaterial(null);
+          setNewMaterialName("");
+          setNewMaterialDescription("");
+          setNewMaterialDueDate("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingMaterial ? 'Edit Material Item' : 'Add Material Item'}</DialogTitle>
+            <DialogDescription>
+              {editingMaterial 
+                ? 'Update the details for this material item.'
+                : 'Add an item the client needs to provide for this project.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="material-name">Item Name *</Label>
+              <Input
+                id="material-name"
+                placeholder="e.g., Kitchen Backsplash Tile"
+                value={newMaterialName}
+                onChange={(e) => setNewMaterialName(e.target.value)}
+                data-testid="input-material-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="material-description">Description (optional)</Label>
+              <Textarea
+                id="material-description"
+                placeholder="Additional details about the item..."
+                value={newMaterialDescription}
+                onChange={(e) => setNewMaterialDescription(e.target.value)}
+                data-testid="input-material-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="material-due-date">Due Date (optional)</Label>
+              <Input
+                id="material-due-date"
+                type="date"
+                value={newMaterialDueDate}
+                onChange={(e) => setNewMaterialDueDate(e.target.value)}
+                data-testid="input-material-due-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMaterialDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!newMaterialName.trim()) {
+                  alert('Please enter an item name');
+                  return;
+                }
+                if (editingMaterial) {
+                  updateMaterialMutation.mutate({
+                    itemId: editingMaterial.id,
+                    name: newMaterialName,
+                    description: newMaterialDescription || undefined,
+                    dueDate: newMaterialDueDate || undefined
+                  });
+                } else {
+                  addMaterialMutation.mutate({
+                    name: newMaterialName,
+                    description: newMaterialDescription || undefined,
+                    dueDate: newMaterialDueDate || undefined
+                  });
+                }
+              }}
+              disabled={addMaterialMutation.isPending || updateMaterialMutation.isPending}
+              data-testid="button-save-material"
+            >
+              {(addMaterialMutation.isPending || updateMaterialMutation.isPending) 
+                ? 'Saving...' 
+                : editingMaterial ? 'Update Item' : 'Add Item'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Notarization Upload Dialog (for clients to upload externally notarized documents) */}
       <Dialog open={notarizationUploadDialogOpen} onOpenChange={(open) => {
