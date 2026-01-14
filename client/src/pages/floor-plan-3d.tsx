@@ -626,11 +626,26 @@ function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, 
   );
 }
 
+function checkWebGLSupport(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    return !!gl;
+  } catch (e) {
+    return false;
+  }
+}
+
 export default function FloorPlan3D() {
   const { currentPortal } = useAuth();
   const { toast } = useToast();
   
+  const [webGLSupported, setWebGLSupported] = useState<boolean | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  
+  useEffect(() => {
+    setWebGLSupported(checkWebGLSupport());
+  }, []);
   const [furniture, setFurniture] = useState<Furniture[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
@@ -2255,22 +2270,44 @@ export default function FloorPlan3D() {
 
         <main className="flex-1 relative">
           <div className="absolute inset-0">
-            <WebGLErrorBoundary>
-              <Canvas shadows gl={{ preserveDrawingBuffer: true }} onClick={() => setSelectedFurniture(null)}>
-                <Suspense fallback={null}>
-                  <Scene
-                    rooms={currentFloorRooms}
-                    furniture={furniture.filter(f => currentFloorRooms.some(r => r.id === f.roomId))}
-                    doors={doors.filter(d => currentFloorRooms.some(r => r.id === d.roomId))}
-                    selectedFurniture={selectedFurniture}
-                    onSelectFurniture={setSelectedFurniture}
-                    cameraView={cameraView}
-                    resetTrigger={cameraResetTrigger}
-                    sceneRef={sceneRef}
-                  />
-                </Suspense>
-              </Canvas>
-            </WebGLErrorBoundary>
+            {webGLSupported === false ? (
+              <div className="flex items-center justify-center h-full bg-muted/50">
+                <div className="text-center p-8">
+                  <div className="text-4xl mb-4">🖥️</div>
+                  <h3 className="text-lg font-semibold mb-2">3D View Unavailable</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    WebGL is not available. Please try refreshing the page or using a different browser.
+                  </p>
+                  <button
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload Page
+                  </button>
+                </div>
+              </div>
+            ) : webGLSupported === null ? (
+              <div className="flex items-center justify-center h-full bg-muted/50">
+                <p className="text-muted-foreground">Loading 3D view...</p>
+              </div>
+            ) : (
+              <WebGLErrorBoundary>
+                <Canvas shadows gl={{ preserveDrawingBuffer: true }} onClick={() => setSelectedFurniture(null)}>
+                  <Suspense fallback={null}>
+                    <Scene
+                      rooms={currentFloorRooms}
+                      furniture={furniture.filter(f => currentFloorRooms.some(r => r.id === f.roomId))}
+                      doors={doors.filter(d => currentFloorRooms.some(r => r.id === d.roomId))}
+                      selectedFurniture={selectedFurniture}
+                      onSelectFurniture={setSelectedFurniture}
+                      cameraView={cameraView}
+                      resetTrigger={cameraResetTrigger}
+                      sceneRef={sceneRef}
+                    />
+                  </Suspense>
+                </Canvas>
+              </WebGLErrorBoundary>
+            )}
           </div>
 
           <div className="absolute top-4 right-4 flex flex-col gap-2">
