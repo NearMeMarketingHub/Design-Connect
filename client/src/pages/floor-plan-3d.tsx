@@ -868,6 +868,52 @@ export default function FloorPlan3D() {
                       </Card>
                     )}
                     
+                    {selectedRoom && selectedRooms.size === 0 && (
+                      <Card className="mb-3 border-primary">
+                        <CardContent className="p-3">
+                          <div className="text-xs font-medium mb-2">Move: {selectedRoomData?.name}</div>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateRoomPosition(selectedRoom, "x", -1)}
+                              data-testid="button-move-single-left"
+                            >
+                              <ArrowLeftIcon className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateRoomPosition(selectedRoom, "z", -1)}
+                              data-testid="button-move-single-up"
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateRoomPosition(selectedRoom, "z", 1)}
+                              data-testid="button-move-single-down"
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => updateRoomPosition(selectedRoom, "x", 1)}
+                              data-testid="button-move-single-right"
+                            >
+                              <ArrowRightIcon className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
                     {rooms.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         No rooms added yet. Use presets above or add a custom room.
@@ -882,7 +928,7 @@ export default function FloorPlan3D() {
                             data-testid={`card-room-${room.id}`}
                           >
                             <CardContent className="p-3">
-                              <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <Checkbox
                                     checked={selectedRooms.has(room.id)}
@@ -905,45 +951,6 @@ export default function FloorPlan3D() {
                                   data-testid={`button-remove-room-${room.id}`}
                                 >
                                   <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="text-xs text-muted-foreground mr-2">Move:</span>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "x", -1); }}
-                                  data-testid={`button-move-room-left-${room.id}`}
-                                >
-                                  <ArrowLeftIcon className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "z", -1); }}
-                                  data-testid={`button-move-room-up-${room.id}`}
-                                >
-                                  <ArrowUp className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "z", 1); }}
-                                  data-testid={`button-move-room-down-${room.id}`}
-                                >
-                                  <ArrowDown className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={(e) => { e.stopPropagation(); updateRoomPosition(room.id, "x", 1); }}
-                                  data-testid={`button-move-room-right-${room.id}`}
-                                >
-                                  <ArrowRightIcon className="h-3 w-3" />
                                 </Button>
                               </div>
                             </CardContent>
