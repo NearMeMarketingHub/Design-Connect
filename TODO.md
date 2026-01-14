@@ -30,7 +30,6 @@ Last Updated: January 9, 2026
 - [ ] Generate estimate summaries that can be attached to projects
 - [x] Building out the post feature for the progress photos on the contractors side of the app
 - [ ] Plans and Drawings section for Contractor
-- [ ] The ability to choose when uploading a document from the contractor side, whether it needs to be signed or its just being uploaded to have documented in the system
 - [ ] Project-type-specific default milestones - Different preset milestones based on Project Type (Renovation, Remodel, Addition, Commercial, Residential) selected during project creation. Waiting on milestone data.
 
 ### Contractor Internal Roles (Company Type Access Levels)
@@ -67,9 +66,6 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Recent Updates card in the client page to connect with data completed in the contractor side
 - [ ] Splitting up the documents tab in the client side to either have multiple tabs, or multiple tabs within the document tabs for Contracts, Plans and Drawings, Permits and Approvals, Invoices and Payments, and Warranties and Manuals
 - [ ] Plans and Drawings section for Client
-
-### Integrations
-- [ ] PandaDocs Integration - Document creation from templates, e-signature collection, embedded signing in-app, webhooks for signed notifications, status tracking (viewed/signed/completed). Use for construction contracts, change orders, and client approvals.
 
 ### Branding
 - [ ] Changing the logo and app name when completed
