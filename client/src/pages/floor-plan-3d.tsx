@@ -259,6 +259,44 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
   );
 }
 
+function Stairs3D({ room }: { room: Room }) {
+  const numSteps = 12;
+  const stepHeight = room.height / numSteps;
+  const stepDepth = room.length / numSteps;
+  const stepWidth = room.width;
+  
+  const steps = [];
+  for (let i = 0; i < numSteps; i++) {
+    steps.push(
+      <mesh
+        key={i}
+        position={[0, stepHeight * (i + 0.5), -room.length / 2 + stepDepth * (i + 0.5)]}
+      >
+        <boxGeometry args={[stepWidth - 0.2, stepHeight, stepDepth]} />
+        <meshStandardMaterial color="#a08070" />
+      </mesh>
+    );
+  }
+  
+  return (
+    <group position={[room.x, 0, room.z]}>
+      <mesh position={[-stepWidth / 2 - 0.1, room.height / 2, 0]}>
+        <boxGeometry args={[0.2, room.height, room.length]} />
+        <meshStandardMaterial color="#8b7355" />
+      </mesh>
+      <mesh position={[stepWidth / 2 + 0.1, room.height / 2, 0]}>
+        <boxGeometry args={[0.2, room.height, room.length]} />
+        <meshStandardMaterial color="#8b7355" />
+      </mesh>
+      {steps}
+      <mesh position={[0, room.height, room.length / 2 - 0.5]}>
+        <boxGeometry args={[stepWidth, 0.3, 1]} />
+        <meshStandardMaterial color="#654321" />
+      </mesh>
+    </group>
+  );
+}
+
 function FurnitureItem({ furniture, isSelected, onClick }: { furniture: Furniture; isSelected: boolean; onClick: () => void }) {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -379,7 +417,11 @@ function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, 
       />
 
       {rooms.map((room) => (
-        <RoomFloor key={room.id} room={room} doors={doors} />
+        room.isStairs ? (
+          <Stairs3D key={room.id} room={room} />
+        ) : (
+          <RoomFloor key={room.id} room={room} doors={doors} />
+        )
       ))}
 
       {furniture.map((item) => (
