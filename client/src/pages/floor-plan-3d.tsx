@@ -1,4 +1,4 @@
-import React, { useState, useRef, Suspense, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useRef, Suspense, useCallback, useEffect, useMemo, Component, ErrorInfo, ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Grid, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -119,6 +119,50 @@ interface Door {
 }
 
 type CameraView = "perspective" | "top";
+
+interface WebGLErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class WebGLErrorBoundary extends Component<{ children: ReactNode }, WebGLErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): WebGLErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("WebGL Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-full bg-muted/50">
+          <div className="text-center p-8">
+            <div className="text-4xl mb-4">🖥️</div>
+            <h3 className="text-lg font-semibold mb-2">3D View Unavailable</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Unable to create graphics context. This can happen when system resources are limited.
+            </p>
+            <button
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
+              onClick={() => window.location.reload()}
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const ROOM_PRESETS = [
   { name: "Living Room", width: 15, length: 12, height: 9, color: "#e8e4e1", isStairs: false },
@@ -2211,20 +2255,22 @@ export default function FloorPlan3D() {
 
         <main className="flex-1 relative">
           <div className="absolute inset-0">
-            <Canvas shadows gl={{ preserveDrawingBuffer: true }} onClick={() => setSelectedFurniture(null)}>
-              <Suspense fallback={null}>
-                <Scene
-                  rooms={currentFloorRooms}
-                  furniture={furniture.filter(f => currentFloorRooms.some(r => r.id === f.roomId))}
-                  doors={doors.filter(d => currentFloorRooms.some(r => r.id === d.roomId))}
-                  selectedFurniture={selectedFurniture}
-                  onSelectFurniture={setSelectedFurniture}
-                  cameraView={cameraView}
-                  resetTrigger={cameraResetTrigger}
-                  sceneRef={sceneRef}
-                />
-              </Suspense>
-            </Canvas>
+            <WebGLErrorBoundary>
+              <Canvas shadows gl={{ preserveDrawingBuffer: true }} onClick={() => setSelectedFurniture(null)}>
+                <Suspense fallback={null}>
+                  <Scene
+                    rooms={currentFloorRooms}
+                    furniture={furniture.filter(f => currentFloorRooms.some(r => r.id === f.roomId))}
+                    doors={doors.filter(d => currentFloorRooms.some(r => r.id === d.roomId))}
+                    selectedFurniture={selectedFurniture}
+                    onSelectFurniture={setSelectedFurniture}
+                    cameraView={cameraView}
+                    resetTrigger={cameraResetTrigger}
+                    sceneRef={sceneRef}
+                  />
+                </Suspense>
+              </Canvas>
+            </WebGLErrorBoundary>
           </div>
 
           <div className="absolute top-4 right-4 flex flex-col gap-2">
