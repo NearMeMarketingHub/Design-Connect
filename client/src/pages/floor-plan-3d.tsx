@@ -1443,9 +1443,9 @@ export default function FloorPlan3D() {
 
   const openConnectToDoorDialog = (doorId: string, targetRoomId: string) => {
     const door = doors.find(d => d.id === doorId);
-    const defaultDirection = door?.wall === "south" ? "south" : 
-                            door?.wall === "north" ? "north" : 
-                            door?.wall === "east" ? "east" : "west";
+    const defaultDirection = door?.wall === "south" ? "north" : 
+                            door?.wall === "north" ? "south" : 
+                            door?.wall === "east" ? "west" : "east";
     setConnectToDoorDialog({ open: true, doorId, targetRoomId, selectedWall: defaultDirection });
   };
 
@@ -2768,13 +2768,13 @@ export default function FloorPlan3D() {
                         <SelectContent>
                           {isHorizontalDoor ? (
                             <>
-                              <SelectItem value="north">Room goes NORTH of {sourceRoom.name} (door on your south wall)</SelectItem>
-                              <SelectItem value="south">Room goes SOUTH of {sourceRoom.name} (door on your north wall)</SelectItem>
+                              <SelectItem value="south">Room goes UP/BACK (door on your south wall)</SelectItem>
+                              <SelectItem value="north">Room goes DOWN/FRONT (door on your north wall)</SelectItem>
                             </>
                           ) : (
                             <>
-                              <SelectItem value="east">Room goes EAST of {sourceRoom.name} (door on your west wall)</SelectItem>
-                              <SelectItem value="west">Room goes WEST of {sourceRoom.name} (door on your east wall)</SelectItem>
+                              <SelectItem value="west">Room goes LEFT (door on your east wall)</SelectItem>
+                              <SelectItem value="east">Room goes RIGHT (door on your west wall)</SelectItem>
                             </>
                           )}
                         </SelectContent>
