@@ -55,6 +55,8 @@ import {
   ArrowDown,
   ArrowLeftIcon,
   ArrowRightIcon,
+  Video,
+  Link2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -90,7 +92,10 @@ interface Door {
   wall: "north" | "south" | "east" | "west";
   position: number;
   width: number;
+  connectedRoomId?: string;
 }
+
+type CameraView = "perspective" | "top";
 
 const ROOM_PRESETS = [
   { name: "Living Room", width: 15, length: 12, height: 9, color: "#e8e4e1" },
@@ -286,12 +291,58 @@ function FurnitureItem({ furniture, isSelected, onClick }: { furniture: Furnitur
   );
 }
 
-function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture }: {
+function CameraController({ view, rooms }: { view: CameraView; rooms: Room[] }) {
+  const { camera } = useThree();
+  const controlsRef = useRef<any>(null);
+  
+  const centerX = rooms.length > 0 
+    ? rooms.reduce((sum, r) => sum + r.x, 0) / rooms.length 
+    : 0;
+  const centerZ = rooms.length > 0 
+    ? rooms.reduce((sum, r) => sum + r.z, 0) / rooms.length 
+    : 0;
+  
+  const defaultPos = { x: 30, y: 30, z: 30 };
+  
+  useFrame(() => {
+    if (view === "top") {
+      const targetY = 60;
+      camera.position.x += (centerX - camera.position.x) * 0.1;
+      camera.position.y += (targetY - camera.position.y) * 0.1;
+      camera.position.z += (centerZ + 0.1 - camera.position.z) * 0.1;
+      camera.lookAt(centerX, 0, centerZ);
+      if (controlsRef.current) {
+        controlsRef.current.target.set(centerX, 0, centerZ);
+      }
+    } else {
+      camera.position.x += (defaultPos.x - camera.position.x) * 0.05;
+      camera.position.y += (defaultPos.y - camera.position.y) * 0.05;
+      camera.position.z += (defaultPos.z - camera.position.z) * 0.05;
+      if (controlsRef.current) {
+        controlsRef.current.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+      }
+    }
+  });
+  
+  return (
+    <OrbitControls 
+      ref={controlsRef}
+      makeDefault 
+      minDistance={5} 
+      maxDistance={100}
+      maxPolarAngle={view === "top" ? Math.PI * 0.1 : Math.PI / 2 - 0.1}
+      enableRotate={view !== "top"}
+    />
+  );
+}
+
+function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture, cameraView }: {
   rooms: Room[];
   furniture: Furniture[];
   doors: Door[];
   selectedFurniture: string | null;
   onSelectFurniture: (id: string | null) => void;
+  cameraView: CameraView;
 }) {
   return (
     <>
@@ -325,12 +376,7 @@ function Scene({ rooms, furniture, doors, selectedFurniture, onSelectFurniture }
         />
       ))}
 
-      <OrbitControls 
-        makeDefault 
-        minDistance={5} 
-        maxDistance={100}
-        maxPolarAngle={Math.PI / 2 - 0.1}
-      />
+      <CameraController view={cameraView} rooms={rooms} />
       <PerspectiveCamera makeDefault position={[30, 30, 30]} fov={50} />
     </>
   );
@@ -347,10 +393,12 @@ export default function FloorPlan3D() {
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
   const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
-  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number }>({
+  const [cameraView, setCameraView] = useState<CameraView>("perspective");
+  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string }>({
     wall: "south",
     position: 50,
     width: 3,
+    connectedRoomId: undefined,
   });
   
   const [newRoom, setNewRoom] = useState({
@@ -442,11 +490,51 @@ export default function FloorPlan3D() {
       wall: newDoor.wall,
       position: doorPosition,
       width: newDoor.width,
+      connectedRoomId: newDoor.connectedRoomId,
     };
 
     setDoors([...doors, door]);
+    
+    if (newDoor.connectedRoomId) {
+      const connectedRoom = rooms.find((r) => r.id === newDoor.connectedRoomId);
+      if (connectedRoom) {
+        let newX = connectedRoom.x;
+        let newZ = connectedRoom.z;
+        
+        switch (newDoor.wall) {
+          case "north":
+            newX = room.x - room.width / 2 + doorPosition;
+            newZ = room.z + room.length / 2 + connectedRoom.length / 2;
+            break;
+          case "south":
+            newX = room.x - room.width / 2 + doorPosition;
+            newZ = room.z - room.length / 2 - connectedRoom.length / 2;
+            break;
+          case "east":
+            newX = room.x + room.width / 2 + connectedRoom.width / 2;
+            newZ = room.z - room.length / 2 + doorPosition;
+            break;
+          case "west":
+            newX = room.x - room.width / 2 - connectedRoom.width / 2;
+            newZ = room.z - room.length / 2 + doorPosition;
+            break;
+        }
+        
+        const deltaX = newX - connectedRoom.x;
+        const deltaZ = newZ - connectedRoom.z;
+        
+        setRooms(rooms.map((r) =>
+          r.id === newDoor.connectedRoomId ? { ...r, x: newX, z: newZ } : r
+        ));
+        setFurniture(furniture.map((f) =>
+          f.roomId === newDoor.connectedRoomId ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+        ));
+      }
+    }
+    
     setShowAddDoorDialog(false);
-    toast({ title: "Door Added", description: `Door added to ${newDoor.wall} wall` });
+    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined });
+    toast({ title: "Door Added", description: newDoor.connectedRoomId ? `Door added and room connected` : `Door added to ${newDoor.wall} wall` });
   };
 
   const removeDoor = (doorId: string) => {
@@ -826,6 +914,28 @@ export default function FloorPlan3D() {
                                 data-testid="input-door-width"
                               />
                             </div>
+                            <div>
+                              <Label>Connect to Room (Optional)</Label>
+                              <Select 
+                                value={newDoor.connectedRoomId || "none"} 
+                                onValueChange={(val) => setNewDoor({ ...newDoor, connectedRoomId: val === "none" ? undefined : val })}
+                              >
+                                <SelectTrigger data-testid="select-connected-room">
+                                  <SelectValue placeholder="Select a room to connect" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No connection</SelectItem>
+                                  {rooms.filter((r) => r.id !== selectedRoom).map((room) => (
+                                    <SelectItem key={room.id} value={room.id}>
+                                      {room.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Connecting will snap the selected room to this door
+                              </p>
+                            </div>
                           </div>
                           <DialogFooter>
                             <Button variant="outline" onClick={() => setShowAddDoorDialog(false)}>
@@ -858,7 +968,15 @@ export default function FloorPlan3D() {
                                   <DoorOpen className="h-4 w-4 text-muted-foreground" />
                                   <div>
                                     <div className="text-sm font-medium capitalize">{door.wall} Wall</div>
-                                    <div className="text-xs text-muted-foreground">{door.width}' wide</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {door.width}' wide
+                                      {door.connectedRoomId && (
+                                        <span className="flex items-center gap-1 mt-0.5">
+                                          <Link2 className="h-3 w-3" />
+                                          {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Connected"}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                                 <Button
@@ -1108,9 +1226,31 @@ export default function FloorPlan3D() {
                   doors={doors}
                   selectedFurniture={selectedFurniture}
                   onSelectFurniture={setSelectedFurniture}
+                  cameraView={cameraView}
                 />
               </Suspense>
             </Canvas>
+          </div>
+
+          <div className="absolute top-4 right-4 flex gap-2">
+            <Button
+              variant={cameraView === "perspective" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCameraView("perspective")}
+              data-testid="button-perspective-view"
+            >
+              <Video className="h-4 w-4 mr-2" />
+              3D View
+            </Button>
+            <Button
+              variant={cameraView === "top" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCameraView("top")}
+              data-testid="button-top-view"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Top View
+            </Button>
           </div>
 
           <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm border rounded-lg p-3 text-xs text-muted-foreground">
