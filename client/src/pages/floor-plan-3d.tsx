@@ -142,7 +142,7 @@ const FURNITURE_TYPES = [
   { type: "cabinet", name: "Cabinet", width: 3, depth: 2, height: 6, icon: Square, color: "#8B4513" },
 ];
 
-function WallSegment({ start, end, height, thickness = 0.5, debugColor }: { start: [number, number]; end: [number, number]; height: number; thickness?: number; debugColor?: string }) {
+function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, number]; end: [number, number]; height: number; thickness?: number }) {
   const length = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
   if (length < 0.1) return null;
   const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
@@ -152,7 +152,7 @@ function WallSegment({ start, end, height, thickness = 0.5, debugColor }: { star
   return (
     <mesh position={[midX, height / 2, midZ]} rotation={[0, -angle, 0]}>
       <boxGeometry args={[length, height, thickness]} />
-      <meshStandardMaterial color={debugColor || "#f5f5f5"} />
+      <meshStandardMaterial color="#f5f5f5" />
     </mesh>
   );
 }
@@ -213,7 +213,6 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
   const segments: React.ReactNode[] = [];
   const doorFrames: React.ReactNode[] = [];
   let currentPos = 0;
-  const debugColors = ["#ff9999", "#99ff99", "#9999ff", "#ffff99"];
 
   sortedDoors.forEach((door, index) => {
     const doorStart = door.position - door.width / 2;
@@ -222,7 +221,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
     if (currentPos < doorStart) {
       const segStart: [number, number] = [start[0] + dx * currentPos, start[1] + dz * currentPos];
       const segEnd: [number, number] = [start[0] + dx * doorStart, start[1] + dz * doorStart];
-      segments.push(<WallSegment key={`seg-${index}-before`} start={segStart} end={segEnd} height={height} thickness={thickness} debugColor={debugColors[index % debugColors.length]} />);
+      segments.push(<WallSegment key={`seg-${index}-before`} start={segStart} end={segEnd} height={height} thickness={thickness} />);
     }
 
     const doorX = start[0] + dx * door.position;
@@ -242,7 +241,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
 
   if (currentPos < wallLength) {
     const segStart: [number, number] = [start[0] + dx * currentPos, start[1] + dz * currentPos];
-    segments.push(<WallSegment key="seg-final" start={segStart} end={end} height={height} thickness={thickness} debugColor={debugColors[(sortedDoors.length) % debugColors.length]} />);
+    segments.push(<WallSegment key="seg-final" start={segStart} end={end} height={height} thickness={thickness} />);
   }
 
   return <>{segments}{doorFrames}</>;
@@ -252,9 +251,14 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
   const roomDoors = doors.filter(d => d.roomId === room.id);
   
   const getDoorsForWall = (wall: "north" | "south" | "east" | "west") => {
+    const wallLength = wall === "north" || wall === "south" ? room.width : room.length;
     return roomDoors
       .filter(d => d.wall === wall)
-      .map(d => ({ position: d.position, width: d.width }));
+      .map(d => {
+        const isReversedWall = wall === "north" || wall === "west";
+        const adjustedPosition = isReversedWall ? (wallLength - d.position) : d.position;
+        return { position: adjustedPosition, width: d.width };
+      });
   };
 
   return (
@@ -1133,13 +1137,24 @@ export default function FloorPlan3D() {
       connectedRoomId: newDoor.connectedRoomId,
     };
 
-    setDoors([...doors, door]);
+    const newDoors = [door];
     
     if (newDoor.connectedRoomId) {
       const connectedRoom = rooms.find((r) => r.id === newDoor.connectedRoomId);
       if (connectedRoom) {
         let newX = connectedRoom.x;
         let newZ = connectedRoom.z;
+        
+        const oppositeWall: Record<string, "north" | "south" | "east" | "west"> = {
+          north: "south",
+          south: "north",
+          east: "west",
+          west: "east"
+        };
+        const connectedWall = oppositeWall[newDoor.wall];
+        const connectedWallLength = connectedWall === "north" || connectedWall === "south" 
+          ? connectedRoom.width 
+          : connectedRoom.length;
         
         switch (newDoor.wall) {
           case "north":
@@ -1169,8 +1184,20 @@ export default function FloorPlan3D() {
         setFurniture(furniture.map((f) =>
           f.roomId === newDoor.connectedRoomId ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
         ));
+        
+        const connectedDoor: Door = {
+          id: crypto.randomUUID(),
+          roomId: newDoor.connectedRoomId,
+          wall: connectedWall,
+          position: connectedWallLength / 2,
+          width: newDoor.width,
+          connectedRoomId: selectedRoom,
+        };
+        newDoors.push(connectedDoor);
       }
     }
+    
+    setDoors([...doors, ...newDoors]);
     
     setShowAddDoorDialog(false);
     setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined });
