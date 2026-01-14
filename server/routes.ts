@@ -599,6 +599,50 @@ export async function registerRoutes(
     }
   });
 
+  // Timeline delay routes
+  app.post("/api/phases/:phaseId/delay", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as any;
+      // Only contractors and admins can delay phases
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only project managers can delay phases" });
+      }
+      
+      const { delayDays, projectId } = req.body;
+      if (!delayDays || typeof delayDays !== 'number' || delayDays <= 0) {
+        return res.status(400).json({ message: "delayDays must be a positive number" });
+      }
+      if (!projectId) {
+        return res.status(400).json({ message: "projectId is required" });
+      }
+
+      const result = await storage.delayPhase(req.params.phaseId, delayDays, projectId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/milestone-tasks/:taskId/delay", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as any;
+      // Only contractors and admins can delay tasks
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only project managers can delay tasks" });
+      }
+      
+      const { delayDays } = req.body;
+      if (!delayDays || typeof delayDays !== 'number' || delayDays <= 0) {
+        return res.status(400).json({ message: "delayDays must be a positive number" });
+      }
+
+      const result = await storage.delayTask(req.params.taskId, delayDays);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Action item routes
   app.get("/api/projects/:projectId/action-items", requireAuth, async (req, res, next) => {
     try {
