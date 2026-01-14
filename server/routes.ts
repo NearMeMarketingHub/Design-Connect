@@ -1370,6 +1370,120 @@ export async function registerRoutes(
     }
   });
 
+  // Client Material Items routes
+  app.get("/api/projects/:projectId/materials", requireAuth, async (req, res, next) => {
+    try {
+      const items = await storage.getClientMaterialItems(req.params.projectId);
+      res.json(items);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/projects/:projectId/materials/has-items", requireAuth, async (req, res, next) => {
+    try {
+      const hasItems = await storage.hasClientMaterialItems(req.params.projectId);
+      res.json({ hasItems });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/materials", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only Project Managers can add material items" });
+      }
+      
+      const { name, description, dueDate } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: "Item name is required" });
+      }
+      
+      const item = await storage.createClientMaterialItem({
+        projectId: req.params.projectId,
+        name,
+        description: description || null,
+        dueDate: dueDate || null,
+        isCompleted: false,
+        completedAt: null,
+        completedById: null,
+        completedByName: null,
+        createdById: user.id,
+        createdByName: user.name || user.username,
+      });
+      
+      res.status(201).json(item);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/materials/:itemId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const item = await storage.getClientMaterialItem(req.params.itemId);
+      
+      if (!item) {
+        return res.status(404).json({ message: "Material item not found" });
+      }
+      
+      const { name, description, dueDate, isCompleted } = req.body;
+      
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (dueDate !== undefined) updateData.dueDate = dueDate;
+      
+      // Handle completion toggle
+      if (isCompleted !== undefined) {
+        updateData.isCompleted = isCompleted;
+        if (isCompleted) {
+          updateData.completedAt = new Date();
+          updateData.completedById = user.id;
+          updateData.completedByName = user.name || user.username;
+        } else {
+          updateData.completedAt = null;
+          updateData.completedById = null;
+          updateData.completedByName = null;
+        }
+      }
+      
+      // Only allow contractors/admins to edit name, description, dueDate
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        // Clients can only toggle completion
+        if (name !== undefined || description !== undefined || dueDate !== undefined) {
+          return res.status(403).json({ message: "Only Project Managers can edit item details" });
+        }
+      }
+      
+      const updated = await storage.updateClientMaterialItem(req.params.itemId, updateData);
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/materials/:itemId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only Project Managers can delete material items" });
+      }
+      
+      const item = await storage.getClientMaterialItem(req.params.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Material item not found" });
+      }
+      
+      await storage.deleteClientMaterialItem(req.params.itemId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Comment routes
   app.get("/api/posts/:postId/comments", async (req, res, next) => {
     try {
