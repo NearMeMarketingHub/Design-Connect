@@ -198,7 +198,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
   end: [number, number]; 
   height: number; 
   thickness?: number;
-  doors?: { position: number; width: number }[];
+  doors?: { position: number; width: number; renderFrame?: boolean }[];
 }) {
   const wallLength = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
   const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
@@ -226,15 +226,17 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
 
     const doorX = start[0] + dx * door.position;
     const doorZ = start[1] + dz * door.position;
-    doorFrames.push(
-      <DoorFrame 
-        key={`door-${index}`} 
-        position={[doorX, 0, doorZ]} 
-        rotation={-angle} 
-        width={door.width} 
-        height={height} 
-      />
-    );
+    if (door.renderFrame !== false) {
+      doorFrames.push(
+        <DoorFrame 
+          key={`door-${index}`} 
+          position={[doorX, 0, doorZ]} 
+          rotation={-angle} 
+          width={door.width} 
+          height={height} 
+        />
+      );
+    }
 
     currentPos = doorEnd;
   });
@@ -257,7 +259,8 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
       .map(d => {
         const isReversedWall = wall === "north" || wall === "west";
         const adjustedPosition = isReversedWall ? (wallLength - d.position) : d.position;
-        return { position: adjustedPosition, width: d.width };
+        const isPrimaryDoor = !d.connectedRoomId || d.roomId < d.connectedRoomId;
+        return { position: adjustedPosition, width: d.width, renderFrame: isPrimaryDoor };
       });
   };
 
