@@ -77,6 +77,8 @@ import {
   ChevronDown,
   ChevronRight,
   FolderPlus,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -95,6 +97,7 @@ interface Room {
   isStairs?: boolean;
   stairsDirection?: "up" | "down";
   connectedRoomId?: string;
+  locked?: boolean;
 }
 
 interface Furniture {
@@ -1241,13 +1244,43 @@ export default function FloorPlan3D() {
     });
   };
 
+  const toggleRoomLock = (roomId: string) => {
+    setRooms(rooms.map((r) =>
+      r.id === roomId ? { ...r, locked: !r.locked } : r
+    ));
+    const room = rooms.find(r => r.id === roomId);
+    toast({ 
+      title: room?.locked ? "Room Unlocked" : "Room Locked", 
+      description: room?.locked ? `${room.name} can now be moved` : `${room?.name} position is locked`
+    });
+  };
+
   const updateRoomPosition = (roomId: string, axis: "x" | "z", delta: number) => {
+    const room = rooms.find(r => r.id === roomId);
+    if (room?.locked) {
+      toast({ title: "Room Locked", description: "Unlock the room to move it", variant: "destructive" });
+      return;
+    }
     setRooms(rooms.map((r) =>
       r.id === roomId ? { ...r, [axis]: r[axis] + delta } : r
     ));
     setFurniture(furniture.map((f) =>
       f.roomId === roomId ? { ...f, [axis]: f[axis] + delta } : f
     ));
+  };
+
+  const updateDoorPosition = (doorId: string, delta: number) => {
+    const door = doors.find(d => d.id === doorId);
+    if (!door) return;
+    const room = rooms.find(r => r.id === door.roomId);
+    if (!room) return;
+    
+    const wallLength = door.wall === "north" || door.wall === "south" ? room.width : room.length;
+    const minPos = door.width / 2 + 0.5;
+    const maxPos = wallLength - door.width / 2 - 0.5;
+    const newPos = Math.max(minPos, Math.min(maxPos, door.position + delta));
+    
+    setDoors(doors.map(d => d.id === doorId ? { ...d, position: newPos } : d));
   };
 
   const moveSelectedRooms = (axis: "x" | "z", delta: number) => {
@@ -1402,42 +1435,76 @@ export default function FloorPlan3D() {
     setDoors(doors.filter((d) => d.id !== doorId));
   };
 
-  const quickConnectRooms = (roomId1: string, roomId2: string) => {
-    const room1 = rooms.find(r => r.id === roomId1);
-    const room2 = rooms.find(r => r.id === roomId2);
-    if (!room1 || !room2) return;
-
-    const room1South = room1.z + room1.length / 2;
-    const room1North = room1.z - room1.length / 2;
-    const room1East = room1.x + room1.width / 2;
-    const room1West = room1.x - room1.width / 2;
+  const connectDoorToRoom = (doorId: string, targetRoomId: string) => {
+    const door = doors.find(d => d.id === doorId);
+    if (!door) return;
     
-    const room2South = room2.z + room2.length / 2;
-    const room2North = room2.z - room2.length / 2;
-    const room2East = room2.x + room2.width / 2;
-    const room2West = room2.x - room2.width / 2;
+    const sourceRoom = rooms.find(r => r.id === door.roomId);
+    const targetRoom = rooms.find(r => r.id === targetRoomId);
+    if (!sourceRoom || !targetRoom) return;
 
-    let suggestedWall: "north" | "south" | "east" | "west" = "south";
-    
-    const southDist = Math.abs(room1South - room2North);
-    const northDist = Math.abs(room1North - room2South);
-    const eastDist = Math.abs(room1East - room2West);
-    const westDist = Math.abs(room1West - room2East);
-    
-    const minDist = Math.min(southDist, northDist, eastDist, westDist);
-    if (minDist === southDist) suggestedWall = "south";
-    else if (minDist === northDist) suggestedWall = "north";
-    else if (minDist === eastDist) suggestedWall = "east";
-    else suggestedWall = "west";
+    if (sourceRoom.locked && targetRoom.locked) {
+      toast({ 
+        title: "Both Rooms Locked", 
+        description: "At least one room must be unlocked to connect", 
+        variant: "destructive" 
+      });
+      return;
+    }
 
-    setNewDoor({
-      wall: suggestedWall,
-      position: 50,
-      width: 3,
-      connectedRoomId: roomId2,
-      snapConnectedRoom: false,
-    });
-    setShowAddDoorDialog(true);
+    const oppositeWall: Record<string, "north" | "south" | "east" | "west"> = {
+      north: "south", south: "north", east: "west", west: "east"
+    };
+    const targetWall = oppositeWall[door.wall];
+
+    let newX = targetRoom.x;
+    let newZ = targetRoom.z;
+    
+    switch (door.wall) {
+      case "south":
+        newX = sourceRoom.x - sourceRoom.width / 2 + door.position;
+        newZ = sourceRoom.z + sourceRoom.length / 2 + targetRoom.length / 2;
+        break;
+      case "north":
+        newX = sourceRoom.x - sourceRoom.width / 2 + door.position;
+        newZ = sourceRoom.z - sourceRoom.length / 2 - targetRoom.length / 2;
+        break;
+      case "east":
+        newX = sourceRoom.x + sourceRoom.width / 2 + targetRoom.width / 2;
+        newZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
+        break;
+      case "west":
+        newX = sourceRoom.x - sourceRoom.width / 2 - targetRoom.width / 2;
+        newZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
+        break;
+    }
+
+    const roomToMove = sourceRoom.locked ? targetRoom : (targetRoom.locked ? null : targetRoom);
+    
+    if (roomToMove) {
+      const deltaX = newX - roomToMove.x;
+      const deltaZ = newZ - roomToMove.z;
+      
+      setRooms(rooms.map(r => 
+        r.id === roomToMove.id ? { ...r, x: newX, z: newZ } : r
+      ));
+      setFurniture(furniture.map(f => 
+        f.roomId === roomToMove.id ? { ...f, x: f.x + deltaX, z: f.z + deltaZ } : f
+      ));
+    }
+
+    const targetWallLength = targetWall === "north" || targetWall === "south" ? targetRoom.width : targetRoom.length;
+    const targetDoor: Door = {
+      id: crypto.randomUUID(),
+      roomId: targetRoomId,
+      wall: targetWall,
+      position: targetWallLength / 2,
+      width: door.width,
+      connectedRoomId: door.roomId,
+    };
+
+    setDoors(doors.map(d => d.id === doorId ? { ...d, connectedRoomId: targetRoomId } : d).concat(targetDoor));
+    toast({ title: "Rooms Connected", description: `${sourceRoom.name} connected to ${targetRoom.name}` });
   };
 
   const addFurniture = (type: typeof FURNITURE_TYPES[0]) => {
@@ -1798,6 +1865,15 @@ export default function FloorPlan3D() {
                                           <div className="flex items-center gap-1">
                                             <Button
                                               variant="ghost"
+                                              size="icon"
+                                              className={`h-8 w-8 ${room.locked ? "text-amber-600" : ""}`}
+                                              onClick={(e) => { e.stopPropagation(); toggleRoomLock(room.id); }}
+                                              data-testid={`button-lock-room-${room.id}`}
+                                            >
+                                              {room.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
                                               size="sm"
                                               className="h-7 px-2 text-xs"
                                               onClick={(e) => { e.stopPropagation(); removeRoomFromGroup(room.id); }}
@@ -1859,6 +1935,15 @@ export default function FloorPlan3D() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={`h-8 w-8 ${group.rooms[0].locked ? "text-amber-600" : ""}`}
+                                      onClick={(e) => { e.stopPropagation(); toggleRoomLock(group.rooms[0].id); }}
+                                      data-testid={`button-lock-room-${group.rooms[0].id}`}
+                                    >
+                                      {group.rooms[0].locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                    </Button>
                                     {currentFloorGroups.length > 0 && (
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -2057,37 +2142,91 @@ export default function FloorPlan3D() {
                             No doors added yet
                           </p>
                         ) : (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {doors.filter((d) => d.roomId === selectedRoom).map((door) => (
                               <div
                                 key={door.id}
-                                className="flex items-center justify-between p-2 border rounded"
+                                className="p-3 border rounded space-y-2"
                                 data-testid={`door-item-${door.id}`}
                               >
-                                <div className="flex items-center gap-2">
-                                  <DoorOpen className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <div className="text-sm font-medium capitalize">{door.wall} Wall</div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {door.width}' wide
-                                      {door.connectedRoomId && (
-                                        <span className="flex items-center gap-1 mt-0.5">
-                                          <Link2 className="h-3 w-3" />
-                                          {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Connected"}
-                                        </span>
-                                      )}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <DoorOpen className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                      <div className="text-sm font-medium capitalize">{door.wall} Wall</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {door.width}' wide • Position: {door.position.toFixed(1)}'
+                                      </div>
                                     </div>
                                   </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => removeDoor(door.id)}
+                                    data-testid={`button-remove-door-${door.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => removeDoor(door.id)}
-                                  data-testid={`button-remove-door-${door.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
+                                
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Move:</span>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => updateDoorPosition(door.id, -0.5)}
+                                    data-testid={`button-door-left-${door.id}`}
+                                  >
+                                    <ArrowLeftIcon className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => updateDoorPosition(door.id, 0.5)}
+                                    data-testid={`button-door-right-${door.id}`}
+                                  >
+                                    <ArrowRightIcon className="h-3 w-3" />
+                                  </Button>
+                                </div>
+
+                                {door.connectedRoomId ? (
+                                  <div className="text-xs text-green-600 flex items-center gap-1 bg-green-50 dark:bg-green-950 p-2 rounded">
+                                    <Link2 className="h-3 w-3" />
+                                    Connected to: {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Room"}
+                                  </div>
+                                ) : (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="outline" size="sm" className="w-full text-xs" data-testid={`button-connect-door-${door.id}`}>
+                                        <Link2 className="h-3 w-3 mr-1" />
+                                        Connect to Room
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className="w-48">
+                                      <DropdownMenuLabel className="text-xs">Select room to connect:</DropdownMenuLabel>
+                                      <DropdownMenuSeparator />
+                                      {currentFloorRooms.filter(r => r.id !== selectedRoom && !r.isStairs).length === 0 ? (
+                                        <DropdownMenuItem disabled className="text-xs">No other rooms</DropdownMenuItem>
+                                      ) : (
+                                        currentFloorRooms.filter(r => r.id !== selectedRoom && !r.isStairs).map(room => (
+                                          <DropdownMenuItem
+                                            key={room.id}
+                                            onClick={() => connectDoorToRoom(door.id, room.id)}
+                                            className="text-xs"
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {room.name}
+                                              {room.locked && <Lock className="h-3 w-3 text-amber-600" />}
+                                            </div>
+                                          </DropdownMenuItem>
+                                        ))
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -2466,39 +2605,6 @@ export default function FloorPlan3D() {
                   >
                     Clear
                   </Button>
-                )}
-                {selectedRoom && selectedRooms.size === 0 && (
-                  <>
-                    <Separator orientation="vertical" className="h-6" />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-7 text-xs" data-testid="button-quick-connect">
-                          <Link2 className="h-3 w-3 mr-1" />
-                          Connect
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel className="text-xs">Connect {selectedRoomData?.name} to:</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {currentFloorRooms.filter(r => r.id !== selectedRoom && !r.isStairs).length === 0 ? (
-                          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                            No other rooms on this floor
-                          </DropdownMenuItem>
-                        ) : (
-                          currentFloorRooms.filter(r => r.id !== selectedRoom && !r.isStairs).map(room => (
-                            <DropdownMenuItem
-                              key={room.id}
-                              onClick={() => quickConnectRooms(selectedRoom, room.id)}
-                              data-testid={`quick-connect-${room.id}`}
-                            >
-                              <DoorOpen className="h-3 w-3 mr-2" />
-                              {room.name}
-                            </DropdownMenuItem>
-                          ))
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </>
                 )}
               </div>
             )}
