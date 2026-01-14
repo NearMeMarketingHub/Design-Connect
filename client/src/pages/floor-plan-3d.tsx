@@ -1,4 +1,4 @@
-import React, { useState, useRef, Suspense, useCallback } from "react";
+import React, { useState, useRef, Suspense, useCallback, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Grid, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -71,6 +71,8 @@ interface Room {
   x: number;
   z: number;
   color: string;
+  floor: number;
+  isStairs?: boolean;
 }
 
 interface Furniture {
@@ -99,16 +101,17 @@ interface Door {
 type CameraView = "perspective" | "top";
 
 const ROOM_PRESETS = [
-  { name: "Living Room", width: 15, length: 12, height: 9, color: "#e8e4e1" },
-  { name: "Master Bedroom", width: 14, length: 12, height: 9, color: "#d4e5f7" },
-  { name: "Bedroom", width: 12, length: 10, height: 9, color: "#d4e5f7" },
-  { name: "Kitchen", width: 12, length: 10, height: 9, color: "#f5e6d3" },
-  { name: "Bathroom", width: 8, length: 6, height: 9, color: "#e0f0e8" },
-  { name: "Dining Room", width: 12, length: 10, height: 9, color: "#f0e8d0" },
-  { name: "Office", width: 10, length: 10, height: 9, color: "#e8e8e8" },
-  { name: "Hallway", width: 4, length: 15, height: 9, color: "#f5f5f5" },
-  { name: "Laundry Room", width: 8, length: 6, height: 9, color: "#f0f0f0" },
-  { name: "Garage", width: 20, length: 20, height: 10, color: "#d0d0d0" },
+  { name: "Living Room", width: 15, length: 12, height: 9, color: "#e8e4e1", isStairs: false },
+  { name: "Master Bedroom", width: 14, length: 12, height: 9, color: "#d4e5f7", isStairs: false },
+  { name: "Bedroom", width: 12, length: 10, height: 9, color: "#d4e5f7", isStairs: false },
+  { name: "Kitchen", width: 12, length: 10, height: 9, color: "#f5e6d3", isStairs: false },
+  { name: "Bathroom", width: 8, length: 6, height: 9, color: "#e0f0e8", isStairs: false },
+  { name: "Dining Room", width: 12, length: 10, height: 9, color: "#f0e8d0", isStairs: false },
+  { name: "Office", width: 10, length: 10, height: 9, color: "#e8e8e8", isStairs: false },
+  { name: "Hallway", width: 4, length: 15, height: 9, color: "#f5f5f5", isStairs: false },
+  { name: "Laundry Room", width: 8, length: 6, height: 9, color: "#f0f0f0", isStairs: false },
+  { name: "Garage", width: 20, length: 20, height: 10, color: "#d0d0d0", isStairs: false },
+  { name: "Stairs", width: 4, length: 10, height: 9, color: "#b8a090", isStairs: true },
 ];
 
 const FURNITURE_TYPES = [
@@ -408,6 +411,8 @@ export default function FloorPlan3D() {
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
   const [cameraView, setCameraView] = useState<CameraView>("perspective");
   const [cameraResetTrigger, setCameraResetTrigger] = useState(0);
+  const [currentFloor, setCurrentFloor] = useState(1);
+  const [totalFloors, setTotalFloors] = useState(1);
   const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string }>({
     wall: "south",
     position: 50,
@@ -425,13 +430,27 @@ export default function FloorPlan3D() {
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
 
+  const currentFloorRooms = rooms.filter(r => r.floor === currentFloor);
+
+  useEffect(() => {
+    if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
+      setSelectedRoom(null);
+      setSelectedFurniture(null);
+    }
+    setSelectedRooms(prev => {
+      const filtered = new Set(Array.from(prev).filter(id => currentFloorRooms.some(r => r.id === id)));
+      return filtered.size !== prev.size ? filtered : prev;
+    });
+  }, [currentFloor, rooms]);
+
   const addRoom = () => {
     if (!newRoom.name.trim()) {
       toast({ title: "Error", description: "Please enter a room name", variant: "destructive" });
       return;
     }
 
-    const lastRoom = rooms[rooms.length - 1];
+    const floorRooms = rooms.filter(r => r.floor === currentFloor);
+    const lastRoom = floorRooms[floorRooms.length - 1];
     const newX = lastRoom ? lastRoom.x + lastRoom.width / 2 + newRoom.width / 2 + 2 : 0;
 
     const room: Room = {
@@ -443,16 +462,19 @@ export default function FloorPlan3D() {
       x: newX,
       z: 0,
       color: newRoom.color,
+      floor: currentFloor,
+      isStairs: false,
     };
 
     setRooms([...rooms, room]);
     setShowAddRoomDialog(false);
     setNewRoom({ name: "", width: 12, length: 10, height: 9, color: "#e8e4e1" });
-    toast({ title: "Room Added", description: `${room.name} has been added to the floor plan` });
+    toast({ title: "Room Added", description: `${room.name} has been added to Floor ${currentFloor}` });
   };
 
   const addPresetRoom = (preset: typeof ROOM_PRESETS[0]) => {
-    const lastRoom = rooms[rooms.length - 1];
+    const floorRooms = rooms.filter(r => r.floor === currentFloor);
+    const lastRoom = floorRooms[floorRooms.length - 1];
     const newX = lastRoom ? lastRoom.x + lastRoom.width / 2 + preset.width / 2 + 2 : 0;
 
     const room: Room = {
@@ -464,10 +486,34 @@ export default function FloorPlan3D() {
       x: newX,
       z: 0,
       color: preset.color,
+      floor: currentFloor,
+      isStairs: preset.isStairs,
     };
 
     setRooms([...rooms, room]);
-    toast({ title: "Room Added", description: `${preset.name} has been added to the floor plan` });
+    toast({ title: "Room Added", description: `${preset.name} has been added to Floor ${currentFloor}` });
+  };
+
+  const addFloor = () => {
+    const newFloorNumber = totalFloors + 1;
+    const stairsOnPreviousFloor = rooms.filter(r => r.floor === totalFloors && r.isStairs);
+    
+    const copiedStairs: Room[] = stairsOnPreviousFloor.map(stair => ({
+      ...stair,
+      id: crypto.randomUUID(),
+      floor: newFloorNumber,
+      name: stair.name.includes("(Floor") ? stair.name.replace(/\(Floor \d+\)/, `(Floor ${newFloorNumber})`) : `${stair.name} (Floor ${newFloorNumber})`,
+    }));
+    
+    setRooms([...rooms, ...copiedStairs]);
+    setTotalFloors(newFloorNumber);
+    setCurrentFloor(newFloorNumber);
+    toast({ 
+      title: "Floor Added", 
+      description: copiedStairs.length > 0 
+        ? `Floor ${newFloorNumber} created with ${copiedStairs.length} stair${copiedStairs.length > 1 ? 's' : ''} copied from Floor ${totalFloors}`
+        : `Floor ${newFloorNumber} created`
+    });
   };
 
   const removeRoom = (roomId: string) => {
@@ -807,22 +853,22 @@ export default function FloorPlan3D() {
 
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">Your Rooms</h3>
+                      <h3 className="font-semibold">Floor {currentFloor} Rooms</h3>
                       {selectedRooms.size > 0 && (
                         <Badge variant="secondary">{selectedRooms.size} selected</Badge>
                       )}
                     </div>
                     
-                    {rooms.length === 0 ? (
+                    {currentFloorRooms.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
-                        No rooms added yet. Use presets above or add a custom room.
+                        No rooms on this floor yet. Use presets above or add a custom room.
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {rooms.map((room) => (
+                        {currentFloorRooms.map((room) => (
                           <Card
                             key={room.id}
-                            className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""} ${selectedRooms.has(room.id) ? "bg-primary/5" : ""}`}
+                            className={`cursor-pointer transition-colors ${selectedRoom === room.id ? "border-primary" : ""} ${selectedRooms.has(room.id) ? "bg-primary/5" : ""} ${room.isStairs ? "border-amber-500/50" : ""}`}
                             onClick={() => setSelectedRoom(room.id)}
                             data-testid={`card-room-${room.id}`}
                           >
@@ -836,7 +882,10 @@ export default function FloorPlan3D() {
                                     data-testid={`checkbox-room-${room.id}`}
                                   />
                                   <div>
-                                    <div className="font-medium text-sm">{room.name}</div>
+                                    <div className="font-medium text-sm flex items-center gap-2">
+                                      {room.name}
+                                      {room.isStairs && <Badge variant="outline" className="text-xs px-1 py-0 text-amber-600">Stairs</Badge>}
+                                    </div>
                                     <div className="text-xs text-muted-foreground">
                                       {room.width}' x {room.length}' x {room.height}'
                                     </div>
@@ -1234,9 +1283,9 @@ export default function FloorPlan3D() {
             <Canvas shadows onClick={() => setSelectedFurniture(null)}>
               <Suspense fallback={null}>
                 <Scene
-                  rooms={rooms}
-                  furniture={furniture}
-                  doors={doors}
+                  rooms={currentFloorRooms}
+                  furniture={furniture.filter(f => currentFloorRooms.some(r => r.id === f.roomId))}
+                  doors={doors.filter(d => currentFloorRooms.some(r => r.id === d.roomId))}
                   selectedFurniture={selectedFurniture}
                   onSelectFurniture={setSelectedFurniture}
                   cameraView={cameraView}
@@ -1331,6 +1380,37 @@ export default function FloorPlan3D() {
                 )}
               </div>
             )}
+          </div>
+
+          <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm border rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Floor:</span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalFloors }, (_, i) => i + 1).map(floor => (
+                  <Button
+                    key={floor}
+                    variant={currentFloor === floor ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setCurrentFloor(floor)}
+                    data-testid={`button-floor-${floor}`}
+                  >
+                    {floor}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={addFloor}
+                  data-testid="button-add-floor"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm border rounded-lg p-3 text-xs text-muted-foreground">
