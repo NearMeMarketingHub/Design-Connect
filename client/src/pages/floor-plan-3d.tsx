@@ -71,6 +71,7 @@ import {
   ArrowRightIcon,
   Video,
   Link2,
+  Unlink,
   FileJson,
   Image,
   FileText,
@@ -1432,7 +1433,30 @@ export default function FloorPlan3D() {
   };
 
   const removeDoor = (doorId: string) => {
-    setDoors(doors.filter((d) => d.id !== doorId));
+    const door = doors.find(d => d.id === doorId);
+    if (!door) return;
+    
+    // Also remove the connected door on the other room
+    const connectedDoorIds = door.connectedRoomId 
+      ? doors.filter(d => d.roomId === door.connectedRoomId && d.connectedRoomId === door.roomId).map(d => d.id)
+      : [];
+    
+    setDoors(doors.filter(d => d.id !== doorId && !connectedDoorIds.includes(d.id)));
+    toast({ title: "Door Removed", description: "Door and wall opening removed" });
+  };
+
+  const disconnectDoor = (doorId: string) => {
+    const door = doors.find(d => d.id === doorId);
+    if (!door || !door.connectedRoomId) return;
+    
+    // Find and remove the connected door on the other room
+    const connectedDoorIds = doors
+      .filter(d => d.roomId === door.connectedRoomId && d.connectedRoomId === door.roomId)
+      .map(d => d.id);
+    
+    // Remove both doors entirely to close the wall holes
+    setDoors(doors.filter(d => d.id !== doorId && !connectedDoorIds.includes(d.id)));
+    toast({ title: "Disconnected", description: "Connection and wall openings removed" });
   };
 
   const connectDoorToRoom = (doorId: string, targetRoomId: string) => {
@@ -2236,9 +2260,21 @@ export default function FloorPlan3D() {
                                 </div>
 
                                 {door.connectedRoomId ? (
-                                  <div className="text-xs text-green-600 flex items-center gap-1 bg-green-50 dark:bg-green-950 p-2 rounded">
-                                    <Link2 className="h-3 w-3" />
-                                    Connected to: {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Room"}
+                                  <div className="space-y-2">
+                                    <div className="text-xs text-green-600 flex items-center gap-1 bg-green-50 dark:bg-green-950 p-2 rounded">
+                                      <Link2 className="h-3 w-3" />
+                                      Connected to: {rooms.find((r) => r.id === door.connectedRoomId)?.name || "Room"}
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full text-xs text-destructive hover:text-destructive"
+                                      onClick={() => disconnectDoor(door.id)}
+                                      data-testid={`button-disconnect-door-${door.id}`}
+                                    >
+                                      <Unlink className="h-3 w-3 mr-1" />
+                                      Disconnect & Close Wall
+                                    </Button>
                                   </div>
                                 ) : (
                                   <DropdownMenu>
