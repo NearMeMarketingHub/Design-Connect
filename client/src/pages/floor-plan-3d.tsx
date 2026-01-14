@@ -1466,21 +1466,21 @@ export default function FloorPlan3D() {
     let newX = targetRoom.x;
     let newZ = targetRoom.z;
     
-    if (door.wall === "south") {
+    if (door.wall === "north") {
       const doorX = sourceRoom.x - sourceRoom.width / 2 + door.position;
       newX = doorX - targetDoorPosition + targetRoom.width / 2;
       newZ = sourceRoom.z + sourceRoom.length / 2 + targetRoom.length / 2;
-    } else if (door.wall === "north") {
+    } else if (door.wall === "south") {
       const doorX = sourceRoom.x - sourceRoom.width / 2 + door.position;
       newX = doorX - targetDoorPosition + targetRoom.width / 2;
       newZ = sourceRoom.z - sourceRoom.length / 2 - targetRoom.length / 2;
     } else if (door.wall === "east") {
       const doorZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
-      newX = sourceRoom.x + sourceRoom.width / 2 + targetRoom.width / 2;
+      newX = sourceRoom.x - sourceRoom.width / 2 - targetRoom.width / 2;
       newZ = doorZ - targetDoorPosition + targetRoom.length / 2;
     } else if (door.wall === "west") {
       const doorZ = sourceRoom.z - sourceRoom.length / 2 + door.position;
-      newX = sourceRoom.x - sourceRoom.width / 2 - targetRoom.width / 2;
+      newX = sourceRoom.x + sourceRoom.width / 2 + targetRoom.width / 2;
       newZ = doorZ - targetDoorPosition + targetRoom.length / 2;
     }
 
