@@ -1407,77 +1407,37 @@ export default function FloorPlan3D() {
     const room2 = rooms.find(r => r.id === roomId2);
     if (!room1 || !room2) return;
 
-    const room1North = room1.z - room1.length / 2;
     const room1South = room1.z + room1.length / 2;
-    const room1West = room1.x - room1.width / 2;
+    const room1North = room1.z - room1.length / 2;
     const room1East = room1.x + room1.width / 2;
+    const room1West = room1.x - room1.width / 2;
     
-    const room2North = room2.z - room2.length / 2;
     const room2South = room2.z + room2.length / 2;
-    const room2West = room2.x - room2.width / 2;
+    const room2North = room2.z - room2.length / 2;
     const room2East = room2.x + room2.width / 2;
+    const room2West = room2.x - room2.width / 2;
 
-    type WallPair = { wall1: "north" | "south" | "east" | "west"; wall2: "north" | "south" | "east" | "west"; distance: number; overlap: number };
-    const candidates: WallPair[] = [];
+    let suggestedWall: "north" | "south" | "east" | "west" = "south";
+    
+    const southDist = Math.abs(room1South - room2North);
+    const northDist = Math.abs(room1North - room2South);
+    const eastDist = Math.abs(room1East - room2West);
+    const westDist = Math.abs(room1West - room2East);
+    
+    const minDist = Math.min(southDist, northDist, eastDist, westDist);
+    if (minDist === southDist) suggestedWall = "south";
+    else if (minDist === northDist) suggestedWall = "north";
+    else if (minDist === eastDist) suggestedWall = "east";
+    else suggestedWall = "west";
 
-    const xOverlapStart = Math.max(room1West, room2West);
-    const xOverlapEnd = Math.min(room1East, room2East);
-    const xOverlap = Math.max(0, xOverlapEnd - xOverlapStart);
-
-    const zOverlapStart = Math.max(room1North, room2North);
-    const zOverlapEnd = Math.min(room1South, room2South);
-    const zOverlap = Math.max(0, zOverlapEnd - zOverlapStart);
-
-    if (xOverlap > 0) {
-      candidates.push({ wall1: "south", wall2: "north", distance: Math.abs(room1South - room2North), overlap: xOverlap });
-      candidates.push({ wall1: "north", wall2: "south", distance: Math.abs(room1North - room2South), overlap: xOverlap });
-    }
-    if (zOverlap > 0) {
-      candidates.push({ wall1: "east", wall2: "west", distance: Math.abs(room1East - room2West), overlap: zOverlap });
-      candidates.push({ wall1: "west", wall2: "east", distance: Math.abs(room1West - room2East), overlap: zOverlap });
-    }
-
-    if (candidates.length === 0) {
-      toast({ title: "Cannot Connect", description: "Rooms must be adjacent (walls aligned) to connect", variant: "destructive" });
-      return;
-    }
-
-    candidates.sort((a, b) => a.distance - b.distance);
-    const best = candidates[0];
-
-    let pos1: number;
-    let pos2: number;
-
-    if (best.wall1 === "north" || best.wall1 === "south") {
-      const overlapCenter = (xOverlapStart + xOverlapEnd) / 2;
-      pos1 = overlapCenter - room1West;
-      pos2 = overlapCenter - room2West;
-    } else {
-      const overlapCenter = (zOverlapStart + zOverlapEnd) / 2;
-      pos1 = overlapCenter - room1North;
-      pos2 = overlapCenter - room2North;
-    }
-
-    const door1: Door = {
-      id: crypto.randomUUID(),
-      roomId: roomId1,
-      wall: best.wall1,
-      position: Math.max(1.5, Math.min(pos1, (best.wall1 === "north" || best.wall1 === "south" ? room1.width : room1.length) - 1.5)),
+    setNewDoor({
+      wall: suggestedWall,
+      position: 50,
       width: 3,
       connectedRoomId: roomId2,
-    };
-
-    const door2: Door = {
-      id: crypto.randomUUID(),
-      roomId: roomId2,
-      wall: best.wall2,
-      position: Math.max(1.5, Math.min(pos2, (best.wall2 === "north" || best.wall2 === "south" ? room2.width : room2.length) - 1.5)),
-      width: 3,
-      connectedRoomId: roomId1,
-    };
-
-    setDoors([...doors, door1, door2]);
-    toast({ title: "Rooms Connected", description: `${room1.name} and ${room2.name} are now connected` });
+      snapConnectedRoom: false,
+    });
+    setShowAddDoorDialog(true);
   };
 
   const addFurniture = (type: typeof FURNITURE_TYPES[0]) => {
