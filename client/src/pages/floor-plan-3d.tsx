@@ -1407,47 +1407,62 @@ export default function FloorPlan3D() {
     const room2 = rooms.find(r => r.id === roomId2);
     if (!room1 || !room2) return;
 
-    const dx = room2.x - room1.x;
-    const dz = room2.z - room1.z;
+    const room1North = room1.z - room1.length / 2;
+    const room1South = room1.z + room1.length / 2;
+    const room1West = room1.x - room1.width / 2;
+    const room1East = room1.x + room1.width / 2;
     
-    let wall1: "north" | "south" | "east" | "west";
-    let wall2: "north" | "south" | "east" | "west";
+    const room2North = room2.z - room2.length / 2;
+    const room2South = room2.z + room2.length / 2;
+    const room2West = room2.x - room2.width / 2;
+    const room2East = room2.x + room2.width / 2;
+
+    type WallPair = { wall1: "north" | "south" | "east" | "west"; wall2: "north" | "south" | "east" | "west"; distance: number; overlap: number };
+    const candidates: WallPair[] = [];
+
+    const xOverlapStart = Math.max(room1West, room2West);
+    const xOverlapEnd = Math.min(room1East, room2East);
+    const xOverlap = Math.max(0, xOverlapEnd - xOverlapStart);
+
+    const zOverlapStart = Math.max(room1North, room2North);
+    const zOverlapEnd = Math.min(room1South, room2South);
+    const zOverlap = Math.max(0, zOverlapEnd - zOverlapStart);
+
+    if (xOverlap > 0) {
+      candidates.push({ wall1: "south", wall2: "north", distance: Math.abs(room1South - room2North), overlap: xOverlap });
+      candidates.push({ wall1: "north", wall2: "south", distance: Math.abs(room1North - room2South), overlap: xOverlap });
+    }
+    if (zOverlap > 0) {
+      candidates.push({ wall1: "east", wall2: "west", distance: Math.abs(room1East - room2West), overlap: zOverlap });
+      candidates.push({ wall1: "west", wall2: "east", distance: Math.abs(room1West - room2East), overlap: zOverlap });
+    }
+
+    if (candidates.length === 0) {
+      toast({ title: "Cannot Connect", description: "Rooms must be adjacent (walls aligned) to connect", variant: "destructive" });
+      return;
+    }
+
+    candidates.sort((a, b) => a.distance - b.distance);
+    const best = candidates[0];
+
     let pos1: number;
     let pos2: number;
-    
-    if (Math.abs(dx) > Math.abs(dz)) {
-      if (dx > 0) {
-        wall1 = "east";
-        wall2 = "west";
-      } else {
-        wall1 = "west";
-        wall2 = "east";
-      }
-      const overlapStart = Math.max(room1.z - room1.length / 2, room2.z - room2.length / 2);
-      const overlapEnd = Math.min(room1.z + room1.length / 2, room2.z + room2.length / 2);
-      const overlapCenter = (overlapStart + overlapEnd) / 2;
-      pos1 = overlapCenter - (room1.z - room1.length / 2);
-      pos2 = overlapCenter - (room2.z - room2.length / 2);
+
+    if (best.wall1 === "north" || best.wall1 === "south") {
+      const overlapCenter = (xOverlapStart + xOverlapEnd) / 2;
+      pos1 = overlapCenter - room1West;
+      pos2 = overlapCenter - room2West;
     } else {
-      if (dz > 0) {
-        wall1 = "south";
-        wall2 = "north";
-      } else {
-        wall1 = "north";
-        wall2 = "south";
-      }
-      const overlapStart = Math.max(room1.x - room1.width / 2, room2.x - room2.width / 2);
-      const overlapEnd = Math.min(room1.x + room1.width / 2, room2.x + room2.width / 2);
-      const overlapCenter = (overlapStart + overlapEnd) / 2;
-      pos1 = overlapCenter - (room1.x - room1.width / 2);
-      pos2 = overlapCenter - (room2.x - room2.width / 2);
+      const overlapCenter = (zOverlapStart + zOverlapEnd) / 2;
+      pos1 = overlapCenter - room1North;
+      pos2 = overlapCenter - room2North;
     }
 
     const door1: Door = {
       id: crypto.randomUUID(),
       roomId: roomId1,
-      wall: wall1,
-      position: Math.max(1.5, Math.min(pos1, (wall1 === "north" || wall1 === "south" ? room1.width : room1.length) - 1.5)),
+      wall: best.wall1,
+      position: Math.max(1.5, Math.min(pos1, (best.wall1 === "north" || best.wall1 === "south" ? room1.width : room1.length) - 1.5)),
       width: 3,
       connectedRoomId: roomId2,
     };
@@ -1455,8 +1470,8 @@ export default function FloorPlan3D() {
     const door2: Door = {
       id: crypto.randomUUID(),
       roomId: roomId2,
-      wall: wall2,
-      position: Math.max(1.5, Math.min(pos2, (wall2 === "north" || wall2 === "south" ? room2.width : room2.length) - 1.5)),
+      wall: best.wall2,
+      position: Math.max(1.5, Math.min(pos2, (best.wall2 === "north" || best.wall2 === "south" ? room2.width : room2.length) - 1.5)),
       width: 3,
       connectedRoomId: roomId1,
     };
