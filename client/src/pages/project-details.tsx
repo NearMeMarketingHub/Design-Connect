@@ -320,6 +320,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/inspiration')) return 'inspiration';
     if (path.endsWith('/contractor-photos')) return 'contractor-photos';
     if (path.endsWith('/materials')) return 'materials';
+    if (path.endsWith('/change-orders')) return 'change-orders';
     if (path.endsWith('/action-center')) return 'action-center';
     return 'overview';
   };
@@ -1336,6 +1337,47 @@ export default function ProjectDetails() {
   const [newMaterialDescription, setNewMaterialDescription] = useState("");
   const [newMaterialDueDate, setNewMaterialDueDate] = useState("");
 
+  // Change orders state
+  type ChangeOrderLineItemForm = {
+    id?: string;
+    description: string;
+    quantity: string;
+    unit: string;
+    rate: string;
+    amount: string;
+  };
+  
+  type ChangeOrder = {
+    id: string;
+    projectId: string;
+    orderNumber: number;
+    title: string;
+    description: string;
+    reason: string;
+    costImpact: string;
+    timelineImpact: number;
+    status: string;
+    createdById: string;
+    createdByName: string;
+    approvedById: string | null;
+    approvedByName: string | null;
+    approvedAt: string | null;
+    rejectionReason: string | null;
+    createdAt: string;
+  };
+  
+  const [showChangeOrderDialog, setShowChangeOrderDialog] = useState(false);
+  const [editingChangeOrder, setEditingChangeOrder] = useState<ChangeOrder | null>(null);
+  const [changeOrderTitle, setChangeOrderTitle] = useState("");
+  const [changeOrderDescription, setChangeOrderDescription] = useState("");
+  const [changeOrderReason, setChangeOrderReason] = useState("");
+  const [changeOrderCostImpact, setChangeOrderCostImpact] = useState("");
+  const [changeOrderTimelineImpact, setChangeOrderTimelineImpact] = useState("");
+  const [changeOrderLineItems, setChangeOrderLineItems] = useState<ChangeOrderLineItemForm[]>([]);
+  const [showRejectChangeOrderDialog, setShowRejectChangeOrderDialog] = useState(false);
+  const [changeOrderToReject, setChangeOrderToReject] = useState<{ id: string; title: string } | null>(null);
+  const [changeOrderRejectionReason, setChangeOrderRejectionReason] = useState("");
+
   // Notarization upload dialog (for clients to upload notarized documents)
   const [notarizationUploadDialogOpen, setNotarizationUploadDialogOpen] = useState(false);
   const [notarizationUploadDocId, setNotarizationUploadDocId] = useState<string | null>(null);
@@ -1551,6 +1593,262 @@ export default function ProjectDetails() {
       alert(error.message || 'Failed to delete material item');
     }
   });
+
+  // Fetch change orders
+  const { data: changeOrders = [] } = useQuery<ChangeOrder[]>({
+    queryKey: ['/api/projects', projectId, 'change-orders'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/change-orders`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Create change order mutation
+  const createChangeOrderMutation = useMutation({
+    mutationFn: async (data: { 
+      title: string; 
+      description: string; 
+      reason: string; 
+      costImpact: number; 
+      timelineImpact: number;
+      lineItems?: Array<{ description: string; quantity: number; unit: string; rate: number; amount: number }>;
+    }) => {
+      const res = await fetch(`/api/projects/${projectId}/change-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to create change order');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'change-orders'] });
+      resetChangeOrderForm();
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to create change order');
+    }
+  });
+
+  // Update change order mutation
+  const updateChangeOrderMutation = useMutation({
+    mutationFn: async ({ orderId, data }: { 
+      orderId: string; 
+      data: { 
+        title?: string; 
+        description?: string; 
+        reason?: string; 
+        costImpact?: number; 
+        timelineImpact?: number;
+        lineItems?: Array<{ description: string; quantity: number; unit: string; rate: number; amount: number }>;
+      };
+    }) => {
+      const res = await fetch(`/api/change-orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to update change order');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'change-orders'] });
+      resetChangeOrderForm();
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to update change order');
+    }
+  });
+
+  // Delete change order mutation
+  const deleteChangeOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const res = await fetch(`/api/change-orders/${orderId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to delete change order');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'change-orders'] });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to delete change order');
+    }
+  });
+
+  // Approve change order mutation
+  const approveChangeOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const res = await fetch(`/api/change-orders/${orderId}/approve`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to approve change order');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'change-orders'] });
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to approve change order');
+    }
+  });
+
+  // Reject change order mutation
+  const rejectChangeOrderMutation = useMutation({
+    mutationFn: async ({ orderId, reason }: { orderId: string; reason: string }) => {
+      const res = await fetch(`/api/change-orders/${orderId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to reject change order');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'change-orders'] });
+      setShowRejectChangeOrderDialog(false);
+      setChangeOrderToReject(null);
+      setChangeOrderRejectionReason("");
+    },
+    onError: (error: Error) => {
+      alert(error.message || 'Failed to reject change order');
+    }
+  });
+
+  // Reset change order form
+  const resetChangeOrderForm = () => {
+    setShowChangeOrderDialog(false);
+    setEditingChangeOrder(null);
+    setChangeOrderTitle("");
+    setChangeOrderDescription("");
+    setChangeOrderReason("");
+    setChangeOrderCostImpact("");
+    setChangeOrderTimelineImpact("");
+    setChangeOrderLineItems([]);
+  };
+
+  // Open edit change order dialog
+  const openEditChangeOrder = async (order: ChangeOrder) => {
+    setEditingChangeOrder(order);
+    setChangeOrderTitle(order.title);
+    setChangeOrderDescription(order.description);
+    setChangeOrderReason(order.reason);
+    setChangeOrderCostImpact(order.costImpact || "0");
+    setChangeOrderTimelineImpact(String(order.timelineImpact || 0));
+    
+    // Fetch line items
+    try {
+      const res = await fetch(`/api/change-orders/${order.id}/line-items`, { credentials: 'include' });
+      if (res.ok) {
+        const items = await res.json();
+        setChangeOrderLineItems(items.map((item: any) => ({
+          id: item.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          rate: item.rate,
+          amount: item.amount
+        })));
+      }
+    } catch (e) {
+      console.error('Failed to fetch line items:', e);
+    }
+    
+    setShowChangeOrderDialog(true);
+  };
+
+  // Add line item
+  const addChangeOrderLineItem = () => {
+    setChangeOrderLineItems([
+      ...changeOrderLineItems,
+      { description: "", quantity: "1", unit: "EA", rate: "0", amount: "0" }
+    ]);
+  };
+
+  // Update line item
+  const updateChangeOrderLineItem = (index: number, field: keyof ChangeOrderLineItemForm, value: string) => {
+    const updated = [...changeOrderLineItems];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    // Auto-calculate amount when quantity or rate changes
+    if (field === 'quantity' || field === 'rate') {
+      const qty = parseFloat(updated[index].quantity) || 0;
+      const rate = parseFloat(updated[index].rate) || 0;
+      updated[index].amount = (qty * rate).toFixed(2);
+    }
+    
+    setChangeOrderLineItems(updated);
+  };
+
+  // Remove line item
+  const removeChangeOrderLineItem = (index: number) => {
+    setChangeOrderLineItems(changeOrderLineItems.filter((_, i) => i !== index));
+  };
+
+  // Submit change order
+  const handleSubmitChangeOrder = () => {
+    if (!changeOrderTitle.trim() || !changeOrderDescription.trim() || !changeOrderReason.trim()) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const costImpact = parseFloat(changeOrderCostImpact) || 0;
+    const timelineImpact = parseInt(changeOrderTimelineImpact) || 0;
+    const lineItems = changeOrderLineItems
+      .filter(item => item.description.trim())
+      .map(item => ({
+        description: item.description,
+        quantity: parseFloat(item.quantity) || 1,
+        unit: item.unit || 'EA',
+        rate: parseFloat(item.rate) || 0,
+        amount: parseFloat(item.amount) || 0
+      }));
+
+    if (editingChangeOrder) {
+      updateChangeOrderMutation.mutate({
+        orderId: editingChangeOrder.id,
+        data: {
+          title: changeOrderTitle,
+          description: changeOrderDescription,
+          reason: changeOrderReason,
+          costImpact,
+          timelineImpact,
+          lineItems
+        }
+      });
+    } else {
+      createChangeOrderMutation.mutate({
+        title: changeOrderTitle,
+        description: changeOrderDescription,
+        reason: changeOrderReason,
+        costImpact,
+        timelineImpact,
+        lineItems
+      });
+    }
+  };
 
   // Create notary profile mutation
   const createNotaryProfileMutation = useMutation({
@@ -2464,6 +2762,13 @@ export default function ProjectDetails() {
               Client Materials
             </TabsTrigger>
           )}
+          <TabsTrigger 
+            value="change-orders"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+            data-testid="tab-change-orders"
+          >
+            Change Orders
+          </TabsTrigger>
           <TabsTrigger 
             value="action-center"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 pr-6 whitespace-nowrap transition-colors relative overflow-visible"
@@ -4502,6 +4807,178 @@ export default function ProjectDetails() {
             </Card>
           </TabsContent>
 
+          {/* CHANGE ORDERS TAB */}
+          <TabsContent value="change-orders" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Receipt className="h-5 w-5" />
+                      Change Orders
+                    </CardTitle>
+                    <CardDescription>
+                      {canEdit 
+                        ? "Manage project scope, budget, or timeline modifications"
+                        : "Review and respond to proposed project changes"
+                      }
+                    </CardDescription>
+                  </div>
+                  {canEdit && (
+                    <Button 
+                      onClick={() => {
+                        resetChangeOrderForm();
+                        setShowChangeOrderDialog(true);
+                      }}
+                      data-testid="button-create-change-order"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Change Order
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {changeOrders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      {canEdit 
+                        ? "No change orders yet. Click 'New Change Order' to create one."
+                        : "No change orders have been submitted for this project."
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {changeOrders.map((order) => {
+                      const costImpact = parseFloat(order.costImpact) || 0;
+                      const isPending = order.status === 'pending';
+                      const isApproved = order.status === 'approved';
+                      const isRejected = order.status === 'rejected';
+                      
+                      return (
+                        <div 
+                          key={order.id}
+                          className="p-4 border rounded-lg space-y-3"
+                          data-testid={`change-order-${order.id}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm text-muted-foreground" data-testid={`change-order-number-${order.id}`}>
+                                  CO-{String(order.orderNumber).padStart(3, '0')}
+                                </span>
+                                <Badge 
+                                  className={
+                                    isPending ? 'bg-yellow-500 hover:bg-yellow-600' :
+                                    isApproved ? 'bg-green-500 hover:bg-green-600' :
+                                    isRejected ? 'bg-red-500 hover:bg-red-600' : ''
+                                  }
+                                  data-testid={`change-order-status-${order.id}`}
+                                >
+                                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                                </Badge>
+                              </div>
+                              <h4 className="font-medium" data-testid={`change-order-title-${order.id}`}>{order.title}</h4>
+                              <p className="text-sm text-muted-foreground">{order.description}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {canEdit && isPending && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEditChangeOrder(order)}
+                                    data-testid={`button-edit-change-order-${order.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm('Delete this change order?')) {
+                                        deleteChangeOrderMutation.mutate(order.id);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-change-order-${order.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-4 text-sm">
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-4 w-4 text-muted-foreground" />
+                              <span className={costImpact > 0 ? 'text-red-600 font-medium' : costImpact < 0 ? 'text-green-600 font-medium' : ''}>
+                                {costImpact > 0 ? '+' : ''}{formatCurrency(costImpact)}
+                              </span>
+                              <span className="text-muted-foreground">cost impact</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <span className={order.timelineImpact > 0 ? 'text-orange-600 font-medium' : order.timelineImpact < 0 ? 'text-green-600 font-medium' : ''}>
+                                {order.timelineImpact > 0 ? '+' : ''}{order.timelineImpact} days
+                              </span>
+                              <span className="text-muted-foreground">timeline impact</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-muted-foreground">
+                            <span>Created by {order.createdByName} on {new Date(order.createdAt).toLocaleDateString()}</span>
+                            {isApproved && order.approvedByName && order.approvedAt && (
+                              <span className="ml-4">• Approved by {order.approvedByName} on {new Date(order.approvedAt).toLocaleDateString()}</span>
+                            )}
+                          </div>
+                          
+                          {isRejected && order.rejectionReason && (
+                            <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
+                              <p className="text-sm text-red-800 dark:text-red-200">
+                                <strong>Rejection reason:</strong> {order.rejectionReason}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {!canEdit && isPending && (
+                            <div className="flex gap-2 pt-2 border-t">
+                              <Button
+                                size="sm"
+                                onClick={() => approveChangeOrderMutation.mutate(order.id)}
+                                disabled={approveChangeOrderMutation.isPending}
+                                data-testid={`button-approve-change-order-${order.id}`}
+                              >
+                                <Check className="h-4 w-4 mr-2" />
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setChangeOrderToReject({ id: order.id, title: order.title });
+                                  setChangeOrderRejectionReason("");
+                                  setShowRejectChangeOrderDialog(true);
+                                }}
+                                data-testid={`button-reject-change-order-${order.id}`}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* ACTION CENTER TAB */}
           <TabsContent value="action-center" className="space-y-6">
             <Card>
@@ -6159,6 +6636,273 @@ export default function ProjectDetails() {
               setPendingImageForChat(null);
             }}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Change Order Dialog */}
+      <Dialog open={showChangeOrderDialog} onOpenChange={(open) => {
+        if (!open) resetChangeOrderForm();
+        setShowChangeOrderDialog(open);
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingChangeOrder ? 'Edit Change Order' : 'New Change Order'}</DialogTitle>
+            <DialogDescription>
+              {editingChangeOrder 
+                ? 'Modify the details of this change order' 
+                : 'Create a new change order to document project modifications'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="change-order-title">Title <span className="text-destructive">*</span></Label>
+              <Input
+                id="change-order-title"
+                placeholder="e.g., Additional electrical outlets in kitchen"
+                value={changeOrderTitle}
+                onChange={(e) => setChangeOrderTitle(e.target.value)}
+                data-testid="input-change-order-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="change-order-description">Description <span className="text-destructive">*</span></Label>
+              <Textarea
+                id="change-order-description"
+                placeholder="Describe the changes in detail..."
+                value={changeOrderDescription}
+                onChange={(e) => setChangeOrderDescription(e.target.value)}
+                rows={3}
+                data-testid="input-change-order-description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="change-order-reason">Reason for Change <span className="text-destructive">*</span></Label>
+              <Select value={changeOrderReason} onValueChange={setChangeOrderReason}>
+                <SelectTrigger id="change-order-reason" data-testid="select-change-order-reason">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="client_request">Client Request</SelectItem>
+                  <SelectItem value="unforeseen_conditions">Unforeseen Conditions</SelectItem>
+                  <SelectItem value="design_change">Design Change</SelectItem>
+                  <SelectItem value="code_compliance">Code Compliance</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="change-order-cost">Cost Impact ($)</Label>
+                <Input
+                  id="change-order-cost"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={changeOrderCostImpact}
+                  onChange={(e) => setChangeOrderCostImpact(e.target.value)}
+                  data-testid="input-change-order-cost"
+                />
+                <p className="text-xs text-muted-foreground">Positive for additions, negative for credits</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="change-order-timeline">Timeline Impact (days)</Label>
+                <Input
+                  id="change-order-timeline"
+                  type="number"
+                  placeholder="0"
+                  value={changeOrderTimelineImpact}
+                  onChange={(e) => setChangeOrderTimelineImpact(e.target.value)}
+                  data-testid="input-change-order-timeline"
+                />
+                <p className="text-xs text-muted-foreground">Positive adds days, negative subtracts</p>
+              </div>
+            </div>
+
+            {/* Line Items Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Line Items (Optional)</Label>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={addChangeOrderLineItem}
+                  data-testid="button-add-line-item"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Item
+                </Button>
+              </div>
+
+              {changeOrderLineItems.length > 0 && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground">
+                    <div className="col-span-4">Description</div>
+                    <div className="col-span-2">Qty</div>
+                    <div className="col-span-2">Unit</div>
+                    <div className="col-span-2">Rate</div>
+                    <div className="col-span-1">Amount</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  {changeOrderLineItems.map((item, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-center" data-testid={`line-item-${index}`}>
+                      <div className="col-span-4">
+                        <Input
+                          placeholder="Description"
+                          value={item.description}
+                          onChange={(e) => updateChangeOrderLineItem(index, 'description', e.target.value)}
+                          data-testid={`input-line-item-description-${index}`}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          placeholder="1"
+                          value={item.quantity}
+                          onChange={(e) => updateChangeOrderLineItem(index, 'quantity', e.target.value)}
+                          data-testid={`input-line-item-quantity-${index}`}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Select 
+                          value={item.unit} 
+                          onValueChange={(value) => updateChangeOrderLineItem(index, 'unit', value)}
+                        >
+                          <SelectTrigger data-testid={`select-line-item-unit-${index}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="EA">EA</SelectItem>
+                            <SelectItem value="SF">SF</SelectItem>
+                            <SelectItem value="LF">LF</SelectItem>
+                            <SelectItem value="HR">HR</SelectItem>
+                            <SelectItem value="LS">LS</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={item.rate}
+                          onChange={(e) => updateChangeOrderLineItem(index, 'rate', e.target.value)}
+                          data-testid={`input-line-item-rate-${index}`}
+                        />
+                      </div>
+                      <div className="col-span-1 text-sm">
+                        ${parseFloat(item.amount || '0').toFixed(2)}
+                      </div>
+                      <div className="col-span-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => removeChangeOrderLineItem(index)}
+                          data-testid={`button-remove-line-item-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end pt-2 border-t">
+                    <div className="text-sm font-medium">
+                      Total: ${changeOrderLineItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => resetChangeOrderForm()}
+              data-testid="button-cancel-change-order"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitChangeOrder}
+              disabled={
+                !changeOrderTitle.trim() || 
+                !changeOrderDescription.trim() || 
+                !changeOrderReason.trim() ||
+                createChangeOrderMutation.isPending ||
+                updateChangeOrderMutation.isPending
+              }
+              data-testid="button-submit-change-order"
+            >
+              {(createChangeOrderMutation.isPending || updateChangeOrderMutation.isPending) 
+                ? 'Saving...' 
+                : editingChangeOrder ? 'Save Changes' : 'Create Change Order'
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Change Order Dialog */}
+      <Dialog open={showRejectChangeOrderDialog} onOpenChange={setShowRejectChangeOrderDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject Change Order</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject "{changeOrderToReject?.title}"?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-reason">Reason for Rejection (Optional)</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Explain why this change order is being rejected..."
+                value={changeOrderRejectionReason}
+                onChange={(e) => setChangeOrderRejectionReason(e.target.value)}
+                rows={3}
+                data-testid="input-rejection-reason"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowRejectChangeOrderDialog(false);
+                setChangeOrderToReject(null);
+                setChangeOrderRejectionReason("");
+              }}
+              data-testid="button-cancel-rejection"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                if (changeOrderToReject) {
+                  rejectChangeOrderMutation.mutate({
+                    orderId: changeOrderToReject.id,
+                    reason: changeOrderRejectionReason.trim()
+                  });
+                }
+              }}
+              disabled={rejectChangeOrderMutation.isPending}
+              data-testid="button-confirm-rejection"
+            >
+              {rejectChangeOrderMutation.isPending ? 'Rejecting...' : 'Reject Change Order'}
             </Button>
           </DialogFooter>
         </DialogContent>
