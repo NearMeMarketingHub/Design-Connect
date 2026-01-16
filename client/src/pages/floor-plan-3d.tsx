@@ -194,6 +194,9 @@ const ROOM_PRESETS = [
   { name: "Landing", width: 6, length: 6, height: 9, color: "#d8d0c8", isStairs: false },
   { name: "Laundry Room", width: 8, length: 6, height: 9, color: "#f0f0f0", isStairs: false },
   { name: "Garage", width: 20, length: 20, height: 10, color: "#d0d0d0", isStairs: false },
+  { name: "Pool", width: 20, length: 40, height: 5, color: "#87CEEB", isStairs: false },
+  { name: "Lanai", width: 20, length: 12, height: 10, color: "#c4d4c0", isStairs: false },
+  { name: "Porch", width: 12, length: 8, height: 10, color: "#d8c8b8", isStairs: false },
   { name: "Stairs", width: 4, length: 10, height: 9, color: "#b8a090", isStairs: true },
 ];
 
@@ -1277,6 +1280,7 @@ export default function FloorPlan3D() {
     };
 
     setRooms([...rooms, room]);
+    setSelectedRoom(room.id);
     setShowAddRoomDialog(false);
     setNewRoom({ name: "", width: 12, length: 10, height: 9, color: "#e8e4e1" });
     toast({ title: "Room Added", description: `${room.name} has been added to Floor ${currentFloor}` });
@@ -1302,6 +1306,7 @@ export default function FloorPlan3D() {
     };
 
     setRooms([...rooms, room]);
+    setSelectedRoom(room.id);
     toast({ title: "Room Added", description: `${preset.name} has been added to Floor ${currentFloor}${preset.isStairs ? " (going up)" : ""}` });
   };
 
@@ -1329,6 +1334,44 @@ export default function FloorPlan3D() {
         ? `Floor ${newFloorNumber} created with ${copiedStairs.length} stair${copiedStairs.length > 1 ? 's' : ''} copied from Floor ${totalFloors}`
         : `Floor ${newFloorNumber} created`
     });
+  };
+
+  const deleteFloor = (floorNumber: number) => {
+    if (totalFloors <= 1) {
+      toast({ title: "Cannot Delete", description: "You must have at least one floor", variant: "destructive" });
+      return;
+    }
+    const floorRooms = rooms.filter(r => r.floor === floorNumber);
+    if (floorRooms.length > 0) {
+      const roomIds = floorRooms.map(r => r.id);
+      setRooms(rooms.filter(r => r.floor !== floorNumber).map(r => 
+        r.floor > floorNumber ? { ...r, floor: r.floor - 1 } : r
+      ));
+      setFurniture(furniture.filter(f => !roomIds.includes(f.roomId)));
+      setDoors(doors.filter(d => !roomIds.includes(d.roomId)));
+      setManualGroups(prev => prev
+        .filter(g => g.floor !== floorNumber)
+        .map(g => g.floor > floorNumber ? { ...g, floor: g.floor - 1 } : g)
+      );
+    } else {
+      setRooms(rooms.map(r => r.floor > floorNumber ? { ...r, floor: r.floor - 1 } : r));
+      setManualGroups(prev => prev
+        .filter(g => g.floor !== floorNumber)
+        .map(g => g.floor > floorNumber ? { ...g, floor: g.floor - 1 } : g)
+      );
+    }
+    setTotalFloors(totalFloors - 1);
+    if (currentFloor === floorNumber) {
+      setCurrentFloor(Math.max(1, floorNumber - 1));
+    } else if (currentFloor > floorNumber) {
+      setCurrentFloor(currentFloor - 1);
+    }
+    setSelectedRoom(null);
+    toast({ title: "Floor Deleted", description: `Floor ${floorNumber} has been removed` });
+  };
+
+  const renameRoom = (roomId: string, newName: string) => {
+    setRooms(rooms.map(r => r.id === roomId ? { ...r, name: newName } : r));
   };
 
   const removeRoom = (roomId: string) => {
@@ -2130,6 +2173,17 @@ export default function FloorPlan3D() {
                                         </div>
                                         {selectedRoom === room.id && (
                                           <div className="mt-2 pt-2 border-t space-y-2">
+                                            <div>
+                                              <Label className="text-xs font-medium">Room Name</Label>
+                                              <Input
+                                                type="text"
+                                                className="h-7 text-xs mt-1"
+                                                value={room.name}
+                                                onChange={(e) => renameRoom(room.id, e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                data-testid={`input-room-name-${room.id}`}
+                                              />
+                                            </div>
                                             <Label className="text-xs font-medium">Edit Dimensions</Label>
                                             <div className="grid grid-cols-3 gap-2">
                                               <div>
@@ -2169,6 +2223,41 @@ export default function FloorPlan3D() {
                                                 />
                                               </div>
                                             </div>
+                                            {!room.isStairs && (() => {
+                                              const availableDoors = doors.filter(d => 
+                                                d.roomId !== room.id && 
+                                                !d.connectedRoomId &&
+                                                currentFloorRooms.some(r => r.id === d.roomId)
+                                              );
+                                              if (availableDoors.length === 0) return null;
+                                              return (
+                                                <DropdownMenu>
+                                                  <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="w-full text-xs" data-testid={`button-connect-to-door-grouped-${room.id}`}>
+                                                      <Link2 className="h-3 w-3 mr-1" />
+                                                      Connect to Existing Door
+                                                    </Button>
+                                                  </DropdownMenuTrigger>
+                                                  <DropdownMenuContent align="start" className="w-56">
+                                                    <DropdownMenuLabel className="text-xs">Available doors:</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    {availableDoors.map(door => {
+                                                      const ownerRoom = rooms.find(r => r.id === door.roomId);
+                                                      return (
+                                                        <DropdownMenuItem
+                                                          key={door.id}
+                                                          onClick={() => connectDoorToRoom(door.id, room.id)}
+                                                          className="text-xs"
+                                                        >
+                                                          <DoorOpen className="h-3 w-3 mr-2" />
+                                                          {ownerRoom?.name} - {door.wall} wall
+                                                        </DropdownMenuItem>
+                                                      );
+                                                    })}
+                                                  </DropdownMenuContent>
+                                                </DropdownMenu>
+                                              );
+                                            })()}
                                           </div>
                                         )}
                                       </CardContent>
@@ -2340,6 +2429,17 @@ export default function FloorPlan3D() {
                                 )}
                                 {selectedRoom === group.rooms[0].id && (
                                   <div className="mt-2 pt-2 border-t space-y-2">
+                                    <div>
+                                      <Label className="text-xs font-medium">Room Name</Label>
+                                      <Input
+                                        type="text"
+                                        className="h-7 text-xs mt-1"
+                                        value={group.rooms[0].name}
+                                        onChange={(e) => renameRoom(group.rooms[0].id, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        data-testid={`input-room-name-${group.rooms[0].id}`}
+                                      />
+                                    </div>
                                     <Label className="text-xs font-medium">Edit Dimensions</Label>
                                     <div className="grid grid-cols-3 gap-2">
                                       <div>
@@ -3075,6 +3175,18 @@ export default function FloorPlan3D() {
                   <Plus className="h-3 w-3 mr-1" />
                   Add
                 </Button>
+                {totalFloors > 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-destructive hover:text-destructive"
+                    onClick={() => deleteFloor(currentFloor)}
+                    data-testid="button-delete-floor"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
+                  </Button>
+                )}
               </div>
             </div>
           </div>
