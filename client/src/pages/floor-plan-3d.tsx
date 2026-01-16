@@ -135,6 +135,8 @@ interface Door {
   width: number;
   connectedRoomId?: string;
   doorType?: "standard" | "open";
+  swingDirection?: "left" | "right";
+  swingInward?: boolean;
 }
 
 type CameraView = "perspective" | "top";
@@ -697,13 +699,15 @@ export default function FloorPlan3D() {
   const [cameraResetTrigger, setCameraResetTrigger] = useState(0);
   const [currentFloor, setCurrentFloor] = useState(1);
   const [totalFloors, setTotalFloors] = useState(1);
-  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string; snapConnectedRoom: boolean; doorType: "standard" | "open" }>({
+  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string; snapConnectedRoom: boolean; doorType: "standard" | "open"; swingDirection: "left" | "right"; swingInward: boolean }>({
     wall: "south",
     position: 50,
     width: 3,
     connectedRoomId: undefined,
     snapConnectedRoom: true,
     doorType: "standard",
+    swingDirection: "left",
+    swingInward: true,
   });
   
   const [newRoom, setNewRoom] = useState({
@@ -1690,6 +1694,8 @@ export default function FloorPlan3D() {
       width: newDoor.width,
       connectedRoomId: newDoor.connectedRoomId,
       doorType: newDoor.doorType,
+      swingDirection: newDoor.doorType === "open" ? undefined : newDoor.swingDirection,
+      swingInward: newDoor.doorType === "open" ? undefined : newDoor.swingInward,
     };
 
     const newDoors = [door];
@@ -1803,6 +1809,8 @@ export default function FloorPlan3D() {
           width: newDoor.width,
           connectedRoomId: selectedRoom,
           doorType: newDoor.doorType,
+          swingDirection: newDoor.doorType === "open" ? undefined : (newDoor.swingDirection === "left" ? "right" : "left"),
+          swingInward: newDoor.doorType === "open" ? undefined : !newDoor.swingInward,
         };
         newDoors.push(connectedDoor);
       }
@@ -1811,7 +1819,7 @@ export default function FloorPlan3D() {
     setDoors([...doors, ...newDoors]);
     
     setShowAddDoorDialog(false);
-    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined, snapConnectedRoom: true, doorType: "standard" });
+    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined, snapConnectedRoom: true, doorType: "standard", swingDirection: "left", swingInward: true });
     toast({ title: "Door Added", description: newDoor.connectedRoomId ? `Door added and room connected` : `Door added to ${newDoor.wall} wall` });
   };
 
@@ -2297,18 +2305,6 @@ export default function FloorPlan3D() {
                                             </div>
                                           </div>
                                           <div className="flex items-center gap-1">
-                                            {!room.isStairs && (
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8"
-                                                onClick={(e) => { e.stopPropagation(); rotateRoom(room.id); }}
-                                                data-testid={`button-rotate-room-${room.id}`}
-                                                title="Rotate 90°"
-                                              >
-                                                <RotateCw className="h-4 w-4" />
-                                              </Button>
-                                            )}
                                             <Button
                                               variant="ghost"
                                               size="icon"
@@ -2470,18 +2466,6 @@ export default function FloorPlan3D() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    {!group.rooms[0].isStairs && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={(e) => { e.stopPropagation(); rotateRoom(group.rooms[0].id); }}
-                                        data-testid={`button-rotate-room-${group.rooms[0].id}`}
-                                        title="Rotate 90°"
-                                      >
-                                        <RotateCw className="h-4 w-4" />
-                                      </Button>
-                                    )}
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -2740,6 +2724,41 @@ export default function FloorPlan3D() {
                               </Select>
                               <p className="text-xs text-muted-foreground mt-1">Open wall creates an opening without a door frame - ideal for open floor concepts</p>
                             </div>
+                            {newDoor.doorType === "standard" && (
+                              <>
+                                <div>
+                                  <Label>Door Swing Direction</Label>
+                                  <Select 
+                                    value={newDoor.swingDirection} 
+                                    onValueChange={(val) => setNewDoor({ ...newDoor, swingDirection: val as "left" | "right" })}
+                                  >
+                                    <SelectTrigger data-testid="select-swing-direction">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="left">Swing Left (hinges on right)</SelectItem>
+                                      <SelectItem value="right">Swing Right (hinges on left)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="swing-inward"
+                                    checked={newDoor.swingInward}
+                                    onCheckedChange={(checked) => setNewDoor({ ...newDoor, swingInward: checked === true })}
+                                    data-testid="checkbox-swing-inward"
+                                  />
+                                  <Label htmlFor="swing-inward" className="text-sm font-normal cursor-pointer">
+                                    Door swings inward (into room)
+                                  </Label>
+                                </div>
+                                <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                                  {newDoor.swingInward 
+                                    ? `Door opens into the room, swinging to the ${newDoor.swingDirection}` 
+                                    : `Door opens outward (away from room), swinging to the ${newDoor.swingDirection}`}
+                                </p>
+                              </>
+                            )}
                             <div>
                               <Label>Connect to Room (Optional)</Label>
                               <Select 
@@ -2809,9 +2828,15 @@ export default function FloorPlan3D() {
                                   <div className="flex items-center gap-2">
                                     <DoorOpen className="h-4 w-4 text-muted-foreground" />
                                     <div>
-                                      <div className="text-sm font-medium capitalize">{door.wall} Wall</div>
+                                      <div className="text-sm font-medium capitalize flex items-center gap-2">
+                                        {door.wall} Wall
+                                        {door.doorType === "open" && <Badge variant="outline" className="text-xs px-1 py-0 text-green-600">Open</Badge>}
+                                      </div>
                                       <div className="text-xs text-muted-foreground">
                                         {door.width}' wide • Position: {door.position.toFixed(1)}'
+                                        {door.doorType !== "open" && door.swingDirection && (
+                                          <> • Swings {door.swingDirection} {door.swingInward ? "inward" : "outward"}</>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
