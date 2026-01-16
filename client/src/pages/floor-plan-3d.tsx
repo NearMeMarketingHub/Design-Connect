@@ -236,11 +236,31 @@ function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, 
   );
 }
 
-function DoorFrame({ position, rotation, width, height }: { position: [number, number, number]; rotation: number; width: number; height: number }) {
+function DoorFrame({ position, rotation, width, height, swingDirection = "left", swingInward = true }: { 
+  position: [number, number, number]; 
+  rotation: number; 
+  width: number; 
+  height: number;
+  swingDirection?: "left" | "right";
+  swingInward?: boolean;
+}) {
   const frameThickness = 0.3;
   const doorThickness = 0.15;
   const doorHeight = height - 0.5;
   const doorWidth = width - 0.2;
+  
+  const hingeOnLeft = swingDirection === "right";
+  const hingeX = hingeOnLeft ? (-width / 2 + 0.1) : (width / 2 - 0.1);
+  
+  let doorSwingAngle = Math.PI / 2;
+  if (hingeOnLeft) {
+    doorSwingAngle = swingInward ? -Math.PI / 2 : Math.PI / 2;
+  } else {
+    doorSwingAngle = swingInward ? Math.PI / 2 : -Math.PI / 2;
+  }
+  
+  const handleOffset = hingeOnLeft ? (doorWidth - 0.3) : (0.3 - doorWidth);
+  const doorPivotX = hingeOnLeft ? (doorWidth / 2) : (-doorWidth / 2);
   
   return (
     <group position={position} rotation={[0, rotation, 0]}>
@@ -256,13 +276,13 @@ function DoorFrame({ position, rotation, width, height }: { position: [number, n
         <boxGeometry args={[width + frameThickness * 2, 0.3, 0.5]} />
         <meshStandardMaterial color="#654321" />
       </mesh>
-      <group position={[-width / 2 + 0.1, 0, 0]}>
-        <group rotation={[0, Math.PI / 2, 0]}>
-          <mesh position={[doorWidth / 2, doorHeight / 2 + 0.1, 0]}>
+      <group position={[hingeX, 0, 0]}>
+        <group rotation={[0, doorSwingAngle, 0]}>
+          <mesh position={[doorPivotX, doorHeight / 2 + 0.1, 0]}>
             <boxGeometry args={[doorWidth, doorHeight, doorThickness]} />
             <meshStandardMaterial color="#8B4513" />
           </mesh>
-          <mesh position={[doorWidth - 0.3, doorHeight / 2, doorThickness / 2 + 0.08]}>
+          <mesh position={[handleOffset, doorHeight / 2, doorThickness / 2 + 0.08]}>
             <sphereGeometry args={[0.12, 16, 16]} />
             <meshStandardMaterial color="#C0A000" metalness={0.8} roughness={0.2} />
           </mesh>
@@ -277,7 +297,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
   end: [number, number]; 
   height: number; 
   thickness?: number;
-  doors?: { position: number; width: number; renderFrame?: boolean; doorType?: "standard" | "open" }[];
+  doors?: { position: number; width: number; renderFrame?: boolean; doorType?: "standard" | "open"; swingDirection?: "left" | "right"; swingInward?: boolean }[];
 }) {
   const wallLength = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
   const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
@@ -312,7 +332,9 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
           position={[doorX, 0, doorZ]} 
           rotation={-angle} 
           width={door.width} 
-          height={height} 
+          height={height}
+          swingDirection={door.swingDirection}
+          swingInward={door.swingInward}
         />
       );
     }
@@ -339,7 +361,17 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
         const isReversedWall = wall === "north" || wall === "east";
         const adjustedPosition = isReversedWall ? (wallLength - d.position) : d.position;
         const isPrimaryDoor = !d.connectedRoomId || d.roomId < d.connectedRoomId;
-        return { position: adjustedPosition, width: d.width, renderFrame: isPrimaryDoor, doorType: d.doorType || "standard" };
+        const adjustedSwing = isReversedWall 
+          ? (d.swingDirection === "left" ? "right" : "left") 
+          : (d.swingDirection || "left");
+        return { 
+          position: adjustedPosition, 
+          width: d.width, 
+          renderFrame: isPrimaryDoor, 
+          doorType: d.doorType || "standard",
+          swingDirection: adjustedSwing as "left" | "right",
+          swingInward: d.swingInward !== false,
+        };
       });
   };
 
