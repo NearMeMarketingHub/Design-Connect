@@ -88,6 +88,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
+import JSZip from "jszip";
 
 interface Room {
   id: string;
@@ -1318,7 +1319,7 @@ export default function FloorPlan3D() {
       return;
     }
 
-    toast({ title: "Capturing...", description: `Generating PDF for all ${totalFloors} floor(s)...` });
+    toast({ title: "Capturing...", description: `Generating ZIP with PDF and JSON for all ${totalFloors} floor(s)...` });
 
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -1378,10 +1379,36 @@ export default function FloorPlan3D() {
       pdf.setTextColor(0);
     }
     
-    pdf.save(`floor-plan-complete-${new Date().toISOString().split("T")[0]}.pdf`);
+    const dateStr = new Date().toISOString().split("T")[0];
+    const pdfBlob = pdf.output("blob");
     
-    toast({ title: "Exported", description: `Complete floor plan with ${totalFloors} floor(s) saved!` });
-  }, [rooms, totalFloors, generateFloorTopDown, toast]);
+    const floorPlanData = {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      totalFloors,
+      rooms,
+      furniture,
+      doors,
+      manualGroups,
+    };
+    const jsonStr = JSON.stringify(floorPlanData, null, 2);
+    
+    const zip = new JSZip();
+    zip.file(`floor-plan-${dateStr}.pdf`, pdfBlob);
+    zip.file(`floor-plan-${dateStr}.json`, jsonStr);
+    
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `floor-plan-complete-${dateStr}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "Exported", description: `Complete floor plan ZIP with PDF and JSON saved!` });
+  }, [rooms, furniture, doors, totalFloors, manualGroups, generateFloorTopDown, toast]);
 
   useEffect(() => {
     if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
@@ -3206,7 +3233,7 @@ export default function FloorPlan3D() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" data-testid="button-export">
                     <Download className="h-4 w-4 mr-2" />
-                    Export
+                    Export/Import
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
