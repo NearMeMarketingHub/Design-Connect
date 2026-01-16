@@ -1803,24 +1803,12 @@ export default function FloorPlan3D() {
   const totalSquareFeet = rooms.reduce((sum, room) => sum + room.width * room.length, 0);
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] -m-4 md:-m-8 flex flex-col overflow-hidden">
       <div className="border-b border-border bg-card flex-shrink-0">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href={dashboardPath}>
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Box className="h-6 w-6" />
-                3D Floor Plan Builder
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Create and visualize room layouts in 3D
-              </p>
-            </div>
+        <div className="px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Box className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold">3D Floor Plan Builder</h1>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="text-sm">
