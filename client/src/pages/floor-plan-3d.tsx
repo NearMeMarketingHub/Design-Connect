@@ -132,6 +132,7 @@ interface Door {
   position: number;
   width: number;
   connectedRoomId?: string;
+  doorType?: "standard" | "open";
 }
 
 type CameraView = "perspective" | "top";
@@ -272,7 +273,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
   end: [number, number]; 
   height: number; 
   thickness?: number;
-  doors?: { position: number; width: number; renderFrame?: boolean }[];
+  doors?: { position: number; width: number; renderFrame?: boolean; doorType?: "standard" | "open" }[];
 }) {
   const wallLength = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
   const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
@@ -300,7 +301,7 @@ function Wall({ start, end, height, thickness = 0.5, doors = [] }: {
 
     const doorX = start[0] + dx * door.position;
     const doorZ = start[1] + dz * door.position;
-    if (door.renderFrame !== false) {
+    if (door.renderFrame !== false && door.doorType !== "open") {
       doorFrames.push(
         <DoorFrame 
           key={`door-${index}`} 
@@ -334,7 +335,7 @@ function RoomFloor({ room, doors }: { room: Room; doors: Door[] }) {
         const isReversedWall = wall === "north" || wall === "east";
         const adjustedPosition = isReversedWall ? (wallLength - d.position) : d.position;
         const isPrimaryDoor = !d.connectedRoomId || d.roomId < d.connectedRoomId;
-        return { position: adjustedPosition, width: d.width, renderFrame: isPrimaryDoor };
+        return { position: adjustedPosition, width: d.width, renderFrame: isPrimaryDoor, doorType: d.doorType || "standard" };
       });
   };
 
@@ -694,12 +695,13 @@ export default function FloorPlan3D() {
   const [cameraResetTrigger, setCameraResetTrigger] = useState(0);
   const [currentFloor, setCurrentFloor] = useState(1);
   const [totalFloors, setTotalFloors] = useState(1);
-  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string; snapConnectedRoom: boolean }>({
+  const [newDoor, setNewDoor] = useState<{ wall: "north" | "south" | "east" | "west"; position: number; width: number; connectedRoomId?: string; snapConnectedRoom: boolean; doorType: "standard" | "open" }>({
     wall: "south",
     position: 50,
     width: 3,
     connectedRoomId: undefined,
     snapConnectedRoom: true,
+    doorType: "standard",
   });
   
   const [newRoom, setNewRoom] = useState({
@@ -1524,6 +1526,7 @@ export default function FloorPlan3D() {
       position: doorPosition,
       width: newDoor.width,
       connectedRoomId: newDoor.connectedRoomId,
+      doorType: newDoor.doorType,
     };
 
     const newDoors = [door];
@@ -1636,6 +1639,7 @@ export default function FloorPlan3D() {
           position: connectedWallLength / 2,
           width: newDoor.width,
           connectedRoomId: selectedRoom,
+          doorType: newDoor.doorType,
         };
         newDoors.push(connectedDoor);
       }
@@ -1644,7 +1648,7 @@ export default function FloorPlan3D() {
     setDoors([...doors, ...newDoors]);
     
     setShowAddDoorDialog(false);
-    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined, snapConnectedRoom: true });
+    setNewDoor({ wall: "south", position: 50, width: 3, connectedRoomId: undefined, snapConnectedRoom: true, doorType: "standard" });
     toast({ title: "Door Added", description: newDoor.connectedRoomId ? `Door added and room connected` : `Door added to ${newDoor.wall} wall` });
   };
 
@@ -2556,6 +2560,22 @@ export default function FloorPlan3D() {
                                 onChange={(e) => setNewDoor({ ...newDoor, width: parseFloat(e.target.value) || 3 })}
                                 data-testid="input-door-width"
                               />
+                            </div>
+                            <div>
+                              <Label>Opening Type</Label>
+                              <Select 
+                                value={newDoor.doorType} 
+                                onValueChange={(val) => setNewDoor({ ...newDoor, doorType: val as "standard" | "open" })}
+                              >
+                                <SelectTrigger data-testid="select-door-type">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="standard">Standard Door</SelectItem>
+                                  <SelectItem value="open">Open Wall (No Door)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground mt-1">Open wall creates an opening without a door frame - ideal for open floor concepts</p>
                             </div>
                             <div>
                               <Label>Connect to Room (Optional)</Label>
