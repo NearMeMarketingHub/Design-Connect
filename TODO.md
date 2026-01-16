@@ -1,6 +1,6 @@
 # BuildVision - Project To-Do List
 
-Last Updated: January 9, 2026
+Last Updated: January 16, 2026
 
 ---
 
@@ -112,6 +112,9 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Generate PDF documents from approved change orders for full e-signature integration
 - [ ] Currently the "Send for Signature" button opens the signature dialog with change order title pre-filled, but signers need a document to view and sign
 - [ ] Options: Generate PDF server-side or create inline change order content display in signing page
+
+### 3D Floor Plan Builder
+- [ ] Select different types of doors (French doors, sliding doors, pocket doors, double doors, etc.)
 
 ### Branding
 - [ ] Changing the logo and app name when completed
