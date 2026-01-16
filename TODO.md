@@ -76,6 +76,9 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Create admin support dashboard for managing support conversations
 - [ ] Add chat history and search functionality
 
+### Email Configuration
+- [ ] Configure different sender email addresses per application using Resend integration - allows each app to send from its own branded email address while sharing the same Resend API key
+
 ### Branding
 - [ ] Changing the logo and app name when completed
 
