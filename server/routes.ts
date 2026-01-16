@@ -1559,6 +1559,217 @@ export async function registerRoutes(
     }
   });
 
+  // Change Order routes
+  app.get("/api/projects/:projectId/change-orders", requireAuth, async (req, res, next) => {
+    try {
+      const changeOrders = await storage.getChangeOrders(req.params.projectId);
+      res.json(changeOrders);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/change-orders/:orderId", requireAuth, async (req, res, next) => {
+    try {
+      const order = await storage.getChangeOrder(req.params.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Change order not found" });
+      }
+      res.json(order);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/change-orders/:orderId/line-items", requireAuth, async (req, res, next) => {
+    try {
+      const lineItems = await storage.getChangeOrderLineItems(req.params.orderId);
+      res.json(lineItems);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/projects/:projectId/change-orders", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can create change orders" });
+      }
+
+      const { title, description, reason, costImpact, timelineImpact, lineItems } = req.body;
+      const orderNumber = await storage.getNextChangeOrderNumber(req.params.projectId);
+
+      const changeOrder = await storage.createChangeOrder({
+        projectId: req.params.projectId,
+        orderNumber,
+        title,
+        description,
+        reason,
+        costImpact: costImpact || "0",
+        timelineImpact: timelineImpact || 0,
+        status: "pending",
+        createdById: user.id,
+        createdByName: user.name || user.username,
+      });
+
+      // Create line items if provided
+      if (lineItems && Array.isArray(lineItems)) {
+        for (const item of lineItems) {
+          await storage.createChangeOrderLineItem({
+            changeOrderId: changeOrder.id,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            rate: item.rate,
+            amount: item.amount,
+          });
+        }
+      }
+
+      res.status(201).json(changeOrder);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put("/api/change-orders/:orderId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const order = await storage.getChangeOrder(req.params.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Change order not found" });
+      }
+
+      // Only contractor can edit pending orders
+      if (order.status !== 'pending' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Can only edit pending change orders" });
+      }
+
+      const { title, description, reason, costImpact, timelineImpact, lineItems } = req.body;
+      
+      const updated = await storage.updateChangeOrder(req.params.orderId, {
+        title,
+        description,
+        reason,
+        costImpact,
+        timelineImpact,
+      });
+
+      // Update line items if provided
+      if (lineItems && Array.isArray(lineItems)) {
+        await storage.deleteChangeOrderLineItems(req.params.orderId);
+        for (const item of lineItems) {
+          await storage.createChangeOrderLineItem({
+            changeOrderId: req.params.orderId,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            rate: item.rate,
+            amount: item.amount,
+          });
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/change-orders/:orderId/approve", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const order = await storage.getChangeOrder(req.params.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Change order not found" });
+      }
+
+      if (order.status !== 'pending') {
+        return res.status(400).json({ message: "Change order is not pending" });
+      }
+
+      // Update the change order status
+      const updated = await storage.updateChangeOrder(req.params.orderId, {
+        status: "approved",
+        approvedById: user.id,
+        approvedByName: user.name || user.username,
+        approvedAt: new Date(),
+      });
+
+      // Update project budget and timeline
+      const project = await storage.getProject(order.projectId);
+      if (project) {
+        const currentBudget = parseFloat(project.budget?.toString() || "0");
+        const costImpact = parseFloat(order.costImpact?.toString() || "0");
+        const newBudget = currentBudget + costImpact;
+
+        // Calculate new due date if timeline impact
+        let newDueDate = project.dueDate;
+        if (order.timelineImpact && order.timelineImpact !== 0 && project.dueDate) {
+          const dueDate = new Date(project.dueDate);
+          dueDate.setDate(dueDate.getDate() + order.timelineImpact);
+          newDueDate = dueDate.toISOString().split('T')[0];
+        }
+
+        await storage.updateProject(order.projectId, {
+          budget: newBudget.toString(),
+          dueDate: newDueDate,
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/change-orders/:orderId/reject", requireAuth, async (req, res, next) => {
+    try {
+      const order = await storage.getChangeOrder(req.params.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Change order not found" });
+      }
+
+      if (order.status !== 'pending') {
+        return res.status(400).json({ message: "Change order is not pending" });
+      }
+
+      const { reason } = req.body;
+      const updated = await storage.updateChangeOrder(req.params.orderId, {
+        status: "rejected",
+        rejectionReason: reason,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/change-orders/:orderId", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only contractors can delete change orders" });
+      }
+
+      const order = await storage.getChangeOrder(req.params.orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Change order not found" });
+      }
+
+      if (order.status !== 'pending') {
+        return res.status(403).json({ message: "Can only delete pending change orders" });
+      }
+
+      await storage.deleteChangeOrder(req.params.orderId);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Post Comment routes
   app.get("/api/posts/:postId/comments", async (req, res, next) => {
     try {

@@ -56,7 +56,9 @@ import type {
   SigningEvent, InsertSigningEvent,
   SigningField, InsertSigningField,
   NotaryProfile, InsertNotaryProfile,
-  ClientMaterialItem, InsertClientMaterialItem
+  ClientMaterialItem, InsertClientMaterialItem,
+  ChangeOrder, InsertChangeOrder,
+  ChangeOrderLineItem, InsertChangeOrderLineItem
 } from "@shared/schema";
 
 export interface IStorage {
@@ -287,6 +289,17 @@ export interface IStorage {
   updateClientMaterialItem(id: string, data: Partial<InsertClientMaterialItem>): Promise<ClientMaterialItem | undefined>;
   deleteClientMaterialItem(id: string): Promise<void>;
   hasClientMaterialItems(projectId: string): Promise<boolean>;
+
+  // Change order methods
+  getChangeOrders(projectId: string): Promise<ChangeOrder[]>;
+  getChangeOrder(id: string): Promise<ChangeOrder | undefined>;
+  createChangeOrder(order: InsertChangeOrder): Promise<ChangeOrder>;
+  updateChangeOrder(id: string, data: Partial<InsertChangeOrder>): Promise<ChangeOrder | undefined>;
+  deleteChangeOrder(id: string): Promise<void>;
+  getNextChangeOrderNumber(projectId: string): Promise<number>;
+  getChangeOrderLineItems(changeOrderId: string): Promise<ChangeOrderLineItem[]>;
+  createChangeOrderLineItem(item: InsertChangeOrderLineItem): Promise<ChangeOrderLineItem>;
+  deleteChangeOrderLineItems(changeOrderId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1897,6 +1910,63 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.clientMaterialItems.projectId, projectId))
       .limit(1);
     return items.length > 0;
+  }
+
+  // Change order methods
+  async getChangeOrders(projectId: string): Promise<ChangeOrder[]> {
+    return await db.select().from(schema.changeOrders)
+      .where(eq(schema.changeOrders.projectId, projectId))
+      .orderBy(schema.changeOrders.orderNumber);
+  }
+
+  async getChangeOrder(id: string): Promise<ChangeOrder | undefined> {
+    const [order] = await db.select().from(schema.changeOrders)
+      .where(eq(schema.changeOrders.id, id));
+    return order;
+  }
+
+  async createChangeOrder(order: InsertChangeOrder): Promise<ChangeOrder> {
+    const [created] = await db.insert(schema.changeOrders).values(order).returning();
+    return created;
+  }
+
+  async updateChangeOrder(id: string, data: Partial<InsertChangeOrder>): Promise<ChangeOrder | undefined> {
+    const [updated] = await db.update(schema.changeOrders)
+      .set(data)
+      .where(eq(schema.changeOrders.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteChangeOrder(id: string): Promise<void> {
+    await db.delete(schema.changeOrderLineItems)
+      .where(eq(schema.changeOrderLineItems.changeOrderId, id));
+    await db.delete(schema.changeOrders)
+      .where(eq(schema.changeOrders.id, id));
+  }
+
+  async getNextChangeOrderNumber(projectId: string): Promise<number> {
+    const orders = await db.select({ orderNumber: schema.changeOrders.orderNumber })
+      .from(schema.changeOrders)
+      .where(eq(schema.changeOrders.projectId, projectId))
+      .orderBy(schema.changeOrders.orderNumber);
+    if (orders.length === 0) return 1;
+    return Math.max(...orders.map(o => o.orderNumber)) + 1;
+  }
+
+  async getChangeOrderLineItems(changeOrderId: string): Promise<ChangeOrderLineItem[]> {
+    return await db.select().from(schema.changeOrderLineItems)
+      .where(eq(schema.changeOrderLineItems.changeOrderId, changeOrderId));
+  }
+
+  async createChangeOrderLineItem(item: InsertChangeOrderLineItem): Promise<ChangeOrderLineItem> {
+    const [created] = await db.insert(schema.changeOrderLineItems).values(item).returning();
+    return created;
+  }
+
+  async deleteChangeOrderLineItems(changeOrderId: string): Promise<void> {
+    await db.delete(schema.changeOrderLineItems)
+      .where(eq(schema.changeOrderLineItems.changeOrderId, changeOrderId));
   }
 }
 
