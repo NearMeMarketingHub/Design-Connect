@@ -1649,7 +1649,31 @@ export default function FloorPlan3D() {
   };
 
   const updateDoorSwing = (doorId: string, field: "swingDirection" | "swingInward", value: "left" | "right" | boolean) => {
-    setDoors(doors.map(d => d.id === doorId ? { ...d, [field]: value } : d));
+    const door = doors.find(d => d.id === doorId);
+    if (!door) return;
+    
+    // Find the connected door on the other room (if any)
+    const connectedDoor = door.connectedRoomId 
+      ? doors.find(d => d.roomId === door.connectedRoomId && d.connectedRoomId === door.roomId)
+      : null;
+    
+    // Calculate the mirrored value for the connected door
+    let connectedValue = value;
+    if (field === "swingDirection") {
+      connectedValue = value === "left" ? "right" : "left";
+    } else if (field === "swingInward") {
+      connectedValue = !value;
+    }
+    
+    setDoors(doors.map(d => {
+      if (d.id === doorId) {
+        return { ...d, [field]: value };
+      }
+      if (connectedDoor && d.id === connectedDoor.id) {
+        return { ...d, [field]: connectedValue };
+      }
+      return d;
+    }));
   };
 
   const moveSelectedRooms = (axis: "x" | "z", delta: number) => {
