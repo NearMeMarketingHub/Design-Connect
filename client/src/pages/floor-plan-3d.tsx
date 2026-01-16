@@ -716,6 +716,7 @@ export default function FloorPlan3D() {
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [addingToGroupRoomId, setAddingToGroupRoomId] = useState<string | null>(null);
+  const [moveStep, setMoveStep] = useState<number>(1);
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -3099,11 +3100,25 @@ export default function FloorPlan3D() {
                 <span className="text-xs text-muted-foreground">
                   Move {selectedRooms.size > 0 ? `${selectedRooms.size} rooms` : selectedRoomData?.name}:
                 </span>
+                <div className="flex items-center gap-1 mr-2">
+                  {[0.5, 1, 5].map(step => (
+                    <Button
+                      key={step}
+                      variant={moveStep === step ? "default" : "outline"}
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setMoveStep(step)}
+                      data-testid={`button-step-${step}`}
+                    >
+                      {step}'
+                    </Button>
+                  ))}
+                </div>
                 <Button
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", 1) : selectedRoom && updateRoomPosition(selectedRoom, "x", 1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", moveStep) : selectedRoom && updateRoomPosition(selectedRoom, "x", moveStep)}
                   disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-left"
                 >
@@ -3113,7 +3128,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", 1) : selectedRoom && updateRoomPosition(selectedRoom, "z", 1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", moveStep) : selectedRoom && updateRoomPosition(selectedRoom, "z", moveStep)}
                   disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-up"
                 >
@@ -3123,7 +3138,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", -1) : selectedRoom && updateRoomPosition(selectedRoom, "z", -1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("z", -moveStep) : selectedRoom && updateRoomPosition(selectedRoom, "z", -moveStep)}
                   disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-down"
                 >
@@ -3133,7 +3148,7 @@ export default function FloorPlan3D() {
                   variant="outline"
                   size="icon"
                   className="h-7 w-7"
-                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", -1) : selectedRoom && updateRoomPosition(selectedRoom, "x", -1)}
+                  onClick={() => selectedRooms.size > 0 ? moveSelectedRooms("x", -moveStep) : selectedRoom && updateRoomPosition(selectedRoom, "x", -moveStep)}
                   disabled={selectedRooms.size === 0 && selectedRoomData?.locked}
                   data-testid="button-move-right"
                 >
