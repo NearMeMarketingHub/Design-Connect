@@ -1823,8 +1823,8 @@ export default function FloorPlan3D() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 border-r border-border bg-card overflow-hidden flex flex-col">
-          <Tabs defaultValue="rooms" className="flex-1 flex flex-col">
+        <aside className="w-80 border-r border-border bg-card flex flex-col min-h-0">
+          <Tabs defaultValue="rooms" className="flex-1 flex flex-col min-h-0">
             <TabsList className="w-full justify-start rounded-none border-b h-12 px-2">
               <TabsTrigger value="rooms" className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
@@ -1840,7 +1840,7 @@ export default function FloorPlan3D() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="rooms" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="rooms" className="flex-1 m-0 min-h-0 overflow-y-auto">
               <ScrollArea className="h-full">
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
@@ -2392,7 +2392,7 @@ export default function FloorPlan3D() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="doors" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="doors" className="flex-1 m-0 min-h-0 overflow-y-auto">
               <ScrollArea className="h-full">
                 <div className="p-4 space-y-4">
                   {selectedRoom ? (
@@ -2645,7 +2645,7 @@ export default function FloorPlan3D() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="furniture" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="furniture" className="flex-1 m-0 min-h-0 overflow-y-auto">
               <ScrollArea className="h-full">
                 <div className="p-4 space-y-4">
                   {selectedRoom ? (
