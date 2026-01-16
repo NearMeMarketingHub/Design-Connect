@@ -83,6 +83,7 @@ import {
   Undo,
   Redo,
   RotateCw,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -903,6 +904,7 @@ export default function FloorPlan3D() {
       rooms,
       furniture,
       doors,
+      manualGroups,
     };
     
     const blob = new Blob([JSON.stringify(floorPlanData, null, 2)], { type: "application/json" });
@@ -916,7 +918,41 @@ export default function FloorPlan3D() {
     URL.revokeObjectURL(url);
     
     toast({ title: "Exported", description: "Floor plan saved as JSON file" });
-  }, [rooms, furniture, doors, totalFloors, toast]);
+  }, [rooms, furniture, doors, totalFloors, manualGroups, toast]);
+
+  const importFromJSON = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        if (!data.rooms || !Array.isArray(data.rooms)) {
+          toast({ title: "Invalid File", description: "File does not contain valid floor plan data", variant: "destructive" });
+          return;
+        }
+        
+        setRooms(data.rooms);
+        setFurniture(data.furniture || []);
+        setDoors(data.doors || []);
+        setTotalFloors(data.totalFloors || 1);
+        setManualGroups(data.manualGroups || []);
+        setCurrentFloor(1);
+        setSelectedRoom(null);
+        setSelectedRooms(new Set());
+        
+        toast({ title: "Imported", description: `Loaded floor plan with ${data.rooms.length} rooms` });
+      } catch (error) {
+        toast({ title: "Import Failed", description: "Could not parse JSON file", variant: "destructive" });
+      }
+    };
+    input.click();
+  }, [toast]);
 
   const exportAsImage = useCallback(() => {
     const canvas = document.querySelector("canvas");
@@ -1084,6 +1120,108 @@ export default function FloorPlan3D() {
     toast({ title: "Exported", description: `Floor ${currentFloor} top-down view with measurements saved` });
   }, [rooms, doors, currentFloor, toast]);
 
+  const generateFloorTopDown = useCallback((floorNumber: number, scale: number, padding: number) => {
+    const floorRooms = rooms.filter(r => r.floor === floorNumber);
+    if (floorRooms.length === 0) return null;
+    
+    const minX = Math.min(...floorRooms.map(r => r.x - r.width / 2));
+    const maxX = Math.max(...floorRooms.map(r => r.x + r.width / 2));
+    const minZ = Math.min(...floorRooms.map(r => r.z - r.length / 2));
+    const maxZ = Math.max(...floorRooms.map(r => r.z + r.length / 2));
+    
+    const topDownWidth = Math.max(300, (maxX - minX) * scale + padding * 2);
+    const topDownHeight = Math.max(200, (maxZ - minZ) * scale + padding * 2);
+    
+    const topDownCanvas = document.createElement("canvas");
+    topDownCanvas.width = topDownWidth;
+    topDownCanvas.height = topDownHeight;
+    const ctx = topDownCanvas.getContext("2d");
+    if (!ctx) return null;
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, topDownWidth, topDownHeight);
+    
+    ctx.fillStyle = "#dc2626";
+    ctx.font = "bold 14px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("N", topDownWidth / 2, 18);
+    ctx.beginPath();
+    ctx.moveTo(topDownWidth / 2, 22);
+    ctx.lineTo(topDownWidth / 2 - 8, 35);
+    ctx.lineTo(topDownWidth / 2 + 8, 35);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.fillStyle = "#666666";
+    ctx.font = "10px Arial";
+    ctx.fillText("S", topDownWidth / 2, topDownHeight - 8);
+    ctx.textAlign = "left";
+    ctx.fillText("W", 5, topDownHeight / 2);
+    ctx.textAlign = "right";
+    ctx.fillText("E", topDownWidth - 5, topDownHeight / 2);
+    
+    floorRooms.forEach(room => {
+      const x = (room.x - minX) * scale + padding;
+      const z = (maxZ - room.z) * scale + padding;
+      const w = room.width * scale;
+      const l = room.length * scale;
+      
+      ctx.fillStyle = room.isStairs ? "#fef3c7" : room.color;
+      ctx.fillRect(x - w / 2, z - l / 2, w, l);
+      
+      ctx.strokeStyle = room.isStairs ? "#f59e0b" : "#374151";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - w / 2, z - l / 2, w, l);
+      
+      const floorDoors = doors.filter(d => d.roomId === room.id);
+      floorDoors.forEach(door => {
+        ctx.fillStyle = door.doorType === "open" ? "#22c55e" : "#8b5cf6";
+        let doorX = x, doorZ = z;
+        let doorW = door.width * scale, doorH = 4;
+        
+        if (door.wall === "north") {
+          doorX = x - w / 2 + door.position * scale;
+          doorZ = z - l / 2;
+        } else if (door.wall === "south") {
+          doorX = x - w / 2 + door.position * scale;
+          doorZ = z + l / 2;
+        } else if (door.wall === "east") {
+          doorX = x + w / 2;
+          doorZ = z - l / 2 + door.position * scale;
+          doorW = 4;
+          doorH = door.width * scale;
+        } else {
+          doorX = x - w / 2;
+          doorZ = z - l / 2 + door.position * scale;
+          doorW = 4;
+          doorH = door.width * scale;
+        }
+        ctx.fillRect(doorX - doorW / 2, doorZ - doorH / 2, doorW, doorH);
+      });
+      
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "bold 11px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(room.name, x, z - 2);
+      
+      ctx.font = "10px Arial";
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 10);
+      
+      ctx.fillStyle = "#dc2626";
+      ctx.font = "bold 9px Arial";
+      ctx.fillText(`${room.width}'`, x, z - l / 2 - 4);
+      
+      ctx.save();
+      ctx.translate(x - w / 2 - 4, z);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(`${room.length}'`, 0, 0);
+      ctx.restore();
+    });
+    
+    return { dataUrl: topDownCanvas.toDataURL("image/png"), width: topDownWidth, height: topDownHeight };
+  }, [rooms, doors]);
+
   const exportAllViews = useCallback(async () => {
     const floorRooms = rooms.filter(r => r.floor === currentFloor);
     if (floorRooms.length === 0) {
@@ -1148,89 +1286,15 @@ export default function FloorPlan3D() {
     
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Top-Down View with Measurements", pageWidth / 2, 20, { align: "center" });
+    pdf.text(`Floor ${currentFloor} - Top-Down View (North at Top)`, pageWidth / 2, 20, { align: "center" });
     
     const scale = 12;
-    const padding = 40;
-    const minX = Math.min(...floorRooms.map(r => r.x - r.width / 2));
-    const maxX = Math.max(...floorRooms.map(r => r.x + r.width / 2));
-    const minZ = Math.min(...floorRooms.map(r => r.z - r.length / 2));
-    const maxZ = Math.max(...floorRooms.map(r => r.z + r.length / 2));
-    
-    const topDownWidth = Math.max(300, (maxX - minX) * scale + padding * 2);
-    const topDownHeight = Math.max(200, (maxZ - minZ) * scale + padding * 2);
-    
-    const topDownCanvas = document.createElement("canvas");
-    topDownCanvas.width = topDownWidth;
-    topDownCanvas.height = topDownHeight;
-    const ctx = topDownCanvas.getContext("2d");
-    if (ctx) {
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, topDownWidth, topDownHeight);
-      
-      floorRooms.forEach(room => {
-        const x = (room.x - minX) * scale + padding;
-        const z = (room.z - minZ) * scale + padding;
-        const w = room.width * scale;
-        const l = room.length * scale;
-        
-        ctx.fillStyle = room.isStairs ? "#fef3c7" : room.color;
-        ctx.fillRect(x - w / 2, z - l / 2, w, l);
-        
-        ctx.strokeStyle = room.isStairs ? "#f59e0b" : "#374151";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x - w / 2, z - l / 2, w, l);
-        
-        const floorDoors = doors.filter(d => d.roomId === room.id);
-        floorDoors.forEach(door => {
-          ctx.fillStyle = "#8b5cf6";
-          let doorX = x, doorZ = z;
-          let doorW = door.width * scale, doorH = 4;
-          
-          if (door.wall === "north") {
-            doorX = x - w / 2 + door.position * scale;
-            doorZ = z + l / 2;
-          } else if (door.wall === "south") {
-            doorX = x - w / 2 + door.position * scale;
-            doorZ = z - l / 2;
-          } else if (door.wall === "east") {
-            doorX = x - w / 2;
-            doorZ = z - l / 2 + door.position * scale;
-            doorW = 4;
-            doorH = door.width * scale;
-          } else {
-            doorX = x + w / 2;
-            doorZ = z - l / 2 + door.position * scale;
-            doorW = 4;
-            doorH = door.width * scale;
-          }
-          ctx.fillRect(doorX - doorW / 2, doorZ - doorH / 2, doorW, doorH);
-        });
-        
-        ctx.fillStyle = "#1f2937";
-        ctx.font = "bold 11px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(room.name, x, z - 2);
-        
-        ctx.font = "10px Arial";
-        ctx.fillStyle = "#4b5563";
-        ctx.fillText(`${room.width}' × ${room.length}'`, x, z + 10);
-        
-        ctx.fillStyle = "#dc2626";
-        ctx.font = "bold 9px Arial";
-        ctx.fillText(`${room.width}'`, x, z - l / 2 - 4);
-        
-        ctx.save();
-        ctx.translate(x - w / 2 - 4, z);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillText(`${room.length}'`, 0, 0);
-        ctx.restore();
-      });
-      
-      const topDownDataUrl = topDownCanvas.toDataURL("image/png");
+    const padding = 50;
+    const topDown = generateFloorTopDown(currentFloor, scale, padding);
+    if (topDown) {
       const availableWidth = pageWidth - margin * 2;
       const availableHeight = pageHeight - 40;
-      const aspectRatio = topDownWidth / topDownHeight;
+      const aspectRatio = topDown.width / topDown.height;
       
       let finalWidth = availableWidth;
       let finalHeight = finalWidth / aspectRatio;
@@ -1240,13 +1304,84 @@ export default function FloorPlan3D() {
       }
       
       const xOffset = (pageWidth - finalWidth) / 2;
-      pdf.addImage(topDownDataUrl, "PNG", xOffset, 30, finalWidth, finalHeight);
+      pdf.addImage(topDown.dataUrl, "PNG", xOffset, 30, finalWidth, finalHeight);
     }
     
     pdf.save(`floor-plan-floor${currentFloor}-${new Date().toISOString().split("T")[0]}.pdf`);
     
     toast({ title: "Exported", description: `Floor plan PDF with 3D views saved!` });
-  }, [rooms, doors, currentFloor, toast, sceneRef]);
+  }, [rooms, doors, currentFloor, toast, sceneRef, generateFloorTopDown]);
+
+  const exportAllFloorsPDF = useCallback(async () => {
+    if (rooms.length === 0) {
+      toast({ title: "No Rooms", description: "Add some rooms before exporting", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Capturing...", description: `Generating PDF for all ${totalFloors} floor(s)...` });
+
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    
+    pdf.setFontSize(24);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Complete Floor Plan", pageWidth / 2, 40, { align: "center" });
+    
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`${totalFloors} Floor${totalFloors > 1 ? 's' : ''}`, pageWidth / 2, 52, { align: "center" });
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 62, { align: "center" });
+    
+    pdf.setFontSize(10);
+    pdf.text("North is at the top of each floor plan", pageWidth / 2, 80, { align: "center" });
+    
+    const scale = 10;
+    const padding = 50;
+    
+    for (let floor = 1; floor <= totalFloors; floor++) {
+      const floorRooms = rooms.filter(r => r.floor === floor);
+      if (floorRooms.length === 0) continue;
+      
+      pdf.addPage();
+      
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Floor ${floor}`, pageWidth / 2, 20, { align: "center" });
+      
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`${floorRooms.length} room${floorRooms.length > 1 ? 's' : ''}`, pageWidth / 2, 28, { align: "center" });
+      
+      const topDown = generateFloorTopDown(floor, scale, padding);
+      if (topDown) {
+        const availableWidth = pageWidth - margin * 2;
+        const availableHeight = pageHeight - 50;
+        const aspectRatio = topDown.width / topDown.height;
+        
+        let finalWidth = availableWidth;
+        let finalHeight = finalWidth / aspectRatio;
+        if (finalHeight > availableHeight) {
+          finalHeight = availableHeight;
+          finalWidth = finalHeight * aspectRatio;
+        }
+        
+        const xOffset = (pageWidth - finalWidth) / 2;
+        pdf.addImage(topDown.dataUrl, "PNG", xOffset, 35, finalWidth, finalHeight);
+      }
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(150);
+      const roomList = floorRooms.map(r => r.name).join(", ");
+      pdf.text(`Rooms: ${roomList}`, margin, pageHeight - 10);
+      pdf.setTextColor(0);
+    }
+    
+    pdf.save(`floor-plan-complete-${new Date().toISOString().split("T")[0]}.pdf`);
+    
+    toast({ title: "Exported", description: `Complete floor plan with ${totalFloors} floor(s) saved!` });
+  }, [rooms, totalFloors, generateFloorTopDown, toast]);
 
   useEffect(() => {
     if (selectedRoom && !currentFloorRooms.some(r => r.id === selectedRoom)) {
@@ -3077,8 +3212,14 @@ export default function FloorPlan3D() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={exportAllViews} data-testid="menu-export-complete">
                     <FileText className="h-4 w-4 mr-2" />
-                    Complete Export (3D + Top-Down)
+                    Current Floor (3D + Top-Down)
                   </DropdownMenuItem>
+                  {totalFloors > 1 && (
+                    <DropdownMenuItem onClick={exportAllFloorsPDF} data-testid="menu-export-all-floors">
+                      <Layers className="h-4 w-4 mr-2" />
+                      All Floors PDF ({totalFloors} floors)
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={exportAsImage} data-testid="menu-export-image">
                     <Image className="h-4 w-4 mr-2" />
                     Current 3D View Only
@@ -3087,9 +3228,14 @@ export default function FloorPlan3D() {
                     <Grid3X3 className="h-4 w-4 mr-2" />
                     Top-Down with Measurements
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={exportAsJSON} data-testid="menu-export-json">
                     <FileJson className="h-4 w-4 mr-2" />
-                    Export as JSON Data
+                    Save Floor Plan (JSON)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={importFromJSON} data-testid="menu-import-json">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Load Floor Plan (JSON)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
