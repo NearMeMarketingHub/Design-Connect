@@ -607,3 +607,43 @@ export const clientMaterialItems = pgTable("client_material_items", {
 export const insertClientMaterialItemSchema = createInsertSchema(clientMaterialItems).omit({ id: true, createdAt: true });
 export type InsertClientMaterialItem = z.infer<typeof insertClientMaterialItemSchema>;
 export type ClientMaterialItem = typeof clientMaterialItems.$inferSelect;
+
+// Change Orders - Formal modifications to project scope, budget, or timeline
+export const changeOrders = pgTable("change_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  orderNumber: integer("order_number").notNull(), // Sequential number per project (CO-001, CO-002, etc.)
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  reason: text("reason").notNull(), // client_request, unforeseen_conditions, design_change, code_compliance, other
+  costImpact: numeric("cost_impact").notNull().default("0"), // Positive for additions, negative for credits
+  timelineImpact: integer("timeline_impact").notNull().default(0), // Days added (positive) or removed (negative)
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdByName: text("created_by_name").notNull(),
+  approvedById: varchar("approved_by_id").references(() => users.id),
+  approvedByName: text("approved_by_name"),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  signingPacketId: varchar("signing_packet_id").references(() => signingPackets.id), // For e-signature integration
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertChangeOrderSchema = createInsertSchema(changeOrders).omit({ id: true, createdAt: true });
+export type InsertChangeOrder = z.infer<typeof insertChangeOrderSchema>;
+export type ChangeOrder = typeof changeOrders.$inferSelect;
+
+// Change Order Line Items - Itemized breakdown of costs in a change order
+export const changeOrderLineItems = pgTable("change_order_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  changeOrderId: varchar("change_order_id").notNull().references(() => changeOrders.id),
+  description: text("description").notNull(),
+  quantity: numeric("quantity").notNull(),
+  unit: text("unit").notNull(),
+  rate: numeric("rate").notNull(),
+  amount: numeric("amount").notNull(),
+});
+
+export const insertChangeOrderLineItemSchema = createInsertSchema(changeOrderLineItems).omit({ id: true });
+export type InsertChangeOrderLineItem = z.infer<typeof insertChangeOrderLineItemSchema>;
+export type ChangeOrderLineItem = typeof changeOrderLineItems.$inferSelect;
