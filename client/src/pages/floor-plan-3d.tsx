@@ -219,6 +219,9 @@ const FURNITURE_TYPES = [
   { type: "stove", name: "Stove/Oven", width: 2.5, depth: 2.5, height: 3, icon: CookingPot, color: "#404040" },
   { type: "refrigerator", name: "Refrigerator", width: 3, depth: 2.5, height: 6, icon: Box, color: "#C0C0C0" },
   { type: "cabinet", name: "Cabinet", width: 3, depth: 2, height: 6, icon: Square, color: "#8B4513" },
+  { type: "island", name: "Kitchen Island", width: 6, depth: 4, height: 3, icon: Square, color: "#5D4037" },
+  { type: "counter", name: "Counter", width: 8, depth: 2, height: 3, icon: Square, color: "#795548" },
+  { type: "counter_corner", name: "L-Counter", width: 6, depth: 6, height: 3, icon: Square, color: "#795548" },
 ];
 
 function WallSegment({ start, end, height, thickness = 0.5 }: { start: [number, number]; end: [number, number]; height: number; thickness?: number }) {
@@ -3068,7 +3071,7 @@ export default function FloorPlan3D() {
 
                         <h4 className="text-sm font-medium">Kitchen</h4>
                         <div className="grid grid-cols-2 gap-2">
-                          {FURNITURE_TYPES.filter((f) => ["stove", "refrigerator"].includes(f.type)).map((type) => (
+                          {FURNITURE_TYPES.filter((f) => ["stove", "refrigerator", "island", "counter", "counter_corner"].includes(f.type)).map((type) => (
                             <Button
                               key={type.type}
                               variant="outline"
