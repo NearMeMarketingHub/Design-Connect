@@ -1803,7 +1803,7 @@ export default function FloorPlan3D() {
   const totalSquareFeet = rooms.reduce((sum, room) => sum + room.width * room.length, 0);
 
   return (
-    <div className="h-[calc(100vh-4rem)] -m-4 md:-m-8 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
       <div className="border-b border-border bg-card flex-shrink-0">
         <div className="px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">

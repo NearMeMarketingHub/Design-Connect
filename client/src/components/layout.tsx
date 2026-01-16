@@ -188,8 +188,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </header>
           
           {/* Main Content */}
-          <main className="flex-1 overflow-auto p-4 md:p-8">
-            <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <main className={cn(
+            "flex-1 overflow-auto",
+            location === "/contractor/floor-plan-3d" ? "" : "p-4 md:p-8"
+          )}>
+            <div className={cn(
+              location === "/contractor/floor-plan-3d" 
+                ? "h-full" 
+                : "max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
+            )}>
               {children}
             </div>
           </main>
