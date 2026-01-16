@@ -4943,6 +4943,26 @@ export default function ProjectDetails() {
                               </p>
                             </div>
                           )}
+
+                          {canEdit && isApproved && (
+                            <div className="flex gap-2 pt-2 border-t">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setDocumentToSign({
+                                    id: "",
+                                    name: `Change Order CO-${String(order.orderNumber).padStart(3, '0')}: ${order.title}`
+                                  });
+                                  setSendForSignatureOpen(true);
+                                }}
+                                data-testid={`button-signature-change-order-${order.id}`}
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Send for Signature
+                              </Button>
+                            </div>
+                          )}
                           
                           {!canEdit && isPending && (
                             <div className="flex gap-2 pt-2 border-t">

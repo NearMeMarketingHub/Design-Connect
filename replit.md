@@ -47,6 +47,17 @@ Key data models include:
 - Invoices with recurring billing support
 - Inspiration images and messaging
 - E-Signature system (signing packets, participants, audit events)
+- Change orders with line items (for scope/budget/timeline changes)
+
+### Change Order System
+BuildVision includes a comprehensive change order management system:
+- **Change Order Creation**: Contractors create change orders with title, description, reason, cost impact, and timeline impact
+- **Line Items**: Detailed breakdown with quantity, unit (EA, SF, LF, HR, LS), rate, and calculated amount
+- **Status Workflow**: pending → approved/rejected
+- **Client Approval**: Clients can review pending change orders and approve or reject with reason
+- **Auto-Update**: Approved change orders automatically update project budget and extend due date based on timeline impact
+- **E-Signature Integration**: "Send for Signature" button on approved change orders (requires PDF generation enhancement for full functionality)
+- **Sequential Numbering**: CO-001, CO-002, etc. per project
 
 ### E-Signature System
 BuildVision includes an in-app document e-signature system compliant with ESIGN/UETA requirements:

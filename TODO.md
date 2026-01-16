@@ -6,6 +6,14 @@ Last Updated: January 9, 2026
 
 ## ✅ Completed
 
+### Change Order System
+- [x] Database schema for change orders with line items (orderNumber, title, description, reason, costImpact, timelineImpact, status)
+- [x] API endpoints for CRUD operations, approval/rejection workflow
+- [x] Contractor UI to create, edit, delete change orders with line item breakdown
+- [x] Client UI to view and approve/reject change orders
+- [x] Auto-update project budget and timeline on approval
+- [x] "Send for Signature" button on approved change orders (partial - see enhancement note)
+
 ### Authentication & User Management
 - [x] Admin-side Budget Manager - CRUD operations for categories and line items
 - [x] Excel Import - Imported 936 pricing items from Master Budget Template
@@ -99,6 +107,11 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 **Future Features:**
 - New UI text needs to be added to translation files as features are built
 - Auto-translation works automatically for any new user content fields
+
+### Change Order E-Signature Enhancement
+- [ ] Generate PDF documents from approved change orders for full e-signature integration
+- [ ] Currently the "Send for Signature" button opens the signature dialog with change order title pre-filled, but signers need a document to view and sign
+- [ ] Options: Generate PDF server-side or create inline change order content display in signing page
 
 ### Branding
 - [ ] Changing the logo and app name when completed
