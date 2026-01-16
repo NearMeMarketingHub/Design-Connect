@@ -2803,8 +2803,8 @@ export default function FloorPlan3D() {
                                       </div>
                                       <div className="text-xs text-muted-foreground">
                                         {door.width}' wide • Position: {door.position.toFixed(1)}'
-                                        {door.doorType !== "open" && door.swingDirection && (
-                                          <> • Swings {door.swingDirection} {door.swingInward ? "inward" : "outward"}</>
+                                        {door.doorType !== "open" && (
+                                          <> • Swings {door.swingDirection || "left"} {door.swingInward !== false ? "inward" : "outward"}</>
                                         )}
                                       </div>
                                     </div>
@@ -2873,7 +2873,7 @@ export default function FloorPlan3D() {
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-xs text-muted-foreground">Swing:</span>
                                     <Button
-                                      variant={door.swingDirection === "left" ? "default" : "outline"}
+                                      variant={(door.swingDirection || "left") === "left" ? "default" : "outline"}
                                       size="sm"
                                       className="h-6 px-2 text-xs"
                                       onClick={() => updateDoorSwing(door.id, "swingDirection", "left")}
@@ -2882,7 +2882,7 @@ export default function FloorPlan3D() {
                                       Left
                                     </Button>
                                     <Button
-                                      variant={door.swingDirection === "right" ? "default" : "outline"}
+                                      variant={(door.swingDirection || "left") === "right" ? "default" : "outline"}
                                       size="sm"
                                       className="h-6 px-2 text-xs"
                                       onClick={() => updateDoorSwing(door.id, "swingDirection", "right")}
@@ -2892,7 +2892,7 @@ export default function FloorPlan3D() {
                                     </Button>
                                     <Separator orientation="vertical" className="h-4" />
                                     <Button
-                                      variant={door.swingInward ? "default" : "outline"}
+                                      variant={(door.swingInward !== false) ? "default" : "outline"}
                                       size="sm"
                                       className="h-6 px-2 text-xs"
                                       onClick={() => updateDoorSwing(door.id, "swingInward", true)}
@@ -2901,7 +2901,7 @@ export default function FloorPlan3D() {
                                       Inward
                                     </Button>
                                     <Button
-                                      variant={door.swingInward === false ? "default" : "outline"}
+                                      variant={(door.swingInward === false) ? "default" : "outline"}
                                       size="sm"
                                       className="h-6 px-2 text-xs"
                                       onClick={() => updateDoorSwing(door.id, "swingInward", false)}
