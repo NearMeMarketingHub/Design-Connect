@@ -79,6 +79,27 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 ### Email Configuration
 - [ ] Configure different sender email addresses per application using Resend integration - allows each app to send from its own branded email address while sharing the same Resend API key
 
+### Spanish Translation (Hybrid System)
+**Prerequisites:** OpenAI API key (managed at platform.openai.com, separate from ChatGPT subscription)
+
+**Full UI Translation (i18n):**
+- [ ] Add language toggle in user settings (English/Spanish)
+- [ ] Create translation files with all UI text in both languages
+- [ ] Implement React context for language state management
+- [ ] Create reusable `t()` function for translating static UI text
+- [ ] Update all components to use translation keys instead of hardcoded text
+
+**Auto-Translation for User Content:**
+- [ ] Create translation API endpoint using OpenAI
+- [ ] Implement bidirectional translation based on user's language preference
+- [ ] English users see Spanish content translated to English
+- [ ] Spanish users see English content translated to Spanish
+- [ ] Apply to messages, notes, and other user-generated content
+
+**Future Features:**
+- New UI text needs to be added to translation files as features are built
+- Auto-translation works automatically for any new user content fields
+
 ### Branding
 - [ ] Changing the logo and app name when completed
 
