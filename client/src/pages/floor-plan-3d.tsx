@@ -1616,6 +1616,10 @@ export default function FloorPlan3D() {
     setDoors(doors.map(d => d.id === doorId ? { ...d, position: newPos } : d));
   };
 
+  const updateDoorSwing = (doorId: string, field: "swingDirection" | "swingInward", value: "left" | "right" | boolean) => {
+    setDoors(doors.map(d => d.id === doorId ? { ...d, [field]: value } : d));
+  };
+
   const moveSelectedRooms = (axis: "x" | "z", delta: number) => {
     if (selectedRooms.size === 0) {
       toast({ title: "No Rooms Selected", description: "Check the boxes next to rooms to select them", variant: "destructive" });
@@ -2724,41 +2728,6 @@ export default function FloorPlan3D() {
                               </Select>
                               <p className="text-xs text-muted-foreground mt-1">Open wall creates an opening without a door frame - ideal for open floor concepts</p>
                             </div>
-                            {newDoor.doorType === "standard" && (
-                              <>
-                                <div>
-                                  <Label>Door Swing Direction</Label>
-                                  <Select 
-                                    value={newDoor.swingDirection} 
-                                    onValueChange={(val) => setNewDoor({ ...newDoor, swingDirection: val as "left" | "right" })}
-                                  >
-                                    <SelectTrigger data-testid="select-swing-direction">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="left">Swing Left (hinges on right)</SelectItem>
-                                      <SelectItem value="right">Swing Right (hinges on left)</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id="swing-inward"
-                                    checked={newDoor.swingInward}
-                                    onCheckedChange={(checked) => setNewDoor({ ...newDoor, swingInward: checked === true })}
-                                    data-testid="checkbox-swing-inward"
-                                  />
-                                  <Label htmlFor="swing-inward" className="text-sm font-normal cursor-pointer">
-                                    Door swings inward (into room)
-                                  </Label>
-                                </div>
-                                <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                                  {newDoor.swingInward 
-                                    ? `Door opens into the room, swinging to the ${newDoor.swingDirection}` 
-                                    : `Door opens outward (away from room), swinging to the ${newDoor.swingDirection}`}
-                                </p>
-                              </>
-                            )}
                             <div>
                               <Label>Connect to Room (Optional)</Label>
                               <Select 
@@ -2899,6 +2868,49 @@ export default function FloorPlan3D() {
                                     </>
                                   )}
                                 </div>
+
+                                {door.doorType !== "open" && (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs text-muted-foreground">Swing:</span>
+                                    <Button
+                                      variant={door.swingDirection === "left" ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => updateDoorSwing(door.id, "swingDirection", "left")}
+                                      data-testid={`button-swing-left-${door.id}`}
+                                    >
+                                      Left
+                                    </Button>
+                                    <Button
+                                      variant={door.swingDirection === "right" ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => updateDoorSwing(door.id, "swingDirection", "right")}
+                                      data-testid={`button-swing-right-${door.id}`}
+                                    >
+                                      Right
+                                    </Button>
+                                    <Separator orientation="vertical" className="h-4" />
+                                    <Button
+                                      variant={door.swingInward ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => updateDoorSwing(door.id, "swingInward", true)}
+                                      data-testid={`button-swing-in-${door.id}`}
+                                    >
+                                      Inward
+                                    </Button>
+                                    <Button
+                                      variant={door.swingInward === false ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => updateDoorSwing(door.id, "swingInward", false)}
+                                      data-testid={`button-swing-out-${door.id}`}
+                                    >
+                                      Outward
+                                    </Button>
+                                  </div>
+                                )}
 
                                 {door.connectedRoomId ? (
                                   <div className="text-xs text-green-600 flex items-center gap-1 bg-green-50 dark:bg-green-950 p-2 rounded">
