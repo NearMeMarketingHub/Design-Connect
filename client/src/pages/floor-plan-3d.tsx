@@ -1823,7 +1823,7 @@ export default function FloorPlan3D() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 border-r border-border bg-card flex flex-col min-h-0">
+        <aside className="w-96 border-r border-border bg-card flex flex-col min-h-0">
           <Tabs defaultValue="rooms" className="flex-1 flex flex-col min-h-0">
             <TabsList className="w-full justify-start rounded-none border-b h-12 px-2">
               <TabsTrigger value="rooms" className="flex items-center gap-2">
