@@ -116,6 +116,39 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 ### 3D Floor Plan Builder
 - [ ] Select different types of doors (French doors, sliding doors, pocket doors, double doors, etc.)
 
+### Mobile App (React Native / Expo)
+**Phase 1: Foundation**
+- [ ] Create new React Native/Expo project
+- [ ] Connect to existing backend API
+- [ ] Set up token-based authentication (shared user system)
+- [ ] Basic navigation structure (client vs contractor views)
+
+**Phase 2: Client Mobile Features**
+- [ ] Dashboard with project overview and progress tracking
+- [ ] Document viewing
+- [ ] Photo uploads from camera
+- [ ] Messaging/communication
+- [ ] Timeline and schedule viewing
+- [ ] Invoice viewing and approval
+- [ ] Change order approval
+
+**Phase 3: Contractor Mobile Features**
+- [ ] Project management views
+- [ ] Photo documentation from job sites
+- [ ] Quick status updates
+- [ ] Invoice creation
+
+**Phase 4: Advanced Features**
+- [ ] Push notifications for updates
+- [ ] Offline capability for poor signal areas
+- [ ] Camera integration for easy photo capture
+- [ ] 3D floor plan viewer (view-only with pinch/zoom)
+
+**Web-Only Features (complex editing needs larger screen):**
+- Full 3D Floor Plan Builder
+- Detailed estimate building
+- Document e-signature creation
+
 ### Branding
 - [ ] Changing the logo and app name when completed
 
