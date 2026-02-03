@@ -152,6 +152,50 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 ### Branding
 - [ ] Changing the logo and app name when completed
 
+### Company-Based Subscription System (Major Refactor)
+**New User Hierarchy:**
+- Super Admin (Platform Owner) - Manages all companies, can bypass subscriptions
+- Company Admin - Construction company owner, pays subscription, manages team
+- Project Manager - Full access, manages sub-contractors, COUNTED toward tier seats
+- Sub-Contractor - Limited role, assigned to projects by PM, UNLIMITED
+- Client - View their projects, belongs to company, UNLIMITED
+
+**Phase 1: Database Restructure**
+- [ ] Create Companies table (name, subscriptionTier, subscriptionStatus, settings)
+- [ ] Add subscription bypass fields (isComped, compedReason, compedBy)
+- [ ] Add companyId to users table
+- [ ] Create new role types (company_admin, project_manager, subcontractor)
+- [ ] Link clients to companies instead of standalone users
+
+**Phase 2: Stripe Integration**
+- [ ] Set up Stripe subscription products and pricing tiers
+- [ ] Implement subscription checkout for new companies
+- [ ] Add billing portal for plan management
+- [ ] Handle subscription webhooks (payment success, failed, cancelled)
+
+**Phase 3: Tier Enforcement**
+- [ ] Seat counting logic (only count project_managers)
+- [ ] Feature gating based on tier
+- [ ] Upgrade prompts when hitting limits
+- [ ] Usage dashboard for company admins
+
+**Phase 4: Super Admin Controls**
+- [ ] Company management dashboard (view all companies)
+- [ ] Grant/revoke comped access with reason tracking
+- [ ] Override tier limits per company
+- [ ] Usage analytics across all companies
+
+**Phase 5: Permission Updates**
+- [ ] Project Managers can manage sub-contractors
+- [ ] Company Admin manages Project Managers
+- [ ] Sub-contractors see only assigned projects
+- [ ] Client access scoped to their company's projects
+
+**Tier Structure (Example):**
+- Starter: 3 Project Managers, 10 projects
+- Professional: 10 Project Managers, 50 projects
+- Business: Unlimited PMs, unlimited projects
+
 ---
 
 ## 📝 Notes
