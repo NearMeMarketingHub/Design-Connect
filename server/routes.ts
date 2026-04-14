@@ -2191,23 +2191,6 @@ export async function registerRoutes(
     }
   });
 
-  // Get project team members
-  app.get("/api/projects/:id/team", requireAuth, async (req, res, next) => {
-    try {
-      const teamMembers = await storage.getProjectTeamMembers(req.params.id);
-      res.json(teamMembers.map(m => ({
-        id: m.id,
-        userId: m.contractorId,
-        name: m.contractor?.name || 'Unknown',
-        email: m.contractor?.email || null,
-        role: m.contractor?.role || 'contractor',
-        companyName: m.contractor?.companyName || null
-      })));
-    } catch (error) {
-      next(error);
-    }
-  });
-  
   // Get user by ID
   app.get("/api/users/:id", requireAuth, async (req, res, next) => {
     try {
@@ -2226,32 +2209,6 @@ export async function registerRoutes(
       next(error);
     }
   });
-
-  // Add team member to project
-  app.post("/api/projects/:id/team", requireAuth, async (req, res, next) => {
-    try {
-      const { contractorId, role } = req.body;
-      const teamMember = await storage.addProjectTeamMember({
-        projectId: req.params.id,
-        contractorId,
-        role: role || null,
-      });
-      res.status(201).json(teamMember);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Remove team member from project
-  app.delete("/api/projects/:id/team/:memberId", requireAuth, async (req, res, next) => {
-    try {
-      await storage.removeProjectTeamMember(req.params.memberId);
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  });
-
 
   // ==================== CHAT ROUTES ====================
   
