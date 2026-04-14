@@ -374,11 +374,38 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  // Admin: list all companies
+  // Toggle isCompanyAdmin for a company member (owner only, not self)
+  app.patch("/api/company/:companyId/members/:userId/admin", requireAuth, async (req, res, next) => {
+    try {
+      const ok = await verifyCompanyAccess(req, res, req.params.companyId);
+      if (!ok) return;
+      const caller = req.user as User;
+      if (caller.id === req.params.userId) {
+        return res.status(400).json({ message: "Cannot change your own admin status" });
+      }
+      const { isCompanyAdmin } = req.body;
+      if (typeof isCompanyAdmin !== "boolean") {
+        return res.status(400).json({ message: "isCompanyAdmin must be a boolean" });
+      }
+      await storage.updateUser(req.params.userId, { isCompanyAdmin });
+      res.json({ message: "Admin status updated" });
+    } catch (error) { next(error); }
+  });
+
+  // Admin: list all companies with owner and member count
   app.get("/api/admin/companies", requireAdmin, async (req, res, next) => {
     try {
       const companies = await storage.getAllCompanies();
-      res.json(companies);
+      const enriched = await Promise.all(companies.map(async (company) => {
+        const members = await storage.getCompanyMembers(company.id);
+        const owner = await storage.getUserByCompanyOwner(company.id);
+        return {
+          ...company,
+          memberCount: members.length,
+          ownerName: owner ? (owner.name || owner.username) : null,
+        };
+      }));
+      res.json(enriched);
     } catch (error) { next(error); }
   });
 
@@ -433,8 +460,15 @@ export async function registerRoutes(
         // Company owners only see their company's projects
         projects = await storage.getProjectsByCompanyId(user.companyId);
       } else if (user.role === "contractor") {
-        // Contractors see projects they are team members of
-        projects = await storage.getContractorProjects(user.id);
+        if (user.contractorType === "subcontractor") {
+          // Subcontractors: only explicitly assigned projects
+          projects = await storage.getContractorProjects(user.id);
+        } else if (user.companyId) {
+          // Regular contractors (notary, plain contractor): see all company projects
+          projects = await storage.getProjectsByCompanyId(user.companyId);
+        } else {
+          projects = await storage.getContractorProjects(user.id);
+        }
       } else {
         // Admins see all
         projects = await storage.getProjects();
@@ -461,7 +495,7 @@ export async function registerRoutes(
       return teamMembers.some(m => m.contractorId === user.id);
     }
     // Regular contractors (non-subcontractor): allow if in same company
-    if (user.role === "contractor" && !user.contractorType && user.companyId) {
+    if (user.role === "contractor" && user.contractorType !== "subcontractor" && user.companyId) {
       const contractor = await storage.getUser(project.contractorId);
       if (contractor && contractor.companyId === user.companyId) return true;
     }
@@ -3087,7 +3121,23 @@ export async function registerRoutes(
           return res.status(403).json({ message: "You can only invite members to your own company" });
         }
       }
-      
+
+      // Validate projectId belongs to caller's company (prevents cross-company project linking)
+      if (projectId && user.role !== 'admin') {
+        const project = await storage.getProject(projectId);
+        if (!project) {
+          return res.status(404).json({ message: "Project not found" });
+        }
+        const callerCompanyId = companyId || user.companyId;
+        if (callerCompanyId) {
+          const projectContractor = project.contractorId ? await storage.getUser(project.contractorId) : null;
+          const projectCompanyId = projectContractor?.companyId;
+          if (projectCompanyId && projectCompanyId !== callerCompanyId) {
+            return res.status(403).json({ message: "Project does not belong to your company" });
+          }
+        }
+      }
+
       // Note: we allow inviting existing users (they can accept by logging in rather than creating new account)
       
       // Generate invite token

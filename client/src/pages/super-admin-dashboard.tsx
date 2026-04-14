@@ -731,6 +731,8 @@ export default function SuperAdminDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Company Name</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Members</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
@@ -740,6 +742,8 @@ export default function SuperAdminDashboard() {
                     {companies.map((company: any) => (
                       <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
                         <TableCell className="font-medium">{company.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{company.ownerName || "—"}</TableCell>
+                        <TableCell className="text-sm">{company.memberCount ?? 0}</TableCell>
                         <TableCell><Badge variant="outline" className="capitalize">{company.subscriptionPlan}</Badge></TableCell>
                         <TableCell><Badge variant={company.subscriptionStatus === "active" ? "default" : "secondary"} className="capitalize">{company.subscriptionStatus}</Badge></TableCell>
                         <TableCell className="text-muted-foreground text-sm">{new Date(company.createdAt).toLocaleDateString()}</TableCell>

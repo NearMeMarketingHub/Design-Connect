@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { 
   Building2, Users, CreditCard, Settings, Plus, Mail, Trash2,
   CheckCircle, Clock, Crown, Wrench, FileText, UserPlus, ChevronRight,
-  RefreshCw, AlertCircle
+  RefreshCw, AlertCircle, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -29,7 +30,7 @@ export default function CompanyDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: "", contractorType: "contractor", specialty: "" });
+  const [inviteForm, setInviteForm] = useState({ email: "", contractorType: "contractor", specialty: "", projectId: "" });
   const [activeTab, setActiveTab] = useState("overview");
 
   const { data: company, isLoading: companyLoading } = useQuery({
@@ -62,7 +63,7 @@ export default function CompanyDashboard() {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (data: { email: string; contractorType: string; specialty?: string }) => {
+    mutationFn: async (data: { email: string; contractorType: string; specialty?: string; projectId?: string }) => {
       const res = await fetch("/api/contractor-invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,6 +73,7 @@ export default function CompanyDashboard() {
           companyId: company?.id,
           contractorType: data.contractorType,
           subcontractorSpecialty: data.specialty || null,
+          projectId: data.projectId || null,
         }),
       });
       if (!res.ok) {
@@ -83,7 +85,30 @@ export default function CompanyDashboard() {
     onSuccess: () => {
       toast({ title: "Invite sent!", description: `Invitation sent to ${inviteForm.email}` });
       setInviteOpen(false);
-      setInviteForm({ email: "", contractorType: "contractor", specialty: "" });
+      setInviteForm({ email: "", contractorType: "contractor", specialty: "", projectId: "" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const toggleAdminMutation = useMutation({
+    mutationFn: async ({ userId, isCompanyAdmin }: { userId: string; isCompanyAdmin: boolean }) => {
+      const res = await fetch(`/api/company/${company?.id}/members/${userId}/admin`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ isCompanyAdmin }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update admin status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company/members"] });
+      toast({ title: "Admin status updated" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -297,22 +322,41 @@ export default function CompanyDashboard() {
                     </Select>
                   </div>
                   {inviteForm.contractorType === "subcontractor" && (
-                    <div>
-                      <Label>Trade Specialty</Label>
-                      <Select
-                        value={inviteForm.specialty}
-                        onValueChange={v => setInviteForm(f => ({ ...f, specialty: v }))}
-                      >
-                        <SelectTrigger data-testid="select-specialty">
-                          <SelectValue placeholder="Select specialty..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUBCONTRACTOR_SPECIALTIES.map(s => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <>
+                      <div>
+                        <Label>Trade Specialty</Label>
+                        <Select
+                          value={inviteForm.specialty}
+                          onValueChange={v => setInviteForm(f => ({ ...f, specialty: v }))}
+                        >
+                          <SelectTrigger data-testid="select-specialty">
+                            <SelectValue placeholder="Select specialty..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUBCONTRACTOR_SPECIALTIES.map(s => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Assign to Project <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                        <Select
+                          value={inviteForm.projectId}
+                          onValueChange={v => setInviteForm(f => ({ ...f, projectId: v === "_none" ? "" : v }))}
+                        >
+                          <SelectTrigger data-testid="select-project">
+                            <SelectValue placeholder="Select project..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="_none">No specific project</SelectItem>
+                            {projects.map((p: any) => (
+                              <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
                   )}
                 </div>
                 <DialogFooter>
@@ -322,6 +366,7 @@ export default function CompanyDashboard() {
                       email: inviteForm.email,
                       contractorType: inviteForm.contractorType,
                       specialty: inviteForm.specialty,
+                      projectId: inviteForm.projectId || undefined,
                     })}
                     disabled={!inviteForm.email || inviteMutation.isPending}
                     data-testid="button-send-invite"
@@ -378,7 +423,16 @@ export default function CompanyDashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5" title={member.user?.isCompanyAdmin ? "Company Admin" : "Make Admin"}>
+                          <ShieldCheck className={`w-4 h-4 ${member.user?.isCompanyAdmin ? "text-primary" : "text-muted-foreground/30"}`} />
+                          <Switch
+                            checked={!!member.user?.isCompanyAdmin}
+                            onCheckedChange={v => toggleAdminMutation.mutate({ userId: member.userId, isCompanyAdmin: v })}
+                            disabled={toggleAdminMutation.isPending}
+                            data-testid={`toggle-admin-${member.userId}`}
+                          />
+                        </div>
                         <Badge variant="outline" className="capitalize">
                           {member.status}
                         </Badge>

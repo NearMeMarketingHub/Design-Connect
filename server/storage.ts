@@ -190,6 +190,7 @@ export interface IStorage {
   approveContractor(id: string): Promise<User | undefined>;
   rejectContractor(id: string): Promise<void>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+  getUserByCompanyOwner(companyId: string): Promise<User | undefined>;
 
   // Sandbox methods
   getSandboxData(): Promise<{ client: User | null; contractor: User | null; project: Project | null }>;
@@ -1061,6 +1062,13 @@ export class DatabaseStorage implements IStorage {
       .set(data)
       .where(eq(schema.users.id, id))
       .returning();
+    return user;
+  }
+
+  async getUserByCompanyOwner(companyId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(
+      and(eq(schema.users.companyId, companyId), eq(schema.users.role, "company_owner"))
+    );
     return user;
   }
 

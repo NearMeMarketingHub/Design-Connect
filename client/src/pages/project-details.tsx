@@ -290,7 +290,8 @@ export default function ProjectDetails() {
   
   // Contractor controls - check if user can edit this project
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
-  const canEdit = isContractorView && (user?.role === 'contractor' || user?.role === 'company_owner' || user?.role === 'admin');
+  const isSubcontractor = user?.role === 'contractor' && user?.contractorType === 'subcontractor';
+  const canEdit = isContractorView && !isSubcontractor && (user?.role === 'contractor' || user?.role === 'company_owner' || user?.role === 'admin');
   
   // Get portal base path
   const getPortalPath = () => {
