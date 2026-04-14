@@ -36,6 +36,9 @@ import SignDocumentPage from "@/pages/sign-document";
 import SignAuthenticatedPage from "@/pages/sign-authenticated";
 import SignatureSetup from "@/pages/signature-setup";
 import NotaryPortal from "@/pages/notary-portal";
+import CompanyDashboard from "@/pages/company-dashboard";
+import SubcontractorDashboard from "@/pages/subcontractor-dashboard";
+import AcceptSubcontractorInvite from "@/pages/accept-subcontractor-invite";
 import { AuthProvider } from "@/lib/auth-context";
 
 function Router() {
@@ -82,6 +85,41 @@ function Router() {
         <Route path="/notary/portal" component={NotaryPortal} />
         <Route component={NotFound} />
       </Switch>
+    );
+  }
+
+  // Accept subcontractor invite (public token-based page)
+  if (location.startsWith("/subcontractor-invite/")) {
+    return (
+      <Switch>
+        <Route path="/subcontractor-invite/:token" component={AcceptSubcontractorInvite} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  // Company Portal Routes (with Layout - shares contractor portal sidebar)
+  if (location.startsWith("/company")) {
+    return (
+      <Layout>
+        <Switch>
+          <Route path="/company/dashboard" component={CompanyDashboard} />
+          <Route path="/company/team" component={CompanyDashboard} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    );
+  }
+
+  // Subcontractor Portal Routes (with Layout)
+  if (location.startsWith("/subcontractor")) {
+    return (
+      <Layout>
+        <Switch>
+          <Route path="/subcontractor/dashboard" component={SubcontractorDashboard} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
     );
   }
   

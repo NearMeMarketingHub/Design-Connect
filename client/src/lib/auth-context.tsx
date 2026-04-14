@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import type { User } from "@shared/schema";
 import { api } from "./api";
 
-type PortalType = 'client' | 'contractor' | 'admin' | 'notary';
+export type PortalType = 'client' | 'contractor' | 'admin';
 
 interface AuthContextType {
   user: Omit<User, "password"> | null;
@@ -35,8 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await api.getCurrentUser();
       const fetchedUser = result.user || null;
       
-      // If user is an unapproved contractor, treat as not authenticated
-      if (fetchedUser && fetchedUser.role === 'contractor' && !fetchedUser.isApproved) {
+      // If user is an unapproved company_owner or contractor, treat as not authenticated
+      const isContractorPortalRole = fetchedUser?.role === 'contractor' || fetchedUser?.role === 'company_owner';
+      if (fetchedUser && isContractorPortalRole && !fetchedUser.isApproved) {
         setUser(null);
         // Clear the session on server side
         await api.logout().catch(() => {});

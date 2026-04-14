@@ -105,12 +105,18 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("admin-email") as string;
-        await login(loginId, password, "contractor");
+        const loggedInUser = await login(loginId, password, "contractor");
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-        setLocation("/contractor/dashboard");
+        if (loggedInUser.role === "company_owner") {
+          setLocation("/company/dashboard");
+        } else if (loggedInUser.role === "contractor" && loggedInUser.contractorType === "notary") {
+          setLocation("/notary/portal");
+        } else {
+          setLocation("/contractor/dashboard");
+        }
       } else {
         // Submit access request (no account creation)
         const firstName = formData.get("admin-first-name") as string;
@@ -169,7 +175,8 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("notary-email") as string;
-        await login(loginId, password, "notary");
+        // Notaries log in through contractor portal
+        await login(loginId, password, "contractor");
         toast({
           title: "Welcome back!",
           description: "You have successfully logged in.",
@@ -186,12 +193,12 @@ export default function AuthPage() {
           throw new Error("Passwords do not match");
         }
 
-        await register(username, email, password, "notary", `${firstName} ${lastName}`);
+        // Register as contractor with notary subtype - needs admin approval
+        await register(username, email, password, "contractor", `${firstName} ${lastName}`);
         toast({
-          title: "Account created!",
-          description: "Welcome to BuildVision Notary Portal.",
+          title: "Registration submitted!",
+          description: "Your notary account is pending admin approval.",
         });
-        setLocation("/notary/portal");
       }
     } catch (error: any) {
       toast({

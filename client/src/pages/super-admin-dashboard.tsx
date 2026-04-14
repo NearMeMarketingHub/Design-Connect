@@ -26,6 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { 
   Shield, 
   Users, 
@@ -48,7 +50,11 @@ import {
   X,
   Clock,
   TrendingUp,
-  Receipt
+  Receipt,
+  Layers,
+  Plus,
+  Trash2,
+  Pencil
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -107,6 +113,35 @@ export default function SuperAdminDashboard() {
     queryKey: ["/api/contractor-requests/pending"],
     queryFn: () => api.getPendingContractorRequests(),
     enabled: user?.role === "admin",
+  });
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ["/api/admin/companies"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/companies", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load companies");
+      return res.json();
+    },
+    enabled: user?.role === "admin",
+  });
+
+  const { data: roleDefs = [], refetch: refetchRoleDefs } = useQuery({
+    queryKey: ["/api/admin/role-definitions"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/role-definitions", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load role definitions");
+      return res.json();
+    },
+    enabled: user?.role === "admin",
+  });
+
+  const deleteRoleDefMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/role-definitions/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete role definition");
+    },
+    onSuccess: () => { refetchRoleDefs(); toast({ title: "Role deleted" }); },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const initSandboxMutation = useMutation({
@@ -627,6 +662,90 @@ export default function SuperAdminDashboard() {
               )}
             </CardContent>
           </Card>
+          </div>
+        </div>
+
+        {/* Companies Section */}
+        <div>
+          <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-amber-600" /> Registered Companies
+          </h2>
+          {companies.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">No companies registered yet.</CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Company Name</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companies.map((company: any) => (
+                      <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
+                        <TableCell className="font-medium">{company.name}</TableCell>
+                        <TableCell><Badge variant="outline" className="capitalize">{company.subscriptionPlan}</Badge></TableCell>
+                        <TableCell><Badge variant={company.subscriptionStatus === "active" ? "default" : "secondary"} className="capitalize">{company.subscriptionStatus}</Badge></TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{new Date(company.createdAt).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Role Definitions Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-600" /> Role Definitions
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(["contractor", "subcontractor"] as string[]).map(type => (
+              <Card key={type}>
+                <CardHeader>
+                  <CardTitle className="capitalize text-base">{type === "contractor" ? "Contractor Roles" : "Subcontractor Specialties"}</CardTitle>
+                  <CardDescription>{type === "contractor" ? "Team member roles and permissions" : "Available subcontractor trade specialties"}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {roleDefs.filter((r: any) => r.type === type).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No role definitions yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {roleDefs.filter((r: any) => r.type === type).map((def: any) => (
+                        <div key={def.id} className="flex items-center justify-between py-2 px-3 rounded-lg border" data-testid={`role-def-${def.id}`}>
+                          <div>
+                            <p className="font-medium text-sm">{def.name}</p>
+                            {def.isDefault && <p className="text-xs text-muted-foreground">System default</p>}
+                          </div>
+                          {!def.isDefault && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive w-7 h-7"
+                              onClick={() => deleteRoleDefMutation.mutate(def.id)}
+                              disabled={deleteRoleDefMutation.isPending}
+                              data-testid={`button-delete-role-${def.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </main>

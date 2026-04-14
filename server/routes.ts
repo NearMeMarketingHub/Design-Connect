@@ -98,14 +98,16 @@ export async function registerRoutes(
 
       const hashedPassword = await bcrypt.hash(password, 10);
       
-      // Contractors need admin approval, clients are auto-approved
-      const isApproved = role !== "contractor";
+      // Map incoming role: 'contractor' from registration form → company_owner
+      // company_owner needs admin approval; clients are auto-approved
+      const mappedRole = role === "contractor" ? "company_owner" : (role || "client");
+      const isApproved = mappedRole !== "company_owner";
       
       const user = await storage.createUser({
         username,
         email,
         password: hashedPassword,
-        role: role || "client",
+        role: mappedRole,
         name,
         phone,
         companyName,
@@ -113,8 +115,15 @@ export async function registerRoutes(
         isApproved,
       });
 
-      // If contractor, don't log them in - they need approval first
-      if (role === "contractor") {
+      // If company_owner, auto-create their company
+      if (mappedRole === "company_owner") {
+        const company = await storage.createCompany({
+          name: companyName || `${name || username}'s Company`,
+          ownerId: user.id,
+          subscriptionPlan: "free",
+          subscriptionStatus: "active",
+        });
+        await storage.updateUser(user.id, { companyId: company.id });
         const { password: _, ...userWithoutPassword } = user;
         return res.json({ 
           user: userWithoutPassword, 
@@ -146,6 +155,10 @@ export async function registerRoutes(
         return res.status(400).json({ message: info?.message || "Login failed" });
       }
       
+      // Contractor portal roles: company_owner, contractor (any subtype)
+      const isContractorPortalRole = (role: string) =>
+        role === "company_owner" || role === "contractor";
+
       // Role-based portal access validation
       // Admins can access any portal
       if (user.role !== "admin") {
@@ -155,16 +168,22 @@ export async function registerRoutes(
             message: "Please use the Client Portal to log in." 
           });
         }
-        // Contractors can only use contractor portal
-        if (user.role === "contractor" && portal !== "contractor") {
+        // Company owners and contractors use contractor portal
+        if (isContractorPortalRole(user.role) && portal !== "contractor") {
           return res.status(403).json({ 
             message: "Please use the Contractor Portal to log in." 
           });
         }
+        // Clients shouldn't hit contractor portal
+        if (user.role === "client" && portal === "contractor") {
+          return res.status(403).json({ 
+            message: "Please use the Client Portal to log in." 
+          });
+        }
       }
       
-      // Check if contractor is approved
-      if (user.role === "contractor" && !user.isApproved) {
+      // Check if company_owner or contractor is approved
+      if (isContractorPortalRole(user.role) && !user.isApproved) {
         return res.status(403).json({ 
           message: "Your account is pending admin approval. Please wait for approval before logging in." 
         });
@@ -207,6 +226,30 @@ export async function registerRoutes(
     next();
   };
 
+  // Company owner middleware
+  const requireCompanyOwner = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as User;
+    if (user.role !== "company_owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Company owner access required" });
+    }
+    next();
+  };
+
+  // Contractor or company_owner middleware (any portal user)
+  const requireContractorOrOwner = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as User;
+    if (user.role !== "company_owner" && user.role !== "contractor" && user.role !== "admin") {
+      return res.status(403).json({ message: "Contractor access required" });
+    }
+    next();
+  };
+
   // Admin contractor approval routes
   app.get("/api/admin/contractors/pending", requireAdmin, async (req, res, next) => {
     try {
@@ -239,14 +282,124 @@ export async function registerRoutes(
     }
   });
 
-  // Project routes
+  // ── Company routes ──────────────────────────────────────────────────────────
+
+  // Get current user's company
+  app.get("/api/company/mine", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const company = await storage.getCompanyByOwnerId(user.id);
+      if (!company) return res.status(404).json({ message: "No company found" });
+      res.json(company);
+    } catch (error) { next(error); }
+  });
+
+  // Update current user's company
+  app.patch("/api/company/mine", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const company = await storage.getCompanyByOwnerId(user.id);
+      if (!company) return res.status(404).json({ message: "No company found" });
+      const updated = await storage.updateCompany(company.id, req.body);
+      res.json(updated);
+    } catch (error) { next(error); }
+  });
+
+  // Get company members
+  app.get("/api/company/:companyId/members", requireAuth, async (req, res, next) => {
+    try {
+      const members = await storage.getCompanyMembers(req.params.companyId);
+      const membersWithoutPasswords = members.map(m => ({
+        ...m,
+        user: m.user ? (() => { const { password: _, ...u } = m.user!; return u; })() : undefined,
+      }));
+      res.json(membersWithoutPasswords);
+    } catch (error) { next(error); }
+  });
+
+  // Add company member (owner or admin only)
+  app.post("/api/company/:companyId/members", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const member = await storage.addCompanyMember({
+        companyId: req.params.companyId,
+        userId: req.body.userId,
+        status: "active",
+      });
+      res.json(member);
+    } catch (error) { next(error); }
+  });
+
+  // Remove company member
+  app.delete("/api/company/:companyId/members/:userId", requireCompanyOwner, async (req, res, next) => {
+    try {
+      await storage.removeCompanyMember(req.params.companyId, req.params.userId);
+      res.json({ message: "Member removed" });
+    } catch (error) { next(error); }
+  });
+
+  // Admin: list all companies
+  app.get("/api/admin/companies", requireAdmin, async (req, res, next) => {
+    try {
+      const companies = await storage.getAllCompanies();
+      res.json(companies);
+    } catch (error) { next(error); }
+  });
+
+  // ── Contractor Role Definition routes (admin only) ───────────────────────────
+
+  app.get("/api/admin/role-definitions", requireAdmin, async (req, res, next) => {
+    try {
+      const defs = await storage.getContractorRoleDefinitions();
+      res.json(defs);
+    } catch (error) { next(error); }
+  });
+
+  // Also expose to authenticated company owners for reading
+  app.get("/api/role-definitions", requireAuth, async (req, res, next) => {
+    try {
+      const defs = await storage.getContractorRoleDefinitions();
+      res.json(defs);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/admin/role-definitions", requireAdmin, async (req, res, next) => {
+    try {
+      const def = await storage.createContractorRoleDefinition(req.body);
+      res.json(def);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/admin/role-definitions/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const def = await storage.updateContractorRoleDefinition(req.params.id, req.body);
+      if (!def) return res.status(404).json({ message: "Role definition not found" });
+      res.json(def);
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/admin/role-definitions/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteContractorRoleDefinition(req.params.id);
+      res.json({ message: "Role definition deleted" });
+    } catch (error) { next(error); }
+  });
+
+  // ── Project routes ────────────────────────────────────────────────────────────
+
   app.get("/api/projects", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
       let projects;
       if (user.role === "client") {
         projects = await storage.getProjectsByClientId(user.id);
+      } else if (user.role === "company_owner" && user.companyId) {
+        // Company owners only see their company's projects
+        projects = await storage.getProjectsByCompanyId(user.companyId);
+      } else if (user.role === "contractor") {
+        // Contractors see projects they are team members of
+        projects = await storage.getContractorProjects(user.id);
       } else {
+        // Admins see all
         projects = await storage.getProjects();
       }
       res.json(projects);
@@ -1140,10 +1293,14 @@ export async function registerRoutes(
 
   // Notary Portal routes (for notary users to search and upload notarized documents)
   // Returns documents (not projects) with their project details for the notary portal list view
+  // Helper: check if user is a notary (legacy role='notary' or new contractor+notary type)
+  const isNotaryUser = (u: User) =>
+    u.role === 'notary' || (u.role === 'contractor' && u.contractorType === 'notary');
+
   app.get("/api/notary/projects", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'notary' && user.role !== 'admin') {
+      if (!isNotaryUser(user) && user.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -1210,7 +1367,7 @@ export async function registerRoutes(
   app.get("/api/notary/projects/:projectId/documents", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'notary' && user.role !== 'admin') {
+      if (!isNotaryUser(user) && user.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -1237,7 +1394,7 @@ export async function registerRoutes(
   app.post("/api/notary/documents/:documentId/upload-notarized", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'notary' && user.role !== 'admin') {
+      if (!isNotaryUser(user) && user.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -1830,8 +1987,9 @@ export async function registerRoutes(
   app.get("/api/admin/contractors", requireAdmin, async (req, res, next) => {
     try {
       const contractors = await storage.getUsersByRole("contractor");
+      const companyOwners = await storage.getUsersByRole("company_owner");
       const admins = await storage.getUsersByRole("admin");
-      const allUsers = [...contractors, ...admins];
+      const allUsers = [...companyOwners, ...contractors, ...admins];
       res.json(allUsers.map(c => ({ ...c, password: undefined })));
     } catch (error) {
       next(error);
@@ -1942,42 +2100,6 @@ export async function registerRoutes(
     }
   });
 
-  // Create contractor invite
-  app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
-    try {
-      const { email, companyName, companyType, projectId } = req.body;
-      const token = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-      
-      const invite = await storage.createContractorInvite({
-        email,
-        companyName: companyName || null,
-        companyType: companyType || null,
-        projectId: projectId || null,
-        token,
-        expiresAt,
-        invitedBy: (req.user as User).id,
-      });
-      
-      res.status(201).json(invite);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Accept contractor invite
-  app.post("/api/contractor-invites/:token/accept", requireAuth, async (req, res, next) => {
-    try {
-      const user = req.user as User;
-      const invite = await storage.acceptContractorInvite(req.params.token, user.id);
-      if (!invite) {
-        return res.status(404).json({ message: "Invite not found or expired" });
-      }
-      res.json(invite);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   // ==================== CHAT ROUTES ====================
   
@@ -2878,16 +3000,16 @@ export async function registerRoutes(
   app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'contractor' && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only contractors and admins can invite contractors" });
+      if (user.role !== 'company_owner' && user.role !== 'contractor' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Only company owners and admins can invite team members" });
       }
       
-      const { email, companyName, companyType, projectId } = req.body;
+      const { email, companyName, companyType, projectId, companyId, contractorType, subcontractorSpecialty } = req.body;
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
       }
       
-      // Check if contractor already exists
+      // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
         return res.status(400).json({ message: "A user with this email already exists" });
@@ -2902,6 +3024,9 @@ export async function registerRoutes(
         companyName,
         companyType,
         projectId: projectId || null,
+        companyId: companyId || null,
+        contractorType: contractorType || 'contractor',
+        subcontractorSpecialty: subcontractorSpecialty || null,
         token,
         invitedBy: user.id,
         expiresAt,
@@ -2942,7 +3067,9 @@ export async function registerRoutes(
       res.json({
         email: invite.email,
         companyName: invite.companyName,
-        companyType: invite.companyType,
+        companyType: invite.companyType || invite.contractorType,
+        contractorType: invite.contractorType,
+        subcontractorSpecialty: invite.subcontractorSpecialty,
         projectId: invite.projectId,
         projectName: project?.name
       });
@@ -2964,7 +3091,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invite has expired" });
       }
       
-      const { username, password, firstName, lastName } = req.body;
+      const { username, password, name, firstName, lastName } = req.body;
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
@@ -2977,16 +3104,29 @@ export async function registerRoutes(
       
       // Create the contractor account
       const hashedPassword = await bcrypt.hash(password, 10);
+      const resolvedName = name || (firstName && lastName ? `${firstName} ${lastName}` : undefined);
       const newUser = await storage.createUser({
         username,
         password: hashedPassword,
         email: invite.email,
-        name: firstName && lastName ? `${firstName} ${lastName}` : undefined,
+        name: resolvedName,
         role: 'contractor',
+        contractorType: invite.contractorType || 'contractor',
+        subcontractorSpecialty: invite.subcontractorSpecialty || null,
+        companyId: invite.companyId || null,
         companyName: invite.companyName,
         companyType: invite.companyType,
         isApproved: true // Auto-approved since they were invited
       });
+      
+      // If invite is for a company, add as company member
+      if (invite.companyId) {
+        await storage.addCompanyMember({
+          companyId: invite.companyId,
+          userId: newUser.id,
+          status: 'active',
+        });
+      }
       
       // Accept the invite (this also adds them to the project team if applicable)
       await storage.acceptContractorInvite(req.params.token, newUser.id);

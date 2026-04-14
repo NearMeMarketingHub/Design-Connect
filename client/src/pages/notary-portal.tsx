@@ -171,14 +171,15 @@ export default function NotaryPortal() {
     }
   };
 
-  // Check if user has notary role
-  if (user.role !== 'notary' && user.role !== 'admin') {
+  // Check if user has notary role (contractorType='notary' in new architecture, or legacy role='notary')
+  const isNotary = user.role === 'notary' || (user.role === 'contractor' && (user as any).contractorType === 'notary');
+  if (!isNotary && user.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center p-8 bg-white rounded-lg shadow max-w-md">
           <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
           <p className="text-gray-600 mb-4">
-            You are currently logged in as a {user.role}. The Notary Portal is only accessible to notary accounts.
+            The Notary Portal is only accessible to notary accounts.
           </p>
           <p className="text-gray-600 mb-6">
             Please log out and sign in with a notary account to access this portal.

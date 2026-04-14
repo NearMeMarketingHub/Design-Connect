@@ -13,7 +13,9 @@ import {
   Grid3X3,
   Menu,
   X,
-  Box
+  Box,
+  Building2,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -31,13 +33,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isContractorPortal = currentPortal === "contractor";
-  const isDashboard = location === "/client/dashboard" || location === "/admin/dashboard" || location === "/contractor/dashboard";
+  const isDashboard = location === "/client/dashboard" || location === "/admin/dashboard" || location === "/contractor/dashboard" || location === "/company/dashboard" || location === "/subcontractor/dashboard";
   
   const getDashboardPath = () => {
     if (currentPortal === "admin") return "/admin/dashboard";
-    if (currentPortal === "contractor") return "/contractor/dashboard";
+    if (currentPortal === "contractor") {
+      if (user?.role === "company_owner") return "/company/dashboard";
+      if (user?.role === "contractor" && user?.contractorType === "notary") return "/notary/portal";
+      return "/contractor/dashboard";
+    }
     if (currentPortal === "client") return "/client/dashboard";
     if (user?.role === "admin") return "/admin/dashboard";
+    if (user?.role === "company_owner") return "/company/dashboard";
     if (user?.role === "contractor") return "/contractor/dashboard";
     return "/client/dashboard";
   };
@@ -52,8 +59,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const basePath = getPortalBasePath();
   const showBackButton = !isDashboard && !loading && user;
 
+  const isCompanyOwner = user?.role === "company_owner";
+
   const contractorSidebarItems: SidebarItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/contractor/dashboard" },
+    ...(isCompanyOwner ? [
+      { label: "Company", icon: <Building2 className="w-5 h-5" />, href: "/company/dashboard" },
+      { label: "Team", icon: <Users className="w-5 h-5" />, href: "/company/team" },
+    ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
     { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
     { label: "Floor Calc", icon: <Grid3X3 className="w-5 h-5" />, href: "/contractor/floor-calculator" },
@@ -92,7 +105,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div>
                   <h1 className="font-heading font-bold text-lg tracking-tight">BuildVision</h1>
-                  <p className="text-xs text-muted-foreground">Contractor Portal</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isCompanyOwner ? "Company Portal" : "Contractor Portal"}
+                  </p>
                 </div>
               </div>
               <Button 
@@ -136,7 +151,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{user?.name || user?.username}</p>
-                  <p className="text-xs text-muted-foreground">Contractor</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isCompanyOwner ? "Company Owner" : user?.contractorType === "notary" ? "Notary" : "Contractor"}
+                  </p>
                 </div>
               </div>
             </div>

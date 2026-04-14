@@ -1,26 +1,77 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, numeric, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, numeric, real, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Companies - the central billing/organizational unit for the subscription model
+// Each company_owner owns exactly one company; contractors/notaries/subcontractors belong to a company
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
+  subscriptionPlan: text("subscription_plan").default("free"), // free, starter, professional, enterprise
+  subscriptionStatus: text("subscription_status").default("active"), // active, past_due, cancelled, trialing
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true });
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   email: text("email"),
   password: text("password").notNull(),
+  // Top-level roles: admin | company_owner | contractor | client | notary (legacy, maps to contractor subtype)
   role: text("role").notNull().default("client"),
   name: text("name"),
   phone: text("phone"),
-  companyName: text("company_name"),
-  companyType: text("company_type"),
+  companyName: text("company_name"),   // Display name / legacy field
+  companyType: text("company_type"),   // Legacy field kept for backwards compat
   profilePicture: text("profile_picture"),
   isSandbox: boolean("is_sandbox").default(false),
   isApproved: boolean("is_approved").default(true),
+  // New fields for company-based architecture
+  companyId: varchar("company_id"),    // FK to companies (nullable — admins and clients have no company)
+  contractorType: text("contractor_type"), // 'contractor' | 'notary' | 'subcontractor' (only when role='contractor')
+  isCompanyAdmin: boolean("is_company_admin").default(false), // For contractorType='contractor': elevated access
+  subcontractorSpecialty: text("subcontractor_specialty"), // e.g., 'Plumber', 'Electrician' (for subcontractors)
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Company members - join table allowing subcontractors to belong to multiple companies
+// Regular contractors/notaries use companyId on the user record; subcontractors use this table
+export const companyMembers = pgTable("company_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("active"), // active | inactive
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+});
+
+export const insertCompanyMemberSchema = createInsertSchema(companyMembers).omit({ id: true, addedAt: true });
+export type InsertCompanyMember = z.infer<typeof insertCompanyMemberSchema>;
+export type CompanyMember = typeof companyMembers.$inferSelect;
+
+// Contractor role definitions - templates created by platform admins
+// These define what permissions a given role/specialty has within the platform
+export const contractorRoleDefinitions = pgTable("contractor_role_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),                         // e.g., 'Project Manager', 'Electrician', 'Company Admin'
+  type: text("type").notNull(),                         // 'contractor' | 'subcontractor'
+  permissions: jsonb("permissions").notNull().default({}), // RolePermissions JSON object
+  isDefault: boolean("is_default").default(false),      // Platform-provided defaults
+  createdByAdminId: varchar("created_by_admin_id"),     // null for platform defaults
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContractorRoleDefinitionSchema = createInsertSchema(contractorRoleDefinitions).omit({ id: true, createdAt: true });
+export type InsertContractorRoleDefinition = z.infer<typeof insertContractorRoleDefinitionSchema>;
+export type ContractorRoleDefinition = typeof contractorRoleDefinitions.$inferSelect;
 
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey(),
@@ -369,13 +420,16 @@ export const insertProjectTeamMemberSchema = createInsertSchema(projectTeamMembe
 export type InsertProjectTeamMember = z.infer<typeof insertProjectTeamMemberSchema>;
 export type ProjectTeamMember = typeof projectTeamMembers.$inferSelect;
 
-// Contractor invitations - invite contractors to join the platform and a project
+// Contractor invitations - invite contractors/subcontractors to join a company and/or project
 export const contractorInvites = pgTable("contractor_invites", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").references(() => projects.id), // Optional - may invite to platform only
+  companyId: varchar("company_id").references(() => companies.id), // Which company this invite is for
   email: text("email").notNull(),
   companyName: text("company_name"),
-  companyType: text("company_type"), // Their trade/role type
+  companyType: text("company_type"), // Legacy: their trade/role type
+  contractorType: text("contractor_type"), // 'contractor' | 'notary' | 'subcontractor'
+  subcontractorSpecialty: text("subcontractor_specialty"), // For subcontractor invites
   token: text("token").notNull().unique(),
   status: text("status").notNull().default("pending"), // pending, accepted, expired
   invitedBy: varchar("invited_by").references(() => users.id),

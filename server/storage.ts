@@ -1,4 +1,4 @@
-import { eq, and, not, isNull, like, sql } from "drizzle-orm";
+import { eq, and, or, not, isNull, like, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import bcrypt from "bcryptjs";
@@ -24,6 +24,9 @@ function generateProjectSlug(name: string, date: Date = new Date()): string {
 }
 import type {
   User, InsertUser,
+  Company, InsertCompany,
+  CompanyMember, InsertCompanyMember,
+  ContractorRoleDefinition, InsertContractorRoleDefinition,
   Project, InsertProject,
   Estimate, InsertEstimate,
   EstimateLineItem, InsertEstimateLineItem,
@@ -300,6 +303,31 @@ export interface IStorage {
   getChangeOrderLineItems(changeOrderId: string): Promise<ChangeOrderLineItem[]>;
   createChangeOrderLineItem(item: InsertChangeOrderLineItem): Promise<ChangeOrderLineItem>;
   deleteChangeOrderLineItems(changeOrderId: string): Promise<void>;
+
+  // Company methods
+  getCompany(id: string): Promise<Company | undefined>;
+  getCompanyByOwnerId(ownerId: string): Promise<Company | undefined>;
+  getAllCompanies(): Promise<Company[]>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  updateCompany(id: string, data: Partial<InsertCompany>): Promise<Company | undefined>;
+  deleteCompany(id: string): Promise<void>;
+
+  // Company member methods
+  getCompanyMembers(companyId: string): Promise<(CompanyMember & { user?: User })[]>;
+  getCompanyMember(companyId: string, userId: string): Promise<CompanyMember | undefined>;
+  addCompanyMember(member: InsertCompanyMember): Promise<CompanyMember>;
+  removeCompanyMember(companyId: string, userId: string): Promise<void>;
+  getUserCompanies(userId: string): Promise<(CompanyMember & { company?: Company })[]>;
+
+  // Contractor role definition methods
+  getContractorRoleDefinitions(): Promise<ContractorRoleDefinition[]>;
+  getContractorRoleDefinition(id: string): Promise<ContractorRoleDefinition | undefined>;
+  createContractorRoleDefinition(def: InsertContractorRoleDefinition): Promise<ContractorRoleDefinition>;
+  updateContractorRoleDefinition(id: string, data: Partial<InsertContractorRoleDefinition>): Promise<ContractorRoleDefinition | undefined>;
+  deleteContractorRoleDefinition(id: string): Promise<void>;
+
+  // Projects by company
+  getProjectsByCompanyId(companyId: string): Promise<Project[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1007,7 +1035,10 @@ export class DatabaseStorage implements IStorage {
   async getPendingContractors(): Promise<User[]> {
     return await db.select().from(schema.users).where(
       and(
-        eq(schema.users.role, "contractor"),
+        or(
+          eq(schema.users.role, "contractor"),
+          eq(schema.users.role, "company_owner")
+        ),
         eq(schema.users.isApproved, false)
       )
     );
@@ -1967,6 +1998,114 @@ export class DatabaseStorage implements IStorage {
   async deleteChangeOrderLineItems(changeOrderId: string): Promise<void> {
     await db.delete(schema.changeOrderLineItems)
       .where(eq(schema.changeOrderLineItems.changeOrderId, changeOrderId));
+  }
+
+  // Company methods
+  async getCompany(id: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, id));
+    return company;
+  }
+
+  async getCompanyByOwnerId(ownerId: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(schema.companies).where(eq(schema.companies.ownerId, ownerId));
+    return company;
+  }
+
+  async getAllCompanies(): Promise<Company[]> {
+    return await db.select().from(schema.companies).orderBy(schema.companies.createdAt);
+  }
+
+  async createCompany(company: InsertCompany): Promise<Company> {
+    const [created] = await db.insert(schema.companies).values(company).returning();
+    return created;
+  }
+
+  async updateCompany(id: string, data: Partial<InsertCompany>): Promise<Company | undefined> {
+    const [updated] = await db.update(schema.companies).set(data).where(eq(schema.companies.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCompany(id: string): Promise<void> {
+    await db.delete(schema.companies).where(eq(schema.companies.id, id));
+  }
+
+  // Company member methods
+  async getCompanyMembers(companyId: string): Promise<(CompanyMember & { user?: User })[]> {
+    const members = await db.select().from(schema.companyMembers)
+      .where(eq(schema.companyMembers.companyId, companyId));
+    const result: (CompanyMember & { user?: User })[] = [];
+    for (const member of members) {
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, member.userId));
+      result.push({ ...member, user });
+    }
+    return result;
+  }
+
+  async getCompanyMember(companyId: string, userId: string): Promise<CompanyMember | undefined> {
+    const [member] = await db.select().from(schema.companyMembers)
+      .where(eq(schema.companyMembers.companyId, companyId) && eq(schema.companyMembers.userId, userId));
+    return member;
+  }
+
+  async addCompanyMember(member: InsertCompanyMember): Promise<CompanyMember> {
+    const [created] = await db.insert(schema.companyMembers).values(member).returning();
+    return created;
+  }
+
+  async removeCompanyMember(companyId: string, userId: string): Promise<void> {
+    await db.delete(schema.companyMembers)
+      .where(eq(schema.companyMembers.companyId, companyId));
+  }
+
+  async getUserCompanies(userId: string): Promise<(CompanyMember & { company?: Company })[]> {
+    const memberships = await db.select().from(schema.companyMembers)
+      .where(eq(schema.companyMembers.userId, userId));
+    const result: (CompanyMember & { company?: Company })[] = [];
+    for (const m of memberships) {
+      const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, m.companyId));
+      result.push({ ...m, company });
+    }
+    return result;
+  }
+
+  // Contractor role definition methods
+  async getContractorRoleDefinitions(): Promise<ContractorRoleDefinition[]> {
+    return await db.select().from(schema.contractorRoleDefinitions).orderBy(schema.contractorRoleDefinitions.type, schema.contractorRoleDefinitions.name);
+  }
+
+  async getContractorRoleDefinition(id: string): Promise<ContractorRoleDefinition | undefined> {
+    const [def] = await db.select().from(schema.contractorRoleDefinitions).where(eq(schema.contractorRoleDefinitions.id, id));
+    return def;
+  }
+
+  async createContractorRoleDefinition(def: InsertContractorRoleDefinition): Promise<ContractorRoleDefinition> {
+    const [created] = await db.insert(schema.contractorRoleDefinitions).values(def).returning();
+    return created;
+  }
+
+  async updateContractorRoleDefinition(id: string, data: Partial<InsertContractorRoleDefinition>): Promise<ContractorRoleDefinition | undefined> {
+    const [updated] = await db.update(schema.contractorRoleDefinitions).set(data).where(eq(schema.contractorRoleDefinitions.id, id)).returning();
+    return updated;
+  }
+
+  async deleteContractorRoleDefinition(id: string): Promise<void> {
+    await db.delete(schema.contractorRoleDefinitions).where(eq(schema.contractorRoleDefinitions.id, id));
+  }
+
+  // Projects by company
+  async getProjectsByCompanyId(companyId: string): Promise<Project[]> {
+    // Get all company_owner users with this companyId, then get their projects
+    const owners = await db.select().from(schema.users)
+      .where(eq(schema.users.companyId, companyId));
+    if (owners.length === 0) return [];
+    const ownerIds = owners.map(o => o.id);
+    const projects: Project[] = [];
+    for (const ownerId of ownerIds) {
+      const ownerProjects = await db.select().from(schema.projects)
+        .where(eq(schema.projects.contractorId, ownerId));
+      projects.push(...ownerProjects);
+    }
+    return projects;
   }
 }
 

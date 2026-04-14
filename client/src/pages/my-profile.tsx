@@ -158,7 +158,7 @@ export default function MyProfile() {
     return null;
   }
 
-  const backUrl = user.role === "contractor" ? "/contractor/dashboard" : user.role === "admin" ? "/admin/dashboard" : "/client/dashboard";
+  const backUrl = user.role === "company_owner" ? "/company/dashboard" : user.role === "contractor" ? "/contractor/dashboard" : user.role === "admin" ? "/admin/dashboard" : "/client/dashboard";
 
   return (
     <div className="min-h-screen bg-background">
