@@ -68,6 +68,16 @@ BuildVision includes an in-app document e-signature system compliant with ESIGN/
 - **Email Notifications**: Signature requests sent via Resend integration with professional templates
 - **Public Signing Page**: Token-based access at `/sign/:token` for external recipients
 
+### Company-Based Architecture
+BuildVision uses a company-based multi-tenant model:
+- **Company Owner** (`role='company_owner'`): Registers as a plain contractor, auto-creates a company. Has full dual dashboard (contractor + company management). Sees all company projects.
+- **Contractor** (`role='contractor'`, no contractorType): Regular employee of a company. Sees all company projects. Can edit project data.
+- **Notary** (`role='contractor'`, `contractorType='notary'`): Requires admin approval. Has notary portal at `/notary/portal`. Sees all company projects. Cannot edit projects.
+- **Subcontractor** (`role='contractor'`, `contractorType='subcontractor'`): Spans multiple companies via email invite. Only sees explicitly assigned projects. Read-only on project details.
+- **Role Definitions**: Platform admins create role templates with permission sets. Company owners can assign templates to team members.
+- **Company isolation**: All data (projects, team, financials) is scoped to companyId. `app.param("projectId")` enforces access checks on all project-scoped routes.
+- **Startup migration**: `server/migrate-roles.ts` runs idempotently on startup to promote legacy contractor accounts to company_owner.
+
 ### Authentication & Authorization
 - Session-based authentication with 30-day cookie expiration
 - Password hashing with bcryptjs

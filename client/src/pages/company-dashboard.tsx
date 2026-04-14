@@ -40,7 +40,7 @@ export default function CompanyDashboard() {
       if (!res.ok) throw new Error("Failed to load company");
       return res.json();
     },
-    enabled: user?.role === "company_owner",
+    enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
   });
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
@@ -60,6 +60,16 @@ export default function CompanyDashboard() {
       if (!res.ok) throw new Error("Failed to load projects");
       return res.json();
     },
+  });
+
+  const { data: roleDefs = [] } = useQuery({
+    queryKey: ["/api/role-definitions"],
+    queryFn: async () => {
+      const res = await fetch("/api/role-definitions", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!company?.id,
   });
 
   const inviteMutation = useMutation({
@@ -86,6 +96,29 @@ export default function CompanyDashboard() {
       toast({ title: "Invite sent!", description: `Invitation sent to ${inviteForm.email}` });
       setInviteOpen(false);
       setInviteForm({ email: "", contractorType: "contractor", specialty: "", projectId: "" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const assignRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleDefinitionId }: { userId: string; roleDefinitionId: string | null }) => {
+      const res = await fetch(`/api/company/${company?.id}/members/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ roleDefinitionId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to assign role");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company/members"] });
+      toast({ title: "Role assigned" });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -423,8 +456,24 @@ export default function CompanyDashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5" title={member.user?.isCompanyAdmin ? "Company Admin" : "Make Admin"}>
+                      <div className="flex items-center gap-2">
+                        {roleDefs.length > 0 && (
+                          <Select
+                            value={member.roleDefinitionId || "_none"}
+                            onValueChange={v => assignRoleMutation.mutate({ userId: member.userId, roleDefinitionId: v === "_none" ? null : v })}
+                          >
+                            <SelectTrigger className="h-7 w-32 text-xs" data-testid={`select-role-${member.userId}`}>
+                              <SelectValue placeholder="Assign role..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_none">No role</SelectItem>
+                              {roleDefs.map((rd: any) => (
+                                <SelectItem key={rd.id} value={rd.id}>{rd.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <div className="flex items-center gap-1" title={member.user?.isCompanyAdmin ? "Company Admin" : "Make Admin"}>
                           <ShieldCheck className={`w-4 h-4 ${member.user?.isCompanyAdmin ? "text-primary" : "text-muted-foreground/30"}`} />
                           <Switch
                             checked={!!member.user?.isCompanyAdmin}

@@ -317,6 +317,7 @@ export interface IStorage {
   getCompanyMembers(companyId: string): Promise<(CompanyMember & { user?: User })[]>;
   getCompanyMember(companyId: string, userId: string): Promise<CompanyMember | undefined>;
   addCompanyMember(member: InsertCompanyMember): Promise<CompanyMember>;
+  updateCompanyMember(companyId: string, userId: string, data: Partial<InsertCompanyMember>): Promise<CompanyMember | undefined>;
   removeCompanyMember(companyId: string, userId: string): Promise<void>;
   getUserCompanies(userId: string): Promise<(CompanyMember & { company?: Company })[]>;
 
@@ -2058,6 +2059,14 @@ export class DatabaseStorage implements IStorage {
   async addCompanyMember(member: InsertCompanyMember): Promise<CompanyMember> {
     const [created] = await db.insert(schema.companyMembers).values(member).returning();
     return created;
+  }
+
+  async updateCompanyMember(companyId: string, userId: string, data: Partial<InsertCompanyMember>): Promise<CompanyMember | undefined> {
+    const [updated] = await db.update(schema.companyMembers)
+      .set(data)
+      .where(and(eq(schema.companyMembers.companyId, companyId), eq(schema.companyMembers.userId, userId)))
+      .returning();
+    return updated;
   }
 
   async removeCompanyMember(companyId: string, userId: string): Promise<void> {

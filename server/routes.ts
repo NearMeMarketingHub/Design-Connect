@@ -14,6 +14,7 @@ const { Pool } = pkg;
 import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
+import { runRoleMigration } from "./migrate-roles";
 
 const PgSession = connectPgSimple(session);
 
@@ -21,7 +22,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
+  // Run idempotent role migration on startup
+  runRoleMigration().catch(err => console.error("[migrate-roles] Migration error:", err));
+
   // Session setup
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -315,23 +319,26 @@ export async function registerRoutes(
 
   // ── Company routes ──────────────────────────────────────────────────────────
 
-  // Get current user's company
-  app.get("/api/company/mine", requireCompanyOwner, async (req, res, next) => {
+  // Get current user's company (works for company_owner AND company admins)
+  app.get("/api/company/mine", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const company = await storage.getCompanyByOwnerId(user.id);
+      if (!user.companyId) return res.status(404).json({ message: "No company found" });
+      const company = await storage.getCompany(user.companyId);
       if (!company) return res.status(404).json({ message: "No company found" });
       res.json(company);
     } catch (error) { next(error); }
   });
 
-  // Update current user's company
-  app.patch("/api/company/mine", requireCompanyOwner, async (req, res, next) => {
+  // Update current user's company (owner or company admin only)
+  app.patch("/api/company/mine", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const company = await storage.getCompanyByOwnerId(user.id);
-      if (!company) return res.status(404).json({ message: "No company found" });
-      const updated = await storage.updateCompany(company.id, req.body);
+      if (!user.companyId) return res.status(404).json({ message: "No company found" });
+      if (user.role !== "company_owner" && user.role !== "admin" && user.isCompanyAdmin !== true) {
+        return res.status(403).json({ message: "Only company owners and admins can update company settings" });
+      }
+      const updated = await storage.updateCompany(user.companyId, req.body);
       res.json(updated);
     } catch (error) { next(error); }
   });
@@ -371,6 +378,25 @@ export async function registerRoutes(
       if (!ok) return;
       await storage.removeCompanyMember(req.params.companyId, req.params.userId);
       res.json({ message: "Member removed" });
+    } catch (error) { next(error); }
+  });
+
+  // Assign/update role template for a company member
+  app.patch("/api/company/:companyId/members/:userId/role", requireAuth, async (req, res, next) => {
+    try {
+      const ok = await verifyCompanyAccess(req, res, req.params.companyId);
+      if (!ok) return;
+      const { roleDefinitionId } = req.body;
+      // Allow null to clear assignment; validate if a value is provided
+      if (roleDefinitionId) {
+        const roleDef = await storage.getContractorRoleDefinition(roleDefinitionId);
+        if (!roleDef) return res.status(404).json({ message: "Role definition not found" });
+      }
+      const updated = await storage.updateCompanyMember(req.params.companyId, req.params.userId, {
+        roleDefinitionId: roleDefinitionId || null,
+      });
+      if (!updated) return res.status(404).json({ message: "Member not found" });
+      res.json(updated);
     } catch (error) { next(error); }
   });
 
@@ -501,6 +527,23 @@ export async function registerRoutes(
     }
     return false;
   };
+
+  // Automatic project access guard — runs for every route with a :projectId param
+  // Ensures consistent IDOR protection across all project-scoped endpoints
+  app.param("projectId", async (req: any, res: any, next: any, projectId: string) => {
+    if (!req.user) return next(); // requireAuth handles unauthenticated case
+    try {
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      if (!(await canAccessProject(req.user as User, project))) {
+        return res.status(403).json({ message: "Access denied to this project" });
+      }
+      (req as any).project = project; // cache for downstream handlers
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
 
   app.get("/api/projects/:id", requireAuth, async (req, res, next) => {
     try {

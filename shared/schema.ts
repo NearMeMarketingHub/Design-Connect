@@ -50,6 +50,7 @@ export const companyMembers = pgTable("company_members", {
   companyId: varchar("company_id").notNull().references(() => companies.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   status: text("status").notNull().default("active"), // active | inactive
+  roleDefinitionId: varchar("role_definition_id"), // optional assigned role template
   addedAt: timestamp("added_at").notNull().defaultNow(),
 });
 
