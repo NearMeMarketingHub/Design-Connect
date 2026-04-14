@@ -6,8 +6,7 @@
  */
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, and, isNull, or } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { eq, and, isNull, or, sql } from "drizzle-orm";
 
 export async function runRoleMigration(): Promise<void> {
   console.log("[migrate-roles] Starting role migration check...");
@@ -51,22 +50,17 @@ export async function runRoleMigration(): Promise<void> {
     migrated++;
   }
 
-  // Ensure notary users have contractorType='notary' set (not null or 'contractor')
-  // Notaries who registered before contractorType was tracked may have contractorType=null
-  // We infer notary status from the old 'notary' role if it exists
-  const legacyNotaries = await db
-    .select()
-    .from(schema.users)
-    .where(
-      and(
-        eq(schema.users.role, "notary" as any),
-      )
-    );
+  // Ensure any legacy users with role='notary' (a discontinued role value) are migrated
+  // to role='contractor' + contractorType='notary'. Uses raw SQL to avoid typing the
+  // discontinued enum value into the TypeScript union.
+  const notaryResult = await db.execute(
+    sql`SELECT id, username FROM users WHERE role = 'notary'`
+  );
+  const legacyNotaries = (notaryResult.rows ?? notaryResult) as Array<{ id: string; username: string }>;
   for (const user of legacyNotaries) {
-    await db
-      .update(schema.users)
-      .set({ role: "contractor", contractorType: "notary" })
-      .where(eq(schema.users.id, user.id));
+    await db.execute(
+      sql`UPDATE users SET role = 'contractor', contractor_type = 'notary' WHERE id = ${user.id}`
+    );
     console.log(`[migrate-roles] Migrated legacy notary ${user.username} → contractor+notary`);
     migrated++;
   }

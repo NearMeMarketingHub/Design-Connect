@@ -409,6 +409,11 @@ export async function registerRoutes(
       if (caller.id === req.params.userId) {
         return res.status(400).json({ message: "Cannot change your own admin status" });
       }
+      // Validate target user is actually a member of this company (prevent privilege escalation)
+      const targetMembership = await storage.getCompanyMember(req.params.companyId, req.params.userId);
+      if (!targetMembership) {
+        return res.status(404).json({ message: "User is not a member of this company" });
+      }
       const { isCompanyAdmin } = req.body;
       if (typeof isCompanyAdmin !== "boolean") {
         return res.status(400).json({ message: "isCompanyAdmin must be a boolean" });
@@ -3147,8 +3152,13 @@ export async function registerRoutes(
   app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'company_owner' && user.role !== 'contractor' && user.role !== 'admin') {
-        return res.status(403).json({ message: "Only company owners and admins can invite team members" });
+      // Strict authorization: only company_owner, platform admin, or contractor with isCompanyAdmin
+      const canInvite =
+        user.role === "admin" ||
+        user.role === "company_owner" ||
+        (user.role === "contractor" && user.isCompanyAdmin === true);
+      if (!canInvite) {
+        return res.status(403).json({ message: "Only company owners and company admins can invite team members" });
       }
       
       const { email, companyName, companyType, projectId, companyId, contractorType, subcontractorSpecialty } = req.body;
