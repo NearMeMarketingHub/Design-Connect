@@ -2043,7 +2043,7 @@ export class DatabaseStorage implements IStorage {
 
   async getCompanyMember(companyId: string, userId: string): Promise<CompanyMember | undefined> {
     const [member] = await db.select().from(schema.companyMembers)
-      .where(eq(schema.companyMembers.companyId, companyId) && eq(schema.companyMembers.userId, userId));
+      .where(and(eq(schema.companyMembers.companyId, companyId), eq(schema.companyMembers.userId, userId)));
     return member;
   }
 
@@ -2054,7 +2054,7 @@ export class DatabaseStorage implements IStorage {
 
   async removeCompanyMember(companyId: string, userId: string): Promise<void> {
     await db.delete(schema.companyMembers)
-      .where(eq(schema.companyMembers.companyId, companyId));
+      .where(and(eq(schema.companyMembers.companyId, companyId), eq(schema.companyMembers.userId, userId)));
   }
 
   async getUserCompanies(userId: string): Promise<(CompanyMember & { company?: Company })[]> {

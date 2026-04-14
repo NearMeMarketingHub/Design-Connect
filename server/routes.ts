@@ -226,16 +226,32 @@ export async function registerRoutes(
     next();
   };
 
-  // Company owner middleware
+  // Company owner middleware (also allows isCompanyAdmin contractors and admins)
   const requireCompanyOwner = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     const user = req.user as User;
-    if (user.role !== "company_owner" && user.role !== "admin") {
+    const isCompanyManager = user.role === "company_owner" || user.isCompanyAdmin === true;
+    if (!isCompanyManager && user.role !== "admin") {
       return res.status(403).json({ message: "Company owner access required" });
     }
     next();
+  };
+
+  // Helper: verify caller is owner/admin of the target company
+  const verifyCompanyAccess = async (req: any, res: any, companyId: string): Promise<boolean> => {
+    const user = req.user as User;
+    if (user.role === "admin") return true;
+    const company = await storage.getCompany(companyId);
+    if (!company) { res.status(404).json({ message: "Company not found" }); return false; }
+    const isOwner = user.role === "company_owner" && user.companyId === companyId;
+    const isCompanyAdmin = user.isCompanyAdmin === true && user.companyId === companyId;
+    if (!isOwner && !isCompanyAdmin) {
+      res.status(403).json({ message: "You do not have access to this company" });
+      return false;
+    }
+    return true;
   };
 
   // Contractor or company_owner middleware (any portal user)
@@ -305,9 +321,11 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  // Get company members
+  // Get company members (only owner, company admin, or platform admin)
   app.get("/api/company/:companyId/members", requireAuth, async (req, res, next) => {
     try {
+      const ok = await verifyCompanyAccess(req, res, req.params.companyId);
+      if (!ok) return;
       const members = await storage.getCompanyMembers(req.params.companyId);
       const membersWithoutPasswords = members.map(m => ({
         ...m,
@@ -317,9 +335,11 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  // Add company member (owner or admin only)
-  app.post("/api/company/:companyId/members", requireCompanyOwner, async (req, res, next) => {
+  // Add company member (owner or company admin of that company only)
+  app.post("/api/company/:companyId/members", requireAuth, async (req, res, next) => {
     try {
+      const ok = await verifyCompanyAccess(req, res, req.params.companyId);
+      if (!ok) return;
       const member = await storage.addCompanyMember({
         companyId: req.params.companyId,
         userId: req.body.userId,
@@ -329,9 +349,11 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  // Remove company member
-  app.delete("/api/company/:companyId/members/:userId", requireCompanyOwner, async (req, res, next) => {
+  // Remove company member (owner or company admin of that company only)
+  app.delete("/api/company/:companyId/members/:userId", requireAuth, async (req, res, next) => {
     try {
+      const ok = await verifyCompanyAccess(req, res, req.params.companyId);
+      if (!ok) return;
       await storage.removeCompanyMember(req.params.companyId, req.params.userId);
       res.json({ message: "Member removed" });
     } catch (error) { next(error); }
@@ -408,11 +430,34 @@ export async function registerRoutes(
     }
   });
 
+  // Helper: check if a user can access a project
+  const canAccessProject = async (user: User, project: any): Promise<boolean> => {
+    if (user.role === "admin") return true;
+    if (project.clientId === user.id) return true;
+    if (project.contractorId === user.id) return true;
+    // Company owner / company admin can see all projects belonging to their company
+    if ((user.role === "company_owner" || user.isCompanyAdmin) && user.companyId) {
+      const contractor = await storage.getUser(project.contractorId);
+      if (contractor && contractor.companyId === user.companyId) return true;
+    }
+    // Contractor team member assigned to this project
+    if (user.role === "contractor" && user.companyId) {
+      const contractor = await storage.getUser(project.contractorId);
+      if (contractor && contractor.companyId === user.companyId) return true;
+    }
+    return false;
+  };
+
   app.get("/api/projects/:id", requireAuth, async (req, res, next) => {
     try {
       const project = await storage.getProject(req.params.id);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
+      }
+
+      const user = req.user as User;
+      if (!(await canAccessProject(user, project))) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       // Include client info if clientId exists
@@ -450,6 +495,11 @@ export async function registerRoutes(
       const currentProject = await storage.getProject(req.params.id);
       if (!currentProject) {
         return res.status(404).json({ message: "Project not found" });
+      }
+
+      const user = req.user as User;
+      if (!(await canAccessProject(user, currentProject))) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       const oldProgress = currentProject.progress || 0;

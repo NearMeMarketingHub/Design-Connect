@@ -73,6 +73,33 @@ export default function SuperAdminDashboard() {
   const [selectedContractorId, setSelectedContractorId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Role definition dialog state
+  const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
+  const [editingRoleDef, setEditingRoleDef] = useState<any | null>(null);
+  const [roleDefForm, setRoleDefForm] = useState({ name: "", type: "contractor", permissions: {} as Record<string, boolean> });
+
+  const PERMISSION_KEYS: { key: string; label: string }[] = [
+    { key: "viewProjects", label: "View Projects" },
+    { key: "editProjects", label: "Edit Projects" },
+    { key: "manageDocuments", label: "Manage Documents" },
+    { key: "viewFinancials", label: "View Financials" },
+    { key: "manageTeam", label: "Manage Team" },
+    { key: "viewMessages", label: "View & Send Messages" },
+    { key: "signDocuments", label: "Sign Documents" },
+  ];
+
+  const openCreateRoleDef = () => {
+    setEditingRoleDef(null);
+    setRoleDefForm({ name: "", type: "contractor", permissions: {} });
+    setRoleDefDialogOpen(true);
+  };
+
+  const openEditRoleDef = (def: any) => {
+    setEditingRoleDef(def);
+    setRoleDefForm({ name: def.name, type: def.type, permissions: def.permissions || {} });
+    setRoleDefDialogOpen(true);
+  };
+
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) {
       setLocation("/admin/login");
@@ -141,6 +168,29 @@ export default function SuperAdminDashboard() {
       if (!res.ok) throw new Error("Failed to delete role definition");
     },
     onSuccess: () => { refetchRoleDefs(); toast({ title: "Role deleted" }); },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const saveRoleDefMutation = useMutation({
+    mutationFn: async (data: { name: string; type: string; permissions: Record<string, boolean> }) => {
+      const url = editingRoleDef
+        ? `/api/admin/role-definitions/${editingRoleDef.id}`
+        : "/api/admin/role-definitions";
+      const method = editingRoleDef ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to save role definition");
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchRoleDefs();
+      setRoleDefDialogOpen(false);
+      toast({ title: editingRoleDef ? "Role updated" : "Role created" });
+    },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
@@ -708,6 +758,9 @@ export default function SuperAdminDashboard() {
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <Layers className="w-5 h-5 text-indigo-600" /> Role Definitions
             </h2>
+            <Button size="sm" onClick={openCreateRoleDef} data-testid="button-add-role-def">
+              <Plus className="w-4 h-4 mr-1" /> Add Role
+            </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(["contractor", "subcontractor"] as string[]).map(type => (
@@ -726,19 +779,37 @@ export default function SuperAdminDashboard() {
                           <div>
                             <p className="font-medium text-sm">{def.name}</p>
                             {def.isDefault && <p className="text-xs text-muted-foreground">System default</p>}
+                            {def.permissions && Object.keys(def.permissions).length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {Object.entries(def.permissions as Record<string, boolean>)
+                                  .filter(([, v]) => v)
+                                  .length} permissions
+                              </p>
+                            )}
                           </div>
-                          {!def.isDefault && (
+                          <div className="flex items-center gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive hover:text-destructive w-7 h-7"
-                              onClick={() => deleteRoleDefMutation.mutate(def.id)}
-                              disabled={deleteRoleDefMutation.isPending}
-                              data-testid={`button-delete-role-${def.id}`}
+                              className="w-7 h-7"
+                              onClick={() => openEditRoleDef(def)}
+                              data-testid={`button-edit-role-${def.id}`}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </Button>
-                          )}
+                            {!def.isDefault && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive w-7 h-7"
+                                onClick={() => deleteRoleDefMutation.mutate(def.id)}
+                                disabled={deleteRoleDefMutation.isPending}
+                                data-testid={`button-delete-role-${def.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -749,6 +820,65 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Role Definition Create/Edit Dialog */}
+      <Dialog open={roleDefDialogOpen} onOpenChange={setRoleDefDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingRoleDef ? "Edit Role Definition" : "Create Role Definition"}</DialogTitle>
+            <DialogDescription>Define a role name, type, and permission set.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="role-name">Role Name</Label>
+              <Input
+                id="role-name"
+                value={roleDefForm.name}
+                onChange={e => setRoleDefForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Project Manager"
+                data-testid="input-role-name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="role-type">Role Type</Label>
+              <Select value={roleDefForm.type} onValueChange={v => setRoleDefForm(f => ({ ...f, type: v }))}>
+                <SelectTrigger id="role-type" data-testid="select-role-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contractor">Contractor (Team Member)</SelectItem>
+                  <SelectItem value="subcontractor">Subcontractor (Trade Specialty)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Permissions</Label>
+              <div className="space-y-2 rounded-lg border p-3">
+                {PERMISSION_KEYS.map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-sm">{label}</span>
+                    <Switch
+                      checked={!!roleDefForm.permissions[key]}
+                      onCheckedChange={v => setRoleDefForm(f => ({ ...f, permissions: { ...f.permissions, [key]: v } }))}
+                      data-testid={`switch-perm-${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRoleDefDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => saveRoleDefMutation.mutate(roleDefForm)}
+              disabled={!roleDefForm.name.trim() || saveRoleDefMutation.isPending}
+              data-testid="button-save-role-def"
+            >
+              {saveRoleDefMutation.isPending ? "Saving…" : (editingRoleDef ? "Save Changes" : "Create Role")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent>

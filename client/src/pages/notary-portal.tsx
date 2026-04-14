@@ -172,7 +172,7 @@ export default function NotaryPortal() {
   };
 
   // Check if user has notary role (contractorType='notary' in new architecture, or legacy role='notary')
-  const isNotary = user.role === 'notary' || (user.role === 'contractor' && (user as any).contractorType === 'notary');
+  const isNotary = user.role === 'notary' || (user.role === 'contractor' && user.contractorType === 'notary');
   if (!isNotary && user.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
