@@ -536,7 +536,8 @@ export async function registerRoutes(
   // Automatic project access guard — runs for every route with a :projectId param
   // Ensures consistent IDOR protection across all project-scoped endpoints
   app.param("projectId", async (req: any, res: any, next: any, projectId: string) => {
-    if (!req.user) return next(); // requireAuth handles unauthenticated case
+    // Deny unauthenticated callers; don't defer to per-route requireAuth
+    if (!req.user) return res.status(401).json({ message: "Authentication required" });
     try {
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -1022,7 +1023,7 @@ export async function registerRoutes(
   });
 
   // Inspiration image routes
-  app.get("/api/projects/:projectId/inspiration", async (req, res, next) => {
+  app.get("/api/projects/:projectId/inspiration", requireAuth, async (req, res, next) => {
     try {
       const images = await storage.getInspirationImages(req.params.projectId);
       res.json(images);
@@ -1031,14 +1032,14 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/projects/:projectId/inspiration", async (req, res, next) => {
+  app.post("/api/projects/:projectId/inspiration", requireAuth, async (req, res, next) => {
     try {
-      const user = req.user as User | undefined;
+      const user = req.user as User;
       const image = await storage.createInspirationImage({
         ...req.body,
         projectId: req.params.projectId,
-        creatorId: user?.id || req.body.creatorId || 'demo-user',
-        creatorName: user?.name || req.body.creatorName || 'You',
+        creatorId: user.id,
+        creatorName: user.name || user.username,
       });
       res.json(image);
     } catch (error) {
@@ -1046,7 +1047,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/inspiration/:imageId", async (req, res, next) => {
+  app.delete("/api/inspiration/:imageId", requireAuth, async (req, res, next) => {
     try {
       await storage.deleteInspirationImage(req.params.imageId);
       res.json({ success: true });
@@ -1055,16 +1056,15 @@ export async function registerRoutes(
     }
   });
 
-  // Message routes - allow without strict auth for demo
-  app.get("/api/projects/:projectId/messages", async (req, res, next) => {
+  // Message routes
+  app.get("/api/projects/:projectId/messages", requireAuth, async (req, res, next) => {
     try {
-      const user = req.user as User | undefined;
-      const currentUserId = user?.id;
+      const user = req.user as User;
       const messages = await storage.getMessages(req.params.projectId);
       // Add isOwn flag to each message
       const messagesWithOwnership = messages.map(msg => ({
         ...msg,
-        isOwn: currentUserId ? msg.senderId === currentUserId : msg.senderId === 'current-user'
+        isOwn: msg.senderId === user.id
       }));
       res.json(messagesWithOwnership);
     } catch (error) {
@@ -1072,15 +1072,15 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/projects/:projectId/messages", async (req, res, next) => {
+  app.post("/api/projects/:projectId/messages", requireAuth, async (req, res, next) => {
     try {
-      const user = req.user as User | undefined;
+      const user = req.user as User;
       const message = await storage.createMessage({
         ...req.body,
         projectId: req.params.projectId,
-        senderId: user?.id || req.body.senderId || 'demo-user',
-        senderName: user?.name || req.body.senderName || 'You',
-        senderAvatar: req.body.senderAvatar || (user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'YO'),
+        senderId: user.id,
+        senderName: user.name || user.username,
+        senderAvatar: req.body.senderAvatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : user.username.slice(0, 2).toUpperCase()),
       });
       res.json(message);
     } catch (error) {
@@ -1089,7 +1089,7 @@ export async function registerRoutes(
   });
 
   // Update message (edit)
-  app.put("/api/messages/:messageId", async (req, res, next) => {
+  app.put("/api/messages/:messageId", requireAuth, async (req, res, next) => {
     try {
       const { content } = req.body;
       if (!content) {
@@ -1106,7 +1106,7 @@ export async function registerRoutes(
   });
 
   // Delete message (soft delete)
-  app.delete("/api/messages/:messageId", async (req, res, next) => {
+  app.delete("/api/messages/:messageId", requireAuth, async (req, res, next) => {
     try {
       const message = await storage.deleteMessage(req.params.messageId);
       if (!message) {
@@ -1119,11 +1119,10 @@ export async function registerRoutes(
   });
 
   // Mark messages as read
-  app.post("/api/projects/:projectId/messages/read", async (req, res, next) => {
+  app.post("/api/projects/:projectId/messages/read", requireAuth, async (req, res, next) => {
     try {
-      const user = req.user as User | undefined;
-      const userId = user?.id || 'demo-user';
-      await storage.markProjectMessagesAsRead(req.params.projectId, userId);
+      const user = req.user as User;
+      await storage.markProjectMessagesAsRead(req.params.projectId, user.id);
       res.json({ success: true });
     } catch (error) {
       next(error);
@@ -1131,7 +1130,7 @@ export async function registerRoutes(
   });
 
   // Progress Post routes
-  app.get("/api/projects/:projectId/posts", async (req, res, next) => {
+  app.get("/api/projects/:projectId/posts", requireAuth, async (req, res, next) => {
     try {
       const posts = await storage.getProgressPosts(req.params.projectId);
       res.json(posts);
@@ -1140,7 +1139,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/posts/:postId", async (req, res, next) => {
+  app.get("/api/posts/:postId", requireAuth, async (req, res, next) => {
     try {
       const post = await storage.getProgressPost(req.params.postId);
       if (!post) {
@@ -1152,15 +1151,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/projects/:projectId/posts", async (req, res, next) => {
+  app.post("/api/projects/:projectId/posts", requireAuth, async (req, res, next) => {
     try {
-      const user = req.user as User | undefined;
-      if (!user) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
+      const user = req.user as User;
       
       // Only contractors and admins can create posts
-      if (user.role !== 'contractor' && user.role !== 'admin') {
+      if (user.role !== 'contractor' && user.role !== 'admin' && user.role !== 'company_owner') {
         return res.status(403).json({ message: "Only contractors can create progress posts" });
       }
       
@@ -2182,11 +2178,16 @@ export async function registerRoutes(
     }
   });
 
-  // Get approved contractors for team member selection
+  // Get approved contractors for team member selection — scoped to caller's company
   app.get("/api/contractors", requireAuth, async (req, res, next) => {
     try {
+      const caller = req.user as User;
       const contractors = await storage.getUsersByRole("contractor");
-      const approvedContractors = contractors.filter(c => c.isApproved && !c.isSandbox);
+      // Admins see all; others see only their own company's contractors
+      const scoped = caller.role === "admin"
+        ? contractors
+        : contractors.filter(c => c.companyId === caller.companyId);
+      const approvedContractors = scoped.filter(c => c.isApproved && !c.isSandbox);
       res.json(approvedContractors.map(c => ({ 
         id: c.id, 
         name: c.name, 
@@ -3107,12 +3108,17 @@ export async function registerRoutes(
     }
   });
 
-  // Get all contractors for team member selection
+  // Get all contractors for team member selection — scoped to caller's company
   app.get("/api/contractors", requireAuth, async (req, res, next) => {
     try {
+      const caller = req.user as User;
       const contractors = await storage.getUsersByRole('contractor');
+      // Admins see all; others see only their own company's contractors
+      const scoped = caller.role === "admin"
+        ? contractors
+        : contractors.filter(c => c.companyId === caller.companyId);
       // Only return approved contractors, exclude passwords
-      const approvedContractors = contractors
+      const approvedContractors = scoped
         .filter(c => c.isApproved)
         .map(({ password, ...contractor }) => contractor);
       res.json(approvedContractors);
