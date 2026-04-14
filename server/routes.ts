@@ -3108,25 +3108,6 @@ export async function registerRoutes(
     }
   });
 
-  // Get all contractors for team member selection — scoped to caller's company
-  app.get("/api/contractors", requireAuth, async (req, res, next) => {
-    try {
-      const caller = req.user as User;
-      const contractors = await storage.getUsersByRole('contractor');
-      // Admins see all; others see only their own company's contractors
-      const scoped = caller.role === "admin"
-        ? contractors
-        : contractors.filter(c => c.companyId === caller.companyId);
-      // Only return approved contractors, exclude passwords
-      const approvedContractors = scoped
-        .filter(c => c.isApproved)
-        .map(({ password, ...contractor }) => contractor);
-      res.json(approvedContractors);
-    } catch (error) {
-      next(error);
-    }
-  });
-
   // Contractor invite routes (for inviting new contractors to join platform)
   app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
     try {
@@ -3266,7 +3247,24 @@ export async function registerRoutes(
         if (!passwordMatch) {
           return res.status(401).json({ message: "Invalid credentials for existing account" });
         }
-        targetUser = existingByEmail;
+        // Normalize role/subtype for existing accounts — ensures consistent state
+        // when the same email is reused across different invite types
+        const updates: Partial<User> = {};
+        if (invite.contractorType && existingByEmail.contractorType !== invite.contractorType) {
+          updates.contractorType = invite.contractorType as any;
+        }
+        if (invite.companyId && existingByEmail.companyId !== invite.companyId) {
+          // Subcontractors span multiple companies — only update companyId for non-subcontractors
+          if (invite.contractorType !== 'subcontractor') {
+            updates.companyId = invite.companyId;
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          await storage.updateUser(existingByEmail.id, updates);
+          targetUser = { ...existingByEmail, ...updates };
+        } else {
+          targetUser = existingByEmail;
+        }
       } else {
         // New user — create account
         if (!username) {
