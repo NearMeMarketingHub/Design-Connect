@@ -581,6 +581,10 @@ export async function registerRoutes(
   app.post("/api/projects", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Subcontractors are read-only and cannot create projects
+      if (user.role === "contractor" && user.contractorType === "subcontractor") {
+        return res.status(403).json({ message: "Subcontractors cannot create projects" });
+      }
       const project = await storage.createProject({
         ...req.body,
         contractorId: user.id,
@@ -602,6 +606,10 @@ export async function registerRoutes(
       const user = req.user as User;
       if (!(await canAccessProject(user, currentProject))) {
         return res.status(403).json({ message: "Access denied" });
+      }
+      // Subcontractors are read-only; only company members can edit
+      if (user.role === "contractor" && user.contractorType === "subcontractor") {
+        return res.status(403).json({ message: "Subcontractors cannot edit projects" });
       }
       
       const oldProgress = currentProject.progress || 0;
@@ -3055,8 +3063,12 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/team", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'contractor' && user.role !== 'admin') {
+      if (user.role !== 'contractor' && user.role !== 'admin' && user.role !== 'company_owner') {
         return res.status(403).json({ message: "Only contractors and admins can add team members" });
+      }
+      // Subcontractors are read-only; they cannot manage team membership
+      if (user.role === "contractor" && user.contractorType === "subcontractor") {
+        return res.status(403).json({ message: "Subcontractors cannot manage team members" });
       }
       
       const { contractorId, role } = req.body;
@@ -3080,8 +3092,12 @@ export async function registerRoutes(
   app.delete("/api/projects/:projectId/team/:memberId", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'contractor' && user.role !== 'admin') {
+      if (user.role !== 'contractor' && user.role !== 'admin' && user.role !== 'company_owner') {
         return res.status(403).json({ message: "Only contractors and admins can remove team members" });
+      }
+      // Subcontractors are read-only; they cannot manage team membership
+      if (user.role === "contractor" && user.contractorType === "subcontractor") {
+        return res.status(403).json({ message: "Subcontractors cannot manage team members" });
       }
       
       await storage.removeProjectTeamMember(req.params.memberId);
@@ -4109,13 +4125,18 @@ export async function registerRoutes(
   app.post("/api/projects/:id/backup", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== 'admin' && user.role !== 'contractor') {
+      if (user.role !== 'admin' && user.role !== 'contractor' && user.role !== 'company_owner') {
         return res.status(403).json({ message: "Only contractors and admins can trigger backups" });
       }
       
       const project = await storage.getProject(req.params.id);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Enforce company-scoped project access — prevents cross-tenant backup trigger
+      if (!(await canAccessProject(user, project))) {
+        return res.status(403).json({ message: "Access denied" });
       }
       
       console.log(`[Backup] Manual backup triggered for project ${project.id} by ${user.username}`);
