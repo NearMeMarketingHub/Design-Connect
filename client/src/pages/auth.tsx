@@ -114,6 +114,8 @@ export default function AuthPage() {
           setLocation("/company/dashboard");
         } else if (loggedInUser.role === "contractor" && loggedInUser.contractorType === "notary") {
           setLocation("/notary/portal");
+        } else if (loggedInUser.role === "contractor" && loggedInUser.contractorType === "subcontractor") {
+          setLocation("/subcontractor/dashboard");
         } else {
           setLocation("/contractor/dashboard");
         }
@@ -194,7 +196,7 @@ export default function AuthPage() {
         }
 
         // Register as contractor with notary subtype - needs admin approval
-        await register(username, email, password, "contractor", `${firstName} ${lastName}`);
+        await register(username, email, password, "contractor", `${firstName} ${lastName}`, undefined, undefined, undefined, "notary");
         toast({
           title: "Registration submitted!",
           description: "Your notary account is pending admin approval.",

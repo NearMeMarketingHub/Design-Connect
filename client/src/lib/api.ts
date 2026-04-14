@@ -26,10 +26,10 @@ class ApiClient {
   }
 
   // Auth methods
-  async register(username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string) {
+  async register(username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string, contractorType?: string) {
     return this.fetch<{ user: Omit<User, "password">; pendingApproval?: boolean; message?: string }>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ username, email, password, role, name, companyName, companyType, phone }),
+      body: JSON.stringify({ username, email, password, role, name, companyName, companyType, phone, contractorType }),
     });
   }
 

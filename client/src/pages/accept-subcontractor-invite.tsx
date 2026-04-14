@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
 
 export default function AcceptSubcontractorInvite() {
   const [, params] = useRoute("/subcontractor-invite/:token");
@@ -22,6 +21,7 @@ export default function AcceptSubcontractorInvite() {
     confirmPassword: "",
   });
   const [accepted, setAccepted] = useState(false);
+  const [acceptedAsExisting, setAcceptedAsExisting] = useState(false);
 
   const { data: invite, isLoading, error } = useQuery({
     queryKey: ["/api/contractor-invites/token", token],
@@ -38,18 +38,20 @@ export default function AcceptSubcontractorInvite() {
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
-      if (form.password !== form.confirmPassword) {
+      const isExistingUser = invite?.hasExistingAccount;
+      if (!isExistingUser && form.password !== form.confirmPassword) {
         throw new Error("Passwords do not match");
+      }
+      const body: Record<string, string> = { password: form.password };
+      if (!isExistingUser) {
+        body.username = form.username;
+        body.name = form.name;
       }
       const res = await fetch(`/api/contractor-invites/accept/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          username: form.username,
-          name: form.name,
-          password: form.password,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -57,7 +59,8 @@ export default function AcceptSubcontractorInvite() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setAcceptedAsExisting(!!data.isExistingUser);
       setAccepted(true);
     },
     onError: (err: Error) => {
@@ -96,11 +99,15 @@ export default function AcceptSubcontractorInvite() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-8 text-center space-y-4">
             <CheckCircle className="w-12 h-12 mx-auto text-green-500" />
-            <h2 className="text-xl font-semibold">Account Created!</h2>
+            <h2 className="text-xl font-semibold">
+              {acceptedAsExisting ? "Invite Accepted!" : "Account Created!"}
+            </h2>
             <p className="text-muted-foreground">
-              Your subcontractor account has been set up. You can now log in to the Contractor Portal.
+              {acceptedAsExisting
+                ? "You have been added to the company. Log in to access your projects."
+                : "Your subcontractor account has been set up. You can now log in to the Contractor Portal."}
             </p>
-            <Button onClick={() => navigate("/auth")} data-testid="button-go-to-login">
+            <Button onClick={() => navigate("/auth?tab=contractor")} data-testid="button-go-to-login">
               Go to Login
             </Button>
           </CardContent>
@@ -108,6 +115,8 @@ export default function AcceptSubcontractorInvite() {
       </div>
     );
   }
+
+  const isExistingUser = invite.hasExistingAccount;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -124,61 +133,73 @@ export default function AcceptSubcontractorInvite() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isExistingUser && (
+            <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
+              An account already exists for <strong>{invite.email}</strong>. Enter your password to accept this invite.
+            </div>
+          )}
           <div>
             <Label>Email</Label>
             <Input value={invite.email} disabled data-testid="input-email" />
           </div>
+          {!isExistingUser && (
+            <>
+              <div>
+                <Label>Full Name</Label>
+                <Input
+                  placeholder="Your full name"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  data-testid="input-name"
+                />
+              </div>
+              <div>
+                <Label>Username</Label>
+                <Input
+                  placeholder="Choose a username"
+                  value={form.username}
+                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                  data-testid="input-username"
+                />
+              </div>
+            </>
+          )}
           <div>
-            <Label>Full Name</Label>
-            <Input
-              placeholder="Your full name"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              data-testid="input-name"
-            />
-          </div>
-          <div>
-            <Label>Username</Label>
-            <Input
-              placeholder="Choose a username"
-              value={form.username}
-              onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-              data-testid="input-username"
-            />
-          </div>
-          <div>
-            <Label>Password</Label>
+            <Label>{isExistingUser ? "Your Password" : "Create Password"}</Label>
             <Input
               type="password"
-              placeholder="Create a password"
+              placeholder={isExistingUser ? "Enter your existing password" : "Create a password"}
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               data-testid="input-password"
             />
           </div>
-          <div>
-            <Label>Confirm Password</Label>
-            <Input
-              type="password"
-              placeholder="Confirm your password"
-              value={form.confirmPassword}
-              onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
-              data-testid="input-confirm-password"
-            />
-          </div>
+          {!isExistingUser && (
+            <div>
+              <Label>Confirm Password</Label>
+              <Input
+                type="password"
+                placeholder="Confirm your password"
+                value={form.confirmPassword}
+                onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                data-testid="input-confirm-password"
+              />
+            </div>
+          )}
           <Button
             className="w-full"
             onClick={() => acceptMutation.mutate()}
             disabled={
-              !form.username || !form.name || !form.password || !form.confirmPassword ||
+              (!isExistingUser && (!form.username || !form.name || !form.confirmPassword)) ||
+              !form.password ||
               acceptMutation.isPending
             }
             data-testid="button-accept-invite"
           >
             {acceptMutation.isPending ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating Account...</>
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isExistingUser ? "Accepting..." : "Creating Account..."}</>
             ) : (
-              "Accept & Create Account"
+              isExistingUser ? "Accept Invite" : "Accept & Create Account"
             )}
           </Button>
         </CardContent>

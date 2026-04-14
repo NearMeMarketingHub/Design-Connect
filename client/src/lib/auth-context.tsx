@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   currentPortal: PortalType | null;
   login: (username: string, password: string, portal: PortalType) => Promise<Omit<User, "password">>;
-  register: (username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string) => Promise<{ pendingApproval?: boolean; message?: string }>;
+  register: (username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string, contractorType?: string) => Promise<{ pendingApproval?: boolean; message?: string }>;
   logout: () => Promise<void>;
   setPortal: (portal: PortalType) => void;
   refetch: () => Promise<void>;
@@ -63,8 +63,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user;
   };
 
-  const register = async (username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string) => {
-    const result = await api.register(username, email, password, role, name, companyName, companyType, phone);
+  const register = async (username: string, email: string, password: string, role: string, name?: string, companyName?: string, companyType?: string, phone?: string, contractorType?: string) => {
+    const result = await api.register(username, email, password, role, name, companyName, companyType, phone, contractorType);
     // Only set user if not pending approval
     if (!result.pendingApproval) {
       setUser(result.user);

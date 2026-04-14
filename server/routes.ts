@@ -89,7 +89,7 @@ export async function registerRoutes(
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {
     try {
-      const { username, email, password, role, name, companyName, companyType, phone } = req.body;
+      const { username, email, password, role, name, companyName, companyType, phone, contractorType } = req.body;
       
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
@@ -98,10 +98,14 @@ export async function registerRoutes(
 
       const hashedPassword = await bcrypt.hash(password, 10);
       
-      // Map incoming role: 'contractor' from registration form → company_owner
-      // company_owner needs admin approval; clients are auto-approved
-      const mappedRole = role === "contractor" ? "company_owner" : (role || "client");
-      const isApproved = mappedRole !== "company_owner";
+      // Map incoming role:
+      // - 'contractor' without a contractorType (direct company registration) → company_owner
+      // - 'contractor' with contractorType (notary, subcontractor) → stays as 'contractor'
+      // - anything else stays as-is
+      const hasContractorSubtype = !!contractorType && contractorType !== 'contractor';
+      const mappedRole = (role === "contractor" && !hasContractorSubtype) ? "company_owner" : (role || "client");
+      // company_owner and subtypes need admin approval; clients are auto-approved
+      const isApproved = mappedRole === "client";
       
       const user = await storage.createUser({
         username,
@@ -112,6 +116,7 @@ export async function registerRoutes(
         phone,
         companyName,
         companyType,
+        contractorType: hasContractorSubtype ? contractorType : null,
         isApproved,
       });
 
@@ -127,6 +132,16 @@ export async function registerRoutes(
         const { password: _, ...userWithoutPassword } = user;
         return res.json({ 
           user: userWithoutPassword, 
+          pendingApproval: true,
+          message: "Your account has been created and is pending admin approval."
+        });
+      }
+      
+      // Contractor subtypes (notary, subcontractor) also need approval
+      if (mappedRole === "contractor" && hasContractorSubtype) {
+        const { password: _, ...userWithoutPassword } = user;
+        return res.json({
+          user: userWithoutPassword,
           pendingApproval: true,
           message: "Your account has been created and is pending admin approval."
         });
@@ -435,13 +450,18 @@ export async function registerRoutes(
     if (user.role === "admin") return true;
     if (project.clientId === user.id) return true;
     if (project.contractorId === user.id) return true;
-    // Company owner / company admin can see all projects belonging to their company
-    if ((user.role === "company_owner" || user.isCompanyAdmin) && user.companyId) {
+    // Company owner or company admin: can see all projects belonging to their company
+    if ((user.role === "company_owner" || user.isCompanyAdmin === true) && user.companyId) {
       const contractor = await storage.getUser(project.contractorId);
       if (contractor && contractor.companyId === user.companyId) return true;
     }
-    // Contractor team member assigned to this project
-    if (user.role === "contractor" && user.companyId) {
+    // Subcontractors: ONLY via explicit projectTeamMembers assignment
+    if (user.role === "contractor" && user.contractorType === "subcontractor") {
+      const teamMembers = await storage.getProjectTeamMembers(project.id);
+      return teamMembers.some(m => m.contractorId === user.id);
+    }
+    // Regular contractors (non-subcontractor): allow if in same company
+    if (user.role === "contractor" && !user.contractorType && user.companyId) {
       const contractor = await storage.getUser(project.contractorId);
       if (contractor && contractor.companyId === user.companyId) return true;
     }
@@ -3058,12 +3078,17 @@ export async function registerRoutes(
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
       }
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "A user with this email already exists" });
+
+      // Validate caller has authority over the specified companyId
+      if (companyId && user.role !== 'admin') {
+        const isCallerOwner = user.role === "company_owner" && user.companyId === companyId;
+        const isCallerAdmin = user.isCompanyAdmin === true && user.companyId === companyId;
+        if (!isCallerOwner && !isCallerAdmin) {
+          return res.status(403).json({ message: "You can only invite members to your own company" });
+        }
       }
+      
+      // Note: we allow inviting existing users (they can accept by logging in rather than creating new account)
       
       // Generate invite token
       const token = crypto.randomBytes(32).toString('hex');
@@ -3113,6 +3138,8 @@ export async function registerRoutes(
       
       // Get project info if invite is for a project
       const project = invite.projectId ? await storage.getProject(invite.projectId) : null;
+      // Check if email already has an account (for existing-user linking flow)
+      const existingUser = await storage.getUserByEmail(invite.email);
       
       res.json({
         email: invite.email,
@@ -3121,7 +3148,8 @@ export async function registerRoutes(
         contractorType: invite.contractorType,
         subcontractorSpecialty: invite.subcontractorSpecialty,
         projectId: invite.projectId,
-        projectName: project?.name
+        projectName: project?.name,
+        hasExistingAccount: !!existingUser  // lets frontend show login vs register form
       });
     } catch (error) {
       next(error);
@@ -3142,48 +3170,67 @@ export async function registerRoutes(
       }
       
       const { username, password, name, firstName, lastName } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
       }
       
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already taken" });
-      }
+      let targetUser: User | null = null;
       
-      // Create the contractor account
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const resolvedName = name || (firstName && lastName ? `${firstName} ${lastName}` : undefined);
-      const newUser = await storage.createUser({
-        username,
-        password: hashedPassword,
-        email: invite.email,
-        name: resolvedName,
-        role: 'contractor',
-        contractorType: invite.contractorType || 'contractor',
-        subcontractorSpecialty: invite.subcontractorSpecialty || null,
-        companyId: invite.companyId || null,
-        companyName: invite.companyName,
-        companyType: invite.companyType,
-        isApproved: true // Auto-approved since they were invited
-      });
-      
-      // If invite is for a company, add as company member
-      if (invite.companyId) {
-        await storage.addCompanyMember({
-          companyId: invite.companyId,
-          userId: newUser.id,
-          status: 'active',
+      // Check if an account with the invited email already exists (existing user linking)
+      const existingByEmail = await storage.getUserByEmail(invite.email);
+      if (existingByEmail) {
+        // Verify password for existing user (login to accept)
+        const passwordMatch = await bcrypt.compare(password, existingByEmail.password);
+        if (!passwordMatch) {
+          return res.status(401).json({ message: "Invalid credentials for existing account" });
+        }
+        targetUser = existingByEmail;
+      } else {
+        // New user — create account
+        if (!username) {
+          return res.status(400).json({ message: "Username is required for new account" });
+        }
+        const existingByUsername = await storage.getUserByUsername(username);
+        if (existingByUsername) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const resolvedName = name || (firstName && lastName ? `${firstName} ${lastName}` : undefined);
+        targetUser = await storage.createUser({
+          username,
+          password: hashedPassword,
+          email: invite.email,
+          name: resolvedName,
+          role: 'contractor',
+          contractorType: invite.contractorType || 'contractor',
+          subcontractorSpecialty: invite.subcontractorSpecialty || null,
+          companyId: invite.companyId || null,
+          companyName: invite.companyName,
+          companyType: invite.companyType,
+          isApproved: true // Auto-approved since they were invited
         });
       }
       
-      // Accept the invite (this also adds them to the project team if applicable)
-      await storage.acceptContractorInvite(req.params.token, newUser.id);
+      // If invite is for a company, ensure company membership (upsert)
+      if (invite.companyId) {
+        const existing = await storage.getCompanyMember(invite.companyId, targetUser.id);
+        if (!existing) {
+          await storage.addCompanyMember({
+            companyId: invite.companyId,
+            userId: targetUser.id,
+            status: 'active',
+          });
+        }
+      }
       
+      // Accept the invite (also adds them to project team if applicable)
+      await storage.acceptContractorInvite(req.params.token, targetUser.id);
+      
+      const { password: _, ...userWithoutPassword } = targetUser;
       res.json({ 
-        message: "Account created successfully",
-        user: { ...newUser, password: undefined }
+        message: existingByEmail ? "Invite accepted successfully" : "Account created successfully",
+        user: userWithoutPassword,
+        isExistingUser: !!existingByEmail
       });
     } catch (error) {
       next(error);
