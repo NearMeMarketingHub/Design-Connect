@@ -361,6 +361,8 @@ export const budgetCategories = pgTable("budget_categories", {
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").default(true),
   notes: text("notes"),
+  // null = platform-level reference; set to company id for company-owned categories
+  companyId: varchar("company_id").references(() => companies.id, { onDelete: "cascade" }),
 });
 
 export const insertBudgetCategorySchema = createInsertSchema(budgetCategories).omit({ id: true });
@@ -382,6 +384,8 @@ export const budgetItems = pgTable("budget_items", {
   notes: text("notes"),
   displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").default(true),
+  // Denormalized for easy filtering; mirrors the category's companyId
+  companyId: varchar("company_id").references(() => companies.id, { onDelete: "cascade" }),
 });
 
 export const insertBudgetItemSchema = createInsertSchema(budgetItems).omit({ id: true });

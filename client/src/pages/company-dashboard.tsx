@@ -4,17 +4,25 @@ import { useLocation } from "wouter";
 import { 
   Building2, Users, CreditCard, Settings, Plus, Mail, Trash2,
   CheckCircle, Clock, Crown, Wrench, FileText, UserPlus, ChevronRight,
-  RefreshCw, AlertCircle, ShieldCheck, AlertTriangle, Lock
+  RefreshCw, AlertCircle, ShieldCheck, AlertTriangle, Lock,
+  BookOpen, Tag, Pencil, Package, DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -34,6 +42,19 @@ export default function CompanyDashboard() {
   const [activeTab, setActiveTab] = useState(() =>
     location === "/company/team" ? "team" : "overview"
   );
+
+  // Price book state
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [categoryForm, setCategoryForm] = useState({ name: "", notes: "", displayOrder: "0" });
+  const [itemDialogOpen, setItemDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [itemCategoryId, setItemCategoryId] = useState<string>("");
+  const [itemForm, setItemForm] = useState({
+    description: "", itemType: "", unitType: "EA",
+    cost: "0", laborRate: "0", materialFee: "0", retailPrice: "0",
+    notes: "", displayOrder: "0",
+  });
 
   useEffect(() => {
     if (location === "/company/team") {
@@ -90,6 +111,143 @@ export default function CompanyDashboard() {
       return res.json();
     },
   });
+
+  // Price book queries
+  const { data: priceCategories = [], refetch: refetchCategories } = useQuery({
+    queryKey: ["/api/company/price-book/categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/company/price-book/categories", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!company?.id,
+  });
+
+  const { data: priceItems = [], refetch: refetchItems } = useQuery({
+    queryKey: ["/api/company/price-book/items"],
+    queryFn: async () => {
+      const res = await fetch("/api/company/price-book/items", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!company?.id,
+  });
+
+  // Category mutations
+  const saveCategoryMutation = useMutation({
+    mutationFn: async (data: typeof categoryForm) => {
+      const url = editingCategory
+        ? `/api/company/price-book/categories/${editingCategory.id}`
+        : "/api/company/price-book/categories";
+      const method = editingCategory ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...data, displayOrder: parseInt(data.displayOrder) || 0 }),
+      });
+      if (!res.ok) throw new Error("Failed to save category");
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchCategories();
+      setCategoryDialogOpen(false);
+      toast({ title: editingCategory ? "Category updated" : "Category created" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/company/price-book/categories/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete category");
+    },
+    onSuccess: () => { refetchCategories(); refetchItems(); toast({ title: "Category deleted" }); },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  // Item mutations
+  const saveItemMutation = useMutation({
+    mutationFn: async (data: typeof itemForm) => {
+      const url = editingItem
+        ? `/api/company/price-book/items/${editingItem.id}`
+        : "/api/company/price-book/items";
+      const method = editingItem ? "PATCH" : "POST";
+      const payload = {
+        ...data,
+        categoryId: itemCategoryId,
+        displayOrder: parseInt(data.displayOrder) || 0,
+        cost: data.cost || "0",
+        laborRate: data.laborRate || "0",
+        materialFee: data.materialFee || "0",
+        retailPrice: data.retailPrice || "0",
+      };
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to save item");
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchItems();
+      setItemDialogOpen(false);
+      toast({ title: editingItem ? "Item updated" : "Item added" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/company/price-book/items/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete item");
+    },
+    onSuccess: () => { refetchItems(); toast({ title: "Item deleted" }); },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const openCategoryCreate = () => {
+    setEditingCategory(null);
+    setCategoryForm({ name: "", notes: "", displayOrder: String(priceCategories.length) });
+    setCategoryDialogOpen(true);
+  };
+
+  const openCategoryEdit = (cat: any) => {
+    setEditingCategory(cat);
+    setCategoryForm({ name: cat.name, notes: cat.notes || "", displayOrder: String(cat.displayOrder) });
+    setCategoryDialogOpen(true);
+  };
+
+  const openItemCreate = (categoryId: string) => {
+    setEditingItem(null);
+    setItemCategoryId(categoryId);
+    const catItems = priceItems.filter((i: any) => i.categoryId === categoryId);
+    setItemForm({
+      description: "", itemType: "", unitType: "EA",
+      cost: "0", laborRate: "0", materialFee: "0", retailPrice: "0",
+      notes: "", displayOrder: String(catItems.length),
+    });
+    setItemDialogOpen(true);
+  };
+
+  const openItemEdit = (item: any) => {
+    setEditingItem(item);
+    setItemCategoryId(item.categoryId);
+    setItemForm({
+      description: item.description,
+      itemType: item.itemType,
+      unitType: item.unitType,
+      cost: item.cost || "0",
+      laborRate: item.laborRate || "0",
+      materialFee: item.materialFee || "0",
+      retailPrice: item.retailPrice || "0",
+      notes: item.notes || "",
+      displayOrder: String(item.displayOrder),
+    });
+    setItemDialogOpen(true);
+  };
 
   // Trial calculation
   const TRIAL_DAYS = 7;
@@ -305,6 +463,7 @@ export default function CompanyDashboard() {
         <TabsList data-testid="company-tabs">
           <TabsTrigger value="overview" disabled={isExpired} data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="team" disabled={isExpired} data-testid="tab-team">Team</TabsTrigger>
+          <TabsTrigger value="price-book" disabled={isExpired} data-testid="tab-price-book">Price Book</TabsTrigger>
           <TabsTrigger value="subscription" data-testid="tab-subscription">Subscription</TabsTrigger>
           <TabsTrigger value="settings" disabled={isExpired} data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
@@ -590,6 +749,284 @@ export default function CompanyDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Price Book Tab */}
+        <TabsContent value="price-book" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <BookOpen className="w-5 h-5" /> Price Book
+              </h2>
+              <p className="text-muted-foreground text-sm">Manage your company's pricing categories and line items</p>
+            </div>
+            <Button onClick={openCategoryCreate} data-testid="button-add-category">
+              <Plus className="w-4 h-4 mr-2" /> Add Category
+            </Button>
+          </div>
+
+          {priceCategories.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">No price book categories yet</p>
+                <p className="text-sm mt-1">Create a category to start building your price book.</p>
+                <Button className="mt-4" onClick={openCategoryCreate} data-testid="button-create-first-category">
+                  <Plus className="w-4 h-4 mr-2" /> Create First Category
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Accordion type="multiple" className="space-y-3" data-testid="price-book-accordion">
+              {(priceCategories as any[]).map((cat) => {
+                const catItems = (priceItems as any[]).filter(i => i.categoryId === cat.id);
+                return (
+                  <AccordionItem key={cat.id} value={cat.id} className="border rounded-lg px-4" data-testid={`category-${cat.id}`}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-3 flex-1 mr-4">
+                        <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="font-medium">{cat.name}</span>
+                        <Badge variant="secondary" className="ml-auto">{catItems.length} item{catItems.length !== 1 ? "s" : ""}</Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pt-2 pb-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => openCategoryEdit(cat)} data-testid={`button-edit-category-${cat.id}`}>
+                              <Pencil className="w-3 h-3 mr-1" /> Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => { if (confirm(`Delete "${cat.name}" and all its items?`)) deleteCategoryMutation.mutate(cat.id); }}
+                              disabled={deleteCategoryMutation.isPending}
+                              data-testid={`button-delete-category-${cat.id}`}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" /> Delete
+                            </Button>
+                          </div>
+                          <Button size="sm" onClick={() => openItemCreate(cat.id)} data-testid={`button-add-item-${cat.id}`}>
+                            <Plus className="w-3 h-3 mr-1" /> Add Item
+                          </Button>
+                        </div>
+
+                        {catItems.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">No items in this category.</p>
+                        ) : (
+                          <div className="rounded-md border overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-muted/40">
+                                <tr>
+                                  <th className="text-left p-2 pl-3 font-medium">Description</th>
+                                  <th className="text-left p-2 font-medium">Type</th>
+                                  <th className="text-left p-2 font-medium">Unit</th>
+                                  <th className="text-right p-2 font-medium">Labor</th>
+                                  <th className="text-right p-2 font-medium">Material</th>
+                                  <th className="text-right p-2 font-medium">Price</th>
+                                  <th className="w-20 p-2"></th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {catItems.map((item: any) => (
+                                  <tr key={item.id} className="hover:bg-muted/20" data-testid={`item-row-${item.id}`}>
+                                    <td className="p-2 pl-3 font-medium">{item.description}</td>
+                                    <td className="p-2 text-muted-foreground">{item.itemType}</td>
+                                    <td className="p-2">{item.unitType}</td>
+                                    <td className="p-2 text-right">{item.laborRate ? `$${parseFloat(item.laborRate).toFixed(2)}` : "-"}</td>
+                                    <td className="p-2 text-right">{item.materialFee ? `$${parseFloat(item.materialFee).toFixed(2)}` : "-"}</td>
+                                    <td className="p-2 text-right font-medium text-primary">{item.retailPrice ? `$${parseFloat(item.retailPrice).toFixed(2)}` : "-"}</td>
+                                    <td className="p-2">
+                                      <div className="flex gap-1 justify-end">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openItemEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+                                          <Pencil className="w-3 h-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-destructive hover:text-destructive"
+                                          onClick={() => { if (confirm("Delete this item?")) deleteItemMutation.mutate(item.id); }}
+                                          disabled={deleteItemMutation.isPending}
+                                          data-testid={`button-delete-item-${item.id}`}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          )}
+
+          {/* Category Dialog */}
+          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingCategory ? "Edit Category" : "New Category"}</DialogTitle>
+                <DialogDescription>Define a price book category to group related items.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-1.5">
+                  <Label>Category Name</Label>
+                  <Input
+                    placeholder="e.g. Electrical, Plumbing, HVAC"
+                    value={categoryForm.name}
+                    onChange={e => setCategoryForm(f => ({ ...f, name: e.target.value }))}
+                    data-testid="input-category-name"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Textarea
+                    placeholder="Internal notes about this category"
+                    value={categoryForm.notes}
+                    onChange={e => setCategoryForm(f => ({ ...f, notes: e.target.value }))}
+                    rows={2}
+                    data-testid="input-category-notes"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Sort Order</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={categoryForm.displayOrder}
+                    onChange={e => setCategoryForm(f => ({ ...f, displayOrder: e.target.value }))}
+                    data-testid="input-category-order"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => saveCategoryMutation.mutate(categoryForm)}
+                  disabled={!categoryForm.name.trim() || saveCategoryMutation.isPending}
+                  data-testid="button-save-category"
+                >
+                  {saveCategoryMutation.isPending ? "Saving…" : editingCategory ? "Save Changes" : "Create Category"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Item Dialog */}
+          <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{editingItem ? "Edit Item" : "New Line Item"}</DialogTitle>
+                <DialogDescription>Add pricing details for this line item.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5 col-span-2">
+                    <Label>Description</Label>
+                    <Input
+                      placeholder="e.g. Install outlet"
+                      value={itemForm.description}
+                      onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))}
+                      data-testid="input-item-description"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Item Type</Label>
+                    <Input
+                      placeholder="e.g. Labor, Material"
+                      value={itemForm.itemType}
+                      onChange={e => setItemForm(f => ({ ...f, itemType: e.target.value }))}
+                      data-testid="input-item-type"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Unit</Label>
+                    <Select value={itemForm.unitType} onValueChange={v => setItemForm(f => ({ ...f, unitType: v }))}>
+                      <SelectTrigger data-testid="select-item-unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["EA", "SF", "LF", "HR", "LS", "SQ", "CY", "GAL", "TON"].map(u => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Labor Rate ($)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemForm.laborRate}
+                      onChange={e => setItemForm(f => ({ ...f, laborRate: e.target.value }))}
+                      data-testid="input-item-labor"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Material Fee ($)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemForm.materialFee}
+                      onChange={e => setItemForm(f => ({ ...f, materialFee: e.target.value }))}
+                      data-testid="input-item-material"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Cost ($)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemForm.cost}
+                      onChange={e => setItemForm(f => ({ ...f, cost: e.target.value }))}
+                      data-testid="input-item-cost"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Retail Price ($)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemForm.retailPrice}
+                      onChange={e => setItemForm(f => ({ ...f, retailPrice: e.target.value }))}
+                      data-testid="input-item-price"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                    <Textarea
+                      placeholder="Internal notes"
+                      value={itemForm.notes}
+                      onChange={e => setItemForm(f => ({ ...f, notes: e.target.value }))}
+                      rows={2}
+                      data-testid="input-item-notes"
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setItemDialogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => saveItemMutation.mutate(itemForm)}
+                  disabled={!itemForm.description.trim() || saveItemMutation.isPending}
+                  data-testid="button-save-item"
+                >
+                  {saveItemMutation.isPending ? "Saving…" : editingItem ? "Save Changes" : "Add Item"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Subscription Tab */}

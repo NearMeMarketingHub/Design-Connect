@@ -214,6 +214,11 @@ export interface IStorage {
   updateBudgetItem(id: string, item: Partial<InsertBudgetItem>): Promise<BudgetItem | undefined>;
   deleteBudgetItem(id: string): Promise<void>;
 
+  // Company-scoped price book methods
+  getCompanyPriceBookCategories(companyId: string): Promise<BudgetCategory[]>;
+  getCompanyPriceBookItems(companyId: string): Promise<BudgetItem[]>;
+  getCompanyPriceBookItemsByCategory(categoryId: string, companyId: string): Promise<BudgetItem[]>;
+
   // Project invite methods
   createProjectInvite(invite: InsertProjectInvite): Promise<ProjectInvite>;
   getProjectInviteByToken(token: string): Promise<ProjectInvite | undefined>;
@@ -1303,6 +1308,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBudgetItem(id: string): Promise<void> {
     await db.delete(schema.budgetItems).where(eq(schema.budgetItems.id, id));
+  }
+
+  // Company-scoped price book methods
+  async getCompanyPriceBookCategories(companyId: string): Promise<BudgetCategory[]> {
+    return await db.select().from(schema.budgetCategories)
+      .where(eq(schema.budgetCategories.companyId, companyId))
+      .orderBy(schema.budgetCategories.displayOrder);
+  }
+
+  async getCompanyPriceBookItems(companyId: string): Promise<BudgetItem[]> {
+    return await db.select().from(schema.budgetItems)
+      .where(eq(schema.budgetItems.companyId, companyId))
+      .orderBy(schema.budgetItems.displayOrder);
+  }
+
+  async getCompanyPriceBookItemsByCategory(categoryId: string, companyId: string): Promise<BudgetItem[]> {
+    return await db.select().from(schema.budgetItems)
+      .where(and(eq(schema.budgetItems.categoryId, categoryId), eq(schema.budgetItems.companyId, companyId)))
+      .orderBy(schema.budgetItems.displayOrder);
   }
 
   // Project invite methods

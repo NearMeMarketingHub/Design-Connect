@@ -2805,17 +2805,18 @@ export async function registerRoutes(
     }
   });
 
-  // Contractor Calculator routes - Read-only access for contractors/admins
+  // Contractor Calculator routes - Access for contractors, company_owners, and admins
   const requireContractorOrAdmin = (req: any, res: any, next: any) => {
     const user = req.user as User | undefined;
     if (!user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    if (user.role !== 'contractor' && user.role !== 'admin') {
+    const allowed = user.role === 'contractor' || user.role === 'company_owner' || user.role === 'admin';
+    if (!allowed) {
       return res.status(403).json({ message: "Access denied" });
     }
-    // Contractors must be approved
-    if (user.role === 'contractor' && !user.isApproved) {
+    // Non-admin contractors must be approved
+    if ((user.role === 'contractor' || user.role === 'company_owner') && !user.isApproved) {
       return res.status(403).json({ message: "Your account is pending approval" });
     }
     next();
@@ -2823,7 +2824,11 @@ export async function registerRoutes(
 
   app.get("/api/calculator/categories", requireContractorOrAdmin, async (req, res, next) => {
     try {
-      const categories = await storage.getBudgetCategories();
+      const user = req.user as User;
+      const companyId = user.companyId;
+      const categories = companyId
+        ? await storage.getCompanyPriceBookCategories(companyId)
+        : [];
       res.json(categories);
     } catch (error) {
       next(error);
@@ -2832,7 +2837,11 @@ export async function registerRoutes(
 
   app.get("/api/calculator/categories/:id/items", requireContractorOrAdmin, async (req, res, next) => {
     try {
-      const items = await storage.getBudgetItems(req.params.id);
+      const user = req.user as User;
+      const companyId = user.companyId;
+      const items = companyId
+        ? await storage.getCompanyPriceBookItemsByCategory(req.params.id, companyId)
+        : [];
       res.json(items);
     } catch (error) {
       next(error);
@@ -2841,7 +2850,11 @@ export async function registerRoutes(
 
   app.get("/api/calculator/items", requireContractorOrAdmin, async (req, res, next) => {
     try {
-      const items = await storage.getAllBudgetItems();
+      const user = req.user as User;
+      const companyId = user.companyId;
+      const items = companyId
+        ? await storage.getCompanyPriceBookItems(companyId)
+        : [];
       res.json(items);
     } catch (error) {
       next(error);
@@ -2850,10 +2863,11 @@ export async function registerRoutes(
 
   app.get("/api/calculator/items/search", requireContractorOrAdmin, async (req, res, next) => {
     try {
+      const user = req.user as User;
+      const companyId = user.companyId;
       const query = (req.query.q as string) || '';
-      const items = await storage.getAllBudgetItems();
-      // Filter items by search query
-      const filtered = items.filter((item: any) => 
+      const items = companyId ? await storage.getCompanyPriceBookItems(companyId) : [];
+      const filtered = items.filter((item: any) =>
         item.description.toLowerCase().includes(query.toLowerCase()) ||
         item.itemType.toLowerCase().includes(query.toLowerCase())
       );
@@ -2861,6 +2875,100 @@ export async function registerRoutes(
     } catch (error) {
       next(error);
     }
+  });
+
+  // ── Company Price Book CRUD routes ────────────────────────────────────────────
+  // Company owner/admin can manage their own price book
+
+  app.get("/api/company/price-book/categories", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const categories = await storage.getCompanyPriceBookCategories(companyId);
+      res.json(categories);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/company/price-book/categories", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const category = await storage.createBudgetCategory({ ...req.body, companyId });
+      res.json(category);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/company/price-book/categories/:id", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const existing = await storage.getBudgetCategory(req.params.id);
+      if (!existing || existing.companyId !== companyId) return res.status(404).json({ message: "Category not found" });
+      const category = await storage.updateBudgetCategory(req.params.id, req.body);
+      res.json(category);
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/company/price-book/categories/:id", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const existing = await storage.getBudgetCategory(req.params.id);
+      if (!existing || existing.companyId !== companyId) return res.status(404).json({ message: "Category not found" });
+      await storage.deleteBudgetCategory(req.params.id);
+      res.json({ message: "Category deleted" });
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/company/price-book/items", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const items = await storage.getCompanyPriceBookItems(companyId);
+      res.json(items);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/company/price-book/items", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      // Verify the category belongs to this company
+      const category = await storage.getBudgetCategory(req.body.categoryId);
+      if (!category || category.companyId !== companyId) return res.status(400).json({ message: "Invalid category" });
+      const item = await storage.createBudgetItem({ ...req.body, companyId });
+      res.json(item);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/company/price-book/items/:id", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const existing = await storage.getBudgetItem(req.params.id);
+      if (!existing || existing.companyId !== companyId) return res.status(404).json({ message: "Item not found" });
+      const item = await storage.updateBudgetItem(req.params.id, req.body);
+      res.json(item);
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/company/price-book/items/:id", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+      const existing = await storage.getBudgetItem(req.params.id);
+      if (!existing || existing.companyId !== companyId) return res.status(404).json({ message: "Item not found" });
+      await storage.deleteBudgetItem(req.params.id);
+      res.json({ message: "Item deleted" });
+    } catch (error) { next(error); }
   });
 
   // Budget Category routes - Admin only
