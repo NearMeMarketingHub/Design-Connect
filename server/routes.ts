@@ -599,9 +599,9 @@ export async function registerRoutes(
   app.post("/api/projects", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      // Subcontractors are read-only and cannot create projects
-      if (user.role === "contractor" && user.contractorType === "subcontractor") {
-        return res.status(403).json({ message: "Subcontractors cannot create projects" });
+      // External users (subcontractors, notaries) are read-only and cannot create projects
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "External users cannot create projects" });
       }
       const project = await storage.createProject({
         ...req.body,
@@ -625,9 +625,9 @@ export async function registerRoutes(
       if (!(await canAccessProject(user, currentProject))) {
         return res.status(403).json({ message: "Access denied" });
       }
-      // Subcontractors are read-only; only company members can edit
-      if (user.role === "contractor" && user.contractorType === "subcontractor") {
-        return res.status(403).json({ message: "Subcontractors cannot edit projects" });
+      // External users (subcontractors, notaries) are read-only; only company members can edit
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "External users cannot edit projects" });
       }
       
       const oldProgress = currentProject.progress || 0;
@@ -3272,7 +3272,7 @@ export async function registerRoutes(
             projectName: project.name,
             role: inviteRole,
             loginUrl: `${baseUrl}/auth`,
-            registerUrl: `${baseUrl}/auth?register=true`,
+            registerUrl: `${baseUrl}/auth?mode=register&tab=${inviteRole}`,
             isNewUser: true,
             inviteeName: name || undefined,
           });
