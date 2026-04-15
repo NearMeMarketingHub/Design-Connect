@@ -1478,7 +1478,7 @@ export class DatabaseStorage implements IStorage {
     return projects;
   }
 
-  async getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: any; membershipId: string })[]> {
+  async getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: ExternalMemberPermissions | null; membershipId: string })[]> {
     const teamMemberships = await db.select().from(schema.projectTeamMembers)
       .where(eq(schema.projectTeamMembers.contractorId, contractorId));
 

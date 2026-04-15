@@ -962,6 +962,7 @@ export default function ProjectDetails() {
   // Invite external sub/notary state
   const [inviteExternalOpen, setInviteExternalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
   const [inviteContractorType, setInviteContractorType] = useState<"subcontractor" | "notary">("subcontractor");
   const [invitePermissions, setInvitePermissions] = useState({
     canViewDocuments: true,
@@ -983,12 +984,12 @@ export default function ProjectDetails() {
   };
 
   const inviteExternalMutation = useMutation({
-    mutationFn: async (data: { email: string; role: "subcontractor" | "notary"; permissions: Record<string, boolean> }) => {
+    mutationFn: async (data: { email: string; name?: string; role: "subcontractor" | "notary"; permissions: Record<string, boolean> }) => {
       const res = await fetch(`/api/projects/${projectId}/invite-external`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: data.email, role: data.role, permissions: data.permissions }),
+        body: JSON.stringify({ email: data.email, name: data.name || undefined, role: data.role, permissions: data.permissions }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -1000,6 +1001,7 @@ export default function ProjectDetails() {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'team'] });
       setInviteExternalOpen(false);
       setInviteEmail("");
+      setInviteName("");
       setInviteContractorType("subcontractor");
       setInvitePermissions({ canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false });
       toast({ title: result.invited ? "Invitation sent" : "Member added", description: result.message });
@@ -3176,7 +3178,8 @@ export default function ProjectDetails() {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Team
                     </Button>
-                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin") && (
+                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin" ||
+                       (user?.role === "contractor" && !user?.contractorType)) && (
                       <Button
                         variant="outline"
                         className="w-full mt-2"
@@ -7253,6 +7256,17 @@ export default function ProjectDetails() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="invite-name">Name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                id="invite-name"
+                type="text"
+                placeholder="Full name"
+                value={inviteName}
+                onChange={e => setInviteName(e.target.value)}
+                data-testid="input-invite-name"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="invite-type">Role</Label>
               <Select value={inviteContractorType} onValueChange={handleInviteTypeChange}>
                 <SelectTrigger id="invite-type" data-testid="select-invite-type">
@@ -7295,7 +7309,7 @@ export default function ProjectDetails() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setInviteExternalOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => inviteExternalMutation.mutate({ email: inviteEmail, role: inviteContractorType, permissions: invitePermissions })}
+              onClick={() => inviteExternalMutation.mutate({ email: inviteEmail, name: inviteName || undefined, role: inviteContractorType, permissions: invitePermissions })}
               disabled={!inviteEmail || inviteExternalMutation.isPending}
               data-testid="button-confirm-invite"
             >

@@ -21,7 +21,7 @@ type Permissions = {
 
 type ProjectWithDetails = {
   id: string;
-  title: string;
+  name: string;
   address?: string;
   status: string;
   progress?: number;
@@ -59,7 +59,7 @@ function ProjectCard({ project, onClick }: { project: ProjectWithDetails; onClic
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <p className="font-semibold truncate" data-testid={`project-title-${project.id}`}>{project.title}</p>
+            <p className="font-semibold truncate" data-testid={`project-title-${project.id}`}>{project.name}</p>
             <Badge
               variant={project.status === "active" ? "default" : project.status === "completed" ? "secondary" : "outline"}
               className="capitalize text-xs shrink-0"
@@ -408,7 +408,7 @@ export default function SubcontractorDashboard() {
                     data-testid={`completed-project-${project.id}`}
                   >
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{project.title}</p>
+                      <p className="font-medium truncate">{project.name}</p>
                       {project.companyName && (
                         <p className="text-xs text-muted-foreground truncate">{project.companyName}</p>
                       )}

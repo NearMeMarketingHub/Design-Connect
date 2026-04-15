@@ -309,6 +309,7 @@ export async function sendExternalInviteEmail(
     loginUrl: string;
     isNewUser: boolean;
     registerUrl?: string;
+    inviteeName?: string;
   }
 ) {
   const { client, fromEmail } = await getResendClient();
@@ -316,6 +317,7 @@ export async function sendExternalInviteEmail(
   const roleLabel = inviteData.role === 'notary' ? 'Notary' : 'Sub-Contractor';
   const actionUrl = inviteData.isNewUser ? (inviteData.registerUrl || inviteData.loginUrl) : inviteData.loginUrl;
   const actionLabel = inviteData.isNewUser ? 'Create Account & Get Started' : 'Log In to View Project';
+  const greeting = inviteData.inviteeName ? `Hi ${inviteData.inviteeName},` : 'Hi there,';
   const newUserNote = inviteData.isNewUser
     ? `<p style="color: #64748b; font-size: 14px; margin-top: 20px;">You don't have a BuildVision account yet. Click the button above to create a free account and access the project.</p>`
     : '';
@@ -338,7 +340,7 @@ export async function sendExternalInviteEmail(
         </div>
 
         <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
-          <p style="font-size: 16px; margin-top: 0;">Hello,</p>
+          <p style="font-size: 16px; margin-top: 0;">${greeting}</p>
 
           <p><strong>${inviteData.inviterName}</strong> has invited you to collaborate on <strong>${inviteData.projectName}</strong> as a <strong>${roleLabel}</strong>.</p>
 

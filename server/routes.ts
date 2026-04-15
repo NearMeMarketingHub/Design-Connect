@@ -583,8 +583,14 @@ export async function registerRoutes(
           client = clientWithoutPassword;
         }
       }
-      
-      res.json({ ...project, client });
+
+      // Strip budget fields for external users (sub/notary) who lack canViewBudget permission
+      const hasBudgetAccess = await checkExternalPermission(user, project.id, 'canViewBudget');
+      const projectPayload = hasBudgetAccess
+        ? { ...project, client }
+        : { ...project, client, budget: null, budgetStatus: null };
+
+      res.json(projectPayload);
     } catch (error) {
       next(error);
     }
@@ -3167,16 +3173,23 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/invite-external", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      // Only company owners, company admins (isCompanyAdmin), and platform admins may invite
-      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
-      if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners and admins can invite external members" });
-      }
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
-      // Tenancy already enforced by app.param("projectId") middleware — no redundant check needed
 
-      const { email, role, permissions } = req.body;
+      // Authorization: company_owner, isCompanyAdmin, platform admin, OR a contractor who is
+      // a project team member of this project from the same company (project-level lead access)
+      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      if (!canInvite && user.role === "contractor" && user.companyId) {
+        const membership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
+        if (membership && project.contractorId === user.companyId) {
+          canInvite = true;
+        }
+      }
+      if (!canInvite) {
+        return res.status(403).json({ message: "Only company owners, admins, or project team members can invite external members" });
+      }
+
+      const { email, name, role, permissions } = req.body;
       if (!email) return res.status(400).json({ message: "email is required" });
 
       // Validate role must be subcontractor or notary
@@ -3227,6 +3240,7 @@ export async function registerRoutes(
             role: inviteRole,
             loginUrl: `${baseUrl}/auth`,
             isNewUser: false,
+            inviteeName: name || existingUser.name || undefined,
           });
         } catch (emailErr) {
           console.error("Failed to send external invite email (non-fatal):", emailErr);
@@ -3260,6 +3274,7 @@ export async function registerRoutes(
             loginUrl: `${baseUrl}/auth`,
             registerUrl: `${baseUrl}/auth?register=true`,
             isNewUser: true,
+            inviteeName: name || undefined,
           });
         } catch (emailErr) {
           console.error("Failed to send external invite email (non-fatal):", emailErr);
