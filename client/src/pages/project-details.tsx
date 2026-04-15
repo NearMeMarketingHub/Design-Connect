@@ -3195,8 +3195,8 @@ export default function ProjectDetails() {
                       </Button>
                     )}
 
-                    {/* External Members (sub/notary) with permission management */}
-                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin") && (() => {
+                    {/* External Members (sub/notary) with permission management - visible to owners, admins, and project leads */}
+                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin" || isCurrentUserProjectLead) && (() => {
                       const externalMembers = teamMembers.filter(m =>
                         m.contractor?.contractorType === "subcontractor" || m.contractor?.contractorType === "notary"
                       );

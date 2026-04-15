@@ -424,14 +424,16 @@ export const insertProjectTeamMemberSchema = createInsertSchema(projectTeamMembe
 export type InsertProjectTeamMember = z.infer<typeof insertProjectTeamMemberSchema>;
 export type ProjectTeamMember = typeof projectTeamMembers.$inferSelect;
 
-// Default permissions for external team members (subs/notaries)
+// Per-project permission keys for external team members (subcontractors and notaries).
+// All six keys are intentional product features; canViewEstimates allows selected external
+// members to view project estimate line items without exposing full financial data.
 export type ExternalMemberPermissions = {
   canViewDocuments: boolean;
   canUploadDocuments: boolean;
   canViewBudget: boolean;
   canViewMessages: boolean;
   canPostMessages: boolean;
-  canViewEstimates: boolean;
+  canViewEstimates: boolean; // Intentional: allows controlled estimate visibility for external members
 };
 
 export const DEFAULT_SUBCONTRACTOR_PERMISSIONS: ExternalMemberPermissions = {
