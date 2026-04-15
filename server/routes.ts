@@ -3050,6 +3050,11 @@ export async function registerRoutes(
   // Budget Item routes - Admin only
   app.get("/api/budget/categories/:categoryId/items", requireAdmin, async (req, res, next) => {
     try {
+      // Verify the category is a platform-level category (companyId = null)
+      const cat = await storage.getBudgetCategory(req.params.categoryId);
+      if (!cat || cat.companyId !== null) {
+        return res.status(404).json({ message: "Category not found" });
+      }
       const items = await storage.getBudgetItems(req.params.categoryId);
       res.json(items);
     } catch (error) {
