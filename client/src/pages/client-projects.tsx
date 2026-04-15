@@ -26,7 +26,7 @@ interface Project {
   createdAt: string | null;
 }
 
-const CURRENT_STATUSES = ["Planning", "Active", "On Hold"];
+const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
 
 function ProjectCard({ project, portalPath }: { project: Project; portalPath: string }) {
   const isCompleted = project.status === 'Completed';
@@ -109,7 +109,7 @@ function EmptyState({ message, detail }: { message: string; detail: string }) {
 export default function ClientProjects() {
   const { user, currentPortal } = useAuth();
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [currentStatusFilter, setCurrentStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("current");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
@@ -145,13 +145,17 @@ export default function ClientProjects() {
   const allCurrent = myProjects.filter(p => p.status !== 'Completed');
   const allCompleted = myProjects.filter(p => p.status === 'Completed');
 
-  // Apply current-tab status filter only within current projects
-  const filteredCurrent = currentStatusFilter === "all"
+  // Apply status filter within each tab's project set independently
+  const filteredCurrent = statusFilter === "all"
     ? allCurrent
-    : allCurrent.filter(p => p.status === currentStatusFilter);
+    : allCurrent.filter(p => p.status === statusFilter);
+
+  const filteredCompleted = statusFilter === "all"
+    ? allCompleted
+    : allCompleted.filter(p => p.status === statusFilter);
 
   const displayedCurrent = sorted(filteredCurrent);
-  const displayedCompleted = sorted(allCompleted);
+  const displayedCompleted = sorted(filteredCompleted);
 
   const portalPath = currentPortal === 'contractor' ? '/contractor' : currentPortal === 'admin' ? '/admin' : '/client';
 
@@ -183,24 +187,22 @@ export default function ClientProjects() {
               </SelectContent>
             </Select>
           </div>
-          {activeTab === "current" && (
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <Select value={currentStatusFilter} onValueChange={setCurrentStatusFilter}>
-                <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="option-all-statuses">All Statuses</SelectItem>
-                  {CURRENT_STATUSES.map((status) => (
-                    <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="option-all-statuses">All Statuses</SelectItem>
+                {PROJECT_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -223,10 +225,10 @@ export default function ClientProjects() {
         <TabsContent value="current" className="mt-6">
           {displayedCurrent.length === 0 ? (
             <EmptyState
-              message={currentStatusFilter !== "all" ? "No Projects Found" : "No Current Projects"}
+              message={statusFilter !== "all" ? "No Projects Found" : "No Current Projects"}
               detail={
-                currentStatusFilter !== "all"
-                  ? `No projects match the "${currentStatusFilter}" filter. Try a different status.`
+                statusFilter !== "all"
+                  ? `No projects match the "${statusFilter}" filter. Try a different status.`
                   : user?.role === 'client'
                     ? "You don't have any active projects yet. Your contractor will add you soon."
                     : "No active projects yet. Create a new project to get started."
@@ -244,8 +246,12 @@ export default function ClientProjects() {
         <TabsContent value="completed" className="mt-6">
           {displayedCompleted.length === 0 ? (
             <EmptyState
-              message="No Completed Projects"
-              detail="Completed projects will appear here once work has been finished and marked complete."
+              message={statusFilter !== "all" ? "No Projects Found" : "No Completed Projects"}
+              detail={
+                statusFilter !== "all"
+                  ? `No completed projects match the "${statusFilter}" filter. Try selecting a different status.`
+                  : "Completed projects will appear here once work has been finished and marked complete."
+              }
             />
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="completed-projects-grid">
