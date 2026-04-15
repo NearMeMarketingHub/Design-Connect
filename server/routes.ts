@@ -282,8 +282,9 @@ export async function registerRoutes(
       path === "/api/company/mine" ||
       path.startsWith("/api/signing") ||
       path.startsWith("/api/sign/") ||
-      path.startsWith("/api/contractor-invites") ||
-      path.startsWith("/api/project-invites") ||
+      // Only allow public invite acceptance (not invite creation which is a paid feature)
+      path.startsWith("/api/contractor-invites/accept/") ||
+      path.startsWith("/api/invites/") ||
       path.startsWith("/api/sandbox")
     ) {
       return next();
