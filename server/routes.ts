@@ -27,8 +27,11 @@ export async function registerRoutes(
   // Run idempotent role migration on startup
   runRoleMigration().catch(err => console.error("[migrate-roles] Migration error:", err));
 
-  // Ensure test accounts (testsubcontractor etc.) are provisioned on startup
-  seedTestAccounts().catch(err => console.error("[seed-test-accounts] Error:", err));
+  // Ensure test accounts (testsubcontractor etc.) are provisioned on startup.
+  // Only runs in development/test environments — never in production.
+  if (process.env.NODE_ENV !== "production") {
+    seedTestAccounts().catch(err => console.error("[seed-test-accounts] Error:", err));
+  }
 
   // Session setup
   const pool = new Pool({
