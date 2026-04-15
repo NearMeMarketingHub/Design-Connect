@@ -491,11 +491,11 @@ export async function registerRoutes(
         // Company owners only see their company's projects
         projects = await storage.getProjectsByCompanyId(user.companyId);
       } else if (user.role === "contractor") {
-        if (user.contractorType === "subcontractor") {
-          // Subcontractors: only explicitly assigned projects
+        if (user.contractorType === "subcontractor" || user.contractorType === "notary") {
+          // Subcontractors and notaries: only explicitly assigned projects (cross-company via invite)
           projects = await storage.getContractorProjects(user.id);
         } else if (user.companyId) {
-          // Regular contractors (notary, plain contractor): see all company projects
+          // Regular contractors (plain): see all company projects
           projects = await storage.getProjectsByCompanyId(user.companyId);
         } else {
           projects = await storage.getContractorProjects(user.id);
@@ -3116,6 +3116,20 @@ export async function registerRoutes(
       if (!canManage) {
         return res.status(403).json({ message: "Only company owners and admins can update permissions" });
       }
+      // Security: verify the team member actually belongs to the specified project (prevent IDOR)
+      const members = await storage.getProjectTeamMembers(req.params.projectId);
+      const member = members.find(m => m.id === req.params.memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Team member not found in this project" });
+      }
+      // Also verify the caller has access to this project's company (if not platform admin)
+      if (user.role !== "admin") {
+        const project = await storage.getProject(req.params.projectId);
+        if (!project) return res.status(404).json({ message: "Project not found" });
+        if (project.companyId && project.companyId !== user.companyId) {
+          return res.status(403).json({ message: "You do not have access to this project" });
+        }
+      }
       const { permissions } = req.body;
       if (!permissions || typeof permissions !== "object") {
         return res.status(400).json({ message: "permissions object is required" });
@@ -3139,29 +3153,69 @@ export async function registerRoutes(
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      const { email, role, contractorType, permissions } = req.body;
+      // Only callers from the same company can invite (unless platform admin)
+      if (user.role !== "admin" && project.companyId && project.companyId !== user.companyId) {
+        return res.status(403).json({ message: "You do not have access to this project" });
+      }
+
+      const { email, role, permissions } = req.body;
       if (!email) return res.status(400).json({ message: "email is required" });
+
+      // Validate role must be subcontractor or notary
+      const validRoles = ["subcontractor", "notary"];
+      const inviteRole: "subcontractor" | "notary" = validRoles.includes(role) ? role : "subcontractor";
+
+      // Determine default permissions based on role
+      const defaultSubPerms = { canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false };
+      const defaultNotaryPerms = { canViewDocuments: true, canUploadDocuments: true, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false };
+      const defaultPerms = inviteRole === "notary" ? defaultNotaryPerms : defaultSubPerms;
+      const finalPermissions = permissions && typeof permissions === "object" ? { ...defaultPerms, ...permissions } : defaultPerms;
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS?.split(",")[0]
+          ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+          : "http://localhost:5000";
+
+      const inviterName = user.name || user.username;
 
       // Check if this user already exists
       const existingUser = await storage.getUserByEmail(email);
 
       if (existingUser) {
+        // Validate they're the right type
+        if (existingUser.role !== "contractor" || existingUser.contractorType !== inviteRole) {
+          return res.status(400).json({ message: `This user does not have a ${inviteRole} account` });
+        }
         // Check if already on this project
         const existing = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, existingUser.id);
         if (existing) {
           return res.status(409).json({ message: "This person is already assigned to this project" });
         }
-        // Add directly to project team with the given permissions
+        // Add directly to project team with the correct permissions
         const member = await storage.addProjectTeamMember({
           projectId: req.params.projectId,
           contractorId: existingUser.id,
-          role: role || null,
+          role: inviteRole,
           addedBy: user.id,
-          permissions: permissions || {},
+          permissions: finalPermissions,
         });
-        return res.json({ member, invited: false, message: "User added to project" });
+        // Send email notification
+        try {
+          const { sendExternalInviteEmail } = await import("./email");
+          await sendExternalInviteEmail(email, {
+            inviterName,
+            projectName: project.name,
+            role: inviteRole,
+            loginUrl: `${baseUrl}/auth`,
+            isNewUser: false,
+          });
+        } catch (emailErr) {
+          console.error("Failed to send external invite email (non-fatal):", emailErr);
+        }
+        return res.json({ member, invited: false, message: `${existingUser.name || email} has been added to the project` });
       } else {
-        // No existing user — create a contractor invite
+        // No existing user — create a contractor invite with permissions embedded
         const companyId = user.companyId || project.companyId || null;
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date();
@@ -3172,12 +3226,25 @@ export async function registerRoutes(
           email,
           token,
           status: "pending",
-          contractorType: contractorType || "subcontractor",
+          contractorType: inviteRole,
           invitedBy: user.id,
           expiresAt,
         });
-        // TODO: send invite email via Resend
-        return res.json({ invite, invited: true, message: "Invitation sent to " + email });
+        // Send invite email
+        try {
+          const { sendExternalInviteEmail } = await import("./email");
+          await sendExternalInviteEmail(email, {
+            inviterName,
+            projectName: project.name,
+            role: inviteRole,
+            loginUrl: `${baseUrl}/auth`,
+            registerUrl: `${baseUrl}/auth?register=true`,
+            isNewUser: true,
+          });
+        } catch (emailErr) {
+          console.error("Failed to send external invite email (non-fatal):", emailErr);
+        }
+        return res.json({ invite, invited: true, message: `Invitation sent to ${email}` });
       }
     } catch (error) {
       next(error);

@@ -857,16 +857,33 @@ export default function ProjectDetails() {
   // Invite external sub/notary state
   const [inviteExternalOpen, setInviteExternalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("");
-  const [inviteContractorType, setInviteContractorType] = useState("subcontractor");
+  const [inviteContractorType, setInviteContractorType] = useState<"subcontractor" | "notary">("subcontractor");
+  const [invitePermissions, setInvitePermissions] = useState({
+    canViewDocuments: true,
+    canUploadDocuments: false,
+    canViewBudget: false,
+    canViewMessages: true,
+    canPostMessages: false,
+    canViewEstimates: false,
+  });
+
+  // Reset permissions when type changes
+  const handleInviteTypeChange = (val: string) => {
+    const t = val as "subcontractor" | "notary";
+    setInviteContractorType(t);
+    setInvitePermissions(t === "notary"
+      ? { canViewDocuments: true, canUploadDocuments: true, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false }
+      : { canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false }
+    );
+  };
 
   const inviteExternalMutation = useMutation({
-    mutationFn: async (data: { email: string; role: string; contractorType: string }) => {
+    mutationFn: async (data: { email: string; role: "subcontractor" | "notary"; permissions: Record<string, boolean> }) => {
       const res = await fetch(`/api/projects/${projectId}/invite-external`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: data.email, role: data.role, contractorType: data.contractorType }),
+        body: JSON.stringify({ email: data.email, role: data.role, permissions: data.permissions }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -878,8 +895,8 @@ export default function ProjectDetails() {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'team'] });
       setInviteExternalOpen(false);
       setInviteEmail("");
-      setInviteRole("");
       setInviteContractorType("subcontractor");
+      setInvitePermissions({ canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false });
       toast({ title: result.invited ? "Invitation sent" : "Member added", description: result.message });
     },
     onError: (err: Error) => {
@@ -6984,7 +7001,7 @@ export default function ProjectDetails() {
               Invite Sub-Contractor / Notary
             </DialogTitle>
             <DialogDescription>
-              Invite an external sub-contractor or notary to this project. If they already have an account, they will be added immediately. Otherwise, an invitation will be sent to their email.
+              Invite an external sub-contractor or notary to this project. If they already have a BuildVision account they'll be added immediately; otherwise an invitation email will be sent.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -7000,8 +7017,8 @@ export default function ProjectDetails() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-type">Type</Label>
-              <Select value={inviteContractorType} onValueChange={setInviteContractorType}>
+              <Label htmlFor="invite-type">Role</Label>
+              <Select value={inviteContractorType} onValueChange={handleInviteTypeChange}>
                 <SelectTrigger id="invite-type" data-testid="select-invite-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -7012,20 +7029,37 @@ export default function ProjectDetails() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-role">Trade / Role (optional)</Label>
-              <Input
-                id="invite-role"
-                placeholder="e.g. Electrician, Plumber, HVAC"
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value)}
-                data-testid="input-invite-role"
-              />
+              <Label className="text-sm font-medium">Project Permissions</Label>
+              <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+                {[
+                  { key: "canViewDocuments", label: "View Documents" },
+                  { key: "canUploadDocuments", label: "Upload Documents" },
+                  { key: "canViewBudget", label: "View Budget" },
+                  { key: "canViewMessages", label: "View Messages" },
+                  { key: "canPostMessages", label: "Post Messages" },
+                  { key: "canViewEstimates", label: "View Estimates" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-sm">{label}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={invitePermissions[key as keyof typeof invitePermissions]}
+                      data-testid={`toggle-perm-${key}`}
+                      onClick={() => setInvitePermissions(p => ({ ...p, [key]: !p[key as keyof typeof invitePermissions] }))}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors ${invitePermissions[key as keyof typeof invitePermissions] ? "bg-blue-600" : "bg-input"}`}
+                    >
+                      <span className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${invitePermissions[key as keyof typeof invitePermissions] ? "translate-x-4" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setInviteExternalOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => inviteExternalMutation.mutate({ email: inviteEmail, role: inviteRole, contractorType: inviteContractorType })}
+              onClick={() => inviteExternalMutation.mutate({ email: inviteEmail, role: inviteContractorType, permissions: invitePermissions })}
               disabled={!inviteEmail || inviteExternalMutation.isPending}
               data-testid="button-confirm-invite"
             >

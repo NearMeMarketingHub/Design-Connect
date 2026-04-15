@@ -298,3 +298,85 @@ export async function sendSignatureCompletedEmail(
 
   return data;
 }
+
+// Send external sub/notary project invite email
+export async function sendExternalInviteEmail(
+  toEmail: string,
+  inviteData: {
+    inviterName: string;
+    projectName: string;
+    role: 'subcontractor' | 'notary';
+    loginUrl: string;
+    isNewUser: boolean;
+    registerUrl?: string;
+  }
+) {
+  const { client, fromEmail } = await getResendClient();
+
+  const roleLabel = inviteData.role === 'notary' ? 'Notary' : 'Sub-Contractor';
+  const actionUrl = inviteData.isNewUser ? (inviteData.registerUrl || inviteData.loginUrl) : inviteData.loginUrl;
+  const actionLabel = inviteData.isNewUser ? 'Create Account & Get Started' : 'Log In to View Project';
+  const newUserNote = inviteData.isNewUser
+    ? `<p style="color: #64748b; font-size: 14px; margin-top: 20px;">You don't have a BuildVision account yet. Click the button above to create a free account and access the project.</p>`
+    : '';
+
+  const { data, error } = await client.emails.send({
+    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    to: toEmail,
+    subject: `You've been invited to a project on BuildVision as a ${roleLabel}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <p style="color: #94a3b8; margin: 5px 0 0;">Construction Management Platform</p>
+        </div>
+
+        <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+          <p style="font-size: 16px; margin-top: 0;">Hello,</p>
+
+          <p><strong>${inviteData.inviterName}</strong> has invited you to collaborate on <strong>${inviteData.projectName}</strong> as a <strong>${roleLabel}</strong>.</p>
+
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 15px;">📋 <strong>Project:</strong> ${inviteData.projectName}</p>
+            <p style="margin: 8px 0 0; font-size: 15px;">👤 <strong>Your Role:</strong> ${roleLabel}</p>
+          </div>
+
+          <a href="${actionUrl}" style="display: inline-block; background: #3b82f6; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 10px 0;">
+            ${actionLabel}
+          </a>
+
+          ${newUserNote}
+
+          <p style="color: #64748b; font-size: 14px; margin-top: 20px;">
+            Or copy and paste this link into your browser:<br>
+            <a href="${actionUrl}" style="color: #3b82f6; word-break: break-all;">${actionUrl}</a>
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+
+          <p style="margin: 0; font-size: 13px; color: #64748b;">
+            If you were not expecting this invitation, you can safely ignore this email.
+          </p>
+        </div>
+
+        <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+
+  if (error) {
+    console.error('Failed to send external invite email:', error);
+    throw new Error(`Failed to send external invite email: ${error.message}`);
+  }
+
+  return data;
+}

@@ -432,12 +432,21 @@ export type ExternalMemberPermissions = {
   canViewEstimates: boolean;
 };
 
-export const DEFAULT_EXTERNAL_PERMISSIONS: ExternalMemberPermissions = {
+export const DEFAULT_SUBCONTRACTOR_PERMISSIONS: ExternalMemberPermissions = {
   canViewDocuments: true,
   canUploadDocuments: false,
   canViewBudget: false,
   canViewMessages: true,
-  canPostMessages: true,
+  canPostMessages: false,
+  canViewEstimates: false,
+};
+
+export const DEFAULT_NOTARY_PERMISSIONS: ExternalMemberPermissions = {
+  canViewDocuments: true,
+  canUploadDocuments: true,
+  canViewBudget: false,
+  canViewMessages: true,
+  canPostMessages: false,
   canViewEstimates: false,
 };
 
