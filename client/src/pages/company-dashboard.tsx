@@ -32,6 +32,31 @@ const SUBCONTRACTOR_SPECIALTIES = [
   "Painter", "Flooring Specialist", "Mason", "Landscaper", "General Labor"
 ];
 
+interface PriceCategory {
+  id: string;
+  name: string;
+  notes: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  companyId: string | null;
+}
+
+interface PriceItem {
+  id: string;
+  categoryId: string;
+  description: string;
+  itemType: string | null;
+  unitType: string;
+  cost: string | null;
+  laborRate: string | null;
+  materialFee: string | null;
+  retailPrice: string | null;
+  notes: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  companyId: string | null;
+}
+
 export default function CompanyDashboard() {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
@@ -45,10 +70,10 @@ export default function CompanyDashboard() {
 
   // Price book state
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [editingCategory, setEditingCategory] = useState<PriceCategory | null>(null);
   const [categoryForm, setCategoryForm] = useState({ name: "", notes: "", displayOrder: "0" });
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<PriceItem | null>(null);
   const [itemCategoryId, setItemCategoryId] = useState<string>("");
   const [itemForm, setItemForm] = useState({
     description: "", itemType: "", unitType: "EA",
@@ -214,7 +239,7 @@ export default function CompanyDashboard() {
     setCategoryDialogOpen(true);
   };
 
-  const openCategoryEdit = (cat: any) => {
+  const openCategoryEdit = (cat: PriceCategory) => {
     setEditingCategory(cat);
     setCategoryForm({ name: cat.name, notes: cat.notes || "", displayOrder: String(cat.displayOrder) });
     setCategoryDialogOpen(true);
@@ -223,7 +248,7 @@ export default function CompanyDashboard() {
   const openItemCreate = (categoryId: string) => {
     setEditingItem(null);
     setItemCategoryId(categoryId);
-    const catItems = priceItems.filter((i: any) => i.categoryId === categoryId);
+    const catItems = (priceItems as PriceItem[]).filter(i => i.categoryId === categoryId);
     setItemForm({
       description: "", itemType: "", unitType: "EA",
       cost: "0", laborRate: "0", materialFee: "0", retailPrice: "0",
@@ -232,7 +257,7 @@ export default function CompanyDashboard() {
     setItemDialogOpen(true);
   };
 
-  const openItemEdit = (item: any) => {
+  const openItemEdit = (item: PriceItem) => {
     setEditingItem(item);
     setItemCategoryId(item.categoryId);
     setItemForm({
@@ -778,8 +803,8 @@ export default function CompanyDashboard() {
             </Card>
           ) : (
             <Accordion type="multiple" className="space-y-3" data-testid="price-book-accordion">
-              {(priceCategories as any[]).map((cat) => {
-                const catItems = (priceItems as any[]).filter(i => i.categoryId === cat.id);
+              {(priceCategories as PriceCategory[]).map((cat) => {
+                const catItems = (priceItems as PriceItem[]).filter(i => i.categoryId === cat.id);
                 return (
                   <AccordionItem key={cat.id} value={cat.id} className="border rounded-lg px-4" data-testid={`category-${cat.id}`}>
                     <AccordionTrigger className="hover:no-underline">
@@ -829,7 +854,7 @@ export default function CompanyDashboard() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y">
-                                {catItems.map((item: any) => (
+                                {catItems.map((item) => (
                                   <tr key={item.id} className="hover:bg-muted/20" data-testid={`item-row-${item.id}`}>
                                     <td className="p-2 pl-3 font-medium">{item.description}</td>
                                     <td className="p-2 text-muted-foreground">{item.itemType}</td>
