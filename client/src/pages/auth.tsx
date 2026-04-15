@@ -581,12 +581,10 @@ export default function AuthPage() {
                           {loading ? "Please wait..." : isLogin ? "Access Dashboard" : "Create Company Account"} 
                           {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                         </Button>
-                        {isLogin && (
                           <p className="text-xs text-center text-muted-foreground">
-                            <Mail className="inline h-3 w-3 mr-1" />
-                            Subcontractors: use the invite link sent to your email, not this form.
-                          </p>
-                        )}
+                          <Mail className="inline h-3 w-3 mr-1" />
+                          Subcontractors: use the invite link sent to your email — not this form.
+                        </p>
                       </CardFooter>
                     </form>
                   </>
