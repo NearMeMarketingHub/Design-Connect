@@ -501,10 +501,10 @@ export async function registerRoutes(
 
   // ── Admin: Update company subscription ───────────────────────────────────────
   const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled"] as const;
-  const VALID_SUBSCRIPTION_PLANS = ["free", "starter", "professional", "enterprise"] as const;
 
   const adminCompanySubscriptionSchema = z.object({
-    subscriptionPlan: z.enum(VALID_SUBSCRIPTION_PLANS).optional(),
+    // Plan name is open-ended — matches any admin-defined tier or legacy "free"
+    subscriptionPlan: z.string().min(1).max(100).optional(),
     subscriptionStatus: z.enum(VALID_SUBSCRIPTION_STATUSES).optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
   });
@@ -545,11 +545,12 @@ export async function registerRoutes(
 
   const tierSchema = z.object({
     name: z.string().min(1).max(100),
-    monthlyPrice: z.number().nonnegative(),
-    maxProjects: z.number().int().positive().nullable().optional(),
+    // Accept numeric string from forms or number from API calls
+    price: z.coerce.number().nonnegative(),
+    maxProjects: z.coerce.number().int().positive().nullable().optional(),
     features: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
-    sortOrder: z.number().int().nonnegative().optional(),
+    sortOrder: z.coerce.number().int().nonnegative().optional(),
   });
 
   app.post("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
@@ -558,7 +559,9 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid tier data", errors: parsed.error.flatten().fieldErrors });
       }
-      const tier = await storage.createSubscriptionTier(parsed.data);
+      // Drizzle numeric column expects string; convert coerced number back
+      const tierData = { ...parsed.data, price: String(parsed.data.price) } as any;
+      const tier = await storage.createSubscriptionTier(tierData);
       res.json(tier);
     } catch (error) { next(error); }
   });
@@ -569,7 +572,9 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid tier data", errors: parsed.error.flatten().fieldErrors });
       }
-      const tier = await storage.updateSubscriptionTier(req.params.id, parsed.data);
+      const updateData: any = { ...parsed.data };
+      if (parsed.data.price !== undefined) updateData.price = String(parsed.data.price);
+      const tier = await storage.updateSubscriptionTier(req.params.id, updateData);
       if (!tier) return res.status(404).json({ message: "Tier not found" });
       res.json(tier);
     } catch (error) { next(error); }
