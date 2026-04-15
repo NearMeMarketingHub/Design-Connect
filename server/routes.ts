@@ -15,6 +15,7 @@ import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLin
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
+import { seedTestAccounts } from "./seed-test-accounts";
 
 const PgSession = connectPgSimple(session);
 
@@ -25,6 +26,9 @@ export async function registerRoutes(
 
   // Run idempotent role migration on startup
   runRoleMigration().catch(err => console.error("[migrate-roles] Migration error:", err));
+
+  // Ensure test accounts (testsubcontractor etc.) are provisioned on startup
+  seedTestAccounts().catch(err => console.error("[seed-test-accounts] Error:", err));
 
   // Session setup
   const pool = new Pool({
