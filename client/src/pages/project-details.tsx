@@ -3178,8 +3178,7 @@ export default function ProjectDetails() {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Team
                     </Button>
-                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin" ||
-                       (user?.role === "contractor" && !user?.contractorType)) && (
+                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin") && (
                       <Button
                         variant="outline"
                         className="w-full mt-2"

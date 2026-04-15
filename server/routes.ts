@@ -3176,21 +3176,10 @@ export async function registerRoutes(
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Authorization: company_owner, isCompanyAdmin, platform admin, OR any contractor
-      // who is a project team member of this project from the same company (project-level lead access).
-      // "Same company" is verified by resolving the project's owning contractor user → companyId.
-      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
-      if (!canInvite && user.role === "contractor" && !user.contractorType && user.companyId) {
-        // Resolve the project's owning company via the project contractor user
-        const projectOwnerUser = project.contractorId ? await storage.getUser(project.contractorId) : null;
-        const projectCompanyId = projectOwnerUser?.companyId ?? null;
-        const membership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
-        if (membership && projectCompanyId && projectCompanyId === user.companyId) {
-          canInvite = true;
-        }
-      }
+      // Authorization: strict — only company_owner, isCompanyAdmin, or platform admin may invite
+      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners, admins, or project team members from the same company can invite external members" });
+        return res.status(403).json({ message: "Only company owners and company admins can invite external members" });
       }
 
       const { email, name, role, permissions } = req.body;
@@ -3309,6 +3298,10 @@ export async function registerRoutes(
   app.get("/api/my-invites", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Only external (sub/notary) users receive project invites
+      if (user.role !== "contractor" || (user.contractorType !== "subcontractor" && user.contractorType !== "notary")) {
+        return res.json([]);
+      }
       if (!user.email) return res.json([]);
       const invites = await storage.getPendingContractorInvitesByEmail(user.email);
       // Filter out expired ones and enrich with project/company info
@@ -3336,10 +3329,23 @@ export async function registerRoutes(
   app.post("/api/my-invites/:inviteId/accept", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const invites = user.email ? await storage.getPendingContractorInvitesByEmail(user.email) : [];
+      // Only sub/notary users can accept project invites
+      if (user.role !== "contractor" || (user.contractorType !== "subcontractor" && user.contractorType !== "notary")) {
+        return res.status(403).json({ message: "Only subcontractors and notaries can accept project invites" });
+      }
+      if (!user.email) return res.status(400).json({ message: "Account has no email address" });
+      const invites = await storage.getPendingContractorInvitesByEmail(user.email);
       const target = invites.find(i => i.id === req.params.inviteId);
       if (!target) return res.status(404).json({ message: "Invite not found" });
       if (target.email !== user.email) return res.status(403).json({ message: "This invite is not for you" });
+      // Enforce expiry at the API layer (not just display layer)
+      if (new Date(target.expiresAt) <= new Date()) {
+        return res.status(400).json({ message: "This invitation has expired" });
+      }
+      // Validate the invite was created for the user's contractor type
+      if (target.contractorType && target.contractorType !== user.contractorType) {
+        return res.status(400).json({ message: `This invitation is for a ${target.contractorType}, not a ${user.contractorType}` });
+      }
       await storage.acceptContractorInvite(target.token, user.id);
       res.json({ message: "Invite accepted" });
     } catch (error) {
@@ -3351,6 +3357,11 @@ export async function registerRoutes(
   app.post("/api/my-invites/:inviteId/decline", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Only sub/notary users can decline project invites
+      if (user.role !== "contractor" || (user.contractorType !== "subcontractor" && user.contractorType !== "notary")) {
+        return res.status(403).json({ message: "Only subcontractors and notaries can decline project invites" });
+      }
+      if (!user.email) return res.status(400).json({ message: "Account has no email address" });
       const invites = user.email ? await storage.getPendingContractorInvitesByEmail(user.email) : [];
       const target = invites.find(i => i.id === req.params.inviteId);
       if (!target) return res.status(404).json({ message: "Invite not found" });
