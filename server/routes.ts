@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { z } from "zod";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -499,9 +500,22 @@ export async function registerRoutes(
   });
 
   // ── Admin: Update company subscription ───────────────────────────────────────
+  const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled"] as const;
+  const VALID_SUBSCRIPTION_PLANS = ["free", "starter", "professional", "enterprise"] as const;
+
+  const adminCompanySubscriptionSchema = z.object({
+    subscriptionPlan: z.enum(VALID_SUBSCRIPTION_PLANS).optional(),
+    subscriptionStatus: z.enum(VALID_SUBSCRIPTION_STATUSES).optional(),
+    trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  });
+
   app.patch("/api/admin/companies/:id/subscription", requireAdmin, async (req, res, next) => {
     try {
-      const { subscriptionPlan, subscriptionStatus, trialStartedAt } = req.body;
+      const parsed = adminCompanySubscriptionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid subscription data", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { subscriptionPlan, subscriptionStatus, trialStartedAt } = parsed.data;
       const updateData: any = {};
       if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
@@ -529,16 +543,33 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
+  const tierSchema = z.object({
+    name: z.string().min(1).max(100),
+    monthlyPrice: z.number().nonnegative(),
+    maxProjects: z.number().int().positive().nullable().optional(),
+    features: z.array(z.string()).optional(),
+    isActive: z.boolean().optional(),
+    sortOrder: z.number().int().nonnegative().optional(),
+  });
+
   app.post("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
     try {
-      const tier = await storage.createSubscriptionTier(req.body);
+      const parsed = tierSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid tier data", errors: parsed.error.flatten().fieldErrors });
+      }
+      const tier = await storage.createSubscriptionTier(parsed.data);
       res.json(tier);
     } catch (error) { next(error); }
   });
 
   app.patch("/api/admin/subscription/tiers/:id", requireAdmin, async (req, res, next) => {
     try {
-      const tier = await storage.updateSubscriptionTier(req.params.id, req.body);
+      const parsed = tierSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid tier data", errors: parsed.error.flatten().fieldErrors });
+      }
+      const tier = await storage.updateSubscriptionTier(req.params.id, parsed.data);
       if (!tier) return res.status(404).json({ message: "Tier not found" });
       res.json(tier);
     } catch (error) { next(error); }
