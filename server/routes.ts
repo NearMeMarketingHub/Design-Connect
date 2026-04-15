@@ -242,6 +242,34 @@ export async function registerRoutes(
   });
 
   // Admin-only middleware
+  const TRIAL_DAYS = 7;
+
+  const requireActiveSubscription = async (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) return next();
+    const user = req.user as any;
+    if (!user) return next();
+    // Admins and clients are never blocked
+    if (user.role === "admin" || user.role === "client") return next();
+    // Subcontractors and notaries span companies — not subject to single-company billing
+    if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) return next();
+    const companyId = user.companyId;
+    if (!companyId) return next();
+    const company = await storage.getCompany(companyId);
+    if (!company) return next();
+    // Active paid subscription — always allowed
+    if (company.subscriptionStatus === "active") return next();
+    // Still within trial window — allowed
+    if (company.subscriptionStatus === "trialing" && company.trialStartedAt) {
+      const trialEnd = new Date(company.trialStartedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      if (new Date() <= trialEnd) return next();
+    }
+    // Expired or any other non-active status
+    return res.status(402).json({
+      message: "Your trial has expired. Please upgrade your subscription to continue.",
+      code: "SUBSCRIPTION_REQUIRED",
+    });
+  };
+
   const requireAdmin = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -657,7 +685,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/projects", requireAuth, async (req, res, next) => {
+  app.post("/api/projects", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
       // External users (subcontractors, notaries) are read-only and cannot create projects
@@ -674,7 +702,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/projects/:id", requireAuth, async (req, res, next) => {
+  app.patch("/api/projects/:id", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
       // Get current project to check progress change
       const currentProject = await storage.getProject(req.params.id);
@@ -742,7 +770,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/estimates", requireAuth, async (req, res, next) => {
+  app.post("/api/estimates", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
       const { lineItems, ...estimateData } = req.body;
       const estimate = await storage.createEstimate(estimateData);
@@ -785,7 +813,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/invoices", requireAuth, async (req, res, next) => {
+  app.post("/api/invoices", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
       const { lineItems, ...invoiceData } = req.body;
       const invoice = await storage.createInvoice(invoiceData);
@@ -1998,7 +2026,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/projects/:projectId/change-orders", requireAuth, async (req, res, next) => {
+  app.post("/api/projects/:projectId/change-orders", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
       if (user.role !== 'contractor' && user.role !== 'admin') {

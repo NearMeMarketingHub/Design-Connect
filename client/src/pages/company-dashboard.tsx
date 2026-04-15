@@ -301,12 +301,12 @@ export default function CompanyDashboard() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={isExpired ? "subscription" : activeTab} onValueChange={isExpired ? undefined : setActiveTab}>
         <TabsList data-testid="company-tabs">
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="team" data-testid="tab-team">Team</TabsTrigger>
+          <TabsTrigger value="overview" disabled={isExpired} data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="team" disabled={isExpired} data-testid="tab-team">Team</TabsTrigger>
           <TabsTrigger value="subscription" data-testid="tab-subscription">Subscription</TabsTrigger>
-          <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
+          <TabsTrigger value="settings" disabled={isExpired} data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
