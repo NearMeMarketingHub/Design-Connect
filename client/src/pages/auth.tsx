@@ -185,7 +185,6 @@ export default function AuthPage() {
               <TabsTrigger value="subcontractor" data-testid="tab-subcontractor">Sub / Notary</TabsTrigger>
             </TabsList>
             
-            {/* ── CLIENT TAB ── */}
             <TabsContent value="client">
               <Card className="border-border/50 shadow-lg">
                 <CardHeader>
@@ -261,7 +260,6 @@ export default function AuthPage() {
               </Card>
             </TabsContent>
             
-            {/* ── COMPANY TAB ── */}
             <TabsContent value="contractor">
               <Card className="border-border/50 shadow-lg">
                 {companyRegistered && !isLogin ? (
@@ -385,7 +383,6 @@ export default function AuthPage() {
               </Card>
             </TabsContent>
 
-            {/* ── SUB-CONTRACTOR / NOTARY TAB ── */}
             <TabsContent value="subcontractor">
               <Card className="border-border/50 shadow-lg">
                 {subRegistered && !isLogin ? (

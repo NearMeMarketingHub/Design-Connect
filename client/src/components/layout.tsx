@@ -67,6 +67,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/contractor/dashboard" },
     ...(canAccessAdminCenter ? [
       { label: "Admin Center", icon: <Shield className="w-5 h-5" />, href: "/company/dashboard" },
+    ] : []),
+    ...(isCompanyOwner ? [
       { label: "Team", icon: <Users className="w-5 h-5" />, href: "/company/team" },
     ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
