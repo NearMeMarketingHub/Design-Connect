@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapPin, ArrowRight, Calendar, CheckCircle2, Loader2, FolderOpen, ArrowUpDown, Filter } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +26,7 @@ interface Project {
   createdAt: string | null;
 }
 
-const PROJECT_STATUSES = ["Planning", "Active", "On Hold", "Completed"];
+const CURRENT_STATUSES = ["Planning", "Active", "On Hold"];
 
 function ProjectCard({ project, portalPath }: { project: Project; portalPath: string }) {
   const isCompleted = project.status === 'Completed';
@@ -95,10 +96,21 @@ function ProjectCard({ project, portalPath }: { project: Project; portalPath: st
   );
 }
 
+function EmptyState({ message, detail }: { message: string; detail: string }) {
+  return (
+    <Card className="p-12 text-center" data-testid="empty-state">
+      <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+      <h3 className="text-xl font-semibold mb-2">{message}</h3>
+      <p className="text-muted-foreground">{detail}</p>
+    </Card>
+  );
+}
+
 export default function ClientProjects() {
   const { user, currentPortal } = useAuth();
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [currentStatusFilter, setCurrentStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState("current");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -109,38 +121,38 @@ export default function ClientProjects() {
   });
 
   // Filter projects based on portal context
-  let myProjects = projects.filter(p => {
-    // When logged into client portal, only show projects where user is the client
+  const myProjects = projects.filter(p => {
     if (currentPortal === 'client') {
       return p.clientId === user?.id;
     }
-    // When logged into contractor portal, show all for company_owner, assigned for others
     if (currentPortal === 'contractor') {
-      if (user?.role === 'company_owner') return true; // Company owners see all company projects
+      if (user?.role === 'company_owner') return true;
       return p.contractorId === user?.id;
     }
-    // When logged into admin portal, admins see all projects, contractors see assigned
-    if (user?.role === 'admin') {
-      return true;
-    }
+    if (user?.role === 'admin') return true;
     return p.contractorId === user?.id;
   });
-  
-  // Apply status filter
-  if (statusFilter !== "all") {
-    myProjects = myProjects.filter(p => p.status === statusFilter);
-  }
-  
-  // Apply sort order using createdAt timestamp
-  myProjects = [...myProjects].sort((a, b) => {
-    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
-  });
-  
-  const activeProjects = myProjects.filter(p => p.status !== 'Completed');
-  const completedProjects = myProjects.filter(p => p.status === 'Completed');
-  
+
+  // Sort helper
+  const sorted = (list: Project[]) =>
+    [...list].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
+    });
+
+  // Split into current (non-completed) and completed
+  const allCurrent = myProjects.filter(p => p.status !== 'Completed');
+  const allCompleted = myProjects.filter(p => p.status === 'Completed');
+
+  // Apply current-tab status filter only within current projects
+  const filteredCurrent = currentStatusFilter === "all"
+    ? allCurrent
+    : allCurrent.filter(p => p.status === currentStatusFilter);
+
+  const displayedCurrent = sorted(filteredCurrent);
+  const displayedCompleted = sorted(allCompleted);
+
   const portalPath = currentPortal === 'contractor' ? '/contractor' : currentPortal === 'admin' ? '/admin' : '/client';
 
   if (isLoading) {
@@ -152,7 +164,7 @@ export default function ClientProjects() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground">My Projects</h1>
@@ -171,64 +183,79 @@ export default function ClientProjects() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" data-testid="option-all-statuses">All Statuses</SelectItem>
-                {PROJECT_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {activeTab === "current" && (
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Select value={currentStatusFilter} onValueChange={setCurrentStatusFilter}>
+                <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="option-all-statuses">All Statuses</SelectItem>
+                  {CURRENT_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
-      {myProjects.length === 0 ? (
-        <Card className="p-12 text-center">
-          <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-xl font-semibold mb-2">
-            {statusFilter !== "all" ? "No Projects Found" : "No Projects Yet"}
-          </h3>
-          <p className="text-muted-foreground">
-            {statusFilter !== "all" 
-              ? `No projects match the "${statusFilter}" status filter. Try selecting a different status.`
-              : user?.role === 'client' 
-                ? "You don't have any projects assigned to you yet. Your contractor will add you to a project soon."
-                : "You don't have any projects assigned to you yet. Create a new project to get started."}
-          </p>
-        </Card>
-      ) : (
-        <>
-          {activeProjects.length > 0 && (
-            <section>
-              <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Current Projects</h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activeProjects.map((project) => (
-                  <ProjectCard key={project.id} project={project} portalPath={portalPath} />
-                ))}
-              </div>
-            </section>
-          )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="projects-tabs">
+        <TabsList data-testid="tabs-list">
+          <TabsTrigger value="current" data-testid="tab-current">
+            Current Projects
+            <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs" data-testid="badge-current-count">
+              {allCurrent.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="completed" data-testid="tab-completed">
+            Completed Projects
+            <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs" data-testid="badge-completed-count">
+              {allCompleted.length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
 
-          {completedProjects.length > 0 && (
-            <section>
-              <h2 className="text-xl font-heading font-semibold text-foreground mb-4">Completed Projects</h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {completedProjects.map((project) => (
-                  <ProjectCard key={project.id} project={project} portalPath={portalPath} />
-                ))}
-              </div>
-            </section>
+        <TabsContent value="current" className="mt-6">
+          {displayedCurrent.length === 0 ? (
+            <EmptyState
+              message={currentStatusFilter !== "all" ? "No Projects Found" : "No Current Projects"}
+              detail={
+                currentStatusFilter !== "all"
+                  ? `No projects match the "${currentStatusFilter}" filter. Try a different status.`
+                  : user?.role === 'client'
+                    ? "You don't have any active projects yet. Your contractor will add you soon."
+                    : "No active projects yet. Create a new project to get started."
+              }
+            />
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="current-projects-grid">
+              {displayedCurrent.map((project) => (
+                <ProjectCard key={project.id} project={project} portalPath={portalPath} />
+              ))}
+            </div>
           )}
-        </>
-      )}
+        </TabsContent>
+
+        <TabsContent value="completed" className="mt-6">
+          {displayedCompleted.length === 0 ? (
+            <EmptyState
+              message="No Completed Projects"
+              detail="Completed projects will appear here once work has been finished and marked complete."
+            />
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="completed-projects-grid">
+              {displayedCompleted.map((project) => (
+                <ProjectCard key={project.id} project={project} portalPath={portalPath} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
