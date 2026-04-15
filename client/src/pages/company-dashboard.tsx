@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
@@ -25,13 +25,23 @@ const SUBCONTRACTOR_SPECIALTIES = [
 ];
 
 export default function CompanyDashboard() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", contractorType: "contractor", specialty: "", projectId: "" });
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() =>
+    location === "/company/team" ? "team" : "overview"
+  );
+
+  useEffect(() => {
+    if (location === "/company/team") {
+      setActiveTab("team");
+    } else if (location === "/company/dashboard") {
+      setActiveTab("overview");
+    }
+  }, [location]);
 
   const { data: company, isLoading: companyLoading } = useQuery({
     queryKey: ["/api/company/mine"],
@@ -294,7 +304,6 @@ export default function CompanyDashboard() {
                     >
                       <div>
                         <p className="font-medium">{project.title}</p>
-                        <p className="text-sm text-muted-foreground">{project.clientName || "No client assigned"}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <Badge variant={project.status === "active" ? "default" : "secondary"} className="capitalize">
