@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HardHat, ArrowRight, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { HardHat, ArrowRight, Eye, EyeOff, CheckCircle2, Mail, Info } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
@@ -41,11 +41,11 @@ export default function AuthPage() {
   // Password visibility states
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showAdminPassword, setShowAdminPassword] = useState(false);
-  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
+  const [showCompanyPassword, setShowCompanyPassword] = useState(false);
+  const [showCompanyConfirmPassword, setShowCompanyConfirmPassword] = useState(false);
   
-  // Contractor request states
-  const [requestSubmitted, setRequestSubmitted] = useState(false);
+  // Company registration state
+  const [companyRegistered, setCompanyRegistered] = useState(false);
   const [companyType, setCompanyType] = useState("");
   const [customCompanyType, setCustomCompanyType] = useState("");
 
@@ -95,16 +95,16 @@ export default function AuthPage() {
     }
   };
 
-  const handleContractorAuth = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCompanyAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const password = formData.get("admin-password") as string;
+    const password = formData.get("company-password") as string;
 
     try {
       if (isLogin) {
-        const loginId = formData.get("admin-email") as string;
+        const loginId = formData.get("company-email") as string;
         const loggedInUser = await login(loginId, password, "contractor");
         toast({
           title: "Welcome back!",
@@ -120,46 +120,40 @@ export default function AuthPage() {
           setLocation("/contractor/dashboard");
         }
       } else {
-        // Submit access request (no account creation)
-        const firstName = formData.get("admin-first-name") as string;
-        const lastName = formData.get("admin-last-name") as string;
-        const username = formData.get("admin-username") as string;
+        const firstName = formData.get("company-first-name") as string;
+        const lastName = formData.get("company-last-name") as string;
+        const username = formData.get("company-username") as string;
         const companyName = formData.get("company-name") as string;
-        const email = formData.get("admin-signup-email") as string;
+        const email = formData.get("company-signup-email") as string;
+        const confirmPassword = formData.get("company-confirm-password") as string;
 
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match");
+        }
         if (!companyType) {
           throw new Error("Please select a company type");
         }
-
-        const finalCompanyType = companyType === "Other" ? customCompanyType : companyType;
         if (companyType === "Other" && !customCompanyType.trim()) {
           throw new Error("Please specify your company type");
         }
 
-        const res = await fetch("/api/contractor-requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            username,
-            companyName,
-            companyType: finalCompanyType,
-            email
-          })
-        });
+        const finalCompanyType = companyType === "Other" ? customCompanyType : companyType;
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.message || "Failed to submit request");
-        }
-
-        setRequestSubmitted(true);
+        await register(
+          username,
+          email,
+          password,
+          "contractor",
+          `${firstName} ${lastName}`,
+          companyName,
+          finalCompanyType
+        );
+        setCompanyRegistered(true);
       }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Request failed",
+        description: error.message || "Registration failed",
         variant: "destructive",
       });
     } finally {
@@ -177,7 +171,6 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("notary-email") as string;
-        // Notaries log in through contractor portal
         await login(loginId, password, "contractor");
         toast({
           title: "Welcome back!",
@@ -195,7 +188,6 @@ export default function AuthPage() {
           throw new Error("Passwords do not match");
         }
 
-        // Register as contractor with notary subtype - needs admin approval
         await register(username, email, password, "contractor", `${firstName} ${lastName}`, undefined, undefined, undefined, "notary");
         toast({
           title: "Registration submitted!",
@@ -232,7 +224,7 @@ export default function AuthPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="client" data-testid="tab-client">Client</TabsTrigger>
-              <TabsTrigger value="contractor" data-testid="tab-contractor">Contractor</TabsTrigger>
+              <TabsTrigger value="contractor" data-testid="tab-contractor">Company</TabsTrigger>
               <TabsTrigger value="notary" data-testid="tab-notary">Notary</TabsTrigger>
             </TabsList>
             
@@ -383,7 +375,7 @@ export default function AuthPage() {
             
             <TabsContent value="contractor">
               <Card className="border-border/50 shadow-lg">
-                {requestSubmitted && !isLogin ? (
+                {companyRegistered && !isLogin ? (
                   <>
                     <CardHeader>
                       <div className="flex items-center justify-center mb-4">
@@ -391,9 +383,10 @@ export default function AuthPage() {
                           <CheckCircle2 className="w-8 h-8 text-green-600" />
                         </div>
                       </div>
-                      <CardTitle className="text-center">Request Submitted!</CardTitle>
+                      <CardTitle className="text-center">Account Created!</CardTitle>
                       <CardDescription className="text-center">
-                        Your access request has been submitted successfully. Our team will review your application and you will receive login credentials via email once approved.
+                        Your company account has been created and is pending admin approval. 
+                        You will be able to log in once your account is approved.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -401,7 +394,7 @@ export default function AuthPage() {
                         className="w-full" 
                         variant="outline"
                         onClick={() => {
-                          setRequestSubmitted(false);
+                          setCompanyRegistered(false);
                           setIsLogin(true);
                         }}
                         data-testid="button-back-to-login"
@@ -413,47 +406,55 @@ export default function AuthPage() {
                 ) : (
                   <>
                     <CardHeader>
-                      <CardTitle>{isLogin ? "Team Access" : "Request Access"}</CardTitle>
+                      <CardTitle>
+                        {isLogin ? "Company Login" : "Register Your Company"}
+                      </CardTitle>
                       <CardDescription>
                         {isLogin 
-                          ? "Secure login for project managers and estimators." 
-                          : "Submit your request to join the BuildVision network."}
+                          ? "Log in to access your company dashboard and projects." 
+                          : "Create a company account and start managing your projects and team."}
                       </CardDescription>
                     </CardHeader>
-                    <form onSubmit={handleContractorAuth}>
+                    <form onSubmit={handleCompanyAuth}>
                       <CardContent className="space-y-4">
                         {!isLogin && (
                           <>
+                            <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-700">
+                              <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                              <span>
+                                This creates a <strong>company owner</strong> account. Your team members (contractors, subcontractors, notaries) join via email invitation from your dashboard.
+                              </span>
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label htmlFor="admin-first-name">First Name</Label>
+                                <Label htmlFor="company-first-name">First Name</Label>
                                 <Input 
-                                  id="admin-first-name" 
-                                  name="admin-first-name"
+                                  id="company-first-name" 
+                                  name="company-first-name"
                                   placeholder="Mike" 
                                   required 
-                                  data-testid="input-admin-first-name"
+                                  data-testid="input-company-first-name"
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="admin-last-name">Last Name</Label>
+                                <Label htmlFor="company-last-name">Last Name</Label>
                                 <Input 
-                                  id="admin-last-name" 
-                                  name="admin-last-name"
+                                  id="company-last-name" 
+                                  name="company-last-name"
                                   placeholder="Builder" 
                                   required 
-                                  data-testid="input-admin-last-name"
+                                  data-testid="input-company-last-name"
                                 />
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="admin-username">Username</Label>
+                              <Label htmlFor="company-username">Username</Label>
                               <Input 
-                                id="admin-username" 
-                                name="admin-username"
+                                id="company-username" 
+                                name="company-username"
                                 placeholder="mikebuilder" 
                                 required 
-                                data-testid="input-admin-username"
+                                data-testid="input-company-username"
                               />
                             </div>
                             <div className="space-y-2">
@@ -495,13 +496,14 @@ export default function AuthPage() {
                               </div>
                             )}
                             <div className="space-y-2">
-                              <Label htmlFor="admin-signup-email">Work Email (Optional)</Label>
+                              <Label htmlFor="company-signup-email">Work Email</Label>
                               <Input 
-                                id="admin-signup-email" 
-                                name="admin-signup-email"
+                                id="company-signup-email" 
+                                name="company-signup-email"
                                 type="email"
-                                placeholder="admin@company.com"
-                                data-testid="input-admin-signup-email"
+                                placeholder="mike@acmeconstruction.com"
+                                required
+                                data-testid="input-company-signup-email"
                               />
                             </div>
                           </>
@@ -509,52 +511,82 @@ export default function AuthPage() {
                         {isLogin && (
                           <>
                             <div className="space-y-2">
-                              <Label htmlFor="admin-email">Email or Username</Label>
+                              <Label htmlFor="company-email">Email or Username</Label>
                               <Input 
-                                id="admin-email" 
-                                name="admin-email"
+                                id="company-email" 
+                                name="company-email"
                                 type="text"
                                 placeholder="email or username"
                                 required 
-                                data-testid="input-admin-email"
+                                data-testid="input-company-email"
                               />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="admin-password">Password</Label>
-                              <div className="relative">
-                                <Input 
-                                  id="admin-password" 
-                                  name="admin-password"
-                                  type={showAdminPassword ? "text" : "password"}
-                                  required 
-                                  data-testid="input-admin-password"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowAdminPassword(!showAdminPassword)}
-                                  data-testid="button-toggle-admin-password"
-                                >
-                                  {showAdminPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                                </Button>
-                              </div>
                             </div>
                           </>
                         )}
+                        <div className="space-y-2">
+                          <Label htmlFor="company-password">Password</Label>
+                          <div className="relative">
+                            <Input 
+                              id="company-password" 
+                              name="company-password"
+                              type={showCompanyPassword ? "text" : "password"}
+                              required 
+                              data-testid="input-company-password"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowCompanyPassword(!showCompanyPassword)}
+                              data-testid="button-toggle-company-password"
+                            >
+                              {showCompanyPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                            </Button>
+                          </div>
+                        </div>
+                        {!isLogin && (
+                          <div className="space-y-2">
+                            <Label htmlFor="company-confirm-password">Confirm Password</Label>
+                            <div className="relative">
+                              <Input 
+                                id="company-confirm-password" 
+                                name="company-confirm-password"
+                                type={showCompanyConfirmPassword ? "text" : "password"}
+                                required 
+                                data-testid="input-company-confirm-password"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowCompanyConfirmPassword(!showCompanyConfirmPassword)}
+                                data-testid="button-toggle-company-confirm-password"
+                              >
+                                {showCompanyConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
-                      <CardFooter>
+                      <CardFooter className="flex-col gap-3">
                         <Button 
                           type="submit" 
                           className="w-full font-medium" 
                           variant="default" 
                           disabled={loading}
-                          data-testid="button-contractor-submit"
+                          data-testid="button-company-submit"
                         >
-                          {loading ? "Please wait..." : isLogin ? "Access Dashboard" : "Submit Request"} 
+                          {loading ? "Please wait..." : isLogin ? "Access Dashboard" : "Create Company Account"} 
                           {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                         </Button>
+                        {isLogin && (
+                          <p className="text-xs text-center text-muted-foreground">
+                            <Mail className="inline h-3 w-3 mr-1" />
+                            Subcontractors: use the invite link sent to your email, not this form.
+                          </p>
+                        )}
                       </CardFooter>
                     </form>
                   </>
@@ -667,6 +699,11 @@ export default function AuthPage() {
                       {loading ? "Please wait..." : isLogin ? "Access Portal" : "Create Account"} 
                       {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                     </Button>
+                    {!isLogin && (
+                      <p className="text-xs text-center text-muted-foreground">
+                        Notary accounts require admin approval before you can log in.
+                      </p>
+                    )}
                   </CardFooter>
                 </form>
               </Card>

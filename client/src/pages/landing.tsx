@@ -13,7 +13,10 @@ import {
   Hammer,
   ClipboardList,
   Shield,
-  Stamp
+  Stamp,
+  Mail,
+  UserPlus,
+  Briefcase
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -43,17 +46,17 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6">
               Construction Management<br />
-              <span className="text-blue-600">Made Simple</span>
+              <span className="text-blue-600">Built for Teams</span>
             </h1>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto mb-10">
-              BuildVision connects contractors and clients with a powerful platform for project tracking, 
-              document management, real-time communication, and transparent budgeting.
+              BuildVision gives contractors a company dashboard to manage projects, build their team, 
+              and keep clients informed — all in one place.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
               <Link href="/auth?mode=register&tab=contractor">
                 <Button size="lg" className="text-lg px-8" data-testid="button-contractor-signup">
-                  <Hammer className="mr-2 h-5 w-5" />
-                  I'm a Contractor
+                  <Building2 className="mr-2 h-5 w-5" />
+                  Start My Company
                 </Button>
               </Link>
               <Link href="/auth?mode=register&tab=client">
@@ -69,6 +72,10 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
+            <p className="mt-6 text-sm text-slate-500">
+              <Mail className="inline h-4 w-4 mr-1 mb-0.5" />
+              Subcontractors and team members join via email invitation from their company owner.
+            </p>
           </div>
         </section>
 
@@ -77,32 +84,42 @@ export default function LandingPage() {
             <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
               How BuildVision Works
             </h2>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-4 gap-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ClipboardList className="h-8 w-8 text-blue-600" />
+                  <Building2 className="h-8 w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">1. Create Your Project</h3>
+                <h3 className="text-xl font-semibold mb-2">1. Register Your Company</h3>
                 <p className="text-slate-600">
-                  Contractors set up projects with timelines, budgets, and milestones. 
-                  Clients receive an invitation to join their project portal.
+                  Contractors sign up and instantly get a company account with a dedicated 
+                  dashboard for managing projects and team members.
                 </p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="h-8 w-8 text-blue-600" />
+                  <UserPlus className="h-8 w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">2. Stay Connected</h3>
+                <h3 className="text-xl font-semibold mb-2">2. Build Your Team</h3>
                 <p className="text-slate-600">
-                  Real-time messaging, progress photos, and document sharing keep everyone 
-                  aligned throughout the construction process.
+                  Invite contractors, subcontractors, and notaries to your company by email. 
+                  Assign roles and control what each member can see and do.
+                </p>
+              </div>
+              <div className="text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ClipboardList className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">3. Run Your Projects</h3>
+                <p className="text-slate-600">
+                  Create projects with timelines, budgets, and milestones. 
+                  Clients receive an invitation to view their dedicated project portal.
                 </p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="h-8 w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">3. Complete with Confidence</h3>
+                <h3 className="text-xl font-semibold mb-2">4. Complete with Confidence</h3>
                 <p className="text-slate-600">
                   Track milestones, manage invoices, and sign documents electronically 
                   for a smooth project completion.
@@ -167,11 +184,11 @@ export default function LandingPage() {
               
               <Card className="border-0 shadow-md">
                 <CardContent className="p-6">
-                  <ClipboardList className="h-10 w-10 text-blue-600 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Milestone Tracking</h3>
+                  <Users className="h-10 w-10 text-blue-600 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Team Management</h3>
                   <p className="text-slate-600 text-sm">
-                    Break projects into phases with clear milestones. 
-                    Track progress and keep projects on schedule.
+                    Invite contractors, subcontractors, and notaries to your company. 
+                    Assign roles and control project-level access per member.
                   </p>
                 </CardContent>
               </Card>
@@ -187,6 +204,17 @@ export default function LandingPage() {
                 </CardContent>
               </Card>
               
+              <Card className="border-0 shadow-md">
+                <CardContent className="p-6">
+                  <ClipboardList className="h-10 w-10 text-blue-600 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Milestone Tracking</h3>
+                  <p className="text-slate-600 text-sm">
+                    Break projects into phases with clear milestones. 
+                    Track progress and keep projects on schedule.
+                  </p>
+                </CardContent>
+              </Card>
+              
               <Card className="border-0 shadow-md bg-purple-50">
                 <CardContent className="p-6">
                   <Stamp className="h-10 w-10 text-purple-600 mb-4" />
@@ -197,6 +225,17 @@ export default function LandingPage() {
                   </p>
                 </CardContent>
               </Card>
+
+              <Card className="border-0 shadow-md bg-amber-50">
+                <CardContent className="p-6">
+                  <Hammer className="h-10 w-10 text-amber-600 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Change Orders</h3>
+                  <p className="text-slate-600 text-sm">
+                    Create and track change orders with line-item breakdowns. 
+                    Clients approve or reject with a full audit trail.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
@@ -204,14 +243,14 @@ export default function LandingPage() {
         <section className="py-16 bg-blue-600 text-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl font-bold mb-4">
-              Ready to Transform Your Construction Projects?
+              Ready to Transform Your Construction Business?
             </h2>
             <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
-              Join contractors and homeowners across Florida who are building better together with BuildVision.
+              Join contractors and companies across Florida who are building smarter with BuildVision.
             </p>
-            <Link href="/auth?mode=register">
+            <Link href="/auth?mode=register&tab=contractor">
               <Button size="lg" variant="secondary" className="text-lg px-8" data-testid="button-get-started-cta">
-                Get Started Free
+                Start Your Company Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -220,85 +259,114 @@ export default function LandingPage() {
 
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-3 gap-12">
+            <div className="grid md:grid-cols-4 gap-10">
               <div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-6">
-                  For Contractors
+                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                  <Building2 className="h-6 w-6 text-blue-600" />
+                  For Companies
                 </h2>
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Manage multiple projects from a single dashboard</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Create a company account and get your own dashboard instantly</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Create professional estimates with our built-in calculator</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Invite team members, assign roles, and set company admins</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Send invoices and track payments easily</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Manage all company projects from a single view</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Tag documents for notarization and assign notaries</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Create estimates, send invoices, and track payments</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Collect signatures on contracts digitally</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Collect e-signatures and manage change orders</span>
                   </li>
                 </ul>
               </div>
               <div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                  <Briefcase className="h-6 w-6 text-orange-500" />
+                  For Subcontractors
+                </h2>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Join multiple companies via email invitation — no separate sign-up needed</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">See only the projects you've been assigned to</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">View project documents, progress, and messages</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Work across multiple general contractors from one account</span>
+                  </li>
+                </ul>
+                <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                  <p className="text-xs text-orange-700 font-medium">
+                    <Mail className="inline h-3.5 w-3.5 mr-1" />
+                    Subcontractors join via invite only. Ask your general contractor to send you an invitation.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                  <Users className="h-6 w-6 text-blue-500" />
                   For Clients
                 </h2>
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Track your project's progress in real-time</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Track your project's progress in real-time</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">View photos and updates from your contractor</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">View photos and updates from your contractor</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Upload notarized documents directly</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Review and approve change orders</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Access all project documents in one place</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Access all project documents in one place</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">See exactly where your budget is being spent</span>
+                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">See exactly where your budget is being spent</span>
                   </li>
                 </ul>
               </div>
               <div>
-                <h2 className="text-3xl font-bold text-purple-700 mb-6">
+                <h2 className="text-2xl font-bold text-purple-700 mb-5 flex items-center gap-2">
+                  <Stamp className="h-6 w-6 text-purple-600" />
                   For Notaries
                 </h2>
-                <ul className="space-y-4">
+                <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Search and find documents requiring notarization</span>
+                    <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Find documents requiring notarization across projects</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Upload notarized documents directly to projects</span>
+                    <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Upload notarized documents directly to projects</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Track pending and completed notarizations</span>
+                    <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Track pending and completed notarizations</span>
                   </li>
                   <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Filter documents by status and due date</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600">Streamlined workflow for Florida construction projects</span>
+                    <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Streamlined workflow for Florida construction projects</span>
                   </li>
                 </ul>
               </div>
