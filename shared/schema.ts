@@ -414,6 +414,7 @@ export const projectTeamMembers = pgTable("project_team_members", {
   projectId: varchar("project_id").notNull().references(() => projects.id),
   contractorId: varchar("contractor_id").notNull().references(() => users.id),
   role: text("role"), // Their role/trade on this project (e.g., "Electrician", "HVAC")
+  isProjectLead: boolean("is_project_lead").default(false), // Project-level admin/lead rights: can invite external members
   addedBy: varchar("added_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   permissions: jsonb("permissions").default({ canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false }), // Per-project permissions for subs/notaries

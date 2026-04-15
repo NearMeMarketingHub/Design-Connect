@@ -391,6 +391,7 @@ export default function ProjectDetails() {
     projectId: string;
     contractorId: string;
     role: string | null;
+    isProjectLead: boolean | null;
     permissions: ExternalMemberPermissions | null;
     contractor?: {
       id: string;
@@ -411,6 +412,10 @@ export default function ProjectDetails() {
     },
     enabled: !!projectId && !isSubOrNotary,
   });
+
+  // Derived: is the current user a project lead (can invite external members)?
+  const isCurrentUserProjectLead = user?.role === "contractor" && !user?.contractorType &&
+    teamMembers.some(m => m.contractorId === user?.id && m.isProjectLead === true);
 
   const [editingMemberPerms, setEditingMemberPerms] = useState<{ memberId: string; permissions: ExternalMemberPermissions } | null>(null);
 
@@ -3178,7 +3183,7 @@ export default function ProjectDetails() {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Team
                     </Button>
-                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin") && (
+                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin" || isCurrentUserProjectLead) && (
                       <Button
                         variant="outline"
                         className="w-full mt-2"

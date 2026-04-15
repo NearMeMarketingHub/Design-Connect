@@ -3101,9 +3101,9 @@ export async function registerRoutes(
       if (user.role !== 'contractor' && user.role !== 'admin' && user.role !== 'company_owner') {
         return res.status(403).json({ message: "Only contractors and admins can add team members" });
       }
-      // Subcontractors are read-only; they cannot manage team membership
-      if (user.role === "contractor" && user.contractorType === "subcontractor") {
-        return res.status(403).json({ message: "Subcontractors cannot manage team members" });
+      // External users (subcontractors, notaries) are read-only; they cannot manage team membership
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "External users (subcontractors and notaries) cannot manage team members" });
       }
       
       const { contractorId, role } = req.body;
@@ -3130,9 +3130,9 @@ export async function registerRoutes(
       if (user.role !== 'contractor' && user.role !== 'admin' && user.role !== 'company_owner') {
         return res.status(403).json({ message: "Only contractors and admins can remove team members" });
       }
-      // Subcontractors are read-only; they cannot manage team membership
-      if (user.role === "contractor" && user.contractorType === "subcontractor") {
-        return res.status(403).json({ message: "Subcontractors cannot manage team members" });
+      // External users (subcontractors, notaries) are read-only; they cannot manage team membership
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "External users (subcontractors and notaries) cannot manage team members" });
       }
       
       await storage.removeProjectTeamMember(req.params.memberId);
@@ -3176,10 +3176,17 @@ export async function registerRoutes(
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Authorization: strict — only company_owner, isCompanyAdmin, or platform admin may invite
-      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      // Authorization: company_owner, isCompanyAdmin, platform admin, OR a plain company contractor
+      // who is a project team member with isProjectLead = true (project-level admin/lead rights)
+      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      if (!canInvite && user.role === "contractor" && !user.contractorType && user.companyId) {
+        const membership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
+        if (membership?.isProjectLead === true) {
+          canInvite = true;
+        }
+      }
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners and company admins can invite external members" });
+        return res.status(403).json({ message: "Only company owners, admins, or project leads can invite external members" });
       }
 
       const { email, name, role, permissions } = req.body;
