@@ -99,6 +99,8 @@ export default function AuthPage() {
         toast({ title: "Welcome back!", description: "You have successfully logged in." });
         if (loggedInUser.role === "company_owner") {
           setLocation("/company/dashboard");
+        } else if (loggedInUser.role === "contractor" && (loggedInUser.contractorType === "notary" || loggedInUser.contractorType === "subcontractor")) {
+          setLocation("/subcontractor/dashboard");
         } else {
           setLocation("/contractor/dashboard");
         }

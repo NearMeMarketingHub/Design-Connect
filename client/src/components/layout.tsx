@@ -60,13 +60,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const showBackButton = !isDashboard && !loading && user;
 
   const isCompanyOwner = user?.role === "company_owner";
-  const isCompanyAdmin = !!(user as any)?.isCompanyAdmin;
+  const isCompanyAdmin = !!user?.isCompanyAdmin;
   const canAccessAdminCenter = isCompanyOwner || isCompanyAdmin;
 
   const contractorSidebarItems: SidebarItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/contractor/dashboard" },
     ...(canAccessAdminCenter ? [
       { label: "Admin Center", icon: <Shield className="w-5 h-5" />, href: "/company/dashboard" },
+      { label: "Team", icon: <Users className="w-5 h-5" />, href: "/company/team" },
     ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
     { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
