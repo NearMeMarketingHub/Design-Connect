@@ -208,7 +208,7 @@ export default function SubcontractorDashboard() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card data-testid="card-active-projects">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -246,6 +246,20 @@ export default function SubcontractorDashboard() {
               </div>
               <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-pending-invites">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Pending Invites</p>
+                <p className="text-3xl font-bold mt-1" data-testid="stat-pending-invites">{pendingInvites.length}</p>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                <Bell className="w-6 h-6 text-yellow-600" />
               </div>
             </div>
           </CardContent>

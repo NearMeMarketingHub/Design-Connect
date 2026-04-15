@@ -3139,10 +3139,15 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/invite-external", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      // Only company owners, company admins, and platform admins may invite external members
-      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      // Company owners, company admins, and platform admins can always invite
+      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      // Also allow non-external project team members who are project leads (on the project, not a sub/notary)
+      if (!canInvite && user.role === "contractor" && user.contractorType !== "subcontractor" && user.contractorType !== "notary") {
+        const teamMembership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
+        if (teamMembership) canInvite = true;
+      }
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners and admins can invite external members" });
+        return res.status(403).json({ message: "Only company owners, admins, and project team members can invite external members" });
       }
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -3247,7 +3252,8 @@ export async function registerRoutes(
   app.get("/api/my-projects", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      if (user.role !== "contractor") {
+      // Only external (sub/notary) users use this endpoint
+      if (user.role !== "contractor" || (user.contractorType !== "subcontractor" && user.contractorType !== "notary")) {
         return res.status(403).json({ message: "Only subcontractors and notaries can use this endpoint" });
       }
       const projects = await storage.getContractorProjectsWithDetails(user.id);

@@ -377,8 +377,32 @@ export default function ProjectDetails() {
     enabled: isSubOrNotary,
   });
 
+  // Typed interface for external member permissions
+  type ExternalMemberPermissions = {
+    canViewDocuments: boolean;
+    canUploadDocuments: boolean;
+    canViewBudget: boolean;
+    canViewMessages: boolean;
+    canPostMessages: boolean;
+    canViewEstimates: boolean;
+  };
+  type ProjectTeamMemberWithUser = {
+    id: string;
+    projectId: string;
+    contractorId: string;
+    role: string | null;
+    permissions: ExternalMemberPermissions | null;
+    contractor?: {
+      id: string;
+      username: string;
+      email: string | null;
+      contractorType: string | null;
+      name: string | null;
+    };
+  };
+
   // Fetch project team members (includes sub/notary external members with permissions)
-  const { data: teamMembers = [], refetch: refetchTeam } = useQuery<any[]>({
+  const { data: teamMembers = [], refetch: refetchTeam } = useQuery<ProjectTeamMemberWithUser[]>({
     queryKey: ["/api/projects", projectId, "team"],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${projectId}/team`, { credentials: "include" });
@@ -388,7 +412,7 @@ export default function ProjectDetails() {
     enabled: !!projectId && !isSubOrNotary,
   });
 
-  const [editingMemberPerms, setEditingMemberPerms] = useState<{ memberId: string; permissions: Record<string, boolean> } | null>(null);
+  const [editingMemberPerms, setEditingMemberPerms] = useState<{ memberId: string; permissions: ExternalMemberPermissions } | null>(null);
 
   const removeTeamMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
@@ -400,7 +424,7 @@ export default function ProjectDetails() {
   });
 
   const updatePermsMutation = useMutation({
-    mutationFn: async ({ memberId, permissions }: { memberId: string; permissions: Record<string, boolean> }) => {
+    mutationFn: async ({ memberId, permissions }: { memberId: string; permissions: ExternalMemberPermissions }) => {
       const res = await fetch(`/api/projects/${projectId}/team/${memberId}/permissions`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -443,7 +467,26 @@ export default function ProjectDetails() {
     clientId: apiProject.clientId
   } : null);
   const activeTab = getTabFromPath();
-  
+
+  // Route-level permission guard: redirect sub/notary users away from tabs they lack permission for
+  useEffect(() => {
+    if (!isSubOrNotary) return;
+    if (!subNotaryPermissions) return; // permissions not loaded yet
+    const tabPermissionMap: Record<string, keyof ExternalMemberPermissions> = {
+      messages: 'canViewMessages',
+      documents: 'canViewDocuments',
+      budget: 'canViewBudget',
+      estimates: 'canViewEstimates',
+    };
+    const requiredPerm = tabPermissionMap[activeTab];
+    if (requiredPerm) {
+      const permsObj = subNotaryPermissions as Record<string, boolean>;
+      if (!permsObj[requiredPerm]) {
+        handleTabChange('overview');
+      }
+    }
+  }, [activeTab, isSubOrNotary, subNotaryPermissions]);
+
   // Update project mutation for contractor editing
   const updateProjectMutation = useMutation({
     mutationFn: async (data: { status?: string; phase?: string; progress?: number; description?: string; nextMilestone?: string }) => {
@@ -3156,8 +3199,9 @@ export default function ProjectDetails() {
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">External Members</p>
                           {externalMembers.map(member => {
                             const isEditing = editingMemberPerms?.memberId === member.id;
-                            const perms: Record<string, boolean> = isEditing ? editingMemberPerms!.permissions : (member.permissions || {});
-                            const PERM_LABELS: Record<string, string> = {
+                            const defaultPerms: ExternalMemberPermissions = { canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false };
+                            const perms: ExternalMemberPermissions = isEditing ? editingMemberPerms!.permissions : (member.permissions ?? defaultPerms);
+                            const PERM_LABELS: Record<keyof ExternalMemberPermissions, string> = {
                               canViewDocuments: "View Docs",
                               canUploadDocuments: "Upload Docs",
                               canViewBudget: "View Budget",
@@ -3226,7 +3270,7 @@ export default function ProjectDetails() {
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {Object.entries(PERM_LABELS).map(([key, label]) => {
+                                  {(Object.entries(PERM_LABELS) as [keyof ExternalMemberPermissions, string][]).map(([key, label]) => {
                                     const enabled = isEditing ? (editingMemberPerms!.permissions[key] ?? false) : (perms[key] ?? false);
                                     return isEditing ? (
                                       <button
@@ -3235,7 +3279,7 @@ export default function ProjectDetails() {
                                         data-testid={`perm-toggle-${member.id}-${key}`}
                                         onClick={() => setEditingMemberPerms(prev => prev ? {
                                           ...prev,
-                                          permissions: { ...prev.permissions, [key]: !prev.permissions[key] }
+                                          permissions: { ...prev.permissions, [key]: !prev.permissions[key] } as ExternalMemberPermissions
                                         } : prev)}
                                         className={`text-xs px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
                                           enabled
