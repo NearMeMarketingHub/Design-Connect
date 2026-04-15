@@ -2907,7 +2907,9 @@ export async function registerRoutes(
       if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
       const existing = await storage.getBudgetCategory(req.params.id);
       if (!existing || existing.companyId !== companyId) return res.status(404).json({ message: "Category not found" });
-      const category = await storage.updateBudgetCategory(req.params.id, req.body);
+      // Whitelist mutable fields — never allow companyId to change
+      const { name, notes, displayOrder, isActive } = req.body;
+      const category = await storage.updateBudgetCategory(req.params.id, { name, notes, displayOrder, isActive });
       res.json(category);
     } catch (error) { next(error); }
   });
@@ -2954,7 +2956,16 @@ export async function registerRoutes(
       if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
       const existing = await storage.getBudgetItem(req.params.id);
       if (!existing || existing.companyId !== companyId) return res.status(404).json({ message: "Item not found" });
-      const item = await storage.updateBudgetItem(req.params.id, req.body);
+      // Whitelist mutable fields — never allow companyId to change
+      const { description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive, categoryId } = req.body;
+      // If categoryId is being changed, verify the new category belongs to this company
+      if (categoryId && categoryId !== existing.categoryId) {
+        const newCat = await storage.getBudgetCategory(categoryId);
+        if (!newCat || newCat.companyId !== companyId) {
+          return res.status(400).json({ message: "Invalid category" });
+        }
+      }
+      const item = await storage.updateBudgetItem(req.params.id, { description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive, categoryId });
       res.json(item);
     } catch (error) { next(error); }
   });
@@ -2984,7 +2995,7 @@ export async function registerRoutes(
   app.get("/api/budget/categories/:id", requireAdmin, async (req, res, next) => {
     try {
       const category = await storage.getBudgetCategory(req.params.id);
-      if (!category) {
+      if (!category || category.companyId !== null) {
         return res.status(404).json({ message: "Category not found" });
       }
       const items = await storage.getBudgetItems(req.params.id);
@@ -2996,7 +3007,9 @@ export async function registerRoutes(
 
   app.post("/api/budget/categories", requireAdmin, async (req, res, next) => {
     try {
-      const category = await storage.createBudgetCategory(req.body);
+      // Platform reference categories always have companyId = null
+      const { name, notes, displayOrder, isActive } = req.body;
+      const category = await storage.createBudgetCategory({ name, notes, displayOrder, isActive, companyId: null });
       res.json(category);
     } catch (error) {
       next(error);
@@ -3005,7 +3018,13 @@ export async function registerRoutes(
 
   app.patch("/api/budget/categories/:id", requireAdmin, async (req, res, next) => {
     try {
-      const category = await storage.updateBudgetCategory(req.params.id, req.body);
+      const existing = await storage.getBudgetCategory(req.params.id);
+      if (!existing || existing.companyId !== null) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      // Whitelist mutable fields — companyId stays null
+      const { name, notes, displayOrder, isActive } = req.body;
+      const category = await storage.updateBudgetCategory(req.params.id, { name, notes, displayOrder, isActive });
       if (!category) {
         return res.status(404).json({ message: "Category not found" });
       }
@@ -3017,6 +3036,10 @@ export async function registerRoutes(
 
   app.delete("/api/budget/categories/:id", requireAdmin, async (req, res, next) => {
     try {
+      const existing = await storage.getBudgetCategory(req.params.id);
+      if (!existing || existing.companyId !== null) {
+        return res.status(404).json({ message: "Category not found" });
+      }
       await storage.deleteBudgetCategory(req.params.id);
       res.json({ message: "Category deleted" });
     } catch (error) {
@@ -3046,7 +3069,7 @@ export async function registerRoutes(
   app.get("/api/budget/items/:id", requireAdmin, async (req, res, next) => {
     try {
       const item = await storage.getBudgetItem(req.params.id);
-      if (!item) {
+      if (!item || item.companyId !== null) {
         return res.status(404).json({ message: "Item not found" });
       }
       res.json(item);
@@ -3057,7 +3080,9 @@ export async function registerRoutes(
 
   app.post("/api/budget/items", requireAdmin, async (req, res, next) => {
     try {
-      const item = await storage.createBudgetItem(req.body);
+      // Platform reference items always have companyId = null
+      const { categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive } = req.body;
+      const item = await storage.createBudgetItem({ categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive, companyId: null });
       res.json(item);
     } catch (error) {
       next(error);
@@ -3066,7 +3091,13 @@ export async function registerRoutes(
 
   app.patch("/api/budget/items/:id", requireAdmin, async (req, res, next) => {
     try {
-      const item = await storage.updateBudgetItem(req.params.id, req.body);
+      const existing = await storage.getBudgetItem(req.params.id);
+      if (!existing || existing.companyId !== null) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      // Whitelist mutable fields — companyId stays null
+      const { categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive } = req.body;
+      const item = await storage.updateBudgetItem(req.params.id, { categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive });
       if (!item) {
         return res.status(404).json({ message: "Item not found" });
       }
@@ -3078,6 +3109,10 @@ export async function registerRoutes(
 
   app.delete("/api/budget/items/:id", requireAdmin, async (req, res, next) => {
     try {
+      const existing = await storage.getBudgetItem(req.params.id);
+      if (!existing || existing.companyId !== null) {
+        return res.status(404).json({ message: "Item not found" });
+      }
       await storage.deleteBudgetItem(req.params.id);
       res.json({ message: "Item deleted" });
     } catch (error) {

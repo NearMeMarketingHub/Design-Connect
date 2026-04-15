@@ -1259,7 +1259,9 @@ export class DatabaseStorage implements IStorage {
 
   // Budget category methods
   async getBudgetCategories(): Promise<BudgetCategory[]> {
-    return await db.select().from(schema.budgetCategories).orderBy(schema.budgetCategories.displayOrder);
+    return await db.select().from(schema.budgetCategories)
+      .where(isNull(schema.budgetCategories.companyId))
+      .orderBy(schema.budgetCategories.displayOrder);
   }
 
   async getBudgetCategory(id: string): Promise<BudgetCategory | undefined> {
@@ -1288,7 +1290,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllBudgetItems(): Promise<BudgetItem[]> {
-    return await db.select().from(schema.budgetItems).orderBy(schema.budgetItems.displayOrder);
+    return await db.select().from(schema.budgetItems)
+      .where(isNull(schema.budgetItems.companyId))
+      .orderBy(schema.budgetItems.displayOrder);
   }
 
   async getBudgetItem(id: string): Promise<BudgetItem | undefined> {
