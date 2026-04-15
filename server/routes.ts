@@ -519,7 +519,12 @@ export async function registerRoutes(
       const updateData: any = {};
       if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
-      if (trialStartedAt !== undefined) updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
+      if (trialStartedAt !== undefined) {
+        updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
+      } else if (subscriptionStatus === "trialing") {
+        // Auto-reset trial start to now so the 7-day window starts fresh
+        updateData.trialStartedAt = new Date();
+      }
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
