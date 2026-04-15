@@ -376,6 +376,43 @@ export default function ProjectDetails() {
     },
     enabled: isSubOrNotary,
   });
+
+  // Fetch project team members (includes sub/notary external members with permissions)
+  const { data: teamMembers = [], refetch: refetchTeam } = useQuery<any[]>({
+    queryKey: ["/api/projects", projectId, "team"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/team`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId && !isSubOrNotary,
+  });
+
+  const [editingMemberPerms, setEditingMemberPerms] = useState<{ memberId: string; permissions: Record<string, boolean> } | null>(null);
+
+  const removeTeamMemberMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const res = await fetch(`/api/projects/${projectId}/team/${memberId}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to remove member");
+    },
+    onSuccess: () => { refetchTeam(); toast({ title: "Member removed" }); },
+    onError: () => { toast({ title: "Failed to remove member", variant: "destructive" }); },
+  });
+
+  const updatePermsMutation = useMutation({
+    mutationFn: async ({ memberId, permissions }: { memberId: string; permissions: Record<string, boolean> }) => {
+      const res = await fetch(`/api/projects/${projectId}/team/${memberId}/permissions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ permissions }),
+      });
+      if (!res.ok) throw new Error("Failed to update permissions");
+      return res.json();
+    },
+    onSuccess: () => { refetchTeam(); setEditingMemberPerms(null); toast({ title: "Permissions updated" }); },
+    onError: () => { toast({ title: "Failed to update permissions", variant: "destructive" }); },
+  });
   const subNotaryPermissions = isSubOrNotary
     ? (myProjects.find(p => p.id === projectId)?.permissions ?? {})
     : null;
@@ -3107,6 +3144,128 @@ export default function ProjectDetails() {
                         Invite Sub / Notary
                       </Button>
                     )}
+
+                    {/* External Members (sub/notary) with permission management */}
+                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin") && (() => {
+                      const externalMembers = teamMembers.filter(m =>
+                        m.contractor?.contractorType === "subcontractor" || m.contractor?.contractorType === "notary"
+                      );
+                      if (externalMembers.length === 0) return null;
+                      return (
+                        <div className="mt-4 space-y-3" data-testid="external-members-list">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">External Members</p>
+                          {externalMembers.map(member => {
+                            const isEditing = editingMemberPerms?.memberId === member.id;
+                            const perms: Record<string, boolean> = isEditing ? editingMemberPerms!.permissions : (member.permissions || {});
+                            const PERM_LABELS: Record<string, string> = {
+                              canViewDocuments: "View Docs",
+                              canUploadDocuments: "Upload Docs",
+                              canViewBudget: "View Budget",
+                              canViewMessages: "View Msgs",
+                              canPostMessages: "Post Msgs",
+                              canViewEstimates: "View Estimates",
+                            };
+                            return (
+                              <div key={member.id} className="border rounded-lg p-3 space-y-2 bg-muted/30" data-testid={`external-member-${member.id}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Avatar className="h-7 w-7 shrink-0">
+                                      <AvatarFallback className="text-xs">
+                                        {(member.contractor?.username || "?").slice(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">{member.contractor?.username || member.contractor?.email || "Unknown"}</p>
+                                      <p className="text-xs text-muted-foreground capitalize">{member.contractor?.contractorType}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {!isEditing ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        data-testid={`button-edit-perms-${member.id}`}
+                                        onClick={() => setEditingMemberPerms({ memberId: member.id, permissions: { ...perms } })}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-primary"
+                                          data-testid={`button-save-perms-${member.id}`}
+                                          onClick={() => updatePermsMutation.mutate({ memberId: member.id, permissions: editingMemberPerms!.permissions })}
+                                          disabled={updatePermsMutation.isPending}
+                                        >
+                                          <Check className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          data-testid={`button-cancel-perms-${member.id}`}
+                                          onClick={() => setEditingMemberPerms(null)}
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
+                                      data-testid={`button-remove-member-${member.id}`}
+                                      onClick={() => removeTeamMemberMutation.mutate(member.id)}
+                                      disabled={removeTeamMemberMutation.isPending}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {Object.entries(PERM_LABELS).map(([key, label]) => {
+                                    const enabled = isEditing ? (editingMemberPerms!.permissions[key] ?? false) : (perms[key] ?? false);
+                                    return isEditing ? (
+                                      <button
+                                        key={key}
+                                        type="button"
+                                        data-testid={`perm-toggle-${member.id}-${key}`}
+                                        onClick={() => setEditingMemberPerms(prev => prev ? {
+                                          ...prev,
+                                          permissions: { ...prev.permissions, [key]: !prev.permissions[key] }
+                                        } : prev)}
+                                        className={`text-xs px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+                                          enabled
+                                            ? "bg-primary text-primary-foreground border-primary"
+                                            : "bg-muted text-muted-foreground border-muted-foreground/30"
+                                        }`}
+                                      >
+                                        {label}
+                                      </button>
+                                    ) : (
+                                      <span
+                                        key={key}
+                                        data-testid={`perm-chip-${member.id}-${key}`}
+                                        className={`text-xs px-2 py-0.5 rounded-full border ${
+                                          enabled
+                                            ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                                            : "bg-muted text-muted-foreground border-transparent"
+                                        }`}
+                                      >
+                                        {label}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
 
@@ -3921,6 +4080,7 @@ export default function ProjectDetails() {
                   </div>
                 </div>
               </CardContent>
+              {hasProjectPerm('canPostMessages') && (
               <div className="p-4 border-t border-border bg-muted/10">
                 {/* Replying to message preview */}
                 {replyingToMessage && (
@@ -4148,6 +4308,7 @@ export default function ProjectDetails() {
                   </Button>
                 </div>
               </div>
+              )}
             </Card>
             </>
             )}
@@ -4309,7 +4470,7 @@ export default function ProjectDetails() {
                 <h3 className="text-lg font-semibold">Project Documents</h3>
                 <p className="text-sm text-muted-foreground">Contracts, permits, plans, and other important files</p>
               </div>
-              {canEdit && (
+              {(canEdit || hasProjectPerm('canUploadDocuments')) && (
                 <Button 
                   onClick={() => setUploadDocumentOpen(true)}
                   data-testid="button-upload-document"

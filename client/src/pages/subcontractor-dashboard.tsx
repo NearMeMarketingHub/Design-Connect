@@ -270,8 +270,11 @@ export default function SubcontractorDashboard() {
               >
                 <div>
                   <p className="text-sm font-medium">
-                    {invite.contractorType === "notary" ? "Notary" : "Sub-Contractor"} Assignment
+                    {invite.projectName ? invite.projectName : `${invite.contractorType === "notary" ? "Notary" : "Sub-Contractor"} Assignment`}
                   </p>
+                  {invite.companyName && (
+                    <p className="text-xs font-medium text-primary">{invite.companyName}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Expires {new Date(invite.expiresAt).toLocaleDateString()}
                   </p>

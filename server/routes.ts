@@ -520,13 +520,13 @@ export async function registerRoutes(
       const contractor = await storage.getUser(project.contractorId);
       if (contractor && contractor.companyId === user.companyId) return true;
     }
-    // Subcontractors: ONLY via explicit projectTeamMembers assignment
-    if (user.role === "contractor" && user.contractorType === "subcontractor") {
+    // Subcontractors and notaries: ONLY via explicit projectTeamMembers assignment
+    if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
       const teamMembers = await storage.getProjectTeamMembers(project.id);
       return teamMembers.some(m => m.contractorId === user.id);
     }
-    // Regular contractors (non-subcontractor): allow if in same company
-    if (user.role === "contractor" && user.contractorType !== "subcontractor" && user.companyId) {
+    // Regular contractors (non-external): allow if in same company
+    if (user.role === "contractor" && user.contractorType !== "subcontractor" && user.contractorType !== "notary" && user.companyId) {
       const contractor = await storage.getUser(project.contractorId);
       if (contractor && contractor.companyId === user.companyId) return true;
     }
@@ -3146,9 +3146,14 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/invite-external", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      // Also allow project team members who are not external (sub/notary) — "project team member with admin rights"
+      if (!canInvite && user.role === "contractor" && user.contractorType !== "subcontractor" && user.contractorType !== "notary") {
+        const teamMembership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
+        if (teamMembership) canInvite = true;
+      }
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners and admins can invite external members" });
+        return res.status(403).json({ message: "Only company owners, admins, and project team members can invite external members" });
       }
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
@@ -3266,15 +3271,28 @@ export async function registerRoutes(
     }
   });
 
-  // Get pending invites for the logged-in sub/notary user
+  // Get pending invites for the logged-in sub/notary user (enriched with project/company info)
   app.get("/api/my-invites", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
       if (!user.email) return res.json([]);
       const invites = await storage.getPendingContractorInvitesByEmail(user.email);
-      // Filter out expired ones
+      // Filter out expired ones and enrich with project/company info
       const valid = invites.filter(i => new Date(i.expiresAt) > new Date());
-      res.json(valid);
+      const enriched = await Promise.all(valid.map(async (invite) => {
+        let projectName: string | null = null;
+        let companyNameVal: string | null = null;
+        if (invite.projectId) {
+          const project = await storage.getProject(invite.projectId);
+          projectName = project?.name ?? null;
+        }
+        if (invite.companyId) {
+          const company = await storage.getCompany(invite.companyId);
+          companyNameVal = company?.name ?? null;
+        }
+        return { ...invite, projectName, companyName: companyNameVal };
+      }));
+      res.json(enriched);
     } catch (error) {
       next(error);
     }
