@@ -130,6 +130,20 @@ Unified project hub for external workers (subcontractors and notaries):
 - Meta image plugin for OpenGraph/Twitter card images
 - Cartographer plugin for code navigation
 
+## Test Accounts
+
+See `TESTACCOUNTS.md` in the project root for the complete list of test accounts, emails, passwords, roles, and portal URLs. Quick summary:
+
+| Username | Email | Role | Portal |
+|---|---|---|---|
+| `testadmin` | testadmin@buildvision.test | Admin | /admin-login |
+| `testcontractor` | testcontractor@buildvision.test | Company Owner | /auth → Company tab |
+| `testnotary` | notary@test.com | Notary | /auth → Sub/Notary tab |
+| `testsubcontractor` | testsubcontractor@buildvision.test | Subcontractor | /auth → Sub/Notary tab |
+| `testclient` | testclient@buildvision.test | Client | /auth → Client tab |
+
+All test accounts use password: `Test123!`
+
 ## Future Tasks
 
 See `TODO.md` in the project root for the complete, up-to-date task list.
