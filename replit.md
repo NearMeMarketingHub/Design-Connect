@@ -48,6 +48,7 @@ Key data models include:
 - Inspiration images and messaging
 - E-Signature system (signing packets, participants, audit events)
 - Change orders with line items (for scope/budget/timeline changes)
+- Project team members with per-project permissions JSON (for sub/notary access control)
 
 ### Change Order System
 BuildVision includes a comprehensive change order management system:
@@ -72,11 +73,20 @@ BuildVision includes an in-app document e-signature system compliant with ESIGN/
 BuildVision uses a company-based multi-tenant model:
 - **Company Owner** (`role='company_owner'`): Registers as a plain contractor, auto-creates a company. Has full dual dashboard (contractor + company management). Sees all company projects.
 - **Contractor** (`role='contractor'`, no contractorType): Regular employee of a company. Sees all company projects. Can edit project data.
-- **Notary** (`role='contractor'`, `contractorType='notary'`): Requires admin approval. Has notary portal at `/notary/portal`. Sees all company projects. Cannot edit projects.
+- **Notary** (`role='contractor'`, `contractorType='notary'`): Requires admin approval. Has notary portal at `/notary/portal`. Uses Sub/Notary hub at `/subcontractor/dashboard`. Only sees explicitly assigned projects.
 - **Subcontractor** (`role='contractor'`, `contractorType='subcontractor'`): Spans multiple companies via email invite. Only sees explicitly assigned projects. Read-only on project details.
 - **Role Definitions**: Platform admins create role templates with permission sets. Company owners can assign templates to team members.
 - **Company isolation**: All data (projects, team, financials) is scoped to companyId. `app.param("projectId")` enforces access checks on all project-scoped routes.
 - **Startup migration**: `server/migrate-roles.ts` runs idempotently on startup to promote legacy contractor accounts to company_owner.
+
+### Sub-Contractor / Notary Hub
+Unified project hub for external workers (subcontractors and notaries):
+- **Dashboard**: `/subcontractor/dashboard` — shows stats (active, companies, completed), project cards with permission chips, access legend, profile card
+- **Dedicated Sidebar**: Simplified nav (Dashboard, My Assignments, Notary Portal for notaries) vs full contractor sidebar for company users
+- **Per-Project Permissions**: JSON column on `projectTeamMembers` table with keys: `canViewDocuments`, `canUploadDocuments`, `canViewBudget`, `canViewMessages`, `canPostMessages`, `canViewEstimates`
+- **API**: `GET /api/my-projects` — returns all assigned projects with companyName, permissions, membershipId
+- **Invite External**: Company owners/admins can invite subs/notaries via email from the project team card (`POST /api/projects/:id/invite-external`). If user exists → added directly; if not → creates a 7-day pending ContractorInvite
+- **Permissions Update**: `PATCH /api/projects/:id/team/:memberId/permissions` — company owners/admins can update per-project permissions
 
 ### Authentication & Authorization
 - Session-based authentication with 30-day cookie expiration

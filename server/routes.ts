@@ -3108,6 +3108,96 @@ export async function registerRoutes(
     }
   });
 
+  // Update permissions for a project team member (company_owner / isCompanyAdmin / admin only)
+  app.patch("/api/projects/:projectId/team/:memberId/permissions", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const canManage = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      if (!canManage) {
+        return res.status(403).json({ message: "Only company owners and admins can update permissions" });
+      }
+      const { permissions } = req.body;
+      if (!permissions || typeof permissions !== "object") {
+        return res.status(400).json({ message: "permissions object is required" });
+      }
+      const updated = await storage.updateProjectTeamMemberPermissions(req.params.memberId, permissions);
+      if (!updated) return res.status(404).json({ message: "Team member not found" });
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Invite an external sub/notary to a project by email
+  app.post("/api/projects/:projectId/invite-external", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
+      if (!canInvite) {
+        return res.status(403).json({ message: "Only company owners and admins can invite external members" });
+      }
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const { email, role, contractorType, permissions } = req.body;
+      if (!email) return res.status(400).json({ message: "email is required" });
+
+      // Check if this user already exists
+      const existingUser = await storage.getUserByEmail(email);
+
+      if (existingUser) {
+        // Check if already on this project
+        const existing = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, existingUser.id);
+        if (existing) {
+          return res.status(409).json({ message: "This person is already assigned to this project" });
+        }
+        // Add directly to project team with the given permissions
+        const member = await storage.addProjectTeamMember({
+          projectId: req.params.projectId,
+          contractorId: existingUser.id,
+          role: role || null,
+          addedBy: user.id,
+          permissions: permissions || {},
+        });
+        return res.json({ member, invited: false, message: "User added to project" });
+      } else {
+        // No existing user — create a contractor invite
+        const companyId = user.companyId || project.companyId || null;
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 day expiry
+        const invite = await storage.createContractorInvite({
+          projectId: req.params.projectId,
+          companyId: companyId || undefined,
+          email,
+          token,
+          status: "pending",
+          contractorType: contractorType || "subcontractor",
+          invitedBy: user.id,
+          expiresAt,
+        });
+        // TODO: send invite email via Resend
+        return res.json({ invite, invited: true, message: "Invitation sent to " + email });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get all projects for the logged-in sub/notary with company info + permissions
+  app.get("/api/my-projects", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "contractor") {
+        return res.status(403).json({ message: "Only subcontractors and notaries can use this endpoint" });
+      }
+      const projects = await storage.getContractorProjectsWithDetails(user.id);
+      res.json(projects);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Contractor invite routes (for inviting new contractors to join platform)
   app.post("/api/contractor-invites", requireAuth, async (req, res, next) => {
     try {

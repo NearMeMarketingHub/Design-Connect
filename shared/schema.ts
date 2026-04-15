@@ -415,11 +415,31 @@ export const projectTeamMembers = pgTable("project_team_members", {
   role: text("role"), // Their role/trade on this project (e.g., "Electrician", "HVAC")
   addedBy: varchar("added_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  permissions: jsonb("permissions").default({}), // Per-project permissions for subs/notaries
 });
 
 export const insertProjectTeamMemberSchema = createInsertSchema(projectTeamMembers).omit({ id: true, createdAt: true });
 export type InsertProjectTeamMember = z.infer<typeof insertProjectTeamMemberSchema>;
 export type ProjectTeamMember = typeof projectTeamMembers.$inferSelect;
+
+// Default permissions for external team members (subs/notaries)
+export type ExternalMemberPermissions = {
+  canViewDocuments: boolean;
+  canUploadDocuments: boolean;
+  canViewBudget: boolean;
+  canViewMessages: boolean;
+  canPostMessages: boolean;
+  canViewEstimates: boolean;
+};
+
+export const DEFAULT_EXTERNAL_PERMISSIONS: ExternalMemberPermissions = {
+  canViewDocuments: true,
+  canUploadDocuments: false,
+  canViewBudget: false,
+  canViewMessages: true,
+  canPostMessages: true,
+  canViewEstimates: false,
+};
 
 // Contractor invitations - invite contractors/subcontractors to join a company and/or project
 export const contractorInvites = pgTable("contractor_invites", {

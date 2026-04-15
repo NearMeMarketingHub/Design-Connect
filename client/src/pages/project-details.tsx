@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import { getInitials } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -287,6 +288,7 @@ export default function ProjectDetails() {
   const staticProject = PROJECTS_DATA[projectId];
   const queryClient = useQueryClient();
   const { user, currentPortal } = useAuth();
+  const { toast } = useToast();
   
   // Contractor controls - check if user can edit this project
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
@@ -851,6 +853,39 @@ export default function ProjectDetails() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Invite external sub/notary state
+  const [inviteExternalOpen, setInviteExternalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("");
+  const [inviteContractorType, setInviteContractorType] = useState("subcontractor");
+
+  const inviteExternalMutation = useMutation({
+    mutationFn: async (data: { email: string; role: string; contractorType: string }) => {
+      const res = await fetch(`/api/projects/${projectId}/invite-external`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: data.email, role: data.role, contractorType: data.contractorType }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to invite");
+      }
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'team'] });
+      setInviteExternalOpen(false);
+      setInviteEmail("");
+      setInviteRole("");
+      setInviteContractorType("subcontractor");
+      toast({ title: result.invited ? "Invitation sent" : "Member added", description: result.message });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 
   // Fetch messages from API (legacy)
   const { data: apiMessages = [], isLoading: messagesLoading } = useQuery({
@@ -3013,6 +3048,17 @@ export default function ProjectDetails() {
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Contact Team
                     </Button>
+                    {(user?.role === "company_owner" || user?.isCompanyAdmin || user?.role === "admin") && (
+                      <Button
+                        variant="outline"
+                        className="w-full mt-2"
+                        data-testid="button-invite-external"
+                        onClick={() => setInviteExternalOpen(true)}
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Invite Sub / Notary
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -6929,7 +6975,66 @@ export default function ProjectDetails() {
         </DialogContent>
       </Dialog>
 
-      {/* Timeline Delay Dialog */}
+      {/* Invite External Sub / Notary Dialog */}
+      <Dialog open={inviteExternalOpen} onOpenChange={setInviteExternalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Invite Sub-Contractor / Notary
+            </DialogTitle>
+            <DialogDescription>
+              Invite an external sub-contractor or notary to this project. If they already have an account, they will be added immediately. Otherwise, an invitation will be sent to their email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email Address *</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="name@example.com"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                data-testid="input-invite-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-type">Type</Label>
+              <Select value={inviteContractorType} onValueChange={setInviteContractorType}>
+                <SelectTrigger id="invite-type" data-testid="select-invite-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="subcontractor">Sub-Contractor</SelectItem>
+                  <SelectItem value="notary">Notary</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invite-role">Trade / Role (optional)</Label>
+              <Input
+                id="invite-role"
+                placeholder="e.g. Electrician, Plumber, HVAC"
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value)}
+                data-testid="input-invite-role"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteExternalOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => inviteExternalMutation.mutate({ email: inviteEmail, role: inviteRole, contractorType: inviteContractorType })}
+              disabled={!inviteEmail || inviteExternalMutation.isPending}
+              data-testid="button-confirm-invite"
+            >
+              {inviteExternalMutation.isPending ? "Sending..." : "Send Invite"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={delayDialogOpen} onOpenChange={setDelayDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>

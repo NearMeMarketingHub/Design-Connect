@@ -35,11 +35,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isContractorPortal = currentPortal === "contractor";
   const isDashboard = location === "/client/dashboard" || location === "/admin/dashboard" || location === "/contractor/dashboard" || location === "/company/dashboard" || location === "/subcontractor/dashboard";
   
+  const isSubOrNotary = user?.role === "contractor" && (user?.contractorType === "subcontractor" || user?.contractorType === "notary");
+
   const getDashboardPath = () => {
     if (currentPortal === "admin") return "/admin/dashboard";
     if (currentPortal === "contractor") {
       if (user?.role === "company_owner") return "/company/dashboard";
-      if (user?.role === "contractor" && (user?.contractorType === "notary" || user?.contractorType === "subcontractor")) return "/subcontractor/dashboard";
+      if (isSubOrNotary) return "/subcontractor/dashboard";
       return "/contractor/dashboard";
     }
     if (currentPortal === "client") return "/client/dashboard";
@@ -77,8 +79,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { label: "3D Floor Plan", icon: <Box className="w-5 h-5" />, href: "/contractor/floor-plan-3d" },
   ];
 
+  // Simplified sidebar for sub-contractors and notaries
+  const subNotarySidebarItems: SidebarItem[] = [
+    { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/subcontractor/dashboard" },
+    { label: "My Assignments", icon: <FolderOpen className="w-5 h-5" />, href: "/subcontractor/dashboard" },
+    ...(user?.contractorType === "notary" ? [
+      { label: "Notary Portal", icon: <Shield className="w-5 h-5" />, href: "/notary/portal" },
+    ] : []),
+  ];
+
   const isActiveRoute = (href: string) => {
-    if (href === "/contractor/dashboard") {
+    if (href === "/contractor/dashboard" || href === "/subcontractor/dashboard") {
       return location === href;
     }
     return location.startsWith(href);
@@ -110,7 +121,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div>
                   <h1 className="font-heading font-bold text-lg tracking-tight">BuildVision</h1>
                   <p className="text-xs text-muted-foreground">
-                    {canAccessAdminCenter ? "Company Portal" : "Contractor Portal"}
+                    {isSubOrNotary ? (user?.contractorType === "notary" ? "Notary Portal" : "Sub-Contractor Portal") : canAccessAdminCenter ? "Company Portal" : "Contractor Portal"}
                   </p>
                 </div>
               </div>
@@ -126,8 +137,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Navigation */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-              {contractorSidebarItems.map((item) => (
-                <Link key={item.href} href={item.href}>
+              {(isSubOrNotary ? subNotarySidebarItems : contractorSidebarItems).map((item) => (
+                <Link key={item.label + item.href} href={item.href}>
                   <button
                     onClick={() => setSidebarOpen(false)}
                     className={cn(

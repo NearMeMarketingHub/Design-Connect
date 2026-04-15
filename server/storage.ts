@@ -231,6 +231,9 @@ export interface IStorage {
   addProjectTeamMember(member: InsertProjectTeamMember): Promise<ProjectTeamMember>;
   removeProjectTeamMember(id: string): Promise<void>;
   getContractorProjects(contractorId: string): Promise<Project[]>;
+  getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: any; membershipId: string })[]>;
+  getProjectTeamMemberByContractorAndProject(projectId: string, contractorId: string): Promise<ProjectTeamMember | undefined>;
+  updateProjectTeamMemberPermissions(memberId: string, permissions: object): Promise<ProjectTeamMember | undefined>;
 
   // Contractor invite methods
   createContractorInvite(invite: InsertContractorInvite): Promise<ContractorInvite>;
@@ -1471,6 +1474,45 @@ export class DatabaseStorage implements IStorage {
       if (project) projects.push(project);
     }
     return projects;
+  }
+
+  async getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: any; membershipId: string })[]> {
+    const teamMemberships = await db.select().from(schema.projectTeamMembers)
+      .where(eq(schema.projectTeamMembers.contractorId, contractorId));
+
+    if (teamMemberships.length === 0) return [];
+
+    const results: (Project & { companyName?: string; companyId?: string; permissions?: any; membershipId: string })[] = [];
+    for (const membership of teamMemberships) {
+      const project = await this.getProject(membership.projectId);
+      if (!project) continue;
+      let companyName: string | undefined;
+      let companyId: string | undefined;
+      if (project.companyId) {
+        const company = await this.getCompany(project.companyId);
+        companyName = company?.name;
+        companyId = company?.id;
+      }
+      results.push({ ...project, companyName, companyId, permissions: membership.permissions, membershipId: membership.id });
+    }
+    return results;
+  }
+
+  async getProjectTeamMemberByContractorAndProject(projectId: string, contractorId: string): Promise<ProjectTeamMember | undefined> {
+    const [member] = await db.select().from(schema.projectTeamMembers)
+      .where(and(
+        eq(schema.projectTeamMembers.projectId, projectId),
+        eq(schema.projectTeamMembers.contractorId, contractorId)
+      ));
+    return member;
+  }
+
+  async updateProjectTeamMemberPermissions(memberId: string, permissions: object): Promise<ProjectTeamMember | undefined> {
+    const [updated] = await db.update(schema.projectTeamMembers)
+      .set({ permissions })
+      .where(eq(schema.projectTeamMembers.id, memberId))
+      .returning();
+    return updated;
   }
 
   // Contractor invite methods
