@@ -65,10 +65,10 @@ export default function LandingPage() {
                   I'm a Client
                 </Button>
               </Link>
-              <Link href="/auth?mode=register&tab=notary">
-                <Button size="lg" variant="outline" className="text-lg px-8 border-purple-300 text-purple-700 hover:bg-purple-50" data-testid="button-notary-signup">
-                  <Stamp className="mr-2 h-5 w-5" />
-                  I'm a Notary
+              <Link href="/auth?mode=register&tab=subcontractor">
+                <Button size="lg" variant="outline" className="text-lg px-8 border-orange-300 text-orange-700 hover:bg-orange-50" data-testid="button-sub-signup">
+                  <Briefcase className="mr-2 h-5 w-5" />
+                  Sub-Contractor / Notary
                 </Button>
               </Link>
             </div>

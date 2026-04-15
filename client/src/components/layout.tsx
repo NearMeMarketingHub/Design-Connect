@@ -39,7 +39,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (currentPortal === "admin") return "/admin/dashboard";
     if (currentPortal === "contractor") {
       if (user?.role === "company_owner") return "/company/dashboard";
-      if (user?.role === "contractor" && user?.contractorType === "notary") return "/notary/portal";
+      if (user?.role === "contractor" && (user?.contractorType === "notary" || user?.contractorType === "subcontractor")) return "/subcontractor/dashboard";
       return "/contractor/dashboard";
     }
     if (currentPortal === "client") return "/client/dashboard";
@@ -60,12 +60,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const showBackButton = !isDashboard && !loading && user;
 
   const isCompanyOwner = user?.role === "company_owner";
+  const isCompanyAdmin = !!(user as any)?.isCompanyAdmin;
+  const canAccessAdminCenter = isCompanyOwner || isCompanyAdmin;
 
   const contractorSidebarItems: SidebarItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/contractor/dashboard" },
-    ...(isCompanyOwner ? [
-      { label: "Company", icon: <Building2 className="w-5 h-5" />, href: "/company/dashboard" },
-      { label: "Team", icon: <Users className="w-5 h-5" />, href: "/company/team" },
+    ...(canAccessAdminCenter ? [
+      { label: "Admin Center", icon: <Shield className="w-5 h-5" />, href: "/company/dashboard" },
     ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
     { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
@@ -106,7 +107,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div>
                   <h1 className="font-heading font-bold text-lg tracking-tight">BuildVision</h1>
                   <p className="text-xs text-muted-foreground">
-                    {isCompanyOwner ? "Company Portal" : "Contractor Portal"}
+                    {canAccessAdminCenter ? "Company Portal" : "Contractor Portal"}
                   </p>
                 </div>
               </div>
@@ -152,7 +153,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{user?.name || user?.username}</p>
                   <p className="text-xs text-muted-foreground">
-                    {isCompanyOwner ? "Company Owner" : user?.contractorType === "notary" ? "Notary" : "Contractor"}
+                    {isCompanyOwner ? "Company Owner" : isCompanyAdmin ? "Company Admin" : user?.contractorType === "notary" ? "Notary" : user?.contractorType === "subcontractor" ? "Sub-Contractor" : "Contractor"}
                   </p>
                 </div>
               </div>
