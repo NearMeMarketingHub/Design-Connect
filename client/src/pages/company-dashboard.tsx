@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { 
   Building2, Users, CreditCard, Settings, Plus, Mail, Trash2,
   CheckCircle, Clock, Crown, Wrench, FileText, UserPlus, ChevronRight,
-  RefreshCw, AlertCircle, ShieldCheck
+  RefreshCw, AlertCircle, ShieldCheck, AlertTriangle, Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -81,6 +81,27 @@ export default function CompanyDashboard() {
     },
     enabled: !!company?.id,
   });
+
+  const { data: subscriptionTiers = [] } = useQuery({
+    queryKey: ["/api/subscription/tiers"],
+    queryFn: async () => {
+      const res = await fetch("/api/subscription/tiers", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  // Trial calculation
+  const TRIAL_DAYS = 7;
+  const trialStartedAt = company?.trialStartedAt ? new Date(company.trialStartedAt) : null;
+  const trialEndsAt = trialStartedAt ? new Date(trialStartedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000) : null;
+  const now = new Date();
+  const isTrialing = company?.subscriptionStatus === "trialing";
+  const isExpired = company?.subscriptionStatus === "expired" || (isTrialing && trialEndsAt !== null && now > trialEndsAt);
+  const trialDaysRemaining = trialEndsAt && isTrialing && !isExpired
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)))
+    : 0;
+  const isActive = company?.subscriptionStatus === "active";
 
   const inviteMutation = useMutation({
     mutationFn: async (data: { email: string; contractorType: string; specialty?: string; projectId?: string }) => {
@@ -197,6 +218,64 @@ export default function CompanyDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Trial countdown banner */}
+      {isTrialing && !isExpired && trialDaysRemaining <= TRIAL_DAYS && (
+        <div
+          className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${
+            trialDaysRemaining <= 2
+              ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800"
+              : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
+          }`}
+          data-testid="trial-banner"
+        >
+          <AlertTriangle className={`w-5 h-5 shrink-0 ${trialDaysRemaining <= 2 ? "text-red-500" : "text-amber-500"}`} />
+          <div className="flex-1">
+            <p className={`font-medium text-sm ${trialDaysRemaining <= 2 ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"}`}>
+              {trialDaysRemaining === 0
+                ? "Your trial expires today!"
+                : trialDaysRemaining === 1
+                ? "1 day remaining in your free trial"
+                : `${trialDaysRemaining} days remaining in your free trial`}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Upgrade to keep full access to all BuildVision features after your trial ends.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant={trialDaysRemaining <= 2 ? "destructive" : "default"}
+            onClick={() => setActiveTab("subscription")}
+            data-testid="button-upgrade-from-banner"
+          >
+            Upgrade Now
+          </Button>
+        </div>
+      )}
+
+      {/* Trial expired screen */}
+      {isExpired && (
+        <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-8 text-center space-y-4" data-testid="trial-expired-screen">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8 text-destructive" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Trial Expired</h2>
+            <p className="text-muted-foreground mt-1 max-w-md mx-auto">
+              Your 7-day free trial has ended. Upgrade to a paid plan to continue using BuildVision's contractor features.
+            </p>
+          </div>
+          <Button
+            onClick={() => setActiveTab("subscription")}
+            size="lg"
+            className="mt-2"
+            data-testid="button-upgrade-expired"
+          >
+            <CreditCard className="w-4 h-4 mr-2" />
+            View Plans & Upgrade
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -205,11 +284,11 @@ export default function CompanyDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Badge
-            variant={company?.subscriptionStatus === "active" ? "default" : "secondary"}
+            variant={isActive ? "default" : isExpired ? "destructive" : "secondary"}
             className="capitalize"
             data-testid="subscription-status"
           >
-            {company?.subscriptionPlan || "free"} plan
+            {isExpired ? "Expired" : isTrialing ? `Trial — ${trialDaysRemaining}d left` : (company?.subscriptionPlan || "free")}
           </Badge>
           <Button
             variant="outline"
@@ -524,62 +603,83 @@ export default function CompanyDashboard() {
               <CardDescription>Manage your BuildVision subscription</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Current plan */}
-              <div className="rounded-lg border p-4 bg-muted/30">
+              {/* Current status card */}
+              <div className={`rounded-lg border p-4 ${isExpired ? "bg-destructive/5 border-destructive/30" : isTrialing ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800" : "bg-muted/30"}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold capitalize text-lg">{company?.subscriptionPlan || "Free"} Plan</p>
+                    <p className="font-semibold capitalize text-lg">
+                      {isExpired ? "Trial Expired" : isTrialing ? "Free Trial" : `${company?.subscriptionPlan || "Free"} Plan`}
+                    </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Status: <span className="capitalize font-medium">{company?.subscriptionStatus || "active"}</span>
+                      {isExpired
+                        ? "Your trial ended. Upgrade to restore access."
+                        : isTrialing
+                        ? trialEndsAt
+                          ? `Trial ends ${trialEndsAt.toLocaleDateString()} — ${trialDaysRemaining} day${trialDaysRemaining !== 1 ? "s" : ""} remaining`
+                          : "Trial active"
+                        : `Status: ${company?.subscriptionStatus || "active"}`
+                      }
                     </p>
                   </div>
-                  <Badge variant={company?.subscriptionStatus === "active" ? "default" : "secondary"} className="capitalize">
-                    {company?.subscriptionStatus || "active"}
+                  <Badge
+                    variant={isActive ? "default" : isExpired ? "destructive" : "secondary"}
+                    className="capitalize"
+                    data-testid="subscription-status-badge"
+                  >
+                    {isExpired ? "Expired" : isTrialing ? "Trialing" : company?.subscriptionStatus || "active"}
                   </Badge>
                 </div>
               </div>
 
-              {/* Plan tiers */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { name: "Free", price: "$0/mo", features: ["Up to 3 projects", "Basic reporting", "Email support"] },
-                  { name: "Pro", price: "$49/mo", features: ["Unlimited projects", "Advanced analytics", "Priority support", "Team members"] },
-                  { name: "Enterprise", price: "Custom", features: ["Everything in Pro", "Custom integrations", "Dedicated support", "SLA guarantee"] },
-                ].map(plan => (
-                  <div
-                    key={plan.name}
-                    className={`rounded-lg border p-4 space-y-3 ${company?.subscriptionPlan === plan.name.toLowerCase() ? "border-primary bg-primary/5" : ""}`}
-                    data-testid={`plan-card-${plan.name.toLowerCase()}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold">{plan.name}</p>
-                      {company?.subscriptionPlan === plan.name.toLowerCase() && (
-                        <Badge className="text-xs">Current</Badge>
-                      )}
-                    </div>
-                    <p className="text-2xl font-bold">{plan.price}</p>
-                    <ul className="space-y-1">
-                      {plan.features.map(f => (
-                        <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    {company?.subscriptionPlan !== plan.name.toLowerCase() && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        data-testid={`button-upgrade-${plan.name.toLowerCase()}`}
-                        onClick={() => toast({ title: "Coming soon", description: "Subscription upgrades will be available soon!" })}
+              {/* Plan tiers from DB */}
+              {subscriptionTiers.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {subscriptionTiers.map((tier: any) => {
+                    const isCurrent = !isTrialing && !isExpired && company?.subscriptionPlan === tier.name.toLowerCase();
+                    const price = parseFloat(tier.price);
+                    const priceStr = price === 0 ? "$0/mo" : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`;
+                    return (
+                      <div
+                        key={tier.id}
+                        className={`rounded-lg border p-4 space-y-3 ${isCurrent ? "border-primary bg-primary/5" : ""}`}
+                        data-testid={`plan-card-${tier.name.toLowerCase()}`}
                       >
-                        {plan.name === "Free" ? "Downgrade" : "Upgrade"}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold">{tier.name}</p>
+                          {isCurrent && <Badge className="text-xs">Current</Badge>}
+                        </div>
+                        <p className="text-2xl font-bold">{priceStr}</p>
+                        {tier.maxProjects && (
+                          <p className="text-xs text-muted-foreground">Up to {tier.maxProjects} projects</p>
+                        )}
+                        <ul className="space-y-1">
+                          {(tier.features || []).map((f: string) => (
+                            <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                        {!isCurrent && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            data-testid={`button-upgrade-${tier.name.toLowerCase()}`}
+                            onClick={() => toast({ title: "Coming soon", description: "Subscription upgrades will be available soon. Contact support to upgrade." })}
+                          >
+                            {price === 0 ? "Select" : "Upgrade"}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+                  <p className="text-sm">No plans available yet. Contact support to upgrade your subscription.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -137,7 +137,8 @@ export async function registerRoutes(
           name: companyName || `${name || username}'s Company`,
           ownerId: user.id,
           subscriptionPlan: "free",
-          subscriptionStatus: "active",
+          subscriptionStatus: "trialing",
+          trialStartedAt: new Date(),
         });
         await storage.updateUser(user.id, { companyId: company.id });
         const { password: _, ...userWithoutPassword } = user;
@@ -444,6 +445,59 @@ export async function registerRoutes(
         };
       }));
       res.json(enriched);
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Update company subscription ───────────────────────────────────────
+  app.patch("/api/admin/companies/:id/subscription", requireAdmin, async (req, res, next) => {
+    try {
+      const { subscriptionPlan, subscriptionStatus, trialStartedAt } = req.body;
+      const updateData: any = {};
+      if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
+      if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
+      if (trialStartedAt !== undefined) updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
+      const company = await storage.updateCompany(req.params.id, updateData);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+      res.json(company);
+    } catch (error) { next(error); }
+  });
+
+  // ── Subscription tier routes ──────────────────────────────────────────────────
+  // GET active tiers — for company dashboard (any authenticated user)
+  app.get("/api/subscription/tiers", requireAuth, async (req, res, next) => {
+    try {
+      const tiers = await storage.getActiveSubscriptionTiers();
+      res.json(tiers);
+    } catch (error) { next(error); }
+  });
+
+  // Admin CRUD for subscription tiers
+  app.get("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
+    try {
+      const tiers = await storage.getSubscriptionTiers();
+      res.json(tiers);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
+    try {
+      const tier = await storage.createSubscriptionTier(req.body);
+      res.json(tier);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/admin/subscription/tiers/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const tier = await storage.updateSubscriptionTier(req.params.id, req.body);
+      if (!tier) return res.status(404).json({ message: "Tier not found" });
+      res.json(tier);
+    } catch (error) { next(error); }
+  });
+
+  app.delete("/api/admin/subscription/tiers/:id", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.deleteSubscriptionTier(req.params.id);
+      res.json({ message: "Tier deleted" });
     } catch (error) { next(error); }
   });
 

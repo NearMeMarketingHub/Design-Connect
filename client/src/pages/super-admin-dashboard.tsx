@@ -54,7 +54,9 @@ import {
   Layers,
   Plus,
   Trash2,
-  Pencil
+  Pencil,
+  CreditCard,
+  CheckCircle
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -77,6 +79,16 @@ export default function SuperAdminDashboard() {
   const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
   const [editingRoleDef, setEditingRoleDef] = useState<any | null>(null);
   const [roleDefForm, setRoleDefForm] = useState({ name: "", type: "contractor", permissions: {} as Record<string, boolean> });
+
+  // Subscription tier dialog state
+  const [tierDialogOpen, setTierDialogOpen] = useState(false);
+  const [editingTier, setEditingTier] = useState<any | null>(null);
+  const [tierForm, setTierForm] = useState({ name: "", price: "0", maxProjects: "", features: "", sortOrder: "0", isActive: true });
+
+  // Company subscription edit dialog
+  const [companySubDialogOpen, setCompanySubDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<any | null>(null);
+  const [companySubForm, setCompanySubForm] = useState({ subscriptionPlan: "free", subscriptionStatus: "trialing" });
 
   const PERMISSION_KEYS: { key: string; label: string }[] = [
     { key: "viewProjects", label: "View Projects" },
@@ -162,6 +174,16 @@ export default function SuperAdminDashboard() {
     enabled: user?.role === "admin",
   });
 
+  const { data: adminTiers = [], refetch: refetchTiers } = useQuery({
+    queryKey: ["/api/admin/subscription/tiers"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/subscription/tiers", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load subscription tiers");
+      return res.json();
+    },
+    enabled: user?.role === "admin",
+  });
+
   const deleteRoleDefMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/admin/role-definitions/${id}`, { method: "DELETE", credentials: "include" });
@@ -170,6 +192,79 @@ export default function SuperAdminDashboard() {
     onSuccess: () => { refetchRoleDefs(); toast({ title: "Role deleted" }); },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
+
+  const saveTierMutation = useMutation({
+    mutationFn: async (data: typeof tierForm) => {
+      const payload = {
+        name: data.name.trim(),
+        price: data.price || "0",
+        maxProjects: data.maxProjects ? parseInt(data.maxProjects) : null,
+        features: data.features.split("\n").map(f => f.trim()).filter(Boolean),
+        sortOrder: parseInt(data.sortOrder) || 0,
+        isActive: data.isActive,
+      };
+      const url = editingTier ? `/api/admin/subscription/tiers/${editingTier.id}` : "/api/admin/subscription/tiers";
+      const method = editingTier ? "PATCH" : "POST";
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error("Failed to save tier");
+      return res.json();
+    },
+    onSuccess: () => { refetchTiers(); setTierDialogOpen(false); toast({ title: editingTier ? "Tier updated" : "Tier created" }); },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteTierMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/subscription/tiers/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete tier");
+    },
+    onSuccess: () => { refetchTiers(); toast({ title: "Tier deleted" }); },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const updateCompanySubMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof companySubForm }) => {
+      const res = await fetch(`/api/admin/companies/${id}/subscription`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update subscription");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
+      setCompanySubDialogOpen(false);
+      toast({ title: "Subscription updated" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const openTierCreate = () => {
+    setEditingTier(null);
+    setTierForm({ name: "", price: "0", maxProjects: "", features: "", sortOrder: "0", isActive: true });
+    setTierDialogOpen(true);
+  };
+
+  const openTierEdit = (tier: any) => {
+    setEditingTier(tier);
+    setTierForm({
+      name: tier.name,
+      price: tier.price || "0",
+      maxProjects: tier.maxProjects ? String(tier.maxProjects) : "",
+      features: (tier.features || []).join("\n"),
+      sortOrder: String(tier.sortOrder || 0),
+      isActive: tier.isActive !== false,
+    });
+    setTierDialogOpen(true);
+  };
+
+  const openCompanySubEdit = (company: any) => {
+    setEditingCompany(company);
+    setCompanySubForm({ subscriptionPlan: company.subscriptionPlan || "free", subscriptionStatus: company.subscriptionStatus || "trialing" });
+    setCompanySubDialogOpen(true);
+  };
 
   const saveRoleDefMutation = useMutation({
     mutationFn: async (data: { name: string; type: string; permissions: Record<string, boolean> }) => {
@@ -715,10 +810,10 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        {/* Companies Section */}
+        {/* Companies / Subscriptions Section */}
         <div>
           <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-amber-600" /> Registered Companies
+            <CreditCard className="w-5 h-5 text-blue-600" /> Subscriptions
           </h2>
           {companies.length === 0 ? (
             <Card>
@@ -730,29 +825,112 @@ export default function SuperAdminDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Company Name</TableHead>
+                      <TableHead>Company</TableHead>
                       <TableHead>Owner</TableHead>
-                      <TableHead>Members</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
+                      <TableHead>Trial Started</TableHead>
+                      <TableHead>Trial Ends</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {companies.map((company: any) => (
-                      <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
-                        <TableCell className="font-medium">{company.name}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{company.ownerName || "—"}</TableCell>
-                        <TableCell className="text-sm">{company.memberCount ?? 0}</TableCell>
-                        <TableCell><Badge variant="outline" className="capitalize">{company.subscriptionPlan}</Badge></TableCell>
-                        <TableCell><Badge variant={company.subscriptionStatus === "active" ? "default" : "secondary"} className="capitalize">{company.subscriptionStatus}</Badge></TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{new Date(company.createdAt).toLocaleDateString()}</TableCell>
-                      </TableRow>
-                    ))}
+                    {companies.map((company: any) => {
+                      const trialStart = company.trialStartedAt ? new Date(company.trialStartedAt) : null;
+                      const trialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+                      const now = new Date();
+                      const isExpired = company.subscriptionStatus === "expired" || (company.subscriptionStatus === "trialing" && trialEnd && now > trialEnd);
+                      return (
+                        <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
+                          <TableCell className="font-medium">{company.name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{company.ownerName || "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">{company.subscriptionPlan || "free"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={company.subscriptionStatus === "active" ? "default" : isExpired ? "destructive" : "secondary"} className="capitalize">
+                              {isExpired && company.subscriptionStatus !== "expired" ? "expired" : company.subscriptionStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {trialStart ? trialStart.toLocaleDateString() : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {trialEnd ? trialEnd.toLocaleDateString() : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openCompanySubEdit(company)}
+                              data-testid={`button-edit-sub-${company.id}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5 mr-1" />
+                              Edit Plan
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+          )}
+        </div>
+
+        {/* Subscription Tiers Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <Layers className="w-5 h-5 text-blue-600" /> Subscription Tiers
+            </h2>
+            <Button size="sm" onClick={openTierCreate} data-testid="button-add-tier">
+              <Plus className="w-4 h-4 mr-1" /> Add Tier
+            </Button>
+          </div>
+          {adminTiers.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <p className="text-sm">No tiers defined. Add tiers to show plans to company users.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {adminTiers.map((tier: any) => {
+                const price = parseFloat(tier.price);
+                return (
+                  <Card key={tier.id} className={!tier.isActive ? "opacity-60" : ""} data-testid={`tier-card-${tier.id}`}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{tier.name}</CardTitle>
+                        <div className="flex items-center gap-1">
+                          {!tier.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                          <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => openTierEdit(tier)} data-testid={`button-edit-tier-${tier.id}`}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => deleteTierMutation.mutate(tier.id)} disabled={deleteTierMutation.isPending} data-testid={`button-delete-tier-${tier.id}`}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-2xl font-bold">{price === 0 ? "Free" : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`}</p>
+                    </CardHeader>
+                    <CardContent>
+                      {tier.maxProjects && <p className="text-xs text-muted-foreground mb-2">Up to {tier.maxProjects} projects</p>}
+                      <ul className="space-y-1">
+                        {(tier.features || []).map((f: string) => (
+                          <li key={f} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -824,6 +1002,104 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Subscription Tier Create/Edit Dialog */}
+      <Dialog open={tierDialogOpen} onOpenChange={setTierDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingTier ? "Edit Subscription Tier" : "Create Subscription Tier"}</DialogTitle>
+            <DialogDescription>Define a subscription plan with pricing and features.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="tier-name">Plan Name</Label>
+              <Input id="tier-name" value={tierForm.name} onChange={e => setTierForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Starter" data-testid="input-tier-name" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="tier-price">Monthly Price ($)</Label>
+                <Input id="tier-price" type="number" min="0" value={tierForm.price} onChange={e => setTierForm(f => ({ ...f, price: e.target.value }))} placeholder="49" data-testid="input-tier-price" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tier-maxprojects">Max Projects</Label>
+                <Input id="tier-maxprojects" type="number" min="1" value={tierForm.maxProjects} onChange={e => setTierForm(f => ({ ...f, maxProjects: e.target.value }))} placeholder="Unlimited" data-testid="input-tier-maxprojects" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tier-features">Features (one per line)</Label>
+              <textarea
+                id="tier-features"
+                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                value={tierForm.features}
+                onChange={e => setTierForm(f => ({ ...f, features: e.target.value }))}
+                placeholder="Unlimited projects&#10;Priority support&#10;Team members"
+                data-testid="input-tier-features"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="tier-active">Active (visible to companies)</Label>
+              <Switch id="tier-active" checked={tierForm.isActive} onCheckedChange={v => setTierForm(f => ({ ...f, isActive: v }))} data-testid="switch-tier-active" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTierDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => saveTierMutation.mutate(tierForm)} disabled={!tierForm.name.trim() || saveTierMutation.isPending} data-testid="button-save-tier">
+              {saveTierMutation.isPending ? "Saving…" : editingTier ? "Save Changes" : "Create Tier"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Company Subscription Edit Dialog */}
+      <Dialog open={companySubDialogOpen} onOpenChange={setCompanySubDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Subscription</DialogTitle>
+            <DialogDescription>Update plan and status for {editingCompany?.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Plan</Label>
+              <Select value={companySubForm.subscriptionPlan} onValueChange={v => setCompanySubForm(f => ({ ...f, subscriptionPlan: v }))}>
+                <SelectTrigger data-testid="select-company-plan">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  {adminTiers.map((t: any) => (
+                    <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={companySubForm.subscriptionStatus} onValueChange={v => setCompanySubForm(f => ({ ...f, subscriptionStatus: v }))}>
+                <SelectTrigger data-testid="select-company-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trialing">Trialing</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="past_due">Past Due</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCompanySubDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => editingCompany && updateCompanySubMutation.mutate({ id: editingCompany.id, data: companySubForm })}
+              disabled={updateCompanySubMutation.isPending}
+              data-testid="button-save-company-sub"
+            >
+              {updateCompanySubMutation.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Role Definition Create/Edit Dialog */}
       <Dialog open={roleDefDialogOpen} onOpenChange={setRoleDefDialogOpen}>

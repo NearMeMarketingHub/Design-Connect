@@ -48,7 +48,22 @@ Key data models include:
 - Inspiration images and messaging
 - E-Signature system (signing packets, participants, audit events)
 - Change orders with line items (for scope/budget/timeline changes)
-- Project team members with per-project permissions JSON (for sub/notary access control)
+- Subscription tiers (admin-configurable plan definitions with pricing and features)
+
+### Subscription Trial System
+BuildVision uses a 7-day free trial model for company accounts:
+- **Trial Start**: New company_owner registrations auto-start a 7-day trial (`subscriptionStatus: "trialing"`, `trialStartedAt: now()`)
+- **Trial Countdown Banner**: Company dashboard shows an amber warning banner with days remaining when status is "trialing"
+- **Expired Screen**: When trial expires, a red "Trial Expired" block appears with an upgrade prompt
+- **Subscription Tab**: Shows real trial dates, days remaining, and tier cards loaded from database (not hardcoded)
+- **Status Values**: `trialing` → `active` (paid) → `expired` / `past_due` / `cancelled`
+- **No payment processing**: Billing is manual/admin-controlled; admins manually set company plans via the Super Admin dashboard
+
+### Admin Subscription Management
+The Super Admin dashboard includes a "Subscriptions" section:
+- **Company Subscriptions Table**: Lists all companies with plan, status, trial start/end dates; "Edit Plan" button lets admin change plan and status per company
+- **Subscription Tiers**: CRUD interface to define plan tiers (name, monthly price, max projects, features list, active/inactive toggle); displayed to company users in their Subscription tab
+- **API Routes**: `GET/POST/PATCH/DELETE /api/admin/subscription/tiers`, `PATCH /api/admin/companies/:id/subscription`, `GET /api/subscription/tiers` (authenticated)
 
 ### Change Order System
 BuildVision includes a comprehensive change order management system:

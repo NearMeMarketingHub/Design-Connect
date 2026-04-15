@@ -11,13 +11,30 @@ export const companies = pgTable("companies", {
   logo: text("logo"), // Optional company logo URL
   ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
   subscriptionPlan: text("subscription_plan").default("free"), // free, starter, professional, enterprise
-  subscriptionStatus: text("subscription_status").default("active"), // active, past_due, cancelled, trialing
+  subscriptionStatus: text("subscription_status").default("trialing"), // trialing, active, expired, past_due, cancelled
+  trialStartedAt: timestamp("trial_started_at"), // When the 7-day trial began
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true });
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
+
+// Subscription tiers — admin-configurable plan definitions
+export const subscriptionTiers = pgTable("subscription_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
+  maxProjects: integer("max_projects"), // null = unlimited
+  features: text("features").array().notNull().default(sql`ARRAY[]::text[]`),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSubscriptionTierSchema = createInsertSchema(subscriptionTiers).omit({ id: true, createdAt: true });
+export type InsertSubscriptionTier = z.infer<typeof insertSubscriptionTierSchema>;
+export type SubscriptionTier = typeof subscriptionTiers.$inferSelect;
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

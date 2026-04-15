@@ -86,5 +86,19 @@ export async function seedTestAccounts(): Promise<void> {
     console.log("[seed-test-accounts] testsubcontractor already assigned to Jenkins Residence — skipping.");
   }
 
+  // Ensure testcontractor's company has trialStartedAt set (for trial feature testing)
+  const [tcUser] = await db.select().from(schema.users).where(eq(schema.users.username, "testcontractor"));
+  if (tcUser?.companyId) {
+    const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, tcUser.companyId));
+    if (company && !company.trialStartedAt) {
+      // Set trial started 4 days ago so it shows "3 days remaining"
+      const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+      await db.update(schema.companies)
+        .set({ subscriptionStatus: "trialing", trialStartedAt: fourDaysAgo })
+        .where(eq(schema.companies.id, company.id));
+      console.log("[seed-test-accounts] Updated testcontractor company to trialing status.");
+    }
+  }
+
   console.log("[seed-test-accounts] Done.");
 }

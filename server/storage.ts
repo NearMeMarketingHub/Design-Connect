@@ -25,6 +25,7 @@ function generateProjectSlug(name: string, date: Date = new Date()): string {
 import type {
   User, InsertUser,
   Company, InsertCompany,
+  SubscriptionTier, InsertSubscriptionTier,
   CompanyMember, InsertCompanyMember,
   ContractorRoleDefinition, InsertContractorRoleDefinition,
   Project, InsertProject,
@@ -335,6 +336,14 @@ export interface IStorage {
 
   // Projects by company
   getProjectsByCompanyId(companyId: string): Promise<Project[]>;
+
+  // Subscription tier methods
+  getSubscriptionTiers(): Promise<SubscriptionTier[]>;
+  getActiveSubscriptionTiers(): Promise<SubscriptionTier[]>;
+  getSubscriptionTier(id: string): Promise<SubscriptionTier | undefined>;
+  createSubscriptionTier(tier: InsertSubscriptionTier): Promise<SubscriptionTier>;
+  updateSubscriptionTier(id: string, data: Partial<InsertSubscriptionTier>): Promise<SubscriptionTier | undefined>;
+  deleteSubscriptionTier(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2188,6 +2197,36 @@ export class DatabaseStorage implements IStorage {
       projects.push(...ownerProjects);
     }
     return projects;
+  }
+
+  // Subscription tier methods
+  async getSubscriptionTiers(): Promise<SubscriptionTier[]> {
+    return await db.select().from(schema.subscriptionTiers).orderBy(schema.subscriptionTiers.sortOrder, schema.subscriptionTiers.name);
+  }
+
+  async getActiveSubscriptionTiers(): Promise<SubscriptionTier[]> {
+    return await db.select().from(schema.subscriptionTiers)
+      .where(eq(schema.subscriptionTiers.isActive, true))
+      .orderBy(schema.subscriptionTiers.sortOrder, schema.subscriptionTiers.name);
+  }
+
+  async getSubscriptionTier(id: string): Promise<SubscriptionTier | undefined> {
+    const [tier] = await db.select().from(schema.subscriptionTiers).where(eq(schema.subscriptionTiers.id, id));
+    return tier;
+  }
+
+  async createSubscriptionTier(tier: InsertSubscriptionTier): Promise<SubscriptionTier> {
+    const [created] = await db.insert(schema.subscriptionTiers).values(tier).returning();
+    return created;
+  }
+
+  async updateSubscriptionTier(id: string, data: Partial<InsertSubscriptionTier>): Promise<SubscriptionTier | undefined> {
+    const [updated] = await db.update(schema.subscriptionTiers).set(data).where(eq(schema.subscriptionTiers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSubscriptionTier(id: string): Promise<void> {
+    await db.delete(schema.subscriptionTiers).where(eq(schema.subscriptionTiers.id, id));
   }
 }
 
