@@ -3082,6 +3082,13 @@ export async function registerRoutes(
     try {
       // Platform reference items always have companyId = null
       const { categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive } = req.body;
+      // Validate that categoryId points to a platform category (companyId = null)
+      if (categoryId) {
+        const cat = await storage.getBudgetCategory(categoryId);
+        if (!cat || cat.companyId !== null) {
+          return res.status(400).json({ message: "Invalid category: must be a platform category" });
+        }
+      }
       const item = await storage.createBudgetItem({ categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive, companyId: null });
       res.json(item);
     } catch (error) {
@@ -3097,6 +3104,13 @@ export async function registerRoutes(
       }
       // Whitelist mutable fields — companyId stays null
       const { categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive } = req.body;
+      // If categoryId is being changed, verify the new category is also a platform category (companyId = null)
+      if (categoryId && categoryId !== existing.categoryId) {
+        const newCat = await storage.getBudgetCategory(categoryId);
+        if (!newCat || newCat.companyId !== null) {
+          return res.status(400).json({ message: "Invalid category: must be a platform category" });
+        }
+      }
       const item = await storage.updateBudgetItem(req.params.id, { categoryId, description, itemType, unitType, cost, laborRate, materialFee, retailPrice, notes, displayOrder, isActive });
       if (!item) {
         return res.status(404).json({ message: "Item not found" });
