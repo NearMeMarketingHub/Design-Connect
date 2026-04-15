@@ -270,6 +270,27 @@ export async function registerRoutes(
     });
   };
 
+  // Global middleware: enforce active subscription for all write operations
+  // Allowlist: auth, admin (guarded by requireAdmin), subscription info, signing, invite acceptance
+  app.use((req: any, res: any, next: any) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+    const path = req.path;
+    if (
+      path.startsWith("/api/auth") ||
+      path.startsWith("/api/admin") ||
+      path.startsWith("/api/subscription") ||
+      path === "/api/company/mine" ||
+      path.startsWith("/api/signing") ||
+      path.startsWith("/api/sign/") ||
+      path.startsWith("/api/contractor-invites") ||
+      path.startsWith("/api/project-invites") ||
+      path.startsWith("/api/sandbox")
+    ) {
+      return next();
+    }
+    return requireActiveSubscription(req, res, next);
+  });
+
   const requireAdmin = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
