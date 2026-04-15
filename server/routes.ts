@@ -3122,14 +3122,7 @@ export async function registerRoutes(
       if (!member) {
         return res.status(404).json({ message: "Team member not found in this project" });
       }
-      // Also verify the caller has access to this project's company (if not platform admin)
-      if (user.role !== "admin") {
-        const project = await storage.getProject(req.params.projectId);
-        if (!project) return res.status(404).json({ message: "Project not found" });
-        if (project.companyId && project.companyId !== user.companyId) {
-          return res.status(403).json({ message: "You do not have access to this project" });
-        }
-      }
+      // Access to this project's company already enforced by app.param("projectId") middleware
       const { permissions } = req.body;
       if (!permissions || typeof permissions !== "object") {
         return res.status(400).json({ message: "permissions object is required" });
@@ -3146,22 +3139,14 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/invite-external", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
-      // Also allow project team members who are not external (sub/notary) — "project team member with admin rights"
-      if (!canInvite && user.role === "contractor" && user.contractorType !== "subcontractor" && user.contractorType !== "notary") {
-        const teamMembership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
-        if (teamMembership) canInvite = true;
-      }
+      // Only company owners, company admins, and platform admins may invite external members
+      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners, admins, and project team members can invite external members" });
+        return res.status(403).json({ message: "Only company owners and admins can invite external members" });
       }
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
-
-      // Only callers from the same company can invite (unless platform admin)
-      if (user.role !== "admin" && project.companyId && project.companyId !== user.companyId) {
-        return res.status(403).json({ message: "You do not have access to this project" });
-      }
+      // Tenancy already enforced by app.param("projectId") middleware — no redundant check needed
 
       const { email, role, permissions } = req.body;
       if (!email) return res.status(400).json({ message: "email is required" });
@@ -3221,7 +3206,8 @@ export async function registerRoutes(
         return res.json({ member, invited: false, message: `${existingUser.name || email} has been added to the project` });
       } else {
         // No existing user — create a contractor invite with permissions embedded
-        const companyId = user.companyId || project.companyId || null;
+        // Use the inviting user's companyId (callers are always company_owner/admin, so this is the correct company)
+        const companyId = user.companyId || null;
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7); // 7 day expiry

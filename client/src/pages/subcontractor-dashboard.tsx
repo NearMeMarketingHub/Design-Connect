@@ -109,6 +109,8 @@ type PendingInvite = {
   companyId?: string;
   status: string;
   expiresAt: string;
+  projectName?: string | null;
+  companyName?: string | null;
 };
 
 export default function SubcontractorDashboard() {

@@ -63,7 +63,7 @@ export default function SignAuthenticatedPage() {
   });
 
   const signMutation = useMutation({
-    mutationFn: async (payload: { signatureData: string; signatureType: string }) => {
+    mutationFn: async (payload: { signatureData: string; signatureType: string; fieldCompletions?: Record<string, FieldCompletion> }) => {
       const response = await fetch(`/api/signing-packets/${packetId}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

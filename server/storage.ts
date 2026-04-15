@@ -1489,10 +1489,14 @@ export class DatabaseStorage implements IStorage {
       if (!project) continue;
       let companyName: string | undefined;
       let companyId: string | undefined;
-      if (project.companyId) {
-        const company = await this.getCompany(project.companyId);
-        companyName = company?.name;
-        companyId = company?.id;
+      // Projects don't have a direct companyId; derive via the project's contractorId → user.companyId
+      if (project.contractorId) {
+        const contractor = await this.getUser(project.contractorId);
+        if (contractor?.companyId) {
+          const company = await this.getCompany(contractor.companyId);
+          companyName = company?.name;
+          companyId = company?.id;
+        }
       }
       results.push({ ...project, companyName, companyId, permissions: membership.permissions, membershipId: membership.id });
     }
