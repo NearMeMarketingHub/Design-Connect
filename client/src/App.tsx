@@ -117,6 +117,12 @@ function Router() {
       <Layout>
         <Switch>
           <Route path="/subcontractor/dashboard" component={SubcontractorDashboard} />
+          <Route path="/subcontractor/project/:id/progress" component={ProjectDetails} />
+          <Route path="/subcontractor/project/:id/documents" component={ProjectDetails} />
+          <Route path="/subcontractor/project/:id/messages" component={ProjectDetails} />
+          <Route path="/subcontractor/project/:id/budget" component={ProjectDetails} />
+          <Route path="/subcontractor/project/:id/timeline" component={ProjectDetails} />
+          <Route path="/subcontractor/project/:id" component={ProjectDetails} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

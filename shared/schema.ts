@@ -415,7 +415,7 @@ export const projectTeamMembers = pgTable("project_team_members", {
   role: text("role"), // Their role/trade on this project (e.g., "Electrician", "HVAC")
   addedBy: varchar("added_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-  permissions: jsonb("permissions").default({}), // Per-project permissions for subs/notaries
+  permissions: jsonb("permissions").default({ canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false }), // Per-project permissions for subs/notaries
 });
 
 export const insertProjectTeamMemberSchema = createInsertSchema(projectTeamMembers).omit({ id: true, createdAt: true });
@@ -465,6 +465,7 @@ export const contractorInvites = pgTable("contractor_invites", {
   invitedBy: varchar("invited_by").references(() => users.id),
   acceptedUserId: varchar("accepted_user_id").references(() => users.id), // Set when invite is accepted
   expiresAt: timestamp("expires_at").notNull(),
+  permissions: jsonb("permissions"), // Per-project permissions to apply when invite is accepted
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

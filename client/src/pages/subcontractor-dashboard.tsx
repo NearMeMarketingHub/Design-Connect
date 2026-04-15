@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   HardHat, FolderOpen, Clock, CheckCircle, RefreshCw, Building2,
   ChevronRight, FileText, DollarSign, MessageSquare, Upload, Eye,
-  Layers, Shield, User, Briefcase
+  Layers, Shield, User, Briefcase, Bell, X, Check
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -101,9 +101,20 @@ function ProjectCard({ project, onClick }: { project: ProjectWithDetails; onClic
   );
 }
 
+type PendingInvite = {
+  id: string;
+  email: string;
+  contractorType?: string;
+  projectId?: string;
+  companyId?: string;
+  status: string;
+  expiresAt: string;
+};
+
 export default function SubcontractorDashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const isNotary = user?.contractorType === "notary";
   const roleLabel = isNotary ? "Notary" : "Sub-Contractor";
@@ -114,6 +125,44 @@ export default function SubcontractorDashboard() {
       const res = await fetch("/api/my-projects", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load projects");
       return res.json();
+    },
+  });
+
+  const { data: pendingInvites = [] } = useQuery<PendingInvite[]>({
+    queryKey: ["/api/my-invites"],
+    queryFn: async () => {
+      const res = await fetch("/api/my-invites", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const acceptInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const res = await fetch(`/api/my-invites/${inviteId}/accept`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to accept invite");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-invites"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-projects"] });
+    },
+  });
+
+  const declineInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const res = await fetch(`/api/my-invites/${inviteId}/decline`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to decline invite");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-invites"] });
     },
   });
 
@@ -201,6 +250,60 @@ export default function SubcontractorDashboard() {
         </Card>
       </div>
 
+      {/* Pending Invites */}
+      {pendingInvites.length > 0 && (
+        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+              <Bell className="w-5 h-5" />
+              Pending Project Invitations
+              <Badge className="ml-auto bg-blue-600 text-white">{pendingInvites.length}</Badge>
+            </CardTitle>
+            <CardDescription>You have been invited to collaborate on these projects</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingInvites.map(invite => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-muted border"
+                data-testid={`pending-invite-${invite.id}`}
+              >
+                <div>
+                  <p className="text-sm font-medium">
+                    {invite.contractorType === "notary" ? "Notary" : "Sub-Contractor"} Assignment
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => declineInviteMutation.mutate(invite.id)}
+                    disabled={declineInviteMutation.isPending}
+                    data-testid={`button-decline-invite-${invite.id}`}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Decline
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => acceptInviteMutation.mutate(invite.id)}
+                    disabled={acceptInviteMutation.isPending}
+                    data-testid={`button-accept-invite-${invite.id}`}
+                  >
+                    <Check className="w-3 h-3 mr-1" />
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Projects + Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Active Assignments */}
@@ -228,7 +331,7 @@ export default function SubcontractorDashboard() {
                     <ProjectCard
                       key={project.id}
                       project={project}
-                      onClick={() => navigate(`/contractor/project/${project.id}`)}
+                      onClick={() => navigate(`/subcontractor/project/${project.id}`)}
                     />
                   ))}
                 </div>
@@ -282,7 +385,7 @@ export default function SubcontractorDashboard() {
                   <div
                     key={project.id}
                     className="flex items-center justify-between text-sm cursor-pointer hover:text-primary py-1"
-                    onClick={() => navigate(`/contractor/project/${project.id}`)}
+                    onClick={() => navigate(`/subcontractor/project/${project.id}`)}
                     data-testid={`completed-project-${project.id}`}
                   >
                     <div className="min-w-0">

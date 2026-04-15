@@ -293,11 +293,14 @@ export default function ProjectDetails() {
   // Contractor controls - check if user can edit this project
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
   const isSubcontractor = user?.role === 'contractor' && user?.contractorType === 'subcontractor';
-  const canEdit = isContractorView && !isSubcontractor && (user?.role === 'contractor' || user?.role === 'company_owner' || user?.role === 'admin');
-  
+  const isNotaryUser = user?.role === 'contractor' && user?.contractorType === 'notary';
+  const isSubOrNotary = isSubcontractor || isNotaryUser;
+  const canEdit = isContractorView && !isSubOrNotary && (user?.role === 'contractor' || user?.role === 'company_owner' || user?.role === 'admin');
+
   // Get portal base path
   const getPortalPath = () => {
     if (currentPortal === 'admin') return '/admin';
+    if (isSubOrNotary) return '/subcontractor';
     if (currentPortal === 'contractor') return '/contractor';
     return '/client';
   };
@@ -307,6 +310,7 @@ export default function ProjectDetails() {
   // Get back path based on current portal
   const getBackPath = () => {
     if (currentPortal === 'admin') return '/admin/dashboard';
+    if (isSubOrNotary) return '/subcontractor/dashboard';
     if (currentPortal === 'contractor') return '/contractor/projects';
     return '/client/projects';
   };
@@ -361,6 +365,27 @@ export default function ProjectDetails() {
     },
     enabled: !staticProject && !!projectId,
   });
+
+  // For sub/notary users: fetch their per-project permissions
+  const { data: myProjects = [] } = useQuery<{ id: string; permissions?: Record<string, boolean> }[]>({
+    queryKey: ["/api/my-projects"],
+    queryFn: async () => {
+      const res = await fetch("/api/my-projects", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isSubOrNotary,
+  });
+  const subNotaryPermissions = isSubOrNotary
+    ? (myProjects.find(p => p.id === projectId)?.permissions ?? {})
+    : null;
+  // Helper: can sub/notary do X? (if not sub/notary, always true)
+  const hasProjectPerm = (key: string) => {
+    if (!isSubOrNotary) return true;
+    const perms = subNotaryPermissions as Record<string, boolean> | null;
+    if (!perms) return false;
+    return perms[key] === true;
+  };
   
   // Merge static or API project data
   const project = staticProject || (apiProject ? {
@@ -2776,13 +2801,15 @@ export default function ProjectDetails() {
           >
             Timeline
           </TabsTrigger>
-          <TabsTrigger 
-            value="messages"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
-            data-testid="tab-messages"
-          >
-            Messages
-          </TabsTrigger>
+          {hasProjectPerm('canViewMessages') && (
+            <TabsTrigger 
+              value="messages"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-messages"
+            >
+              Messages
+            </TabsTrigger>
+          )}
           <TabsTrigger 
             value="progress"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
@@ -2799,13 +2826,15 @@ export default function ProjectDetails() {
               Contractor Photos
             </TabsTrigger>
           )}
-          <TabsTrigger 
-            value="documents"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
-            data-testid="tab-documents"
-          >
-            Documents
-          </TabsTrigger>
+          {hasProjectPerm('canViewDocuments') && (
+            <TabsTrigger 
+              value="documents"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-documents"
+            >
+              Documents
+            </TabsTrigger>
+          )}
           {(canEdit || hasMaterialItems) && (
             <TabsTrigger 
               value="materials"
@@ -2854,19 +2883,21 @@ export default function ProjectDetails() {
                   </div>
                 </CardContent>
               </Card>
-              <Card data-testid="card-stat-budget">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-500/10 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-green-600" />
+              {hasProjectPerm('canViewBudget') && (
+                <Card data-testid="card-stat-budget">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Budget</p>
+                        <p className="text-xl font-bold" data-testid="text-budget">{formatCurrency(project.budget)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Budget</p>
-                      <p className="text-xl font-bold" data-testid="text-budget">{formatCurrency(project.budget)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
               <Card data-testid="card-stat-spent">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">

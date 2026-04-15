@@ -240,6 +240,7 @@ export interface IStorage {
   getContractorInviteByToken(token: string): Promise<ContractorInvite | undefined>;
   getContractorInvitesByProject(projectId: string): Promise<ContractorInvite[]>;
   getPendingContractorInvites(): Promise<ContractorInvite[]>;
+  getPendingContractorInvitesByEmail(email: string): Promise<ContractorInvite[]>;
   updateContractorInvite(id: string, data: Partial<InsertContractorInvite>): Promise<ContractorInvite | undefined>;
   acceptContractorInvite(token: string, userId: string): Promise<ContractorInvite | undefined>;
   
@@ -1537,6 +1538,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.contractorInvites.status, 'pending'));
   }
 
+  async getPendingContractorInvitesByEmail(email: string): Promise<ContractorInvite[]> {
+    return await db.select().from(schema.contractorInvites)
+      .where(
+        and(
+          eq(schema.contractorInvites.email, email),
+          eq(schema.contractorInvites.status, 'pending')
+        )
+      );
+  }
+
   async updateContractorInvite(id: string, data: Partial<InsertContractorInvite>): Promise<ContractorInvite | undefined> {
     const [invite] = await db.update(schema.contractorInvites)
       .set(data)
@@ -1557,12 +1568,17 @@ export class DatabaseStorage implements IStorage {
     
     // If invite was for a specific project, add the contractor to the project team
     if (invite.projectId) {
-      await this.addProjectTeamMember({
-        projectId: invite.projectId,
-        contractorId: userId,
-        role: invite.companyType,
-        addedBy: invite.invitedBy
-      });
+      // Check if already a team member (avoid duplicate)
+      const existingMembership = await this.getProjectTeamMemberByContractorAndProject(invite.projectId, userId);
+      if (!existingMembership) {
+        await this.addProjectTeamMember({
+          projectId: invite.projectId,
+          contractorId: userId,
+          role: invite.contractorType || invite.companyType || null,
+          addedBy: invite.invitedBy,
+          permissions: (invite.permissions as any) || undefined,
+        });
+      }
     }
     
     return updated;

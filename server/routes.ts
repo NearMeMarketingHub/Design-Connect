@@ -3229,6 +3229,7 @@ export async function registerRoutes(
           contractorType: inviteRole,
           invitedBy: user.id,
           expiresAt,
+          permissions: finalPermissions,
         });
         // Send invite email
         try {
@@ -3260,6 +3261,50 @@ export async function registerRoutes(
       }
       const projects = await storage.getContractorProjectsWithDetails(user.id);
       res.json(projects);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Get pending invites for the logged-in sub/notary user
+  app.get("/api/my-invites", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (!user.email) return res.json([]);
+      const invites = await storage.getPendingContractorInvitesByEmail(user.email);
+      // Filter out expired ones
+      const valid = invites.filter(i => new Date(i.expiresAt) > new Date());
+      res.json(valid);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Accept a pending project invite (sub/notary pressing "Accept" in dashboard)
+  app.post("/api/my-invites/:inviteId/accept", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const invites = user.email ? await storage.getPendingContractorInvitesByEmail(user.email) : [];
+      const target = invites.find(i => i.id === req.params.inviteId);
+      if (!target) return res.status(404).json({ message: "Invite not found" });
+      if (target.email !== user.email) return res.status(403).json({ message: "This invite is not for you" });
+      await storage.acceptContractorInvite(target.token, user.id);
+      res.json({ message: "Invite accepted" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Decline a pending project invite
+  app.post("/api/my-invites/:inviteId/decline", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const invites = user.email ? await storage.getPendingContractorInvitesByEmail(user.email) : [];
+      const target = invites.find(i => i.id === req.params.inviteId);
+      if (!target) return res.status(404).json({ message: "Invite not found" });
+      if (target.email !== user.email) return res.status(403).json({ message: "This invite is not for you" });
+      await storage.updateContractorInvite(target.id, { status: "expired" });
+      res.json({ message: "Invite declined" });
     } catch (error) {
       next(error);
     }
