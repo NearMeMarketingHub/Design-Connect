@@ -3176,17 +3176,21 @@ export async function registerRoutes(
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Authorization: company_owner, isCompanyAdmin, platform admin, OR a contractor who is
-      // a project team member of this project from the same company (project-level lead access)
+      // Authorization: company_owner, isCompanyAdmin, platform admin, OR a contractor with
+      // isCompanyAdmin who is a project team member of this project from the same company.
+      // "Same company" means the project's owning contractor user shares companyId with the inviter.
       let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
-      if (!canInvite && user.role === "contractor" && user.companyId) {
+      if (!canInvite && user.role === "contractor" && user.companyId && user.isCompanyAdmin === true) {
+        // Verify the project belongs to the inviter's company by resolving the project contractor user
+        const projectOwnerUser = project.contractorId ? await storage.getUser(project.contractorId) : null;
+        const projectCompanyId = projectOwnerUser?.companyId ?? null;
         const membership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
-        if (membership && project.contractorId === user.companyId) {
+        if (membership && projectCompanyId && projectCompanyId === user.companyId) {
           canInvite = true;
         }
       }
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners, admins, or project team members can invite external members" });
+        return res.status(403).json({ message: "Only company owners, admins, or company admins who are project members can invite external members" });
       }
 
       const { email, name, role, permissions } = req.body;

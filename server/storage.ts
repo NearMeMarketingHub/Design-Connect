@@ -232,7 +232,7 @@ export interface IStorage {
   addProjectTeamMember(member: InsertProjectTeamMember): Promise<ProjectTeamMember>;
   removeProjectTeamMember(id: string): Promise<void>;
   getContractorProjects(contractorId: string): Promise<Project[]>;
-  getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: ExternalMemberPermissions | null; membershipId: string })[]>;
+  getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; companyLogo?: string | null; permissions?: ExternalMemberPermissions | null; membershipId: string })[]>;
   getProjectTeamMemberByContractorAndProject(projectId: string, contractorId: string): Promise<ProjectTeamMember | undefined>;
   updateProjectTeamMemberPermissions(memberId: string, permissions: object): Promise<ProjectTeamMember | undefined>;
 
@@ -1478,18 +1478,19 @@ export class DatabaseStorage implements IStorage {
     return projects;
   }
 
-  async getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: ExternalMemberPermissions | null; membershipId: string })[]> {
+  async getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; companyLogo?: string | null; permissions?: ExternalMemberPermissions | null; membershipId: string })[]> {
     const teamMemberships = await db.select().from(schema.projectTeamMembers)
       .where(eq(schema.projectTeamMembers.contractorId, contractorId));
 
     if (teamMemberships.length === 0) return [];
 
-    const results: (Project & { companyName?: string; companyId?: string; permissions?: ExternalMemberPermissions | null; membershipId: string })[] = [];
+    const results: (Project & { companyName?: string; companyId?: string; companyLogo?: string | null; permissions?: ExternalMemberPermissions | null; membershipId: string })[] = [];
     for (const membership of teamMemberships) {
       const project = await this.getProject(membership.projectId);
       if (!project) continue;
       let companyName: string | undefined;
       let companyId: string | undefined;
+      let companyLogo: string | null = null;
       // Projects don't have a direct companyId; derive via the project's contractorId → user.companyId
       if (project.contractorId) {
         const contractor = await this.getUser(project.contractorId);
@@ -1497,9 +1498,10 @@ export class DatabaseStorage implements IStorage {
           const company = await this.getCompany(contractor.companyId);
           companyName = company?.name;
           companyId = company?.id;
+          companyLogo = company?.logo ?? null;
         }
       }
-      results.push({ ...project, companyName, companyId, permissions: membership.permissions as ExternalMemberPermissions | null, membershipId: membership.id });
+      results.push({ ...project, companyName, companyId, companyLogo, permissions: membership.permissions as ExternalMemberPermissions | null, membershipId: membership.id });
     }
     return results;
   }

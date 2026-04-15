@@ -27,6 +27,7 @@ type ProjectWithDetails = {
   progress?: number;
   companyName?: string;
   companyId?: string;
+  companyLogo?: string | null;
   permissions?: Permissions;
   membershipId: string;
 };
@@ -69,7 +70,11 @@ function ProjectCard({ project, onClick }: { project: ProjectWithDetails; onClic
           </div>
           {project.companyName && (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
-              <Building2 className="w-3.5 h-3.5 shrink-0" />
+              {project.companyLogo ? (
+                <img src={project.companyLogo} alt={project.companyName} className="w-4 h-4 rounded object-contain shrink-0" />
+              ) : (
+                <Building2 className="w-3.5 h-3.5 shrink-0" />
+              )}
               <span className="truncate">{project.companyName}</span>
             </div>
           )}

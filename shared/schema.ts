@@ -8,6 +8,7 @@ import { z } from "zod";
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  logo: text("logo"), // Optional company logo URL
   ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
   subscriptionPlan: text("subscription_plan").default("free"), // free, starter, professional, enterprise
   subscriptionStatus: text("subscription_status").default("active"), // active, past_due, cancelled, trialing
