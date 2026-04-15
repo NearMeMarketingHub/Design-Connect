@@ -133,7 +133,7 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("sub-email") as string;
-        const loggedInUser = await login(loginId, password, "contractor");
+        await login(loginId, password, "contractor");
         toast({ title: "Welcome back!", description: "You have successfully logged in." });
         setLocation("/subcontractor/dashboard");
       } else {
