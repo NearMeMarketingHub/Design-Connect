@@ -11,7 +11,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pkg from "pg";
 const { Pool } = pkg;
-import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage } from "@shared/schema";
+import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
@@ -531,6 +531,17 @@ export async function registerRoutes(
       if (contractor && contractor.companyId === user.companyId) return true;
     }
     return false;
+  };
+
+  // Helper: enforce per-project permissions for external (sub/notary) users
+  // Returns true if the user is allowed to perform the action; false otherwise
+  const checkExternalPermission = async (user: User, projectId: string, permKey: keyof ExternalMemberPermissions): Promise<boolean> => {
+    const isExternal = user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary");
+    if (!isExternal) return true; // non-external users are not restricted by per-project permissions
+    const membership = await storage.getProjectTeamMemberByContractorAndProject(projectId, user.id);
+    if (!membership) return false;
+    const perms = membership.permissions as Record<string, boolean> | null;
+    return perms?.[permKey] === true;
   };
 
   // Automatic project access guard — runs for every route with a :projectId param
@@ -1060,6 +1071,9 @@ export async function registerRoutes(
   app.get("/api/projects/:projectId/messages", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
+      if (!await checkExternalPermission(user, req.params.projectId, 'canViewMessages')) {
+        return res.status(403).json({ message: "You do not have permission to view messages for this project" });
+      }
       const messages = await storage.getMessages(req.params.projectId);
       // Add isOwn flag to each message
       const messagesWithOwnership = messages.map(msg => ({
@@ -1075,6 +1089,9 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/messages", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
+      if (!await checkExternalPermission(user, req.params.projectId, 'canPostMessages')) {
+        return res.status(403).json({ message: "You do not have permission to post messages in this project" });
+      }
       const message = await storage.createMessage({
         ...req.body,
         projectId: req.params.projectId,
@@ -1274,6 +1291,10 @@ export async function registerRoutes(
   // Project Document routes (contractor/admin can upload, all authenticated users can view)
   app.get("/api/projects/:projectId/documents", requireAuth, async (req, res, next) => {
     try {
+      const user = req.user as User;
+      if (!await checkExternalPermission(user, req.params.projectId, 'canViewDocuments')) {
+        return res.status(403).json({ message: "You do not have permission to view documents for this project" });
+      }
       const documents = await storage.getProjectDocuments(req.params.projectId);
       res.json(documents);
     } catch (error) {
@@ -1283,6 +1304,10 @@ export async function registerRoutes(
 
   app.get("/api/projects/:projectId/documents/type/:type", requireAuth, async (req, res, next) => {
     try {
+      const user = req.user as User;
+      if (!await checkExternalPermission(user, req.params.projectId, 'canViewDocuments')) {
+        return res.status(403).json({ message: "You do not have permission to view documents for this project" });
+      }
       const documents = await storage.getProjectDocumentsByType(req.params.projectId, req.params.type);
       res.json(documents);
     } catch (error) {
@@ -1305,9 +1330,12 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/documents", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      // Only contractors and admins can upload documents
+      // Only contractors and admins can upload documents; sub/notary require explicit canUploadDocuments permission
       if (user.role !== 'contractor' && user.role !== 'admin') {
         return res.status(403).json({ message: "Only contractors can upload documents" });
+      }
+      if (!await checkExternalPermission(user, req.params.projectId, 'canUploadDocuments')) {
+        return res.status(403).json({ message: "You do not have permission to upload documents for this project" });
       }
       
       const document = await storage.createProjectDocument({
@@ -3139,15 +3167,10 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/invite-external", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      // Company owners, company admins, and platform admins can always invite
-      let canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
-      // Also allow non-external project team members who are project leads (on the project, not a sub/notary)
-      if (!canInvite && user.role === "contractor" && user.contractorType !== "subcontractor" && user.contractorType !== "notary") {
-        const teamMembership = await storage.getProjectTeamMemberByContractorAndProject(req.params.projectId, user.id);
-        if (teamMembership) canInvite = true;
-      }
+      // Only company owners, company admins (isCompanyAdmin), and platform admins may invite
+      const canInvite = user.role === "company_owner" || user.isCompanyAdmin === true || user.role === "admin";
       if (!canInvite) {
-        return res.status(403).json({ message: "Only company owners, admins, and project team members can invite external members" });
+        return res.status(403).json({ message: "Only company owners and admins can invite external members" });
       }
       const project = await storage.getProject(req.params.projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });

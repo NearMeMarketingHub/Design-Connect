@@ -61,7 +61,8 @@ import type {
   NotaryProfile, InsertNotaryProfile,
   ClientMaterialItem, InsertClientMaterialItem,
   ChangeOrder, InsertChangeOrder,
-  ChangeOrderLineItem, InsertChangeOrderLineItem
+  ChangeOrderLineItem, InsertChangeOrderLineItem,
+  ExternalMemberPermissions
 } from "@shared/schema";
 
 export interface IStorage {
@@ -231,7 +232,7 @@ export interface IStorage {
   addProjectTeamMember(member: InsertProjectTeamMember): Promise<ProjectTeamMember>;
   removeProjectTeamMember(id: string): Promise<void>;
   getContractorProjects(contractorId: string): Promise<Project[]>;
-  getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: any; membershipId: string })[]>;
+  getContractorProjectsWithDetails(contractorId: string): Promise<(Project & { companyName?: string; companyId?: string; permissions?: ExternalMemberPermissions | null; membershipId: string })[]>;
   getProjectTeamMemberByContractorAndProject(projectId: string, contractorId: string): Promise<ProjectTeamMember | undefined>;
   updateProjectTeamMemberPermissions(memberId: string, permissions: object): Promise<ProjectTeamMember | undefined>;
 
@@ -1483,7 +1484,7 @@ export class DatabaseStorage implements IStorage {
 
     if (teamMemberships.length === 0) return [];
 
-    const results: (Project & { companyName?: string; companyId?: string; permissions?: any; membershipId: string })[] = [];
+    const results: (Project & { companyName?: string; companyId?: string; permissions?: ExternalMemberPermissions | null; membershipId: string })[] = [];
     for (const membership of teamMemberships) {
       const project = await this.getProject(membership.projectId);
       if (!project) continue;
@@ -1498,7 +1499,7 @@ export class DatabaseStorage implements IStorage {
           companyId = company?.id;
         }
       }
-      results.push({ ...project, companyName, companyId, permissions: membership.permissions, membershipId: membership.id });
+      results.push({ ...project, companyName, companyId, permissions: membership.permissions as ExternalMemberPermissions | null, membershipId: membership.id });
     }
     return results;
   }
@@ -1580,7 +1581,7 @@ export class DatabaseStorage implements IStorage {
           contractorId: userId,
           role: invite.contractorType || invite.companyType || null,
           addedBy: invite.invitedBy,
-          permissions: (invite.permissions as any) || undefined,
+          permissions: (invite.permissions as ExternalMemberPermissions | null) ?? undefined,
         });
       }
     }
