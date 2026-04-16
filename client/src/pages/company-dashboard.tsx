@@ -26,7 +26,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import { parseErrorMessage } from "@/lib/queryClient";
+import { parseErrorMessage, apiRequest } from "@/lib/queryClient";
 
 const SUBCONTRACTOR_SPECIALTIES = [
   "Plumber", "Electrician", "HVAC Technician", "Roofer", "Carpenter",
@@ -166,13 +166,7 @@ export default function CompanyDashboard() {
         ? `/api/company/price-book/categories/${editingCategory.id}`
         : "/api/company/price-book/categories";
       const method = editingCategory ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ...data, displayOrder: parseInt(data.displayOrder) || 0 }),
-      });
-      if (!res.ok) throw new Error("Failed to save category");
+      const res = await apiRequest(method, url, { ...data, displayOrder: parseInt(data.displayOrder) || 0 });
       return res.json();
     },
     onSuccess: () => {
@@ -185,8 +179,7 @@ export default function CompanyDashboard() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/company/price-book/categories/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete category");
+      await apiRequest("DELETE", `/api/company/price-book/categories/${id}`);
     },
     onSuccess: () => { refetchCategories(); refetchItems(); toast({ title: "Category deleted" }); },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
@@ -208,13 +201,7 @@ export default function CompanyDashboard() {
         materialFee: data.materialFee || "0",
         retailPrice: data.retailPrice || "0",
       };
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Failed to save item");
+      const res = await apiRequest(method, url, payload);
       return res.json();
     },
     onSuccess: () => {
@@ -227,8 +214,7 @@ export default function CompanyDashboard() {
 
   const deleteItemMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/company/price-book/items/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete item");
+      await apiRequest("DELETE", `/api/company/price-book/items/${id}`);
     },
     onSuccess: () => { refetchItems(); toast({ title: "Item deleted" }); },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
@@ -365,11 +351,7 @@ export default function CompanyDashboard() {
 
   const removeMemberMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const res = await fetch(`/api/company/${company?.id}/members/${userId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to remove member");
+      await apiRequest("DELETE", `/api/company/${company?.id}/members/${userId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/company/members"] });

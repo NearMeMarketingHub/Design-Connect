@@ -1,6 +1,16 @@
 import { QueryClient, QueryCache, QueryFunction } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 function tryParseMessage(text: string): string | null {
   try {
     const json = JSON.parse(text);
@@ -15,7 +25,7 @@ async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     const message = tryParseMessage(text) ?? text ?? res.statusText;
-    throw new Error(message);
+    throw new ApiError(res.status, message);
   }
 }
 
@@ -72,9 +82,9 @@ export const getQueryFn: <T>(options: {
 // never go silently blank. Skips 401s (handled by auth redirect).
 const queryCache = new QueryCache({
   onError: (error: unknown) => {
+    // Suppress 401 Unauthorized — the auth layer handles redirecting to login
+    if (error instanceof ApiError && error.status === 401) return;
     const msg = error instanceof Error ? error.message : "An unexpected error occurred.";
-    // Skip 401 errors — the auth layer handles those
-    if (msg.includes("401") || msg === "Unauthorized") return;
     toast({
       title: "Failed to load data",
       description: msg,
