@@ -558,6 +558,99 @@ export async function registerRoutes(
     sortOrder: z.coerce.number().int().nonnegative().optional(),
   });
 
+  // ── Write-route validation schemas ─────────────────────────────────────────
+  // Schemas for key POST/PATCH routes — catch bad data before it reaches the DB
+
+  const createProjectSchema = z.object({
+    name: z.string().min(1, "name is required"),
+    address: z.string().min(1, "address is required"),
+    status: z.string().min(1, "status is required"),
+    phase: z.string().min(1, "phase is required"),
+    progress: z.number().int().min(0).max(100).optional(),
+    budgetStatus: z.string().optional().nullable(),
+    nextMilestone: z.string().optional().nullable(),
+    dueDate: z.string().optional().nullable(),
+    description: z.string().optional().nullable(),
+    image: z.string().optional().nullable(),
+    type: z.string().optional().nullable(),
+    budget: z.union([z.string(), z.number()]).optional().nullable(),
+    clientId: z.string().optional().nullable(),
+    isSandbox: z.boolean().optional().nullable(),
+  });
+  const updateProjectSchema = createProjectSchema.partial();
+
+  const createEstimateSchema = z.object({
+    customId: z.string().min(1, "customId is required"),
+    clientName: z.string().min(1, "clientName is required"),
+    projectName: z.string().min(1, "projectName is required"),
+    amount: z.string().min(1, "amount is required"),
+    status: z.string().min(1, "status is required"),
+    date: z.string().min(1, "date is required"),
+    projectId: z.string().optional().nullable(),
+    lineItems: z.array(z.any()).optional(),
+  });
+
+  const createInvoiceSchema = z.object({
+    customId: z.string().min(1, "customId is required"),
+    clientName: z.string().min(1, "clientName is required"),
+    projectName: z.string().min(1, "projectName is required"),
+    amount: z.string().min(1, "amount is required"),
+    dueDate: z.string().min(1, "dueDate is required"),
+    status: z.string().min(1, "status is required"),
+    type: z.string().min(1, "type is required"),
+    projectId: z.string().optional().nullable(),
+    lineItems: z.array(z.any()).optional(),
+  });
+
+  const createRecurringBillingSchema = z.object({
+    customId: z.string().min(1, "customId is required"),
+    clientName: z.string().min(1, "clientName is required"),
+    projectName: z.string().min(1, "projectName is required"),
+    amount: z.string().min(1, "amount is required"),
+    frequency: z.string().min(1, "frequency is required"),
+    nextRunDate: z.string().min(1, "nextRunDate is required"),
+    status: z.string().min(1, "status is required"),
+    projectId: z.string().optional().nullable(),
+  });
+
+  const createPhaseSchema = z.object({
+    name: z.string().min(1, "name is required"),
+    status: z.string().min(1, "status is required"),
+    dateRange: z.string(),
+    tasks: z.array(z.string()),
+    orderIndex: z.number().int().optional(),
+    dueDate: z.string().optional().nullable(),
+  });
+
+  const createActionItemSchema = z.object({
+    title: z.string().min(1, "title is required"),
+    status: z.string().min(1, "status is required"),
+    assignedTo: z.string().optional().nullable(),
+    dueDate: z.string().optional().nullable(),
+  });
+
+  const projectInviteSchema = z.object({
+    email: z.string().email("email must be a valid email address"),
+    clientName: z.string().optional().nullable(),
+  });
+
+  const externalInviteSchema = z.object({
+    email: z.string().email("email must be a valid email address"),
+    name: z.string().optional().nullable(),
+    role: z.enum(["subcontractor", "notary"]).optional(),
+    permissions: z.record(z.boolean()).optional(),
+  });
+
+  const createChangeOrderSchema = z.object({
+    title: z.string().min(1, "title is required"),
+    description: z.string().default(""),
+    reason: z.string().default(""),
+    costImpact: z.union([z.string(), z.number()]).optional().nullable(),
+    timelineImpact: z.coerce.number().int().optional().nullable(),
+    lineItems: z.array(z.any()).optional(),
+  });
+  // ───────────────────────────────────────────────────────────────────────────
+
   app.post("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
     try {
       const parsed = tierSchema.safeParse(req.body);
@@ -755,8 +848,12 @@ export async function registerRoutes(
       if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
         return res.status(403).json({ message: "External users cannot create projects" });
       }
+      const parsed = createProjectSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid project data", errors: parsed.error.flatten().fieldErrors });
+      }
       const project = await storage.createProject({
-        ...req.body,
+        ...parsed.data,
         contractorId: user.id,
       });
       res.json(project);
@@ -782,10 +879,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "External users cannot edit projects" });
       }
       
+      const parsedUpdate = updateProjectSchema.safeParse(req.body);
+      if (!parsedUpdate.success) {
+        return res.status(400).json({ message: "Invalid project data", errors: parsedUpdate.error.flatten().fieldErrors });
+      }
+
       const oldProgress = currentProject.progress || 0;
-      const newProgress = req.body.progress;
+      const newProgress = parsedUpdate.data.progress;
       
-      const project = await storage.updateProject(req.params.id, req.body);
+      const project = await storage.updateProject(req.params.id, parsedUpdate.data);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
@@ -835,7 +937,11 @@ export async function registerRoutes(
 
   app.post("/api/estimates", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
-      const { lineItems, ...estimateData } = req.body;
+      const parsedEstimate = createEstimateSchema.safeParse(req.body);
+      if (!parsedEstimate.success) {
+        return res.status(400).json({ message: "Invalid estimate data", errors: parsedEstimate.error.flatten().fieldErrors });
+      }
+      const { lineItems, ...estimateData } = parsedEstimate.data;
       const estimate = await storage.createEstimate(estimateData);
       
       if (lineItems && Array.isArray(lineItems)) {
@@ -878,7 +984,11 @@ export async function registerRoutes(
 
   app.post("/api/invoices", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
-      const { lineItems, ...invoiceData } = req.body;
+      const parsedInvoice = createInvoiceSchema.safeParse(req.body);
+      if (!parsedInvoice.success) {
+        return res.status(400).json({ message: "Invalid invoice data", errors: parsedInvoice.error.flatten().fieldErrors });
+      }
+      const { lineItems, ...invoiceData } = parsedInvoice.data;
       const invoice = await storage.createInvoice(invoiceData);
       
       if (lineItems && Array.isArray(lineItems)) {
@@ -908,7 +1018,11 @@ export async function registerRoutes(
 
   app.post("/api/recurring-billing", requireAuth, async (req, res, next) => {
     try {
-      const billing = await storage.createRecurringBilling(req.body);
+      const parsedBilling = createRecurringBillingSchema.safeParse(req.body);
+      if (!parsedBilling.success) {
+        return res.status(400).json({ message: "Invalid recurring billing data", errors: parsedBilling.error.flatten().fieldErrors });
+      }
+      const billing = await storage.createRecurringBilling(parsedBilling.data);
       res.json(billing);
     } catch (error) {
       next(error);
@@ -927,8 +1041,12 @@ export async function registerRoutes(
 
   app.post("/api/projects/:projectId/phases", requireAuth, async (req, res, next) => {
     try {
+      const parsedPhase = createPhaseSchema.safeParse(req.body);
+      if (!parsedPhase.success) {
+        return res.status(400).json({ message: "Invalid phase data", errors: parsedPhase.error.flatten().fieldErrors });
+      }
       const phase = await storage.createProjectPhase({
-        ...req.body,
+        ...parsedPhase.data,
         projectId: req.params.projectId,
       });
       res.json(phase);
@@ -1169,8 +1287,12 @@ export async function registerRoutes(
 
   app.post("/api/projects/:projectId/action-items", requireAuth, async (req, res, next) => {
     try {
+      const parsedItem = createActionItemSchema.safeParse(req.body);
+      if (!parsedItem.success) {
+        return res.status(400).json({ message: "Invalid action item data", errors: parsedItem.error.flatten().fieldErrors });
+      }
       const item = await storage.createActionItem({
-        ...req.body,
+        ...parsedItem.data,
         projectId: req.params.projectId,
       });
       res.json(item);
@@ -2096,7 +2218,11 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only contractors can create change orders" });
       }
 
-      const { title, description, reason, costImpact, timelineImpact, lineItems } = req.body;
+      const parsedCO = createChangeOrderSchema.safeParse(req.body);
+      if (!parsedCO.success) {
+        return res.status(400).json({ message: "Invalid change order data", errors: parsedCO.error.flatten().fieldErrors });
+      }
+      const { title, description, reason, costImpact, timelineImpact, lineItems } = parsedCO.data;
       const orderNumber = await storage.getNextChangeOrderNumber(req.params.projectId);
 
       const changeOrder = await storage.createChangeOrder({
@@ -3147,11 +3273,11 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/invite", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const { email, clientName } = req.body;
-
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
+      const parsedInvite = projectInviteSchema.safeParse(req.body);
+      if (!parsedInvite.success) {
+        return res.status(400).json({ message: "Invalid invite data", errors: parsedInvite.error.flatten().fieldErrors });
       }
+      const { email, clientName } = parsedInvite.data;
 
       const project = await storage.getProject(req.params.projectId);
       if (!project) {
@@ -3503,12 +3629,14 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only company owners, admins, or project leads can invite external members" });
       }
 
-      const { email, name, role, permissions } = req.body;
-      if (!email) return res.status(400).json({ message: "email is required" });
+      const parsedExtInvite = externalInviteSchema.safeParse(req.body);
+      if (!parsedExtInvite.success) {
+        return res.status(400).json({ message: "Invalid invite data", errors: parsedExtInvite.error.flatten().fieldErrors });
+      }
+      const { email, name, role, permissions } = parsedExtInvite.data;
 
-      // Validate role must be subcontractor or notary
-      const validRoles = ["subcontractor", "notary"];
-      const inviteRole: "subcontractor" | "notary" = validRoles.includes(role) ? role : "subcontractor";
+      // Role is already validated by schema; default to subcontractor if omitted
+      const inviteRole: "subcontractor" | "notary" = role ?? "subcontractor";
 
       // Determine default permissions based on role
       const defaultSubPerms = { canViewDocuments: true, canUploadDocuments: false, canViewBudget: false, canViewMessages: true, canPostMessages: false, canViewEstimates: false };
