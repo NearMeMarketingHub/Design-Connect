@@ -94,6 +94,13 @@ BuildVision uses a company-based multi-tenant model:
 - **Company isolation**: All data (projects, team, financials) is scoped to companyId. `app.param("projectId")` enforces access checks on all project-scoped routes.
 - **Startup migration**: `server/migrate-roles.ts` runs idempotently on startup to promote legacy contractor accounts to company_owner.
 
+### Per-Company Price Book
+Each company maintains its own price book for custom pricing:
+- **Categories & Items**: Organized by category (Electrical, Plumbing, Flooring, etc.) with line items showing labor rate, material fee, and retail price
+- **Bulk Import**: `POST /api/company/price-book/bulk-import` accepts an array of items grouped by category name; creates new categories as needed. Frontend dialog supports manual table entry OR Excel/CSV file upload with preview/edit before saving
+- **Floor Calculator Integration**: Items with `unitType` containing SF/SQ, or description matching flooring keywords (floor, tile, carpet, vinyl, hardwood, laminate), automatically appear in the Floor Calculator. These items show an "FC" badge in the price book. The Floor Calculator reads from `/api/calculator/items`
+- **API**: `GET/POST/PATCH/DELETE /api/company/price-book/categories`, `GET/POST/PATCH/DELETE /api/company/price-book/items`, `POST /api/company/price-book/bulk-import`
+
 ### Sub-Contractor / Notary Hub
 Unified project hub for external workers (subcontractors and notaries):
 - **Dashboard**: `/subcontractor/dashboard` — shows stats (active, companies, completed), project cards with permission chips, access legend, profile card

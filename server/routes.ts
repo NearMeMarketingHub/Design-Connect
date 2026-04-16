@@ -854,6 +854,7 @@ export async function registerRoutes(
       }
       const project = await storage.createProject({
         ...parsed.data,
+        budget: parsed.data.budget != null ? String(parsed.data.budget) : undefined,
         contractorId: user.id,
       });
       res.json(project);
@@ -887,7 +888,10 @@ export async function registerRoutes(
       const oldProgress = currentProject.progress || 0;
       const newProgress = parsedUpdate.data.progress;
       
-      const project = await storage.updateProject(req.params.id, parsedUpdate.data);
+      const project = await storage.updateProject(req.params.id, {
+        ...parsedUpdate.data,
+        budget: parsedUpdate.data.budget != null ? String(parsedUpdate.data.budget) : undefined,
+      });
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
@@ -2231,7 +2235,7 @@ export async function registerRoutes(
         title,
         description,
         reason,
-        costImpact: costImpact || "0",
+        costImpact: costImpact != null ? String(costImpact) : "0",
         timelineImpact: timelineImpact || 0,
         status: "pending",
         createdById: user.id,
@@ -3108,6 +3112,86 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
+  // Bulk import endpoint for price book
+  app.post("/api/company/price-book/bulk-import", requireCompanyOwner, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = user.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company associated with this account" });
+
+      const { items } = req.body as {
+        items: Array<{
+          category: string;
+          description: string;
+          unitType: string;
+          laborRate?: string;
+          materialFee?: string;
+          retailPrice?: string;
+          itemType?: string;
+          notes?: string;
+        }>;
+      };
+
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "No items provided" });
+      }
+
+      // Group items by category name
+      const categoryMap = new Map<string, typeof items>();
+      for (const item of items) {
+        const catName = (item.category || "Uncategorized").trim();
+        if (!categoryMap.has(catName)) categoryMap.set(catName, []);
+        categoryMap.get(catName)!.push(item);
+      }
+
+      // Get existing categories for this company
+      const existingCategories = await storage.getCompanyPriceBookCategories(companyId);
+
+      let createdCategories = 0;
+      let createdItems = 0;
+
+      for (const [catName, catItems] of Array.from(categoryMap.entries())) {
+        // Find or create category
+        let category = existingCategories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+        if (!category) {
+          category = await storage.createBudgetCategory({
+            companyId,
+            name: catName,
+            notes: null,
+            displayOrder: 0,
+            isActive: true,
+          });
+          createdCategories++;
+        }
+
+        // Create items in category
+        for (const item of catItems) {
+          await storage.createBudgetItem({
+            categoryId: category.id,
+            companyId,
+            description: item.description,
+            itemType: item.itemType || "",
+            unitType: item.unitType || "EA",
+            cost: null,
+            laborRate: item.laborRate || null,
+            materialFee: item.materialFee || null,
+            retailPrice: item.retailPrice || null,
+            notes: item.notes || null,
+            displayOrder: 0,
+            isActive: true,
+          });
+          createdItems++;
+        }
+      }
+
+      res.json({
+        message: `Imported ${createdItems} item${createdItems !== 1 ? "s" : ""} across ${categoryMap.size} categor${categoryMap.size !== 1 ? "ies" : "y"}`,
+        createdCategories,
+        createdItems,
+      });
+    } catch (error) { next(error); }
+  });
+
   // Budget Category routes - Admin only
   app.get("/api/budget/categories", requireAdmin, async (req, res, next) => {
     try {
@@ -3305,7 +3389,7 @@ export async function registerRoutes(
           projectName: project.name,
           contractorName: user.name || user.username,
           inviteToken: token,
-          clientName,
+          clientName: clientName ?? undefined,
         });
       } catch (emailError) {
         console.error("Failed to send email:", emailError);

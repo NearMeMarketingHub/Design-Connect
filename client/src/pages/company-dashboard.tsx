@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
   Building2, Users, CreditCard, Settings, Plus, Mail, Trash2,
   CheckCircle, Clock, Crown, Wrench, FileText, UserPlus, ChevronRight,
   RefreshCw, AlertCircle, ShieldCheck, AlertTriangle, Lock,
-  BookOpen, Tag, Pencil, Package, DollarSign
+  BookOpen, Tag, Pencil, Package, DollarSign, Upload, Calculator,
+  LayoutGrid, X
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +83,49 @@ export default function CompanyDashboard() {
     cost: "0", laborRate: "0", materialFee: "0", retailPrice: "0",
     notes: "", displayOrder: "0",
   });
+
+  // Bulk import state
+  interface BulkRow {
+    category: string;
+    description: string;
+    unitType: string;
+    laborRate: string;
+    materialFee: string;
+    retailPrice: string;
+    itemType: string;
+    _id: number;
+  }
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkTab, setBulkTab] = useState<"manual" | "upload">("manual");
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkRowCounter, setBulkRowCounter] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const newBulkRow = useCallback((id: number): BulkRow => ({
+    category: "", description: "", unitType: "SF",
+    laborRate: "", materialFee: "", retailPrice: "", itemType: "", _id: id,
+  }), []);
+
+  const addBulkRow = () => {
+    const id = bulkRowCounter + 1;
+    setBulkRowCounter(id);
+    setBulkRows(r => [...r, newBulkRow(id)]);
+  };
+
+  const openBulkImport = () => {
+    const id = 1;
+    setBulkRowCounter(id);
+    setBulkRows([newBulkRow(id)]);
+    setBulkTab("manual");
+    setBulkImportOpen(true);
+  };
+
+  const isFloorCalcItem = (item: PriceItem) => {
+    const unit = (item.unitType || "").toLowerCase();
+    const desc = (item.description || "").toLowerCase();
+    return unit.includes("sf") || unit.includes("sq") ||
+      /floor|tile|carpet|vinyl|hardwood|laminate/i.test(desc);
+  };
 
   useEffect(() => {
     if (location === "/company/team") {
@@ -206,6 +251,20 @@ export default function CompanyDashboard() {
     },
     onSuccess: () => { refetchItems(); toast({ title: "Item deleted" }); },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
+  const bulkImportMutation = useMutation({
+    mutationFn: async (items: Array<{ category: string; description: string; unitType: string; laborRate?: string; materialFee?: string; retailPrice?: string; itemType?: string }>) => {
+      const res = await apiRequest("POST", "/api/company/price-book/bulk-import", { items });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Import Complete", description: data.message });
+      refetchCategories();
+      refetchItems();
+      setBulkImportOpen(false);
+    },
+    onError: (err: Error) => toast({ title: "Import Failed", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const openCategoryCreate = () => {
@@ -456,14 +515,6 @@ export default function CompanyDashboard() {
           >
             {isExpired ? "Expired" : isTrialing ? `Trial — ${trialDaysRemaining}d left` : (company?.subscriptionPlan || "free")}
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/contractor/dashboard")}
-            data-testid="button-switch-to-contractor"
-          >
-            Switch to Contractor View
-          </Button>
         </div>
       </div>
 
@@ -549,7 +600,7 @@ export default function CompanyDashboard() {
                       data-testid={`project-row-${project.id}`}
                     >
                       <div>
-                        <p className="font-medium">{project.title}</p>
+                        <p className="font-medium">{project.name}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <Badge variant={project.status === "active" ? "default" : "secondary"} className="capitalize">
@@ -639,7 +690,7 @@ export default function CompanyDashboard() {
                           <SelectContent>
                             <SelectItem value="_none">No specific project</SelectItem>
                             {projects.map((p: any) => (
-                              <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -768,9 +819,18 @@ export default function CompanyDashboard() {
               </h2>
               <p className="text-muted-foreground text-sm">Manage your company's pricing categories and line items</p>
             </div>
-            <Button onClick={openCategoryCreate} data-testid="button-add-category">
-              <Plus className="w-4 h-4 mr-2" /> Add Category
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={openBulkImport} data-testid="button-bulk-import">
+                <Upload className="w-4 h-4 mr-2" /> Bulk Import
+              </Button>
+              <Button onClick={openCategoryCreate} data-testid="button-add-category">
+                <Plus className="w-4 h-4 mr-2" /> Add Category
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-2">
+            <Calculator className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <span>Items with <strong>SF</strong> or <strong>SQ</strong> unit types (or flooring keywords in the description) automatically appear in the <strong>Floor Calculator</strong>.</span>
           </div>
 
           {priceCategories.length === 0 ? (
@@ -839,7 +899,16 @@ export default function CompanyDashboard() {
                               <tbody className="divide-y">
                                 {catItems.map((item) => (
                                   <tr key={item.id} className="hover:bg-muted/20" data-testid={`item-row-${item.id}`}>
-                                    <td className="p-2 pl-3 font-medium">{item.description}</td>
+                                    <td className="p-2 pl-3 font-medium">
+                                      <div className="flex items-center gap-2">
+                                        {item.description}
+                                        {isFloorCalcItem(item) && (
+                                          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded px-1.5 py-0.5" title="Appears in Floor Calculator">
+                                            <Calculator className="w-2.5 h-2.5" /> FC
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
                                     <td className="p-2 text-muted-foreground">{item.itemType}</td>
                                     <td className="p-2">{item.unitType}</td>
                                     <td className="p-2 text-right">{item.laborRate ? `$${parseFloat(item.laborRate).toFixed(2)}` : "-"}</td>
@@ -1031,6 +1100,250 @@ export default function CompanyDashboard() {
                   data-testid="button-save-item"
                 >
                   {saveItemMutation.isPending ? "Saving…" : editingItem ? "Save Changes" : "Add Item"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Bulk Import Dialog */}
+          <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
+            <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Upload className="w-5 h-5" /> Bulk Import Price Book Items
+                </DialogTitle>
+                <DialogDescription>
+                  Add multiple items at once. Fill in the table manually or upload an Excel/CSV file. Review and edit before saving.
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Tab selector */}
+              <div className="flex gap-2 border-b pb-3">
+                <Button
+                  variant={bulkTab === "manual" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBulkTab("manual")}
+                  data-testid="bulk-tab-manual"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 mr-1.5" /> Manual Entry
+                </Button>
+                <Button
+                  variant={bulkTab === "upload" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBulkTab("upload")}
+                  data-testid="bulk-tab-upload"
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1.5" /> Upload Excel / CSV
+                </Button>
+              </div>
+
+              {bulkTab === "upload" && (
+                <div className="space-y-3">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center space-y-3">
+                    <Upload className="w-8 h-8 mx-auto text-muted-foreground/50" />
+                    <div>
+                      <p className="font-medium">Upload your Excel or CSV file</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Expected columns: <code className="bg-muted rounded px-1">Category</code>, <code className="bg-muted rounded px-1">Description</code>, <code className="bg-muted rounded px-1">Unit</code>, <code className="bg-muted rounded px-1">Labor Rate</code>, <code className="bg-muted rounded px-1">Material Fee</code>, <code className="bg-muted rounded px-1">Retail Price</code>, <code className="bg-muted rounded px-1">Item Type</code>
+                      </p>
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      data-testid="input-bulk-file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          try {
+                            const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+                            const workbook = XLSX.read(data, { type: "array" });
+                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+                            let counter = bulkRowCounter;
+                            const parsed: typeof bulkRows = rows
+                              .filter(r => r["Description"] || r["description"])
+                              .map(r => {
+                                counter++;
+                                return {
+                                  category: r["Category"] || r["category"] || "",
+                                  description: r["Description"] || r["description"] || "",
+                                  unitType: (r["Unit"] || r["unit"] || r["Unit Type"] || r["unitType"] || "EA").toUpperCase(),
+                                  laborRate: r["Labor Rate"] || r["labor rate"] || r["laborRate"] || "",
+                                  materialFee: r["Material Fee"] || r["material fee"] || r["materialFee"] || "",
+                                  retailPrice: r["Retail Price"] || r["retail price"] || r["retailPrice"] || r["Price"] || r["price"] || "",
+                                  itemType: r["Item Type"] || r["item type"] || r["itemType"] || "",
+                                  _id: counter,
+                                };
+                              });
+                            setBulkRowCounter(counter);
+                            setBulkRows(parsed);
+                            setBulkTab("manual");
+                            toast({ title: `Parsed ${parsed.length} row${parsed.length !== 1 ? "s" : ""} from file. Review below.` });
+                          } catch {
+                            toast({ title: "Parse Error", description: "Could not read that file. Check the format.", variant: "destructive" });
+                          }
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        };
+                        reader.readAsArrayBuffer(file);
+                      }}
+                    />
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-choose-file">
+                      Choose File
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground bg-muted/50 rounded p-3">
+                    <strong>Template tip:</strong> Create an Excel file with headers: Category | Description | Unit | Labor Rate | Material Fee | Retail Price | Item Type. Each row becomes one price book item. Items with the same category name are grouped together automatically.
+                  </div>
+                </div>
+              )}
+
+              {/* Review table — always visible on manual tab, also shown after upload parses rows */}
+              {(bulkTab === "manual" || bulkRows.length > 0) && (
+                <div className="flex-1 overflow-auto space-y-3">
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="w-full text-sm min-w-[900px]">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-2 pl-3 font-medium w-36">Category</th>
+                          <th className="text-left p-2 font-medium">Description</th>
+                          <th className="text-left p-2 font-medium w-20">Unit</th>
+                          <th className="text-left p-2 font-medium w-24">Labor ($)</th>
+                          <th className="text-left p-2 font-medium w-24">Material ($)</th>
+                          <th className="text-left p-2 font-medium w-24">Price ($)</th>
+                          <th className="text-left p-2 font-medium w-28">Item Type</th>
+                          <th className="w-8 p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {bulkRows.map((row) => (
+                          <tr key={row._id} className="hover:bg-muted/20">
+                            <td className="p-1">
+                              <Input
+                                placeholder="Category"
+                                value={row.category}
+                                onChange={e => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, category: e.target.value } : r))}
+                                className="h-7 text-xs"
+                                data-testid={`bulk-category-${row._id}`}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <Input
+                                placeholder="Description *"
+                                value={row.description}
+                                onChange={e => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, description: e.target.value } : r))}
+                                className="h-7 text-xs"
+                                data-testid={`bulk-description-${row._id}`}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <Select value={row.unitType} onValueChange={v => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, unitType: v } : r))}>
+                                <SelectTrigger className="h-7 text-xs" data-testid={`bulk-unit-${row._id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["EA", "SF", "LF", "HR", "LS", "SQ", "CY", "GAL", "TON"].map(u => (
+                                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="p-1">
+                              <Input
+                                placeholder="0.00"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={row.laborRate}
+                                onChange={e => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, laborRate: e.target.value } : r))}
+                                className="h-7 text-xs"
+                                data-testid={`bulk-labor-${row._id}`}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <Input
+                                placeholder="0.00"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={row.materialFee}
+                                onChange={e => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, materialFee: e.target.value } : r))}
+                                className="h-7 text-xs"
+                                data-testid={`bulk-material-${row._id}`}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <Input
+                                placeholder="0.00"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={row.retailPrice}
+                                onChange={e => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, retailPrice: e.target.value } : r))}
+                                className="h-7 text-xs"
+                                data-testid={`bulk-price-${row._id}`}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <Input
+                                placeholder="Labor/Material"
+                                value={row.itemType}
+                                onChange={e => setBulkRows(rs => rs.map(r => r._id === row._id ? { ...r, itemType: e.target.value } : r))}
+                                className="h-7 text-xs"
+                                data-testid={`bulk-type-${row._id}`}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => setBulkRows(rs => rs.filter(r => r._id !== row._id))}
+                                data-testid={`bulk-delete-${row._id}`}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={addBulkRow} data-testid="button-bulk-add-row">
+                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Row
+                  </Button>
+                </div>
+              )}
+
+              <DialogFooter className="mt-auto pt-3 border-t">
+                <div className="flex items-center gap-2 mr-auto text-sm text-muted-foreground">
+                  <span>{bulkRows.filter(r => r.description.trim()).length} valid item{bulkRows.filter(r => r.description.trim()).length !== 1 ? "s" : ""} ready to import</span>
+                </div>
+                <Button variant="outline" onClick={() => setBulkImportOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    const validRows = bulkRows.filter(r => r.description.trim());
+                    if (validRows.length === 0) {
+                      toast({ title: "No Items", description: "Add at least one item with a description.", variant: "destructive" });
+                      return;
+                    }
+                    bulkImportMutation.mutate(validRows.map(r => ({
+                      category: r.category.trim() || "Uncategorized",
+                      description: r.description.trim(),
+                      unitType: r.unitType,
+                      laborRate: r.laborRate || undefined,
+                      materialFee: r.materialFee || undefined,
+                      retailPrice: r.retailPrice || undefined,
+                      itemType: r.itemType || undefined,
+                    })));
+                  }}
+                  disabled={bulkImportMutation.isPending}
+                  data-testid="button-bulk-save"
+                >
+                  {bulkImportMutation.isPending ? "Importing…" : "Import Items"}
                 </Button>
               </DialogFooter>
             </DialogContent>
