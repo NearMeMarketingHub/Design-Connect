@@ -40,6 +40,7 @@ import CompanyDashboard from "@/pages/company-dashboard";
 import SubcontractorDashboard from "@/pages/subcontractor-dashboard";
 import AcceptSubcontractorInvite from "@/pages/accept-subcontractor-invite";
 import { AuthProvider } from "@/lib/auth-context";
+import ErrorBoundary from "@/components/error-boundary";
 
 function Router() {
   const [location] = useLocation();
@@ -221,14 +222,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

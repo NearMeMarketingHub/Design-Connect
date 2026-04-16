@@ -83,12 +83,41 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("Express error:", err);
+
+    if (res.headersSent) return;
+
+    // Sanitize Postgres / database errors into user-friendly messages
+    const pgCode = err.code || err.cause?.code;
+    if (pgCode) {
+      switch (pgCode) {
+        case "23505": // unique_violation
+          return res.status(409).json({ message: "A record with that value already exists. Please use a different value." });
+        case "23503": // foreign_key_violation
+          return res.status(400).json({ message: "This record is linked to other data and cannot be removed." });
+        case "23502": // not_null_violation
+          return res.status(400).json({ message: "A required field is missing. Please fill in all required fields." });
+        case "23514": // check_violation
+          return res.status(400).json({ message: "The provided value is not allowed. Please check your input." });
+        case "42P01": // undefined_table
+          return res.status(500).json({ message: "A database configuration error occurred. Please contact support." });
+        case "ECONNREFUSED":
+        case "08006":
+        case "08001":
+          return res.status(503).json({ message: "The database is temporarily unavailable. Please try again in a moment." });
+      }
+    }
+
+    // Zod validation errors bubble up as-is with a specific shape
+    if (err.name === "ZodError" && err.errors) {
+      const first = err.errors[0];
+      const message = first ? `${first.path.join(".")}: ${first.message}` : "Invalid input";
+      return res.status(400).json({ message });
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    console.error("Express error:", err);
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
+    res.status(status).json({ message });
   });
 
   // importantly only setup vite in development and after

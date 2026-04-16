@@ -89,7 +89,7 @@ export default function CompanyDashboard() {
     }
   }, [location]);
 
-  const { data: company, isLoading: companyLoading } = useQuery({
+  const { data: company, isLoading: companyLoading, isError: companyError } = useQuery({
     queryKey: ["/api/company/mine"],
     queryFn: async () => {
       const res = await fetch("/api/company/mine", { credentials: "include" });
@@ -386,6 +386,18 @@ export default function CompanyDashboard() {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (companyError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
+        <AlertCircle className="w-10 h-10 text-destructive" />
+        <div>
+          <p className="font-semibold text-lg">Failed to load company data</p>
+          <p className="text-muted-foreground text-sm mt-1">There was a problem connecting to the server. Please refresh the page.</p>
+        </div>
       </div>
     );
   }

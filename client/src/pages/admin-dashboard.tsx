@@ -10,7 +10,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Search, Plus, Filter, Download } from "lucide-react";
+import { Search, Plus, Filter, Download, AlertCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { data: projects = [], isLoading, isError, error } = useQuery<Project[]>({
+  const { data: projects = [], isLoading, isError } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/projects");
@@ -111,6 +111,18 @@ export default function AdminDashboard() {
     if (normalizedStatus === "planning") return "outline";
     return "secondary";
   };
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
+        <AlertCircle className="w-10 h-10 text-destructive" />
+        <div>
+          <p className="font-semibold text-lg">Failed to load projects</p>
+          <p className="text-muted-foreground text-sm mt-1">There was a problem connecting to the server. Please refresh the page.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

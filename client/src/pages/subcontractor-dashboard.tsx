@@ -3,12 +3,13 @@ import { useLocation } from "wouter";
 import {
   HardHat, FolderOpen, Clock, CheckCircle, RefreshCw, Building2,
   ChevronRight, FileText, DollarSign, MessageSquare, Upload, Eye,
-  Layers, Shield, User, Briefcase, Bell, X, Check
+  Layers, Shield, User, Briefcase, Bell, X, Check, AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 type Permissions = {
   canViewDocuments?: boolean;
@@ -123,10 +124,11 @@ export default function SubcontractorDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const { toast } = useToast();
   const isNotary = user?.contractorType === "notary";
   const roleLabel = isNotary ? "Notary" : "Sub-Contractor";
 
-  const { data: projects = [], isLoading } = useQuery<ProjectWithDetails[]>({
+  const { data: projects = [], isLoading, isError } = useQuery<ProjectWithDetails[]>({
     queryKey: ["/api/my-projects"],
     queryFn: async () => {
       const res = await fetch("/api/my-projects", { credentials: "include" });
@@ -157,6 +159,9 @@ export default function SubcontractorDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/my-invites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-projects"] });
     },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const declineInviteMutation = useMutation({
@@ -171,12 +176,27 @@ export default function SubcontractorDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/my-invites"] });
     },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
+        <AlertCircle className="w-10 h-10 text-destructive" />
+        <div>
+          <p className="font-semibold text-lg">Failed to load your assignments</p>
+          <p className="text-muted-foreground text-sm mt-1">There was a problem connecting to the server. Please refresh the page.</p>
+        </div>
       </div>
     );
   }

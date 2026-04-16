@@ -25,7 +25,7 @@ export default function ClientDashboard() {
   const { user, currentPortal } = useAuth();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  const { data: allProjects = [], isLoading } = useQuery<Project[]>({
+  const { data: allProjects = [], isLoading, isError } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     queryFn: async () => {
       const res = await fetch("/api/projects", { credentials: "include" });
@@ -76,6 +76,18 @@ export default function ClientDashboard() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
+        <AlertCircle className="w-10 h-10 text-destructive" />
+        <div>
+          <p className="font-semibold text-lg">Failed to load your projects</p>
+          <p className="text-muted-foreground text-sm mt-1">There was a problem connecting to the server. Please refresh the page.</p>
+        </div>
       </div>
     );
   }
