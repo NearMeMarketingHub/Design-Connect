@@ -126,6 +126,14 @@ export default function CompanyDashboard() {
   };
 
   const applyBulkMapping = () => {
+    if (!bulkMapping["description"]) {
+      toast({
+        title: "Description column required",
+        description: "Please map a column to Description before previewing rows.",
+        variant: "destructive",
+      });
+      return;
+    }
     const str = (v: unknown) => (v !== undefined && v !== null && v !== "") ? String(v) : "";
     let counter = bulkRowCounter;
     const parsed: typeof bulkRows = bulkRawRows
@@ -1233,6 +1241,11 @@ export default function CompanyDashboard() {
                       </div>
                     ))}
                   </div>
+                  {!bulkMapping["description"] && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                      Description is required — please map a column to it before previewing.
+                    </p>
+                  )}
                   <div className="flex justify-end">
                     <Button onClick={applyBulkMapping} data-testid="button-apply-mapping">
                       Preview Rows →
