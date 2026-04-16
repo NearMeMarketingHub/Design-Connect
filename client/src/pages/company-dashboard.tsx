@@ -1159,8 +1159,7 @@ export default function CompanyDashboard() {
                         const reader = new FileReader();
                         reader.onload = (evt) => {
                           try {
-                            const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-                            const workbook = XLSX.read(data, { type: "array" });
+                            const workbook = XLSX.read(evt.target?.result, { type: "binary" });
                             const sheet = workbook.Sheets[workbook.SheetNames[0]];
                             const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
                             let counter = bulkRowCounter;
@@ -1188,7 +1187,7 @@ export default function CompanyDashboard() {
                           }
                           if (fileInputRef.current) fileInputRef.current.value = "";
                         };
-                        reader.readAsArrayBuffer(file);
+                        reader.readAsBinaryString(file);
                       }}
                     />
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-choose-file">
