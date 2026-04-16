@@ -1,4 +1,4 @@
-import { QueryClient, QueryCache, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryCache, MutationCache, QueryFunction } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
 export class ApiError extends Error {
@@ -78,12 +78,40 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Tracks whether a session-expiry redirect is already in flight so we don't
+// fire multiple toasts / redirects when several queries fail simultaneously.
+let sessionExpiryRedirectPending = false;
+
+function handleSessionExpiry() {
+  if (sessionExpiryRedirectPending) return;
+
+  // Don't redirect if the user is already on a login/auth page.
+  const currentPath = window.location.pathname;
+  if (currentPath === "/auth" || currentPath === "/admin-login" || currentPath === "/") return;
+
+  sessionExpiryRedirectPending = true;
+
+  toast({
+    title: "Session expired",
+    description: "Your session has expired. Please log in again.",
+    variant: "destructive",
+  });
+
+  // Give the toast a moment to appear before navigating away.
+  setTimeout(() => {
+    const isAdminPath = currentPath.startsWith("/admin");
+    window.location.href = isAdminPath ? "/admin-login" : "/auth";
+  }, 1500);
+}
+
 // Global query error handler — fires a toast for any failed query so pages
-// never go silently blank. Skips 401s (handled by auth redirect).
+// never go silently blank. Handles 401s with an auth redirect.
 const queryCache = new QueryCache({
   onError: (error: unknown) => {
-    // Suppress 401 Unauthorized — the auth layer handles redirecting to login
-    if (error instanceof ApiError && error.status === 401) return;
+    if (error instanceof ApiError && error.status === 401) {
+      handleSessionExpiry();
+      return;
+    }
     const msg = error instanceof Error ? error.message : "An unexpected error occurred.";
     toast({
       title: "Failed to load data",
@@ -93,8 +121,19 @@ const queryCache = new QueryCache({
   },
 });
 
+// Global mutation error handler — same 401 handling as queries.
+const mutationCache = new MutationCache({
+  onError: (error: unknown) => {
+    if (error instanceof ApiError && error.status === 401) {
+      handleSessionExpiry();
+      return;
+    }
+  },
+});
+
 export const queryClient = new QueryClient({
   queryCache,
+  mutationCache,
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
