@@ -44,7 +44,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               <CardTitle>Something went wrong</CardTitle>
             </CardHeader>
             <CardContent className="text-center text-muted-foreground text-sm">
-              <p>An unexpected error occurred while loading this page. This has been logged and we'll look into it.</p>
+              <p>An unexpected error occurred while loading this page. Please reload and try again.</p>
               {this.state.error?.message && (
                 <p className="mt-3 text-xs font-mono bg-muted rounded px-2 py-1 text-left break-all">
                   {this.state.error.message}
