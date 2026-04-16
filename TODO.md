@@ -31,6 +31,7 @@ Last Updated: January 16, 2026
 
 ### Admin Side
 - [ ] Contractors Sandbox
+- [ ] **HubSpot Projects Sync** — When a record is created in the HubSpot "Projects" custom object, automatically create a matching project in BuildVision. HubSpot account is already connected via Replit integration. Requires: discovering the custom object type ID, field mapping (HubSpot props → BuildVision fields), a `hubspot_sync_records` table for deduplication, a 15-minute background polling job, admin config to set which company receives synced projects, and a Super Admin UI showing sync history + a "Sync Now" button. Full plan is saved in `.local/tasks/task-11-hubspot-projects-sync.md`.
 
 ### Contractor Side
 - [x] Build contractor-facing calculator using admin-managed pricing data
