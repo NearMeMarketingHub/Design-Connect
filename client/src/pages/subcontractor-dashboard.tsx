@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { parseErrorMessage } from "@/lib/queryClient";
 
 type Permissions = {
   canViewDocuments?: boolean;
@@ -160,7 +161,7 @@ export default function SubcontractorDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/my-projects"] });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -177,7 +178,7 @@ export default function SubcontractorDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/my-invites"] });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 

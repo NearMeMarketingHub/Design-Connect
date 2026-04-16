@@ -37,7 +37,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { data: projects = [], isLoading, isError } = useQuery<Project[]>({
+  const { data: projects = [], isLoading, isError, error } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/projects");

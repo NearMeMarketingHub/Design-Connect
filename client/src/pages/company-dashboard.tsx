@@ -26,6 +26,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { parseErrorMessage } from "@/lib/queryClient";
 
 const SUBCONTRACTOR_SPECIALTIES = [
   "Plumber", "Electrician", "HVAC Technician", "Roofer", "Carpenter",
@@ -179,7 +180,7 @@ export default function CompanyDashboard() {
       setCategoryDialogOpen(false);
       toast({ title: editingCategory ? "Category updated" : "Category created" });
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const deleteCategoryMutation = useMutation({
@@ -188,7 +189,7 @@ export default function CompanyDashboard() {
       if (!res.ok) throw new Error("Failed to delete category");
     },
     onSuccess: () => { refetchCategories(); refetchItems(); toast({ title: "Category deleted" }); },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   // Item mutations
@@ -221,7 +222,7 @@ export default function CompanyDashboard() {
       setItemDialogOpen(false);
       toast({ title: editingItem ? "Item updated" : "Item added" });
     },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const deleteItemMutation = useMutation({
@@ -230,7 +231,7 @@ export default function CompanyDashboard() {
       if (!res.ok) throw new Error("Failed to delete item");
     },
     onSuccess: () => { refetchItems(); toast({ title: "Item deleted" }); },
-    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const openCategoryCreate = () => {
@@ -312,7 +313,7 @@ export default function CompanyDashboard() {
       setInviteForm({ email: "", contractorType: "contractor", specialty: "", projectId: "" });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -335,7 +336,7 @@ export default function CompanyDashboard() {
       toast({ title: "Role assigned" });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -358,7 +359,7 @@ export default function CompanyDashboard() {
       toast({ title: "Admin status updated" });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -375,7 +376,7 @@ export default function CompanyDashboard() {
       toast({ title: "Member removed" });
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 

@@ -353,14 +353,26 @@ export default function ProjectDetails() {
   
   // Fetch project from API if not found in static data (for database projects)
   // Only use admin endpoint when coming from admin context
-  const { data: apiProject, isLoading: projectLoading } = useQuery({
+  const { data: apiProject, isLoading: projectLoading, isError: projectError } = useQuery({
     queryKey: ['/api/admin/projects', projectId, isFromAdmin],
     queryFn: async () => {
       const endpoint = isFromAdmin 
         ? `/api/admin/projects/${projectId}` 
         : `/api/projects/${projectId}`;
       const res = await fetch(endpoint, { credentials: 'include' });
-      if (!res.ok) return null;
+      // 404 means the project genuinely doesn't exist — return null to show "not found"
+      if (res.status === 404) return null;
+      // Any other failure (500, 403, network error) — throw so isError is set
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        try {
+          const json = JSON.parse(body);
+          throw new Error(json.message || `Failed to load project (${res.status})`);
+        } catch (e) {
+          if (e instanceof Error && e.message !== body) throw e;
+        }
+        throw new Error(`Failed to load project (${res.status})`);
+      }
       return res.json();
     },
     enabled: !staticProject && !!projectId,
@@ -2797,6 +2809,33 @@ export default function ProjectDetails() {
           <CardContent className="p-8 text-center">
             <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-muted-foreground">Loading project details...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (projectError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href={backPath}>
+            <Button variant="ghost" size="icon" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-heading font-bold">Failed to Load Project</h1>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+            <p className="text-muted-foreground mb-4">
+              There was a problem loading this project. Please check your connection and try again.
+            </p>
+            <Link href={backPath}>
+              <Button variant="outline">Go Back</Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
