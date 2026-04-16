@@ -8,7 +8,6 @@ import {
   BookOpen, Tag, Pencil, Package, DollarSign, Upload, Calculator,
   LayoutGrid, X
 } from "lucide-react";
-import { read as xlsxRead, utils as xlsxUtils } from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1156,12 +1155,18 @@ export default function CompanyDashboard() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        file.arrayBuffer().then(buffer => {
-                          try {
-                            const data = new Uint8Array(buffer);
-                            const workbook = xlsxRead(data, { type: "array" });
-                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                            const rows = xlsxUtils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+                        const formData = new FormData();
+                        formData.append("file", file);
+                        fetch("/api/company/price-book/parse-file", {
+                          method: "POST",
+                          body: formData,
+                          credentials: "include",
+                        })
+                          .then(async r => {
+                            if (!r.ok) throw new Error(await r.text());
+                            return r.json() as Promise<{ rows: Record<string, string>[] }>;
+                          })
+                          .then(({ rows }) => {
                             let counter = bulkRowCounter;
                             const parsed: typeof bulkRows = rows
                               .filter(r => r["Description"] || r["description"])
@@ -1182,15 +1187,14 @@ export default function CompanyDashboard() {
                             setBulkRows(parsed);
                             setBulkTab("manual");
                             toast({ title: `Parsed ${parsed.length} row${parsed.length !== 1 ? "s" : ""} from file. Review below.` });
-                          } catch (parseErr) {
-                            console.error("xlsx parse error:", parseErr);
+                          })
+                          .catch(err => {
+                            console.error("parse-file error:", err);
                             toast({ title: "Parse Error", description: "Could not read that file. Check the format.", variant: "destructive" });
-                          }
-                          if (fileInputRef.current) fileInputRef.current.value = "";
-                        }).catch(readErr => {
-                          console.error("file read error:", readErr);
-                          toast({ title: "File Error", description: "Could not read the file. Please try again.", variant: "destructive" });
-                        });
+                          })
+                          .finally(() => {
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          });
                       }}
                     />
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-choose-file">

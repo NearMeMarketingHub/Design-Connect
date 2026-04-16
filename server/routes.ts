@@ -4,6 +4,8 @@ import { z } from "zod";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import multer from "multer";
+import * as XLSX from "xlsx";
 import { storage } from "./storage";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -3110,6 +3112,20 @@ export async function registerRoutes(
       await storage.deleteBudgetItem(req.params.id);
       res.json({ message: "Item deleted" });
     } catch (error) { next(error); }
+  });
+
+  // Parse uploaded Excel/CSV file server-side and return rows as JSON
+  const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+  app.post("/api/company/price-book/parse-file", requireCompanyOwner, uploadMemory.single("file"), (req, res, next) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+      res.json({ rows });
+    } catch (error) {
+      next(error);
+    }
   });
 
   // Bulk import endpoint for price book
