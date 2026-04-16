@@ -92,31 +92,19 @@ export default function CompanyDashboard() {
 
   const { data: company, isLoading: companyLoading, isError: companyError } = useQuery({
     queryKey: ["/api/company/mine"],
-    queryFn: async () => {
-      const res = await fetch("/api/company/mine", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load company");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/company/mine").then(r => r.json()),
     enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
   });
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["/api/company/members", company?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/company/${company.id}/members`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load members");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", `/api/company/${company.id}/members`).then(r => r.json()),
     enabled: !!company?.id,
   });
 
   const { data: projects = [] } = useQuery({
     queryKey: ["/api/projects"],
-    queryFn: async () => {
-      const res = await fetch("/api/projects", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load projects");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/projects").then(r => r.json()),
   });
 
   const { data: roleDefs = [] } = useQuery({

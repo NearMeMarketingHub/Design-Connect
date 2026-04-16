@@ -3,7 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { parseErrorMessage } from "@/lib/queryClient";
+import { parseErrorMessage, ApiError } from "@/lib/queryClient";
 import { getInitials } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -363,16 +363,12 @@ export default function ProjectDetails() {
       const res = await fetch(endpoint, { credentials: 'include' });
       // 404 means the project genuinely doesn't exist — return null to show "not found"
       if (res.status === 404) return null;
-      // Any other failure (500, 403, network error) — throw so isError is set
+      // Any other failure — parse server message cleanly, then throw ApiError
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        try {
-          const json = JSON.parse(body);
-          throw new Error(json.message || `Failed to load project (${res.status})`);
-        } catch (e) {
-          if (e instanceof Error && e.message !== body) throw e;
-        }
-        throw new Error(`Failed to load project (${res.status})`);
+        let msg = `Failed to load project (${res.status})`;
+        try { const j = JSON.parse(body); if (j?.message) msg = j.message; } catch { /* not JSON */ }
+        throw new ApiError(res.status, msg);
       }
       return res.json();
     },

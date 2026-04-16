@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { parseErrorMessage } from "@/lib/queryClient";
+import { parseErrorMessage, apiRequest } from "@/lib/queryClient";
 
 type Permissions = {
   canViewDocuments?: boolean;
@@ -131,11 +131,7 @@ export default function SubcontractorDashboard() {
 
   const { data: projects = [], isLoading, isError } = useQuery<ProjectWithDetails[]>({
     queryKey: ["/api/my-projects"],
-    queryFn: async () => {
-      const res = await fetch("/api/my-projects", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load projects");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/my-projects").then(r => r.json()),
   });
 
   const { data: pendingInvites = [] } = useQuery<PendingInvite[]>({

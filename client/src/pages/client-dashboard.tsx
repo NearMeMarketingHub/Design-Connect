@@ -17,6 +17,7 @@ import {
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type { Project } from "@shared/schema";
 import projectImage from "@assets/generated_images/modern_luxury_home_interior_with_natural_light.png";
 import blueprintImage from "@assets/generated_images/construction_blueprints_and_hard_hat_on_table.png";
@@ -27,11 +28,7 @@ export default function ClientDashboard() {
 
   const { data: allProjects = [], isLoading, isError } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
-    queryFn: async () => {
-      const res = await fetch("/api/projects", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch projects");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/projects").then(r => r.json()),
   });
 
   // Filter projects based on portal context
