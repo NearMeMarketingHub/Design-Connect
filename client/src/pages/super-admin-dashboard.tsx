@@ -61,7 +61,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import { parseErrorMessage } from "@/lib/queryClient";
+import { parseErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import type { Project, User, ContractorRequest } from "@shared/schema";
@@ -157,39 +157,24 @@ export default function SuperAdminDashboard() {
 
   const { data: companies = [] } = useQuery({
     queryKey: ["/api/admin/companies"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/companies", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load companies");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/admin/companies").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
   const { data: roleDefs = [], refetch: refetchRoleDefs } = useQuery({
     queryKey: ["/api/admin/role-definitions"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/role-definitions", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load role definitions");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/admin/role-definitions").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
   const { data: adminTiers = [], refetch: refetchTiers } = useQuery({
     queryKey: ["/api/admin/subscription/tiers"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/subscription/tiers", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load subscription tiers");
-      return res.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/admin/subscription/tiers").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
   const deleteRoleDefMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/admin/role-definitions/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete role definition");
-    },
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/role-definitions/${id}`),
     onSuccess: () => { refetchRoleDefs(); toast({ title: "Role deleted" }); },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
@@ -206,34 +191,21 @@ export default function SuperAdminDashboard() {
       };
       const url = editingTier ? `/api/admin/subscription/tiers/${editingTier.id}` : "/api/admin/subscription/tiers";
       const method = editingTier ? "PATCH" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error("Failed to save tier");
-      return res.json();
+      return apiRequest(method, url, payload).then(r => r.json());
     },
     onSuccess: () => { refetchTiers(); setTierDialogOpen(false); toast({ title: editingTier ? "Tier updated" : "Tier created" }); },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const deleteTierMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/admin/subscription/tiers/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete tier");
-    },
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/subscription/tiers/${id}`),
     onSuccess: () => { refetchTiers(); toast({ title: "Tier deleted" }); },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const updateCompanySubMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof companySubForm }) => {
-      const res = await fetch(`/api/admin/companies/${id}/subscription`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update subscription");
-      return res.json();
-    },
+    mutationFn: ({ id, data }: { id: string; data: typeof companySubForm }) =>
+      apiRequest("PATCH", `/api/admin/companies/${id}/subscription`, data).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       setCompanySubDialogOpen(false);
@@ -268,19 +240,12 @@ export default function SuperAdminDashboard() {
   };
 
   const saveRoleDefMutation = useMutation({
-    mutationFn: async (data: { name: string; type: string; permissions: Record<string, boolean> }) => {
+    mutationFn: (data: { name: string; type: string; permissions: Record<string, boolean> }) => {
       const url = editingRoleDef
         ? `/api/admin/role-definitions/${editingRoleDef.id}`
         : "/api/admin/role-definitions";
       const method = editingRoleDef ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to save role definition");
-      return res.json();
+      return apiRequest(method, url, data).then(r => r.json());
     },
     onSuccess: () => {
       refetchRoleDefs();

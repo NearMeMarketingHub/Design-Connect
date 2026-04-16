@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { HardHat, ArrowRight, Eye, EyeOff, CheckCircle2, Mail, Info } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
+import { parseErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import heroImage from "@assets/generated_images/construction_site_frame_with_sunset.png";
 import { CONTRACTOR_ROLES } from "@shared/contractor-roles";
@@ -80,8 +81,8 @@ export default function AuthPage() {
         toast({ title: "Account created!", description: "Welcome to BuildVision." });
         setLocation("/client/dashboard");
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Authentication failed", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: parseErrorMessage(error), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -118,8 +119,8 @@ export default function AuthPage() {
         await register(username, email, password, "contractor", `${firstName} ${lastName}`, companyName, finalCompanyType);
         setCompanyRegistered(true);
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Registration failed", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: parseErrorMessage(error), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -151,8 +152,8 @@ export default function AuthPage() {
         );
         setSubRegistered(true);
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Authentication failed", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: parseErrorMessage(error), variant: "destructive" });
     } finally {
       setLoading(false);
     }

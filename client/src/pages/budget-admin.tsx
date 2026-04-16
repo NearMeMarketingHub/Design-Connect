@@ -40,6 +40,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { parseErrorMessage, apiRequest } from "@/lib/queryClient";
 import type { BudgetCategory, BudgetItem } from "@shared/schema";
 
 interface CategoryWithItems extends BudgetCategory {
@@ -77,61 +78,37 @@ export default function BudgetAdmin() {
 
   const { data: categories = [], isLoading } = useQuery<BudgetCategory[]>({
     queryKey: ["/api/budget/categories"],
-    queryFn: async () => {
-      const response = await fetch("/api/budget/categories", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch categories");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/budget/categories").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
   const { data: allItems = [] } = useQuery<BudgetItem[]>({
     queryKey: ["/api/budget/items"],
-    queryFn: async () => {
-      const response = await fetch("/api/budget/items", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch items");
-      return response.json();
-    },
+    queryFn: () => apiRequest("GET", "/api/budget/items").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async (item: Partial<BudgetItem> & { id: string }) => {
-      const response = await fetch(`/api/budget/items/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(item),
-      });
-      if (!response.ok) throw new Error("Failed to update item");
-      return response.json();
-    },
+    mutationFn: (item: Partial<BudgetItem> & { id: string }) =>
+      apiRequest("PATCH", `/api/budget/items/${item.id}`, item).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budget/items"] });
       toast({ title: "Item Updated", description: "The pricing has been saved." });
       setEditDialogOpen(false);
       setEditingItem(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
-        description: error.message || "Could not update item",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (item: Omit<BudgetItem, "id">) => {
-      const response = await fetch("/api/budget/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(item),
-      });
-      if (!response.ok) throw new Error("Failed to create item");
-      return response.json();
-    },
+    mutationFn: (item: Omit<BudgetItem, "id">) =>
+      apiRequest("POST", "/api/budget/items", item).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budget/items"] });
       toast({ title: "Item Created", description: "New line item has been added." });
@@ -149,32 +126,25 @@ export default function BudgetAdmin() {
         notes: "",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Create Failed",
-        description: error.message || "Could not create item",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
   });
 
   const deleteItemMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/budget/items/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to delete item");
-      return response.json();
-    },
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/budget/items/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/budget/items"] });
       toast({ title: "Item Deleted", description: "The line item has been removed." });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Delete Failed",
-        description: error.message || "Could not delete item",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },

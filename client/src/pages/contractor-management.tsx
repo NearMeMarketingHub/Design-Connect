@@ -33,6 +33,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { parseErrorMessage } from "@/lib/queryClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import type { User, ContractorRequest } from "@shared/schema";
@@ -83,10 +84,10 @@ export default function ContractorManagement() {
         description: "The contractor can now log in to their account.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Approval Failed",
-        description: error.message || "Could not approve contractor",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
@@ -101,10 +102,10 @@ export default function ContractorManagement() {
         description: "The contractor account has been removed.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Rejection Failed",
-        description: error.message || "Could not reject contractor",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
@@ -120,10 +121,10 @@ export default function ContractorManagement() {
         description: `Contractor account created. Temporary password: ${data.tempPassword}`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Approval Failed",
-        description: error.message || "Could not approve request",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
@@ -138,10 +139,10 @@ export default function ContractorManagement() {
         description: "The access request has been rejected.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Rejection Failed",
-        description: error.message || "Could not reject request",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },

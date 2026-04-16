@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, User, Lock, Mail, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 
 export default function AcceptInvite() {
   const { token } = useParams<{ token: string }>();
@@ -61,7 +61,7 @@ export default function AcceptInvite() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create account",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },

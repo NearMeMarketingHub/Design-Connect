@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, ArrowRight, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText, Mail, UserPlus, Plus, Trash2, GripVertical, Users, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { CONTRACTOR_ROLES } from "@shared/contractor-roles";
 
 const PROJECT_TYPES = [
@@ -253,7 +253,7 @@ export default function NewProject() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create project",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },

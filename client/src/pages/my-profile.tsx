@@ -20,6 +20,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useToast } from "@/hooks/use-toast";
+import { parseErrorMessage } from "@/lib/queryClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UppyFile, UploadResult } from "@uppy/core";
 
@@ -66,10 +67,10 @@ export default function MyProfile() {
       refetch();
       setIsEditingPhone(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
-        description: error.message || "Could not update profile",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
@@ -97,10 +98,10 @@ export default function MyProfile() {
       refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors"] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
-        description: error.message || "Could not update profile picture",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { parseErrorMessage } from "@/lib/queryClient";
 
 export default function AcceptSubcontractorInvite() {
   const [, params] = useRoute("/subcontractor-invite/:token");
@@ -64,7 +65,7 @@ export default function AcceptSubcontractorInvite() {
       setAccepted(true);
     },
     onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 

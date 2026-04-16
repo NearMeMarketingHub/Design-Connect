@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
+import { parseErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { User, Bell, Lock, Save, Eye, EyeOff, Camera } from "lucide-react";
 import { getInitials } from "@/lib/utils";
@@ -69,10 +70,10 @@ export default function SettingsPage() {
       refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/contractors"] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
-        description: error.message || "Could not update profile picture",
+        description: parseErrorMessage(error),
         variant: "destructive",
       });
     },
