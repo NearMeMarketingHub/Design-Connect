@@ -8,7 +8,7 @@ import {
   BookOpen, Tag, Pencil, Package, DollarSign, Upload, Calculator,
   LayoutGrid, X
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import { read as xlsxRead, utils as xlsxUtils } from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1156,12 +1156,12 @@ export default function CompanyDashboard() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
+                        file.arrayBuffer().then(buffer => {
                           try {
-                            const workbook = XLSX.read(evt.target?.result, { type: "binary" });
+                            const data = new Uint8Array(buffer);
+                            const workbook = xlsxRead(data, { type: "array" });
                             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                            const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+                            const rows = xlsxUtils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
                             let counter = bulkRowCounter;
                             const parsed: typeof bulkRows = rows
                               .filter(r => r["Description"] || r["description"])
@@ -1182,12 +1182,15 @@ export default function CompanyDashboard() {
                             setBulkRows(parsed);
                             setBulkTab("manual");
                             toast({ title: `Parsed ${parsed.length} row${parsed.length !== 1 ? "s" : ""} from file. Review below.` });
-                          } catch {
+                          } catch (parseErr) {
+                            console.error("xlsx parse error:", parseErr);
                             toast({ title: "Parse Error", description: "Could not read that file. Check the format.", variant: "destructive" });
                           }
                           if (fileInputRef.current) fileInputRef.current.value = "";
-                        };
-                        reader.readAsBinaryString(file);
+                        }).catch(readErr => {
+                          console.error("file read error:", readErr);
+                          toast({ title: "File Error", description: "Could not read the file. Please try again.", variant: "destructive" });
+                        });
                       }}
                     />
                     <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-choose-file">
