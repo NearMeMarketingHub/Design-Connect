@@ -1167,19 +1167,21 @@ export default function CompanyDashboard() {
                             return r.json() as Promise<{ rows: Record<string, string>[] }>;
                           })
                           .then(({ rows }) => {
+                            const str = (v: unknown) => (v !== undefined && v !== null && v !== "") ? String(v) : "";
                             let counter = bulkRowCounter;
                             const parsed: typeof bulkRows = rows
                               .filter(r => r["Description"] || r["description"])
                               .map(r => {
                                 counter++;
+                                const unit = str(r["Unit"] || r["unit"] || r["Unit Type"] || r["unitType"]) || "EA";
                                 return {
-                                  category: r["Category"] || r["category"] || "",
-                                  description: r["Description"] || r["description"] || "",
-                                  unitType: (r["Unit"] || r["unit"] || r["Unit Type"] || r["unitType"] || "EA").toUpperCase(),
-                                  laborRate: r["Labor Rate"] || r["labor rate"] || r["laborRate"] || "",
-                                  materialFee: r["Material Fee"] || r["material fee"] || r["materialFee"] || "",
-                                  retailPrice: r["Retail Price"] || r["retail price"] || r["retailPrice"] || r["Price"] || r["price"] || "",
-                                  itemType: r["Item Type"] || r["item type"] || r["itemType"] || "",
+                                  category: str(r["Category"] || r["category"] || r["Categories"] || r["categories"]),
+                                  description: str(r["Description"] || r["description"]),
+                                  unitType: unit.toUpperCase(),
+                                  laborRate: str(r["Labor Rate"] || r["labor rate"] || r["laborRate"] || r["Labor ($)"] || r["labor ($)"]),
+                                  materialFee: str(r["Material Fee"] || r["material fee"] || r["materialFee"] || r["Material ($)"] || r["material ($)"]),
+                                  retailPrice: str(r["Retail Price"] || r["retail price"] || r["retailPrice"] || r["Price ($)"] || r["price ($)"] || r["Price"] || r["price"]),
+                                  itemType: str(r["Item Type"] || r["item type"] || r["itemType"]),
                                   _id: counter,
                                 };
                               });
