@@ -1,20 +1,21 @@
 import { QueryClient, QueryCache, QueryFunction } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 
+function tryParseMessage(text: string): string | null {
+  try {
+    const json = JSON.parse(text);
+    if (json && typeof json.message === "string") return json.message;
+  } catch {
+    // not valid JSON — fall through
+  }
+  return null;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = await res.text();
-    // Try to parse JSON body and extract the "message" field for clean error messages
-    try {
-      const json = JSON.parse(text);
-      if (json && typeof json.message === "string") {
-        throw new Error(json.message);
-      }
-    } catch (e) {
-      // Re-throw if it was the Error we created above
-      if (e instanceof Error && text && e.message !== text) throw e;
-    }
-    throw new Error(text || res.statusText);
+    const text = await res.text().catch(() => "");
+    const message = tryParseMessage(text) ?? text ?? res.statusText;
+    throw new Error(message);
   }
 }
 
@@ -35,22 +36,18 @@ export async function apiRequest(
 }
 
 /**
- * Strips the HTTP status prefix (e.g. "500: ") and parses JSON bodies
- * so mutations can show a clean server message in their onError toasts.
+ * Extracts a clean, user-readable message from an error thrown by apiRequest.
+ * Since throwIfResNotOk already parses JSON bodies, err.message is typically
+ * clean. This helper strips any residual "NNN: " status prefix as a safety net.
  */
 export function parseErrorMessage(err: Error | unknown): string {
   if (!(err instanceof Error)) return "An unexpected error occurred.";
   const raw = err.message;
-  // Strip leading "NNN: " status prefix if present
+  // Strip leading "NNN: " status prefix if still present (legacy paths)
   const withoutStatus = raw.replace(/^\d{3}:\s*/, "");
   // If the remainder looks like JSON, try to extract "message"
-  try {
-    const parsed = JSON.parse(withoutStatus);
-    if (parsed && typeof parsed.message === "string") return parsed.message;
-  } catch {
-    // not JSON, use as-is
-  }
-  return withoutStatus || "An unexpected error occurred.";
+  const fromJson = tryParseMessage(withoutStatus);
+  return fromJson ?? withoutStatus ?? "An unexpected error occurred.";
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

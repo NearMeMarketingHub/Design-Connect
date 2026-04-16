@@ -61,6 +61,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { parseErrorMessage } from "@/lib/queryClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import type { Project, User, ContractorRequest } from "@shared/schema";
@@ -190,7 +191,7 @@ export default function SuperAdminDashboard() {
       if (!res.ok) throw new Error("Failed to delete role definition");
     },
     onSuccess: () => { refetchRoleDefs(); toast({ title: "Role deleted" }); },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const saveTierMutation = useMutation({
@@ -210,7 +211,7 @@ export default function SuperAdminDashboard() {
       return res.json();
     },
     onSuccess: () => { refetchTiers(); setTierDialogOpen(false); toast({ title: editingTier ? "Tier updated" : "Tier created" }); },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const deleteTierMutation = useMutation({
@@ -219,7 +220,7 @@ export default function SuperAdminDashboard() {
       if (!res.ok) throw new Error("Failed to delete tier");
     },
     onSuccess: () => { refetchTiers(); toast({ title: "Tier deleted" }); },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const updateCompanySubMutation = useMutation({
@@ -238,7 +239,7 @@ export default function SuperAdminDashboard() {
       setCompanySubDialogOpen(false);
       toast({ title: "Subscription updated" });
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const openTierCreate = () => {
@@ -286,7 +287,7 @@ export default function SuperAdminDashboard() {
       setRoleDefDialogOpen(false);
       toast({ title: editingRoleDef ? "Role updated" : "Role created" });
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
   const initSandboxMutation = useMutation({
@@ -298,10 +299,10 @@ export default function SuperAdminDashboard() {
         description: "Test client, contractor, and project have been created.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Initialization Failed",
-        description: error.message || "Could not initialize sandbox",
+        description: parseErrorMessage(error) || "Could not initialize sandbox",
         variant: "destructive",
       });
     },
@@ -316,10 +317,10 @@ export default function SuperAdminDashboard() {
         description: "All sandbox data has been reset to defaults.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Reset Failed",
-        description: error.message || "Could not reset sandbox",
+        description: parseErrorMessage(error) || "Could not reset sandbox",
         variant: "destructive",
       });
     },
@@ -335,10 +336,10 @@ export default function SuperAdminDashboard() {
         description: "The contractor can now log in to their account.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Approval Failed",
-        description: error.message || "Could not approve contractor",
+        description: parseErrorMessage(error) || "Could not approve contractor",
         variant: "destructive",
       });
     },
@@ -353,10 +354,10 @@ export default function SuperAdminDashboard() {
         description: "The contractor account has been removed.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Rejection Failed",
-        description: error.message || "Could not reject contractor",
+        description: parseErrorMessage(error) || "Could not reject contractor",
         variant: "destructive",
       });
     },
@@ -372,10 +373,10 @@ export default function SuperAdminDashboard() {
         description: `Contractor account created. Temporary password: ${data.tempPassword}`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Approval Failed",
-        description: error.message || "Could not approve request",
+        description: parseErrorMessage(error) || "Could not approve request",
         variant: "destructive",
       });
     },
@@ -390,10 +391,10 @@ export default function SuperAdminDashboard() {
         description: "The access request has been rejected.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Rejection Failed",
-        description: error.message || "Could not reject request",
+        description: parseErrorMessage(error) || "Could not reject request",
         variant: "destructive",
       });
     },
@@ -411,10 +412,10 @@ export default function SuperAdminDashboard() {
       setAssignDialogOpen(false);
       setSelectedContractorId("");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Assignment Failed",
-        description: error.message || "Could not assign contractor",
+        description: parseErrorMessage(error) || "Could not assign contractor",
         variant: "destructive",
       });
     },

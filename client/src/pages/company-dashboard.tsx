@@ -263,7 +263,7 @@ export default function CompanyDashboard() {
     setItemCategoryId(item.categoryId);
     setItemForm({
       description: item.description,
-      itemType: item.itemType,
+      itemType: item.itemType ?? "",
       unitType: item.unitType,
       cost: item.cost || "0",
       laborRate: item.laborRate || "0",

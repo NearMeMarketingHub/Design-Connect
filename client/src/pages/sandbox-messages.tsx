@@ -16,6 +16,8 @@ import { Link, useRoute } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
+import { parseErrorMessage } from "@/lib/queryClient";
 import type { Message } from "@shared/schema";
 import { format } from "date-fns";
 import { getInitials } from "@/lib/utils";
@@ -27,6 +29,7 @@ export default function SandboxMessages() {
   const [newMessage, setNewMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: sandboxData, isLoading: sandboxLoading } = useQuery({
     queryKey: ["/api/sandbox/data"],
@@ -46,6 +49,9 @@ export default function SandboxMessages() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "messages"] });
       setNewMessage("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 
