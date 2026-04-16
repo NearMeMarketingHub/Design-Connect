@@ -95,10 +95,61 @@ export default function CompanyDashboard() {
     _id: number;
   }
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
-  const [bulkTab, setBulkTab] = useState<"manual" | "upload">("manual");
+  const [bulkTab, setBulkTab] = useState<"manual" | "upload" | "mapping">("manual");
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
   const [bulkRowCounter, setBulkRowCounter] = useState(0);
+  const [bulkHeaders, setBulkHeaders] = useState<string[]>([]);
+  const [bulkRawRows, setBulkRawRows] = useState<Record<string, unknown>[]>([]);
+  const [bulkMapping, setBulkMapping] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAPPING_FIELDS = [
+    { key: "category", label: "Category", keywords: ["category", "categor"] },
+    { key: "description", label: "Description", keywords: ["description", "desc", "item name", "name", "service"] },
+    { key: "unitType", label: "Unit", keywords: ["unit"] },
+    { key: "laborRate", label: "Labor Rate", keywords: ["labor", "labour", "labor ($)", "labour ($)"] },
+    { key: "materialFee", label: "Material Fee", keywords: ["material", "mat ($)", "material ($)"] },
+    { key: "retailPrice", label: "Retail Price", keywords: ["retail", "price ($)", "total", "price", "cost"] },
+    { key: "itemType", label: "Item Type", keywords: ["item type", "type"] },
+  ];
+
+  const autoDetectMapping = (headers: string[]): Record<string, string> => {
+    const mapping: Record<string, string> = {};
+    const used = new Set<string>();
+    for (const field of MAPPING_FIELDS) {
+      for (const kw of field.keywords) {
+        const match = headers.find(h => !used.has(h) && h.toLowerCase().includes(kw));
+        if (match) { mapping[field.key] = match; used.add(match); break; }
+      }
+    }
+    return mapping;
+  };
+
+  const applyBulkMapping = () => {
+    const str = (v: unknown) => (v !== undefined && v !== null && v !== "") ? String(v) : "";
+    let counter = bulkRowCounter;
+    const parsed: typeof bulkRows = bulkRawRows
+      .map(r => {
+        counter++;
+        const get = (field: string) => bulkMapping[field] ? str(r[bulkMapping[field]]) : "";
+        const unit = get("unitType") || "EA";
+        return {
+          category: get("category"),
+          description: get("description"),
+          unitType: unit.toUpperCase(),
+          laborRate: get("laborRate"),
+          materialFee: get("materialFee"),
+          retailPrice: get("retailPrice"),
+          itemType: get("itemType"),
+          _id: counter,
+        };
+      })
+      .filter(r => r.description.trim());
+    setBulkRowCounter(counter);
+    setBulkRows(parsed);
+    setBulkTab("manual");
+    toast({ title: `${parsed.length} row${parsed.length !== 1 ? "s" : ""} ready to review.` });
+  };
 
   const newBulkRow = useCallback((id: number): BulkRow => ({
     category: "", description: "", unitType: "SF",
@@ -116,6 +167,9 @@ export default function CompanyDashboard() {
     setBulkRowCounter(id);
     setBulkRows([newBulkRow(id)]);
     setBulkTab("manual");
+    setBulkHeaders([]);
+    setBulkRawRows([]);
+    setBulkMapping({});
     setBulkImportOpen(true);
   };
 
@@ -1127,14 +1181,65 @@ export default function CompanyDashboard() {
                   <LayoutGrid className="w-3.5 h-3.5 mr-1.5" /> Manual Entry
                 </Button>
                 <Button
-                  variant={bulkTab === "upload" ? "default" : "outline"}
+                  variant={bulkTab === "upload" || bulkTab === "mapping" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setBulkTab("upload")}
+                  onClick={() => setBulkTab(bulkRawRows.length > 0 ? "mapping" : "upload")}
                   data-testid="bulk-tab-upload"
                 >
                   <Upload className="w-3.5 h-3.5 mr-1.5" /> Upload Excel / CSV
                 </Button>
               </div>
+
+              {/* Column mapping step — shown after file is parsed */}
+              {bulkTab === "mapping" && (
+                <div className="flex-1 overflow-auto space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Map your columns</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {bulkRawRows.length} row{bulkRawRows.length !== 1 ? "s" : ""} detected &mdash; assign which spreadsheet column maps to each field.
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setBulkTab("upload")} data-testid="button-remap-reupload">
+                      Upload different file
+                    </Button>
+                  </div>
+                  <div className="rounded-md border divide-y text-sm">
+                    {MAPPING_FIELDS.map(field => (
+                      <div key={field.key} className="flex items-center gap-4 px-4 py-2.5">
+                        <span className="w-32 font-medium shrink-0">
+                          {field.label}
+                          {field.key === "description" && <span className="text-destructive ml-0.5">*</span>}
+                        </span>
+                        <Select
+                          value={bulkMapping[field.key] ?? "__skip__"}
+                          onValueChange={v => setBulkMapping(m => ({ ...m, [field.key]: v === "__skip__" ? "" : v }))}
+                        >
+                          <SelectTrigger className="h-8 text-xs flex-1" data-testid={`mapping-select-${field.key}`}>
+                            <SelectValue placeholder="— skip —" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__skip__">— skip —</SelectItem>
+                            {bulkHeaders.map(h => (
+                              <SelectItem key={h} value={h}>{h}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {bulkMapping[field.key] && bulkRawRows[0] && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[140px]" title={String(bulkRawRows[0][bulkMapping[field.key]] ?? "")}>
+                            e.g. {String(bulkRawRows[0][bulkMapping[field.key]] ?? "")}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={applyBulkMapping} data-testid="button-apply-mapping">
+                      Preview Rows →
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {bulkTab === "upload" && (
                 <div className="space-y-3">
@@ -1164,31 +1269,14 @@ export default function CompanyDashboard() {
                         })
                           .then(async r => {
                             if (!r.ok) throw new Error(await r.text());
-                            return r.json() as Promise<{ rows: Record<string, string>[] }>;
+                            return r.json() as Promise<{ rows: Record<string, unknown>[]; headers: string[] }>;
                           })
-                          .then(({ rows }) => {
-                            const str = (v: unknown) => (v !== undefined && v !== null && v !== "") ? String(v) : "";
-                            let counter = bulkRowCounter;
-                            const parsed: typeof bulkRows = rows
-                              .filter(r => r["Description"] || r["description"])
-                              .map(r => {
-                                counter++;
-                                const unit = str(r["Unit"] || r["unit"] || r["Unit Type"] || r["unitType"]) || "EA";
-                                return {
-                                  category: str(r["Category"] || r["category"] || r["Categories"] || r["categories"]),
-                                  description: str(r["Description"] || r["description"]),
-                                  unitType: unit.toUpperCase(),
-                                  laborRate: str(r["Labor Rate"] || r["labor rate"] || r["laborRate"] || r["Labor ($)"] || r["labor ($)"]),
-                                  materialFee: str(r["Material Fee"] || r["material fee"] || r["materialFee"] || r["Material ($)"] || r["material ($)"]),
-                                  retailPrice: str(r["Retail Price"] || r["retail price"] || r["retailPrice"] || r["Price ($)"] || r["price ($)"] || r["Price"] || r["price"]),
-                                  itemType: str(r["Item Type"] || r["item type"] || r["itemType"]),
-                                  _id: counter,
-                                };
-                              });
-                            setBulkRowCounter(counter);
-                            setBulkRows(parsed);
-                            setBulkTab("manual");
-                            toast({ title: `Parsed ${parsed.length} row${parsed.length !== 1 ? "s" : ""} from file. Review below.` });
+                          .then(({ rows, headers }) => {
+                            setBulkHeaders(headers);
+                            setBulkRawRows(rows);
+                            const detected = autoDetectMapping(headers);
+                            setBulkMapping(detected);
+                            setBulkTab("mapping");
                           })
                           .catch(err => {
                             console.error("parse-file error:", err);
@@ -1328,31 +1416,52 @@ export default function CompanyDashboard() {
 
               <DialogFooter className="mt-auto pt-3 border-t">
                 <div className="flex items-center gap-2 mr-auto text-sm text-muted-foreground">
-                  <span>{bulkRows.filter(r => r.description.trim()).length} valid item{bulkRows.filter(r => r.description.trim()).length !== 1 ? "s" : ""} ready to import</span>
+                  {bulkTab === "mapping" ? (
+                    <span>{bulkRawRows.length} row{bulkRawRows.length !== 1 ? "s" : ""} detected from file</span>
+                  ) : (
+                    <>
+                      <span>{bulkRows.filter(r => r.description.trim()).length} valid item{bulkRows.filter(r => r.description.trim()).length !== 1 ? "s" : ""} ready to import</span>
+                      {bulkRawRows.length > 0 && bulkTab === "manual" && (
+                        <button
+                          className="text-primary underline-offset-2 hover:underline text-sm"
+                          onClick={() => setBulkTab("mapping")}
+                          data-testid="button-remap-columns"
+                        >
+                          Re-map columns
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
                 <Button variant="outline" onClick={() => setBulkImportOpen(false)}>Cancel</Button>
-                <Button
-                  onClick={() => {
-                    const validRows = bulkRows.filter(r => r.description.trim());
-                    if (validRows.length === 0) {
-                      toast({ title: "No Items", description: "Add at least one item with a description.", variant: "destructive" });
-                      return;
-                    }
-                    bulkImportMutation.mutate(validRows.map(r => ({
-                      category: r.category.trim() || "Uncategorized",
-                      description: r.description.trim(),
-                      unitType: r.unitType,
-                      laborRate: r.laborRate || undefined,
-                      materialFee: r.materialFee || undefined,
-                      retailPrice: r.retailPrice || undefined,
-                      itemType: r.itemType || undefined,
-                    })));
-                  }}
-                  disabled={bulkImportMutation.isPending}
-                  data-testid="button-bulk-save"
-                >
-                  {bulkImportMutation.isPending ? "Importing…" : "Import Items"}
-                </Button>
+                {bulkTab === "mapping" ? (
+                  <Button onClick={applyBulkMapping} data-testid="button-mapping-preview">
+                    Preview Rows →
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      const validRows = bulkRows.filter(r => r.description.trim());
+                      if (validRows.length === 0) {
+                        toast({ title: "No Items", description: "Add at least one item with a description.", variant: "destructive" });
+                        return;
+                      }
+                      bulkImportMutation.mutate(validRows.map(r => ({
+                        category: r.category.trim() || "Uncategorized",
+                        description: r.description.trim(),
+                        unitType: r.unitType,
+                        laborRate: r.laborRate || undefined,
+                        materialFee: r.materialFee || undefined,
+                        retailPrice: r.retailPrice || undefined,
+                        itemType: r.itemType || undefined,
+                      })));
+                    }}
+                    disabled={bulkImportMutation.isPending}
+                    data-testid="button-bulk-save"
+                  >
+                    {bulkImportMutation.isPending ? "Importing…" : "Import Items"}
+                  </Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>

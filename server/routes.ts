@@ -3121,8 +3121,9 @@ export async function registerRoutes(
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
-      res.json({ rows });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+      res.json({ rows, headers });
     } catch (error) {
       next(error);
     }
