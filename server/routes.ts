@@ -40,19 +40,29 @@ export async function registerRoutes(
     seedTestAccounts().catch(err => console.error("[seed-test-accounts] Error:", err));
   }
 
-  // Helper: get broadcast scoping context for a project (company users + client + team members).
-  // Pass the acting user's companyId since projects don't store companyId directly.
-  async function getProjectBroadcastContext(projectId: string, companyId?: string | null) {
+  // Helper: get broadcast scoping context for a project.
+  // Always resolves the project contractor's companyId so that client-triggered
+  // events (e.g. change order approve) correctly reach contractor company users.
+  async function getProjectBroadcastContext(projectId: string, _actingUserCompanyId?: string | null) {
     try {
       const project = await storage.getProject(projectId);
       const members = await storage.getProjectTeamMembers(projectId).catch(() => []);
+
+      // Derive companyId from the project's primary contractor so the correct
+      // company receives the event regardless of which user triggered it.
+      let contractorCompanyId: string | null = null;
+      if (project?.contractorId) {
+        const contractor = await storage.getUser(project.contractorId).catch(() => null);
+        contractorCompanyId = contractor?.companyId ?? null;
+      }
+
       return {
-        companyId: companyId ?? null,
+        companyId: contractorCompanyId,
         clientUserId: project?.clientId ?? null,
         allowedUserIds: members.map((m) => m.contractorId).filter(Boolean) as string[],
       };
     } catch {
-      return { companyId: companyId ?? null, clientUserId: null, allowedUserIds: [] };
+      return { companyId: null, clientUserId: null, allowedUserIds: [] };
     }
   }
 
