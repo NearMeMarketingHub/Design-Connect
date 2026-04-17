@@ -8,6 +8,7 @@ export interface RealtimeEvent {
   projectId?: string;
   companyId?: string | null;
   clientUserId?: string | null;
+  allowedUserIds?: string[];
 }
 
 interface ConnectedClient {
@@ -72,15 +73,15 @@ async function resolveSession(
     const userId = sess?.passport?.user;
     if (!userId) return null;
 
-    const userResult = await pool.query<{ id: string; companyId: string | null }>(
-      `SELECT id, "companyId" FROM users WHERE id = $1`,
+    const userResult = await pool.query<{ id: string; company_id: string | null }>(
+      `SELECT id, company_id FROM users WHERE id = $1`,
       [userId]
     );
     if (!userResult.rows.length) return null;
 
     return {
       userId: userResult.rows[0].id,
-      companyId: userResult.rows[0].companyId,
+      companyId: userResult.rows[0].company_id,
     };
   } catch {
     return null;
@@ -130,7 +131,8 @@ export function broadcast(event: RealtimeEvent): void {
     if (client.ws.readyState !== WebSocket.OPEN) continue;
     const allowed =
       (event.companyId != null && client.companyId === event.companyId) ||
-      (event.clientUserId != null && client.userId === event.clientUserId);
+      (event.clientUserId != null && client.userId === event.clientUserId) ||
+      (event.allowedUserIds != null && event.allowedUserIds.includes(client.userId));
     if (!allowed) continue;
     try {
       client.ws.send(payload);

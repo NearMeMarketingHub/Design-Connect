@@ -77,6 +77,9 @@ export function useRealtimeUpdates(enabled: boolean = true): void {
           break;
         case "project":
           queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+          if (projectId) {
+            queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+          }
           break;
         case "changeorder":
           if (projectId) {

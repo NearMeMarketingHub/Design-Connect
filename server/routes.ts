@@ -40,6 +40,22 @@ export async function registerRoutes(
     seedTestAccounts().catch(err => console.error("[seed-test-accounts] Error:", err));
   }
 
+  // Helper: get broadcast scoping context for a project (company users + client + team members).
+  // Pass the acting user's companyId since projects don't store companyId directly.
+  async function getProjectBroadcastContext(projectId: string, companyId?: string | null) {
+    try {
+      const project = await storage.getProject(projectId);
+      const members = await storage.getProjectTeamMembers(projectId).catch(() => []);
+      return {
+        companyId: companyId ?? null,
+        clientUserId: project?.clientId ?? null,
+        allowedUserIds: members.map((m) => m.contractorId).filter(Boolean) as string[],
+      };
+    } catch {
+      return { companyId: companyId ?? null, clientUserId: null, allowedUserIds: [] };
+    }
+  }
+
   // Session setup
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -916,12 +932,8 @@ export async function registerRoutes(
           .catch(err => console.error('[Backup] Failed to create backup:', err));
       }
       
-      broadcast({
-        type: "project",
-        projectId: project.id,
-        companyId: (req.user as User).companyId,
-        clientUserId: currentProject.clientId,
-      });
+      const projectBroadcastCtx = await getProjectBroadcastContext(project.id, (req.user as User).companyId);
+      broadcast({ type: "project", projectId: project.id, ...projectBroadcastCtx });
       res.json(project);
     } catch (error) {
       next(error);
@@ -970,11 +982,8 @@ export async function registerRoutes(
       }
       
       if (estimate.projectId) {
-        broadcast({
-          type: "estimate",
-          projectId: estimate.projectId,
-          companyId: (req.user as User).companyId,
-        });
+        const estimateBroadcastCtx = await getProjectBroadcastContext(estimate.projectId, (req.user as User).companyId);
+        broadcast({ type: "estimate", projectId: estimate.projectId, ...estimateBroadcastCtx });
       }
       res.json(estimate);
     } catch (error) {
@@ -1024,11 +1033,8 @@ export async function registerRoutes(
       }
       
       if (invoice.projectId) {
-        broadcast({
-          type: "invoice",
-          projectId: invoice.projectId,
-          companyId: (req.user as User).companyId,
-        });
+        const invoiceBroadcastCtx = await getProjectBroadcastContext(invoice.projectId, (req.user as User).companyId);
+        broadcast({ type: "invoice", projectId: invoice.projectId, ...invoiceBroadcastCtx });
       }
       res.json(invoice);
     } catch (error) {
@@ -1409,13 +1415,8 @@ export async function registerRoutes(
         senderName: user.name || user.username,
         senderAvatar: req.body.senderAvatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : user.username.slice(0, 2).toUpperCase()),
       });
-      const msgProject = await storage.getProject(req.params.projectId).catch(() => null);
-      broadcast({
-        type: "messages",
-        projectId: req.params.projectId,
-        companyId: user.companyId,
-        clientUserId: msgProject?.clientId,
-      });
+      const msgBroadcastCtx = await getProjectBroadcastContext(req.params.projectId, user.companyId);
+      broadcast({ type: "messages", projectId: req.params.projectId, ...msgBroadcastCtx });
       res.json(message);
     } catch (error) {
       next(error);
@@ -1434,13 +1435,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Message not found" });
       }
       if (message.projectId) {
-        const editProject = await storage.getProject(message.projectId).catch(() => null);
-        broadcast({
-          type: "messages",
-          projectId: message.projectId,
-          companyId: (req.user as User).companyId,
-          clientUserId: editProject?.clientId,
-        });
+        const editBroadcastCtx = await getProjectBroadcastContext(message.projectId, (req.user as User).companyId);
+        broadcast({ type: "messages", projectId: message.projectId, ...editBroadcastCtx });
       }
       res.json(message);
     } catch (error) {
@@ -1456,13 +1452,8 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Message not found" });
       }
       if (message.projectId) {
-        const delProject = await storage.getProject(message.projectId).catch(() => null);
-        broadcast({
-          type: "messages",
-          projectId: message.projectId,
-          companyId: (req.user as User | undefined)?.companyId,
-          clientUserId: delProject?.clientId,
-        });
+        const delBroadcastCtx = await getProjectBroadcastContext(message.projectId, (req.user as User | undefined)?.companyId);
+        broadcast({ type: "messages", projectId: message.projectId, ...delBroadcastCtx });
       }
       res.json(message);
     } catch (error) {
@@ -2307,13 +2298,8 @@ export async function registerRoutes(
         }
       }
 
-      const coProject = await storage.getProject(req.params.projectId).catch(() => null);
-      broadcast({
-        type: "changeorder",
-        projectId: req.params.projectId,
-        companyId: user.companyId,
-        clientUserId: coProject?.clientId,
-      });
+      const coBroadcastCtx = await getProjectBroadcastContext(req.params.projectId, user.companyId);
+      broadcast({ type: "changeorder", projectId: req.params.projectId, ...coBroadcastCtx });
       res.status(201).json(changeOrder);
     } catch (error) {
       next(error);
@@ -2359,13 +2345,8 @@ export async function registerRoutes(
       }
 
       if (order.projectId) {
-        const updProject = await storage.getProject(order.projectId).catch(() => null);
-        broadcast({
-          type: "changeorder",
-          projectId: order.projectId,
-          companyId: user.companyId,
-          clientUserId: updProject?.clientId,
-        });
+        const updBroadcastCtx = await getProjectBroadcastContext(order.projectId, user.companyId);
+        broadcast({ type: "changeorder", projectId: order.projectId, ...updBroadcastCtx });
       }
       res.json(updated);
     } catch (error) {
@@ -2414,20 +2395,9 @@ export async function registerRoutes(
         });
       }
 
-      broadcast({
-        type: "changeorder",
-        projectId: order.projectId,
-        companyId: user.companyId,
-        clientUserId: project?.clientId,
-      });
-      if (project) {
-        broadcast({
-          type: "project",
-          projectId: order.projectId,
-          companyId: user.companyId,
-          clientUserId: project.clientId,
-        });
-      }
+      const approveBroadcastCtx = await getProjectBroadcastContext(order.projectId, user.companyId);
+      broadcast({ type: "changeorder", projectId: order.projectId, ...approveBroadcastCtx });
+      broadcast({ type: "project", projectId: order.projectId, ...approveBroadcastCtx });
       res.json(updated);
     } catch (error) {
       next(error);
@@ -2451,13 +2421,8 @@ export async function registerRoutes(
         rejectionReason: reason,
       });
 
-      const rejProject = await storage.getProject(order.projectId).catch(() => null);
-      broadcast({
-        type: "changeorder",
-        projectId: order.projectId,
-        companyId: (req.user as User).companyId,
-        clientUserId: rejProject?.clientId,
-      });
+      const rejectBroadcastCtx = await getProjectBroadcastContext(order.projectId, (req.user as User).companyId);
+      broadcast({ type: "changeorder", projectId: order.projectId, ...rejectBroadcastCtx });
       res.json(updated);
     } catch (error) {
       next(error);
