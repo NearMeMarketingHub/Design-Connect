@@ -168,8 +168,8 @@ export default function ContractorCalculator() {
   const clearEstimate = async () => {
     if (estimateItems.length === 0) return;
     const ok = await confirm({
-      title: "Clear estimate?",
-      description: "This will remove all items from the estimate.",
+      title: "Confirm action",
+      description: "Clear all items from the estimate?",
       confirmLabel: "Clear",
       destructive: true,
     });

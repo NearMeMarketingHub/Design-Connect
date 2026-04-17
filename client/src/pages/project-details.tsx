@@ -1138,8 +1138,8 @@ export default function ProjectDetails() {
 
   const handleDeleteMessage = async (messageId: string) => {
     const ok = await confirm({
-      title: "Delete message?",
-      description: "This message will be permanently removed.",
+      title: "Confirm action",
+      description: "Are you sure you want to delete this message?",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -1469,8 +1469,8 @@ export default function ProjectDetails() {
 
   const handleDeleteContractorPhoto = async (photoId: string) => {
     const ok = await confirm({
-      title: "Delete photo?",
-      description: "This photo will be permanently removed.",
+      title: "Confirm action",
+      description: "Are you sure you want to delete this photo?",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -2466,8 +2466,8 @@ export default function ProjectDetails() {
 
   const handleDeletePost = async (postId: string) => {
     const ok = await confirm({
-      title: "Delete post?",
-      description: "This post and its comments will be permanently removed.",
+      title: "Confirm action",
+      description: "Are you sure you want to delete this post?",
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -5146,8 +5146,8 @@ export default function ProjectDetails() {
                                 className="text-destructive hover:text-destructive"
                                 onClick={async () => {
                                   const ok = await confirm({
-                                    title: "Delete material?",
-                                    description: "This material item will be permanently removed.",
+                                    title: "Confirm action",
+                                    description: "Delete this material item?",
                                     confirmLabel: "Delete",
                                     destructive: true,
                                   });
@@ -5261,8 +5261,8 @@ export default function ProjectDetails() {
                                     className="text-destructive hover:text-destructive"
                                     onClick={async () => {
                                       const ok = await confirm({
-                                        title: "Delete change order?",
-                                        description: "This change order will be permanently removed.",
+                                        title: "Confirm action",
+                                        description: "Delete this change order?",
                                         confirmLabel: "Delete",
                                         destructive: true,
                                       });
@@ -6753,8 +6753,8 @@ export default function ProjectDetails() {
               className="absolute right-12 top-4 z-50 rounded-sm p-1 ring-offset-background transition-all hover:bg-destructive/10 focus:outline-none text-destructive"
               onClick={async () => {
                 const ok = await confirm({
-                  title: "Delete inspiration image?",
-                  description: "This image will be permanently removed from the board.",
+                  title: "Confirm action",
+                  description: "Delete this inspiration image?",
                   confirmLabel: "Delete",
                   destructive: true,
                 });

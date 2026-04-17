@@ -933,8 +933,8 @@ export default function CompanyDashboard() {
                               className="text-destructive hover:text-destructive"
                               onClick={async () => {
                                 const ok = await confirm({
-                                  title: `Delete "${cat.name}"?`,
-                                  description: "This will permanently delete the category and all its items.",
+                                  title: "Confirm action",
+                                  description: `Delete "${cat.name}" and all its items?`,
                                   confirmLabel: "Delete",
                                   destructive: true,
                                 });
@@ -996,8 +996,8 @@ export default function CompanyDashboard() {
                                           className="h-7 w-7 text-destructive hover:text-destructive"
                                           onClick={async () => {
                                             const ok = await confirm({
-                                              title: "Delete item?",
-                                              description: "This item will be permanently removed from the price book.",
+                                              title: "Confirm action",
+                                              description: "Delete this item?",
                                               confirmLabel: "Delete",
                                               destructive: true,
                                             });
