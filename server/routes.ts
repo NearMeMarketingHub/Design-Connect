@@ -19,6 +19,7 @@ import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_inte
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
 import { seedTestAccounts } from "./seed-test-accounts";
+import { setupWebSocket, broadcast } from "./websocket";
 
 const PgSession = connectPgSimple(session);
 
@@ -26,6 +27,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Attach WebSocket server for real-time updates
+  setupWebSocket(httpServer);
 
   // Run idempotent role migration on startup
   runRoleMigration().catch(err => console.error("[migrate-roles] Migration error:", err));
@@ -912,6 +916,7 @@ export async function registerRoutes(
           .catch(err => console.error('[Backup] Failed to create backup:', err));
       }
       
+      broadcast({ type: "project", projectId: project.id });
       res.json(project);
     } catch (error) {
       next(error);
@@ -959,6 +964,7 @@ export async function registerRoutes(
         }
       }
       
+      if (estimate.projectId) broadcast({ type: "estimate", projectId: estimate.projectId });
       res.json(estimate);
     } catch (error) {
       next(error);
@@ -1006,6 +1012,7 @@ export async function registerRoutes(
         }
       }
       
+      if (invoice.projectId) broadcast({ type: "invoice", projectId: invoice.projectId });
       res.json(invoice);
     } catch (error) {
       next(error);
@@ -1385,6 +1392,7 @@ export async function registerRoutes(
         senderName: user.name || user.username,
         senderAvatar: req.body.senderAvatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : user.username.slice(0, 2).toUpperCase()),
       });
+      broadcast({ type: "messages", projectId: req.params.projectId });
       res.json(message);
     } catch (error) {
       next(error);
@@ -1402,6 +1410,7 @@ export async function registerRoutes(
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
       }
+      if (message.projectId) broadcast({ type: "messages", projectId: message.projectId });
       res.json(message);
     } catch (error) {
       next(error);
@@ -1415,6 +1424,7 @@ export async function registerRoutes(
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
       }
+      if (message.projectId) broadcast({ type: "messages", projectId: message.projectId });
       res.json(message);
     } catch (error) {
       next(error);
@@ -2258,6 +2268,7 @@ export async function registerRoutes(
         }
       }
 
+      broadcast({ type: "changeorder", projectId: req.params.projectId });
       res.status(201).json(changeOrder);
     } catch (error) {
       next(error);
@@ -2302,6 +2313,7 @@ export async function registerRoutes(
         }
       }
 
+      if (order.projectId) broadcast({ type: "changeorder", projectId: order.projectId });
       res.json(updated);
     } catch (error) {
       next(error);
@@ -2349,6 +2361,8 @@ export async function registerRoutes(
         });
       }
 
+      broadcast({ type: "changeorder", projectId: order.projectId });
+      if (project) broadcast({ type: "project", projectId: order.projectId });
       res.json(updated);
     } catch (error) {
       next(error);
@@ -2372,6 +2386,7 @@ export async function registerRoutes(
         rejectionReason: reason,
       });
 
+      broadcast({ type: "changeorder", projectId: order.projectId });
       res.json(updated);
     } catch (error) {
       next(error);

@@ -125,6 +125,14 @@ Unified project hub for external workers (subcontractors and notaries):
   - Super Admin dashboard shows pending contractors for approval/rejection
 - Portal context tracking in auth-context for navigation (stored in sessionStorage)
 
+### Real-Time Updates (WebSocket)
+BuildVision uses WebSocket for live updates across all authenticated users:
+- **Server**: `server/websocket.ts` — `setupWebSocket(httpServer)` attaches a `noServer` WebSocket server to the httpServer's `upgrade` event at path `/ws`. Only `/ws` requests are handled; other paths (e.g. Vite HMR at `/vite-hmr`) pass through.
+- **`broadcast(event)`** — called after key mutations in `server/routes.ts` (messages, project updates, change orders, estimates, invoices). Sends `{ type, projectId }` to all connected clients.
+- **Client**: `client/src/lib/useRealtimeUpdates.ts` — hook that opens a WebSocket to `/ws`, reconnects with exponential backoff (1s → 30s), and calls `queryClient.invalidateQueries()` for the matching query keys on each event.
+- **Mounting**: `RealtimeUpdates` component in `App.tsx` activates the hook only for authenticated users (enabled when `user` is non-null).
+- **Event-to-query mapping**: `messages` → `/api/projects/:id/messages`, `project` → `/api/projects`, `changeorder` → `/api/projects/:id/change-orders`, `estimate` → `/api/projects/:id/estimates`, `invoice` → `/api/projects/:id/invoices`.
+
 ### Build & Development
 - Development: Vite dev server with HMR proxied through Express
 - Production: esbuild bundles server code, Vite builds client assets

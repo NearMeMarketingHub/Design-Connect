@@ -39,8 +39,9 @@ import NotaryPortal from "@/pages/notary-portal";
 import CompanyDashboard from "@/pages/company-dashboard";
 import SubcontractorDashboard from "@/pages/subcontractor-dashboard";
 import AcceptSubcontractorInvite from "@/pages/accept-subcontractor-invite";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import ErrorBoundary from "@/components/error-boundary";
+import { useRealtimeUpdates } from "@/lib/useRealtimeUpdates";
 
 function Router() {
   const [location] = useLocation();
@@ -220,6 +221,12 @@ function Router() {
   return <NotFound />;
 }
 
+function RealtimeUpdates() {
+  const { user } = useAuth();
+  useRealtimeUpdates(!!user);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -227,6 +234,7 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <Toaster />
+            <RealtimeUpdates />
             <Router />
           </TooltipProvider>
         </AuthProvider>
