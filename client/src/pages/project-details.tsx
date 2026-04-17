@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/hooks/use-confirm";
 import { parseErrorMessage, ApiError } from "@/lib/queryClient";
 import { getInitials } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -290,6 +291,7 @@ export default function ProjectDetails() {
   const queryClient = useQueryClient();
   const { user, currentPortal } = useAuth();
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
   
   // Contractor controls - check if user can edit this project
   const isContractorView = currentPortal === 'contractor' || currentPortal === 'admin';
@@ -1134,10 +1136,14 @@ export default function ProjectDetails() {
     setEditDialogOpen(true);
   };
 
-  const handleDeleteMessage = (messageId: string) => {
-    if (confirm('Are you sure you want to delete this message?')) {
-      deleteMessageMutation.mutate(messageId);
-    }
+  const handleDeleteMessage = async (messageId: string) => {
+    const ok = await confirm({
+      title: "Delete message?",
+      description: "This message will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (ok) deleteMessageMutation.mutate(messageId);
   };
 
   // Mark messages as read when viewing chat
@@ -1461,10 +1467,14 @@ export default function ProjectDetails() {
     });
   };
 
-  const handleDeleteContractorPhoto = (photoId: string) => {
-    if (confirm('Are you sure you want to delete this photo?')) {
-      deleteContractorPhotoMutation.mutate(photoId);
-    }
+  const handleDeleteContractorPhoto = async (photoId: string) => {
+    const ok = await confirm({
+      title: "Delete photo?",
+      description: "This photo will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (ok) deleteContractorPhotoMutation.mutate(photoId);
   };
 
   const openContractorPhotoDetail = (photo: any) => {
@@ -2454,10 +2464,14 @@ export default function ProjectDetails() {
         p.participants?.some((part: any) => part.status === 'pending' && part.email === user?.email)
       ).length;
 
-  const handleDeletePost = (postId: string) => {
-    if (confirm('Are you sure you want to delete this post?')) {
-      deletePostMutation.mutate(postId);
-    }
+  const handleDeletePost = async (postId: string) => {
+    const ok = await confirm({
+      title: "Delete post?",
+      description: "This post and its comments will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (ok) deletePostMutation.mutate(postId);
   };
 
   // Handle post image upload
@@ -5130,10 +5144,14 @@ export default function ProjectDetails() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-destructive hover:text-destructive"
-                                onClick={() => {
-                                  if (confirm('Delete this material item?')) {
-                                    deleteMaterialMutation.mutate(item.id);
-                                  }
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: "Delete material?",
+                                    description: "This material item will be permanently removed.",
+                                    confirmLabel: "Delete",
+                                    destructive: true,
+                                  });
+                                  if (ok) deleteMaterialMutation.mutate(item.id);
                                 }}
                                 data-testid={`button-delete-material-${item.id}`}
                               >
@@ -5241,10 +5259,14 @@ export default function ProjectDetails() {
                                     variant="ghost"
                                     size="icon"
                                     className="text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      if (confirm('Delete this change order?')) {
-                                        deleteChangeOrderMutation.mutate(order.id);
-                                      }
+                                    onClick={async () => {
+                                      const ok = await confirm({
+                                        title: "Delete change order?",
+                                        description: "This change order will be permanently removed.",
+                                        confirmLabel: "Delete",
+                                        destructive: true,
+                                      });
+                                      if (ok) deleteChangeOrderMutation.mutate(order.id);
                                     }}
                                     data-testid={`button-delete-change-order-${order.id}`}
                                   >
@@ -6729,10 +6751,14 @@ export default function ProjectDetails() {
             <button 
               tabIndex={-1}
               className="absolute right-12 top-4 z-50 rounded-sm p-1 ring-offset-background transition-all hover:bg-destructive/10 focus:outline-none text-destructive"
-              onClick={() => {
-                if (confirm('Delete this inspiration image?')) {
-                  deleteInspirationMutation.mutate(selectedInspiration.id);
-                }
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Delete inspiration image?",
+                  description: "This image will be permanently removed from the board.",
+                  confirmLabel: "Delete",
+                  destructive: true,
+                });
+                if (ok) deleteInspirationMutation.mutate(selectedInspiration.id);
               }}
               data-testid="button-delete-inspiration"
             >
@@ -7409,6 +7435,7 @@ export default function ProjectDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }

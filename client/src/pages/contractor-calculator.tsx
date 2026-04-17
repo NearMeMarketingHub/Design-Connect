@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -87,6 +88,7 @@ export default function ContractorCalculator() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [estimateName, setEstimateName] = useState("");
   const [estimateNotes, setEstimateNotes] = useState("");
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
 
@@ -163,10 +165,15 @@ export default function ContractorCalculator() {
     setEstimateItems(prev => prev.filter(e => e.item.id !== itemId));
   };
 
-  const clearEstimate = () => {
-    if (estimateItems.length > 0 && confirm("Clear all items from the estimate?")) {
-      setEstimateItems([]);
-    }
+  const clearEstimate = async () => {
+    if (estimateItems.length === 0) return;
+    const ok = await confirm({
+      title: "Clear estimate?",
+      description: "This will remove all items from the estimate.",
+      confirmLabel: "Clear",
+      destructive: true,
+    });
+    if (ok) setEstimateItems([]);
   };
 
   const totals = useMemo(() => {
@@ -541,6 +548,7 @@ export default function ContractorCalculator() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
@@ -64,6 +65,7 @@ export default function CompanyDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", contractorType: "contractor", specialty: "", projectId: "" });
   const [activeTab, setActiveTab] = useState(() =>
@@ -929,7 +931,15 @@ export default function CompanyDashboard() {
                               variant="outline"
                               size="sm"
                               className="text-destructive hover:text-destructive"
-                              onClick={() => { if (confirm(`Delete "${cat.name}" and all its items?`)) deleteCategoryMutation.mutate(cat.id); }}
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: `Delete "${cat.name}"?`,
+                                  description: "This will permanently delete the category and all its items.",
+                                  confirmLabel: "Delete",
+                                  destructive: true,
+                                });
+                                if (ok) deleteCategoryMutation.mutate(cat.id);
+                              }}
                               disabled={deleteCategoryMutation.isPending}
                               data-testid={`button-delete-category-${cat.id}`}
                             >
@@ -984,7 +994,15 @@ export default function CompanyDashboard() {
                                           variant="ghost"
                                           size="icon"
                                           className="h-7 w-7 text-destructive hover:text-destructive"
-                                          onClick={() => { if (confirm("Delete this item?")) deleteItemMutation.mutate(item.id); }}
+                                          onClick={async () => {
+                                            const ok = await confirm({
+                                              title: "Delete item?",
+                                              description: "This item will be permanently removed from the price book.",
+                                              confirmLabel: "Delete",
+                                              destructive: true,
+                                            });
+                                            if (ok) deleteItemMutation.mutate(item.id);
+                                          }}
                                           disabled={deleteItemMutation.isPending}
                                           data-testid={`button-delete-item-${item.id}`}
                                         >
@@ -1593,6 +1611,7 @@ export default function CompanyDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+      <ConfirmDialog />
     </div>
   );
 }
