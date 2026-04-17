@@ -916,7 +916,12 @@ export async function registerRoutes(
           .catch(err => console.error('[Backup] Failed to create backup:', err));
       }
       
-      broadcast({ type: "project", projectId: project.id });
+      broadcast({
+        type: "project",
+        projectId: project.id,
+        companyId: (req.user as User).companyId,
+        clientUserId: currentProject.clientId,
+      });
       res.json(project);
     } catch (error) {
       next(error);
@@ -964,7 +969,13 @@ export async function registerRoutes(
         }
       }
       
-      if (estimate.projectId) broadcast({ type: "estimate", projectId: estimate.projectId });
+      if (estimate.projectId) {
+        broadcast({
+          type: "estimate",
+          projectId: estimate.projectId,
+          companyId: (req.user as User).companyId,
+        });
+      }
       res.json(estimate);
     } catch (error) {
       next(error);
@@ -1012,7 +1023,13 @@ export async function registerRoutes(
         }
       }
       
-      if (invoice.projectId) broadcast({ type: "invoice", projectId: invoice.projectId });
+      if (invoice.projectId) {
+        broadcast({
+          type: "invoice",
+          projectId: invoice.projectId,
+          companyId: (req.user as User).companyId,
+        });
+      }
       res.json(invoice);
     } catch (error) {
       next(error);
@@ -1392,7 +1409,13 @@ export async function registerRoutes(
         senderName: user.name || user.username,
         senderAvatar: req.body.senderAvatar || (user.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : user.username.slice(0, 2).toUpperCase()),
       });
-      broadcast({ type: "messages", projectId: req.params.projectId });
+      const msgProject = await storage.getProject(req.params.projectId).catch(() => null);
+      broadcast({
+        type: "messages",
+        projectId: req.params.projectId,
+        companyId: user.companyId,
+        clientUserId: msgProject?.clientId,
+      });
       res.json(message);
     } catch (error) {
       next(error);
@@ -1410,7 +1433,15 @@ export async function registerRoutes(
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
       }
-      if (message.projectId) broadcast({ type: "messages", projectId: message.projectId });
+      if (message.projectId) {
+        const editProject = await storage.getProject(message.projectId).catch(() => null);
+        broadcast({
+          type: "messages",
+          projectId: message.projectId,
+          companyId: (req.user as User).companyId,
+          clientUserId: editProject?.clientId,
+        });
+      }
       res.json(message);
     } catch (error) {
       next(error);
@@ -1424,7 +1455,15 @@ export async function registerRoutes(
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
       }
-      if (message.projectId) broadcast({ type: "messages", projectId: message.projectId });
+      if (message.projectId) {
+        const delProject = await storage.getProject(message.projectId).catch(() => null);
+        broadcast({
+          type: "messages",
+          projectId: message.projectId,
+          companyId: (req.user as User | undefined)?.companyId,
+          clientUserId: delProject?.clientId,
+        });
+      }
       res.json(message);
     } catch (error) {
       next(error);
@@ -2268,7 +2307,13 @@ export async function registerRoutes(
         }
       }
 
-      broadcast({ type: "changeorder", projectId: req.params.projectId });
+      const coProject = await storage.getProject(req.params.projectId).catch(() => null);
+      broadcast({
+        type: "changeorder",
+        projectId: req.params.projectId,
+        companyId: user.companyId,
+        clientUserId: coProject?.clientId,
+      });
       res.status(201).json(changeOrder);
     } catch (error) {
       next(error);
@@ -2313,7 +2358,15 @@ export async function registerRoutes(
         }
       }
 
-      if (order.projectId) broadcast({ type: "changeorder", projectId: order.projectId });
+      if (order.projectId) {
+        const updProject = await storage.getProject(order.projectId).catch(() => null);
+        broadcast({
+          type: "changeorder",
+          projectId: order.projectId,
+          companyId: user.companyId,
+          clientUserId: updProject?.clientId,
+        });
+      }
       res.json(updated);
     } catch (error) {
       next(error);
@@ -2361,8 +2414,20 @@ export async function registerRoutes(
         });
       }
 
-      broadcast({ type: "changeorder", projectId: order.projectId });
-      if (project) broadcast({ type: "project", projectId: order.projectId });
+      broadcast({
+        type: "changeorder",
+        projectId: order.projectId,
+        companyId: user.companyId,
+        clientUserId: project?.clientId,
+      });
+      if (project) {
+        broadcast({
+          type: "project",
+          projectId: order.projectId,
+          companyId: user.companyId,
+          clientUserId: project.clientId,
+        });
+      }
       res.json(updated);
     } catch (error) {
       next(error);
@@ -2386,7 +2451,13 @@ export async function registerRoutes(
         rejectionReason: reason,
       });
 
-      broadcast({ type: "changeorder", projectId: order.projectId });
+      const rejProject = await storage.getProject(order.projectId).catch(() => null);
+      broadcast({
+        type: "changeorder",
+        projectId: order.projectId,
+        companyId: (req.user as User).companyId,
+        clientUserId: rejProject?.clientId,
+      });
       res.json(updated);
     } catch (error) {
       next(error);
