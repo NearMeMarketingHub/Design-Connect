@@ -4,8 +4,9 @@ import { createHmac, timingSafeEqual } from "crypto";
 import pg from "pg";
 
 export interface RealtimeEvent {
-  type: "messages" | "project" | "changeorder" | "estimate" | "invoice";
+  type: "messages" | "project" | "changeorder" | "estimate" | "invoice" | "chatmessage";
   projectId?: string;
+  chatId?: string;
   companyId?: string | null;
   clientUserId?: string | null;
   allowedUserIds?: string[];

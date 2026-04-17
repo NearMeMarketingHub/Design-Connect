@@ -2,10 +2,12 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface RealtimeEvent {
-  type: "messages" | "project" | "changeorder" | "estimate" | "invoice";
+  type: "messages" | "project" | "changeorder" | "estimate" | "invoice" | "chatmessage";
   projectId?: string;
+  chatId?: string;
   companyId?: string | null;
   clientUserId?: string | null;
+  allowedUserIds?: string[];
 }
 
 const INITIAL_BACKOFF_MS = 1_000;
@@ -65,13 +67,25 @@ export function useRealtimeUpdates(enabled: boolean = true): void {
     }
 
     function handleEvent(event: RealtimeEvent) {
-      const { type, projectId } = event;
+      const { type, projectId, chatId } = event;
 
       switch (type) {
         case "messages":
           if (projectId) {
             queryClient.invalidateQueries({
               queryKey: ["/api/projects", projectId, "messages"],
+            });
+          }
+          break;
+        case "chatmessage":
+          if (chatId) {
+            queryClient.invalidateQueries({
+              queryKey: ["/api/chats", chatId, "messages"],
+            });
+          }
+          if (projectId) {
+            queryClient.invalidateQueries({
+              queryKey: ["/api/projects", projectId, "chats"],
             });
           }
           break;
@@ -90,9 +104,19 @@ export function useRealtimeUpdates(enabled: boolean = true): void {
           break;
         case "estimate":
           queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+          if (projectId) {
+            queryClient.invalidateQueries({
+              queryKey: ["/api/projects", projectId, "estimates"],
+            });
+          }
           break;
         case "invoice":
           queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+          if (projectId) {
+            queryClient.invalidateQueries({
+              queryKey: ["/api/projects", projectId, "invoices"],
+            });
+          }
           break;
       }
     }

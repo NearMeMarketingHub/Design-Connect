@@ -2719,7 +2719,20 @@ export async function registerRoutes(
         replyToImageUrl: replyToImageUrl || null,
         replyToImageTitle: replyToImageTitle || null
       });
-      
+
+      // Broadcast to all chat participants so they see the new message without refresh
+      if (chat.projectId) {
+        const chatParticipants = await storage.getChatParticipants(req.params.chatId).catch(() => []);
+        const participantUserIds = chatParticipants.map((p) => p.userId).filter(Boolean) as string[];
+        broadcast({
+          type: "chatmessage",
+          chatId: req.params.chatId,
+          projectId: chat.projectId,
+          companyId: user.companyId,
+          allowedUserIds: participantUserIds,
+        });
+      }
+
       res.status(201).json(message);
     } catch (error) {
       next(error);
