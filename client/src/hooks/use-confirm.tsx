@@ -21,7 +21,7 @@ interface ConfirmOptions {
 export function useConfirm() {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions>({ title: "" });
-  const resolveRef = useRef<(value: boolean) => void>(() => {});
+  const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
     setOptions(opts);
@@ -31,15 +31,16 @@ export function useConfirm() {
     });
   }, []);
 
-  const handleConfirm = () => {
+  const settle = (value: boolean) => {
+    if (resolveRef.current) {
+      resolveRef.current(value);
+      resolveRef.current = null;
+    }
     setOpen(false);
-    resolveRef.current(true);
   };
 
-  const handleCancel = () => {
-    setOpen(false);
-    resolveRef.current(false);
-  };
+  const handleConfirm = () => settle(true);
+  const handleCancel = () => settle(false);
 
   const ConfirmDialog = () => (
     <AlertDialog open={open} onOpenChange={(o) => { if (!o) handleCancel(); }}>
