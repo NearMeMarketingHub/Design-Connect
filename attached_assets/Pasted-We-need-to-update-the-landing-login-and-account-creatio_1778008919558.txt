@@ -1,0 +1,39 @@
+We need to update the landing, login, and account creation flow to match the final SaaS user model.
+
+Do not change any BuildVision branding yet.
+
+The app should no longer allow public company self-registration. Company accounts should only be created/approved by Super Admins after the company requests a demo or contacts us.
+
+Update the landing page:
+- Replace “Start My Company” / “Start Your Company Free” with “Request a Demo” or “Schedule a Demo.”
+- Keep login options for Contractor Login and Client Login.
+- Remove “Sub-Contractor / Notary” as a main landing-page login path.
+- Keep marketing sections explaining Companies, Subcontractors, Clients, and Notaries, but make it clear that company accounts are created through our sales/demo process.
+
+Update the /auth page:
+- Change the visible tabs from “Client / Company / Sub / Notary” to only “Client / Contractor.”
+- Remove the separate Company login tab.
+- Remove the separate Sub / Notary login tab.
+- Contractor login should be used by company owners, company team members, subcontractors, and notaries.
+- Client login should remain separate.
+- Admin login should remain separate at /admin-login.
+
+Update login redirect logic:
+- admin → /admin/dashboard
+- client → /client/dashboard
+- company_owner → /company/dashboard
+- contractor with contractorType = notary → /notary/portal
+- contractor with contractorType = subcontractor → /subcontractor/dashboard
+- regular/internal contractor → /contractor/dashboard
+
+Update registration:
+- Remove public company registration from /auth.
+- On the Contractor registration flow, allow only Subcontractor and Notary self-registration.
+- Add a clear message for company owners: “Company accounts are created after a demo. Request a demo to get started.”
+- Add a “Request Demo” button/link where company registration used to be.
+- Subcontractors and Notaries should be able to create an account themselves, but they should also be able to accept an invite from a company if they do not already have an account.
+
+For invites:
+- If a subcontractor/notary invite is sent to an email that already has an account, attach that existing account to the project/company assignment.
+- If the email does not have an account, the invite link should guide them through account creation and then attach them to the assignment after signup.
+- Avoid creating duplicate user accounts for the same email.
