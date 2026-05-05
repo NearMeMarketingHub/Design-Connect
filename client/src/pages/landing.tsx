@@ -64,7 +64,7 @@ export default function LandingPage() {
                   Client Login
                 </Button>
               </Link>
-              <Link href="/auth">
+              <Link href="/auth?tab=contractor">
                 <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-contractor-login">
                   <Briefcase className="mr-2 h-5 w-5" />
                   Contractor Login
