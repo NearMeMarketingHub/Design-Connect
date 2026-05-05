@@ -142,14 +142,8 @@ export async function registerRoutes(
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // ── Public registration allowlist ────────────────────────────────────────
-      // Only two roles may be created through public self-signup:
-      //   1. "client"        — always allowed, auto-approved
-      //   2. "contractor"    — only with contractorType in {subcontractor, notary}
-      //
-      // All other roles (company_owner, admin, plain contractor without subtype)
-      // are blocked. company_owner accounts are created by admins after a demo.
-      // Reject anything not explicitly in this allowlist — never trust raw role values.
+      // Only client and contractor (subcontractor|notary) may self-register.
+      // company_owner and admin accounts are created by admins after a demo.
       const isAllowedPublicRole = role === "client" || role === "contractor";
       if (!isAllowedPublicRole) {
         return res.status(400).json({
