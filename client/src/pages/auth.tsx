@@ -59,9 +59,13 @@ export default function AuthPage() {
     try {
       if (isLogin) {
         const loginId = formData.get("email") as string;
-        await login(loginId, password, "client");
+        const loggedInUser = await login(loginId, password, "client");
         toast({ title: "Welcome back!", description: "You have successfully logged in." });
-        setLocation("/client/dashboard");
+        if (loggedInUser.role === "admin") {
+          setLocation("/admin/dashboard");
+        } else {
+          setLocation("/client/dashboard");
+        }
       } else {
         const firstName = formData.get("first-name") as string;
         const lastName = formData.get("last-name") as string;

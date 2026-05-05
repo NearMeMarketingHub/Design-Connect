@@ -150,17 +150,14 @@ export async function registerRoutes(
       // All other roles (company_owner, admin, plain contractor without subtype)
       // are blocked. company_owner accounts are created by admins after a demo.
       // Reject anything not explicitly in this allowlist — never trust raw role values.
-      const ALLOWED_PUBLIC_ROLES = ["client", "contractor"] as const;
-      const ALLOWED_CONTRACTOR_SUBTYPES = ["subcontractor", "notary"] as const;
-
-      if (!ALLOWED_PUBLIC_ROLES.includes(role as any)) {
+      const isAllowedPublicRole = role === "client" || role === "contractor";
+      if (!isAllowedPublicRole) {
         return res.status(400).json({
           message: "Company accounts are created through our onboarding process. Please request a demo to get started.",
         });
       }
-      const hasContractorSubtype =
-        role === "contractor" &&
-        ALLOWED_CONTRACTOR_SUBTYPES.includes(contractorType as any);
+      const isAllowedContractorSubtype = contractorType === "subcontractor" || contractorType === "notary";
+      const hasContractorSubtype = role === "contractor" && isAllowedContractorSubtype;
       if (role === "contractor" && !hasContractorSubtype) {
         return res.status(400).json({
           message: "Company accounts are created through our onboarding process. Please request a demo to get started.",
