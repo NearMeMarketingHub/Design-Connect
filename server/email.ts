@@ -3,6 +3,15 @@ import { Resend } from 'resend';
 
 let connectionSettings: any;
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
@@ -294,6 +303,95 @@ export async function sendSignatureCompletedEmail(
   if (error) {
     console.error('Failed to send signature completion email:', error);
     throw new Error(`Failed to send signature completion email: ${error.message}`);
+  }
+
+  return data;
+}
+
+// Send demo request notification to the BuildVision team
+export async function sendDemoRequestEmail(formData: {
+  name: string;
+  company: string;
+  email: string;
+  phone: string;
+  message: string;
+}) {
+  const { client, fromEmail } = await getResendClient();
+
+  const teamEmail = process.env.CONTACT_TEAM_EMAIL || 'hello@buildvision.io';
+  const safeName = escapeHtml(formData.name);
+  const safeCompany = escapeHtml(formData.company);
+  const safeEmail = escapeHtml(formData.email);
+  const safePhone = escapeHtml(formData.phone);
+  const safeMessage = escapeHtml(formData.message).replace(/\n/g, '<br>');
+  const { data, error } = await client.emails.send({
+    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    to: teamEmail,
+    replyTo: formData.email,
+    subject: `Demo Request from ${formData.name}${formData.company ? ` — ${formData.company}` : ''}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <p style="color: #94a3b8; margin: 5px 0 0;">New Demo Request</p>
+        </div>
+
+        <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+          <div style="background: #eff6ff; padding: 16px 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 24px;">
+            <p style="margin: 0; font-size: 15px; color: #1e40af; font-weight: 600;">A prospect has requested a demo through the BuildVision website.</p>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; width: 130px; color: #64748b; font-size: 14px; font-weight: 600;">Name</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 15px;">${safeName}</td>
+            </tr>
+            ${safeCompany ? `
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 14px; font-weight: 600;">Company</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 15px;">${safeCompany}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 14px; font-weight: 600;">Email</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 15px;"><a href="mailto:${safeEmail}" style="color: #3b82f6;">${safeEmail}</a></td>
+            </tr>
+            ${safePhone ? `
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 14px; font-weight: 600;">Phone</td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 15px;">${safePhone}</td>
+            </tr>` : ''}
+            ${safeMessage ? `
+            <tr>
+              <td style="padding: 10px 0; color: #64748b; font-size: 14px; font-weight: 600; vertical-align: top;">Message</td>
+              <td style="padding: 10px 0; font-size: 15px;">${safeMessage}</td>
+            </tr>` : ''}
+          </table>
+
+          <div style="margin-top: 24px;">
+            <a href="mailto:${safeEmail}?subject=Re: BuildVision Demo Request" style="display: inline-block; background: #3b82f6; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">
+              Reply to ${safeName}
+            </a>
+          </div>
+        </div>
+
+        <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+          <p>Submitted via BuildVision demo request form &bull; ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'full', timeStyle: 'short' })} ET</p>
+          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+
+  if (error) {
+    console.error('Failed to send demo request email:', error);
+    throw new Error(`Failed to send demo request email: ${error.message}`);
   }
 
   return data;

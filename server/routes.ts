@@ -7,6 +7,7 @@ import path from "path";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { storage } from "./storage";
+import { sendDemoRequestEmail } from "./email";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
@@ -129,6 +130,29 @@ export async function registerRoutes(
     }
     next();
   };
+
+  // Public contact / demo request route
+  app.post("/api/contact", async (req, res, next) => {
+    try {
+      const schema = z.object({
+        name: z.string().min(1, "Name is required"),
+        company: z.string().optional().default(""),
+        email: z.string().email("Valid email is required"),
+        phone: z.string().optional().default(""),
+        message: z.string().optional().default(""),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
+      }
+      const { name, company, email, phone, message } = parsed.data;
+      await sendDemoRequestEmail({ name, company, email, phone, message });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Contact form error:", err);
+      res.status(502).json({ error: "Failed to send your request. Please try again or email us directly." });
+    }
+  });
 
   // Auth routes
   app.post("/api/auth/register", async (req, res, next) => {

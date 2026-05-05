@@ -32,9 +32,9 @@ export default function LandingPage() {
               <Link href="/auth">
                 <Button variant="ghost" data-testid="link-login">Log In</Button>
               </Link>
-              <a href="mailto:hello@buildvision.io?subject=Demo Request">
+              <Link href="/demo">
                 <Button data-testid="link-request-demo">Request a Demo</Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -52,12 +52,12 @@ export default function LandingPage() {
               and keep clients informed — all in one place.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
-              <a href="mailto:hello@buildvision.io?subject=Demo Request">
+              <Link href="/demo">
                 <Button size="lg" className="text-lg px-8" data-testid="button-request-demo">
                   <CalendarCheck className="mr-2 h-5 w-5" />
                   Request a Demo
                 </Button>
-              </a>
+              </Link>
               <Link href="/auth?tab=client">
                 <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-client-login">
                   <Users className="mr-2 h-5 w-5" />
@@ -248,12 +248,12 @@ export default function LandingPage() {
               Join contractors and companies across Florida who are building smarter with BuildVision.
               Schedule a demo to see the platform in action and get your company set up.
             </p>
-            <a href="mailto:hello@buildvision.io?subject=Demo Request">
+            <Link href="/demo">
               <Button size="lg" variant="secondary" className="text-lg px-8" data-testid="button-get-started-cta">
                 Schedule a Demo
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-            </a>
+            </Link>
           </div>
         </section>
 
@@ -288,12 +288,12 @@ export default function LandingPage() {
                   </li>
                 </ul>
                 <div className="mt-4">
-                  <a href="mailto:hello@buildvision.io?subject=Demo Request">
+                  <Link href="/demo">
                     <Button size="sm" className="w-full" data-testid="button-company-demo">
                       <CalendarCheck className="mr-2 h-4 w-4" />
                       Request a Demo
                     </Button>
-                  </a>
+                  </Link>
                 </div>
               </div>
               <div>
