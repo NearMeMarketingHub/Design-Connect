@@ -142,7 +142,7 @@ export default function NotaryPortal() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!loading && !user) {
-      setLocation('/auth?tab=notary');
+      setLocation('/auth?tab=contractor');
     }
   }, [user, loading, setLocation]);
 

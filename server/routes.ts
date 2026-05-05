@@ -143,10 +143,15 @@ export async function registerRoutes(
       const hashedPassword = await bcrypt.hash(password, 10);
       
       // Map incoming role:
-      // - 'contractor' without a contractorType (direct company registration) → company_owner
+      // - 'contractor' without a contractorType → company_owner (blocked for public registration — must go through demo)
       // - 'contractor' with contractorType (notary, subcontractor) → stays as 'contractor'
       // - anything else stays as-is
       const hasContractorSubtype = !!contractorType && contractorType !== 'contractor';
+      if (role === "contractor" && !hasContractorSubtype) {
+        return res.status(400).json({
+          message: "Company accounts are created through our onboarding process. Please request a demo to get started.",
+        });
+      }
       const mappedRole = (role === "contractor" && !hasContractorSubtype) ? "company_owner" : (role || "client");
       // company_owner and subtypes need admin approval; clients are auto-approved
       const isApproved = mappedRole === "client";

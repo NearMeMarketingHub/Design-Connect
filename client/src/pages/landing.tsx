@@ -14,9 +14,8 @@ import {
   ClipboardList,
   Shield,
   Stamp,
-  Mail,
-  UserPlus,
-  Briefcase
+  Briefcase,
+  CalendarCheck
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -33,9 +32,9 @@ export default function LandingPage() {
               <Link href="/auth">
                 <Button variant="ghost" data-testid="link-login">Log In</Button>
               </Link>
-              <Link href="/auth?mode=register">
-                <Button data-testid="link-register">Get Started</Button>
-              </Link>
+              <a href="mailto:hello@buildvision.io?subject=Demo Request">
+                <Button data-testid="link-request-demo">Request a Demo</Button>
+              </a>
             </div>
           </div>
         </div>
@@ -53,28 +52,28 @@ export default function LandingPage() {
               and keep clients informed — all in one place.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
-              <Link href="/auth?mode=register&tab=contractor">
-                <Button size="lg" className="text-lg px-8" data-testid="button-contractor-signup">
-                  <Building2 className="mr-2 h-5 w-5" />
-                  Start My Company
+              <a href="mailto:hello@buildvision.io?subject=Demo Request">
+                <Button size="lg" className="text-lg px-8" data-testid="button-request-demo">
+                  <CalendarCheck className="mr-2 h-5 w-5" />
+                  Request a Demo
                 </Button>
-              </Link>
-              <Link href="/auth?mode=register&tab=client">
-                <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-client-signup">
+              </a>
+              <Link href="/auth?tab=client">
+                <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-client-login">
                   <Users className="mr-2 h-5 w-5" />
-                  I'm a Client
+                  Client Login
                 </Button>
               </Link>
-              <Link href="/auth?mode=register&tab=subcontractor">
-                <Button size="lg" variant="outline" className="text-lg px-8 border-orange-300 text-orange-700 hover:bg-orange-50" data-testid="button-sub-signup">
+              <Link href="/auth">
+                <Button size="lg" variant="outline" className="text-lg px-8" data-testid="button-contractor-login">
                   <Briefcase className="mr-2 h-5 w-5" />
-                  Sub-Contractor / Notary
+                  Contractor Login
                 </Button>
               </Link>
             </div>
             <p className="mt-6 text-sm text-slate-500">
-              <Mail className="inline h-4 w-4 mr-1 mb-0.5" />
-              Subcontractors and team members join via email invitation from their company owner.
+              Company accounts are set up through our onboarding process. 
+              Subcontractors and notaries can create an account or accept an invite from their company.
             </p>
           </div>
         </section>
@@ -87,17 +86,17 @@ export default function LandingPage() {
             <div className="grid md:grid-cols-4 gap-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Building2 className="h-8 w-8 text-blue-600" />
+                  <CalendarCheck className="h-8 w-8 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">1. Register Your Company</h3>
+                <h3 className="text-xl font-semibold mb-2">1. Request a Demo</h3>
                 <p className="text-slate-600">
-                  Contractors sign up and instantly get a company account with a dedicated 
-                  dashboard for managing projects and team members.
+                  Schedule a demo with our team. We'll set up your company account 
+                  and walk you through the platform.
                 </p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <UserPlus className="h-8 w-8 text-blue-600" />
+                  <Users className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">2. Build Your Team</h3>
                 <p className="text-slate-600">
@@ -247,13 +246,14 @@ export default function LandingPage() {
             </h2>
             <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
               Join contractors and companies across Florida who are building smarter with BuildVision.
+              Schedule a demo to see the platform in action and get your company set up.
             </p>
-            <Link href="/auth?mode=register&tab=contractor">
+            <a href="mailto:hello@buildvision.io?subject=Demo Request">
               <Button size="lg" variant="secondary" className="text-lg px-8" data-testid="button-get-started-cta">
-                Start Your Company Free
+                Schedule a Demo
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-            </Link>
+            </a>
           </div>
         </section>
 
@@ -268,7 +268,7 @@ export default function LandingPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Create a company account and get your own dashboard instantly</span>
+                    <span className="text-slate-600 text-sm">Company accounts are set up by our team after a demo — no self-signup required</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
@@ -287,6 +287,14 @@ export default function LandingPage() {
                     <span className="text-slate-600 text-sm">Collect e-signatures and manage change orders</span>
                   </li>
                 </ul>
+                <div className="mt-4">
+                  <a href="mailto:hello@buildvision.io?subject=Demo Request">
+                    <Button size="sm" className="w-full" data-testid="button-company-demo">
+                      <CalendarCheck className="mr-2 h-4 w-4" />
+                      Request a Demo
+                    </Button>
+                  </a>
+                </div>
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
@@ -296,7 +304,11 @@ export default function LandingPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Join multiple companies via email invitation — no separate sign-up needed</span>
+                    <span className="text-slate-600 text-sm">Create a free account or accept an invite from your company</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Join multiple companies from one account</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
@@ -306,16 +318,13 @@ export default function LandingPage() {
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
                     <span className="text-slate-600 text-sm">View project documents, progress, and messages</span>
                   </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Work across multiple general contractors from one account</span>
-                  </li>
                 </ul>
-                <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-100">
-                  <p className="text-xs text-orange-700 font-medium">
-                    <Mail className="inline h-3.5 w-3.5 mr-1" />
-                    Subcontractors join via invite only. Ask your general contractor to send you an invitation.
-                  </p>
+                <div className="mt-4">
+                  <Link href="/auth?mode=register&tab=contractor">
+                    <Button size="sm" variant="outline" className="w-full border-orange-300 text-orange-700 hover:bg-orange-50" data-testid="button-sub-signup">
+                      Create Subcontractor Account
+                    </Button>
+                  </Link>
                 </div>
               </div>
               <div>
@@ -354,6 +363,10 @@ export default function LandingPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-600 text-sm">Create a free account or accept an invite from a company</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
                     <span className="text-slate-600 text-sm">Find documents requiring notarization across projects</span>
                   </li>
                   <li className="flex items-start gap-3">
@@ -362,13 +375,16 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Track pending and completed notarizations</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
                     <span className="text-slate-600 text-sm">Streamlined workflow for Florida construction projects</span>
                   </li>
                 </ul>
+                <div className="mt-4">
+                  <Link href="/auth?mode=register&tab=contractor">
+                    <Button size="sm" variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-50" data-testid="button-notary-signup">
+                      Create Notary Account
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
