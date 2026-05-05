@@ -176,24 +176,6 @@ export async function registerRoutes(
         isApproved,
       });
 
-      // If company_owner, auto-create their company
-      if (mappedRole === "company_owner") {
-        const company = await storage.createCompany({
-          name: companyName || `${name || username}'s Company`,
-          ownerId: user.id,
-          subscriptionPlan: "free",
-          subscriptionStatus: "trialing",
-          trialStartedAt: new Date(),
-        });
-        await storage.updateUser(user.id, { companyId: company.id });
-        const { password: _, ...userWithoutPassword } = user;
-        return res.json({ 
-          user: userWithoutPassword, 
-          pendingApproval: true,
-          message: "Your account has been created and is pending admin approval."
-        });
-      }
-      
       // Contractor subtypes (notary, subcontractor) also need approval
       if (mappedRole === "contractor" && hasContractorSubtype) {
         const { password: _, ...userWithoutPassword } = user;
