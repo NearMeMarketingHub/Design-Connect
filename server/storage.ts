@@ -321,6 +321,7 @@ export interface IStorage {
   getCompanyByOwnerId(ownerId: string): Promise<Company | undefined>;
   getAllCompanies(): Promise<Company[]>;
   createCompany(company: InsertCompany): Promise<Company>;
+  createCompanyWithOwner(companyData: InsertCompany, ownerData: InsertUser): Promise<{ company: Company; user: User }>;
   updateCompany(id: string, data: Partial<InsertCompany>): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<void>;
 
@@ -2129,6 +2130,18 @@ export class DatabaseStorage implements IStorage {
   async createCompany(company: InsertCompany): Promise<Company> {
     const [created] = await db.insert(schema.companies).values(company).returning();
     return created;
+  }
+
+  async createCompanyWithOwner(companyData: InsertCompany, ownerData: InsertUser): Promise<{ company: Company; user: User }> {
+    return await db.transaction(async (tx) => {
+      const [company] = await tx.insert(schema.companies).values(companyData).returning();
+      const [user] = await tx.insert(schema.users).values({ ...ownerData, companyId: company.id }).returning();
+      const [updatedCompany] = await tx.update(schema.companies)
+        .set({ ownerId: user.id })
+        .where(eq(schema.companies.id, company.id))
+        .returning();
+      return { company: updatedCompany, user };
+    });
   }
 
   async updateCompany(id: string, data: Partial<InsertCompany>): Promise<Company | undefined> {

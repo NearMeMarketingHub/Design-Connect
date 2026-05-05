@@ -91,6 +91,18 @@ export default function SuperAdminDashboard() {
   const [editingCompany, setEditingCompany] = useState<any | null>(null);
   const [companySubForm, setCompanySubForm] = useState({ subscriptionPlan: "free", subscriptionStatus: "trialing" });
 
+  // Create company dialog
+  const [createCompanyDialogOpen, setCreateCompanyDialogOpen] = useState(false);
+  const [createCompanyForm, setCreateCompanyForm] = useState({
+    companyName: "",
+    ownerName: "",
+    ownerEmail: "",
+    ownerUsername: "",
+    password: "",
+    companyType: "",
+    subscriptionPlan: "free",
+  });
+
   const PERMISSION_KEYS: { key: string; label: string }[] = [
     { key: "viewProjects", label: "View Projects" },
     { key: "editProjects", label: "Edit Projects" },
@@ -210,6 +222,18 @@ export default function SuperAdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       setCompanySubDialogOpen(false);
       toast({ title: "Subscription updated" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
+  const createCompanyMutation = useMutation({
+    mutationFn: (data: typeof createCompanyForm) =>
+      apiRequest("POST", "/api/admin/companies", data).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
+      setCreateCompanyDialogOpen(false);
+      setCreateCompanyForm({ companyName: "", ownerName: "", ownerEmail: "", ownerUsername: "", password: "", companyType: "", subscriptionPlan: "free" });
+      toast({ title: "Company created", description: "The company and owner account have been created." });
     },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
@@ -778,9 +802,14 @@ export default function SuperAdminDashboard() {
 
         {/* Companies / Subscriptions Section */}
         <div>
-          <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-blue-600" /> Subscriptions
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-blue-600" /> Subscriptions
+            </h2>
+            <Button size="sm" onClick={() => setCreateCompanyDialogOpen(true)} data-testid="button-create-company">
+              <Plus className="w-4 h-4 mr-1" /> Create Company
+            </Button>
+          </div>
           {companies.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">No companies registered yet.</CardContent>
@@ -1121,6 +1150,114 @@ export default function SuperAdminDashboard() {
               data-testid="button-save-role-def"
             >
               {saveRoleDefMutation.isPending ? "Saving…" : (editingRoleDef ? "Save Changes" : "Create Role")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Company Dialog */}
+      <Dialog open={createCompanyDialogOpen} onOpenChange={setCreateCompanyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Company</DialogTitle>
+            <DialogDescription>Create a new company and its owner account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="cc-company-name">Company Name</Label>
+              <Input
+                id="cc-company-name"
+                value={createCompanyForm.companyName}
+                onChange={e => setCreateCompanyForm(f => ({ ...f, companyName: e.target.value }))}
+                placeholder="Acme Construction"
+                data-testid="input-create-company-name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cc-company-type">Company Type <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                id="cc-company-type"
+                value={createCompanyForm.companyType}
+                onChange={e => setCreateCompanyForm(f => ({ ...f, companyType: e.target.value }))}
+                placeholder="General Contractor"
+                data-testid="input-create-company-type"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Subscription Plan</Label>
+              <Select value={createCompanyForm.subscriptionPlan} onValueChange={v => setCreateCompanyForm(f => ({ ...f, subscriptionPlan: v }))}>
+                <SelectTrigger data-testid="select-create-company-plan">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  {adminTiers.map((t: any) => (
+                    <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="border-t pt-3 space-y-3">
+              <p className="text-sm font-medium text-foreground">Owner Account</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-owner-name">Full Name</Label>
+                <Input
+                  id="cc-owner-name"
+                  value={createCompanyForm.ownerName}
+                  onChange={e => setCreateCompanyForm(f => ({ ...f, ownerName: e.target.value }))}
+                  placeholder="Jane Smith"
+                  data-testid="input-create-owner-name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-owner-email">Email</Label>
+                <Input
+                  id="cc-owner-email"
+                  type="email"
+                  value={createCompanyForm.ownerEmail}
+                  onChange={e => setCreateCompanyForm(f => ({ ...f, ownerEmail: e.target.value }))}
+                  placeholder="jane@acme.com"
+                  data-testid="input-create-owner-email"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-owner-username">Username</Label>
+                <Input
+                  id="cc-owner-username"
+                  value={createCompanyForm.ownerUsername}
+                  onChange={e => setCreateCompanyForm(f => ({ ...f, ownerUsername: e.target.value }))}
+                  placeholder="janesmith"
+                  data-testid="input-create-owner-username"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-password">Password</Label>
+                <Input
+                  id="cc-password"
+                  type="password"
+                  value={createCompanyForm.password}
+                  onChange={e => setCreateCompanyForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Min. 6 characters"
+                  data-testid="input-create-owner-password"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCreateCompanyDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => createCompanyMutation.mutate(createCompanyForm)}
+              disabled={
+                !createCompanyForm.companyName.trim() ||
+                !createCompanyForm.ownerName.trim() ||
+                !createCompanyForm.ownerEmail.trim() ||
+                !createCompanyForm.ownerUsername.trim() ||
+                createCompanyForm.password.length < 6 ||
+                createCompanyMutation.isPending
+              }
+              data-testid="button-submit-create-company"
+            >
+              {createCompanyMutation.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Creating…</> : "Create Company"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -549,6 +549,61 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
+  // ── Admin: Create company + owner account ─────────────────────────────────────
+  const adminCreateCompanySchema = z.object({
+    companyName: z.string().min(1).max(200),
+    ownerName: z.string().min(1).max(200),
+    ownerEmail: z.string().email(),
+    ownerUsername: z.string().min(3).max(100),
+    password: z.string().min(6),
+    companyType: z.string().optional(),
+    subscriptionPlan: z.string().min(1).max(100).default("free"),
+  });
+
+  app.post("/api/admin/companies", requireAdmin, async (req, res, next) => {
+    try {
+      const parsed = adminCreateCompanySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
+      }
+      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionPlan } = parsed.data;
+
+      const existingByUsername = await storage.getUserByUsername(ownerUsername);
+      if (existingByUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      const existingByEmail = await storage.getUserByEmail(ownerEmail);
+      if (existingByEmail) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create company + owner atomically in a single transaction
+      const { company, user } = await storage.createCompanyWithOwner(
+        {
+          name: companyName.trim(),
+          subscriptionPlan,
+          subscriptionStatus: "trialing",
+          trialStartedAt: new Date(),
+        },
+        {
+          username: ownerUsername.trim(),
+          email: ownerEmail.trim().toLowerCase(),
+          password: hashedPassword,
+          role: "company_owner",
+          name: ownerName.trim(),
+          companyName: companyName.trim(),
+          companyType: companyType?.trim() || null,
+          isApproved: true,
+        }
+      );
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json({ company, user: userWithoutPassword });
+    } catch (error) { next(error); }
+  });
+
   // ── Admin: Update company subscription ───────────────────────────────────────
   const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled"] as const;
 
