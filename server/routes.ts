@@ -3907,7 +3907,7 @@ export async function registerRoutes(
             projectName: project.name,
             role: inviteRole,
             loginUrl: `${baseUrl}/auth`,
-            registerUrl: `${baseUrl}/auth?mode=register&tab=${inviteRole}`,
+            registerUrl: `${baseUrl}/subcontractor-invite/${token}`,
             isNewUser: true,
             inviteeName: name || undefined,
           });
