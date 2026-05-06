@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -252,6 +253,7 @@ export default function BudgetAdmin() {
                 data-testid="input-search"
               />
             </div>
+            <ThemeToggle />
           </div>
         </div>
       </header>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -232,6 +233,7 @@ export default function ContractorManagement() {
                   {totalPending} pending
                 </Badge>
               )}
+              <ThemeToggle />
             </div>
           </div>
         </div>

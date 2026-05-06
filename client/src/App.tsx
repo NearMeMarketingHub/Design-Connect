@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/layout";
+import { AdminShell } from "@/components/admin-shell";
 import LandingPage from "@/pages/landing";
 import AuthPage from "@/pages/auth";
 import ClientDashboard from "@/pages/client-dashboard";
@@ -160,10 +161,10 @@ function Router() {
         <Route path="/admin/contractors" component={ContractorManagement} />
         <Route path="/admin/contractors/:id" component={ContractorProfile} />
         <Route path="/admin/budget" component={BudgetAdmin} />
-        <Route path="/admin/sales" component={SalesDashboard} />
-        <Route path="/admin/estimates" component={Estimator} />
-        <Route path="/admin/accounting" component={AccountingDashboard} />
-        <Route path="/admin/invoice/new" component={CreateInvoice} />
+        <Route path="/admin/sales">{() => <AdminShell><SalesDashboard /></AdminShell>}</Route>
+        <Route path="/admin/estimates">{() => <AdminShell><Estimator /></AdminShell>}</Route>
+        <Route path="/admin/accounting">{() => <AdminShell><AccountingDashboard /></AdminShell>}</Route>
+        <Route path="/admin/invoice/new">{() => <AdminShell><CreateInvoice /></AdminShell>}</Route>
         <Route component={NotFound} />
       </Switch>
     );

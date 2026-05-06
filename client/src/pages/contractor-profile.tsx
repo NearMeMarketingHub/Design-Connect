@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -117,13 +118,14 @@ export default function ContractorProfile() {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between">
             <Link href="/admin/contractors">
               <Button variant="ghost" size="sm" data-testid="btn-back-to-contractors">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Contractors
               </Button>
             </Link>
+            <ThemeToggle />
           </div>
         </div>
       </header>
