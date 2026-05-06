@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   Building2, 
   Users, 
@@ -20,15 +21,16 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
               <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-slate-900">BuildVision</span>
+              <span className="text-2xl font-bold text-foreground">BuildVision</span>
             </div>
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               <Link href="/auth">
                 <Button variant="ghost" data-testid="link-login">Log In</Button>
               </Link>
@@ -43,11 +45,11 @@ export default function LandingPage() {
       <main>
         <section className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto text-center">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6">
               Construction Management<br />
               <span className="text-blue-600">Built for Teams</span>
             </h1>
-            <p className="text-xl text-slate-600 max-w-3xl mx-auto mb-10">
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
               BuildVision gives contractors a company dashboard to manage projects, build their team, 
               and keep clients informed — all in one place.
             </p>
@@ -71,55 +73,55 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
-            <p className="mt-6 text-sm text-slate-500">
+            <p className="mt-6 text-sm text-muted-foreground">
               Company accounts are set up through our onboarding process. 
               Subcontractors and notaries can create an account or accept an invite from their company.
             </p>
           </div>
         </section>
 
-        <section className="py-16 bg-white">
+        <section className="py-16 bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
+            <h2 className="text-3xl font-bold text-center text-foreground mb-12">
               How BuildVision Works
             </h2>
             <div className="grid md:grid-cols-4 gap-8">
               <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CalendarCheck className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">1. Request a Demo</h3>
-                <p className="text-slate-600">
+                <p className="text-muted-foreground">
                   Schedule a demo with our team. We'll set up your company account 
                   and walk you through the platform.
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">2. Build Your Team</h3>
-                <p className="text-slate-600">
+                <p className="text-muted-foreground">
                   Invite contractors, subcontractors, and notaries to your company by email. 
                   Assign roles and control what each member can see and do.
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <ClipboardList className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">3. Run Your Projects</h3>
-                <p className="text-slate-600">
+                <p className="text-muted-foreground">
                   Create projects with timelines, budgets, and milestones. 
                   Clients receive an invitation to view their dedicated project portal.
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">4. Complete with Confidence</h3>
-                <p className="text-slate-600">
+                <p className="text-muted-foreground">
                   Track milestones, manage invoices, and sign documents electronically 
                   for a smooth project completion.
                 </p>
@@ -128,12 +130,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="py-16 bg-slate-50">
+        <section className="py-16 bg-background">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-slate-900 mb-4">
+            <h2 className="text-3xl font-bold text-center text-foreground mb-4">
               Powerful Features for Every Project
             </h2>
-            <p className="text-center text-slate-600 mb-12 max-w-2xl mx-auto">
+            <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
               Everything you need to manage construction projects from start to finish
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -141,7 +143,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <FileText className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Document Management</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Upload, organize, and share contracts, permits, and plans. 
                     Built-in e-signature for seamless document signing.
                   </p>
@@ -152,7 +154,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <Camera className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Progress Photos</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Share visual updates with clients. Document every phase 
                     of construction with timestamped photos.
                   </p>
@@ -163,7 +165,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <DollarSign className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Budget Tracking</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Transparent budget management with detailed breakdowns. 
                     Clients always know where their money is going.
                   </p>
@@ -174,7 +176,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <MessageSquare className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Real-Time Messaging</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Keep conversations organized by project. 
                     Never lose important discussions in email threads.
                   </p>
@@ -185,7 +187,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <Users className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Team Management</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Invite contractors, subcontractors, and notaries to your company. 
                     Assign roles and control project-level access per member.
                   </p>
@@ -196,7 +198,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <Shield className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">E-Signatures</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Legally binding electronic signatures with audit trails. 
                     Sign contracts and change orders from anywhere.
                   </p>
@@ -207,7 +209,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <ClipboardList className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Milestone Tracking</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Break projects into phases with clear milestones. 
                     Track progress and keep projects on schedule.
                   </p>
@@ -218,7 +220,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <Stamp className="h-10 w-10 text-purple-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Notarization Services</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Streamlined document notarization workflow. Connect with notaries 
                     and track notarization status in real-time.
                   </p>
@@ -229,7 +231,7 @@ export default function LandingPage() {
                 <CardContent className="p-6">
                   <Hammer className="h-10 w-10 text-amber-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Change Orders</h3>
-                  <p className="text-slate-600 text-sm">
+                  <p className="text-muted-foreground text-sm">
                     Create and track change orders with line-item breakdowns. 
                     Clients approve or reject with a full audit trail.
                   </p>
@@ -257,34 +259,34 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="py-16 bg-white">
+        <section className="py-16 bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-4 gap-10">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-foreground mb-5 flex items-center gap-2">
                   <Building2 className="h-6 w-6 text-blue-600" />
                   For Companies
                 </h2>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Company accounts are set up by our team after a demo — no self-signup required</span>
+                    <span className="text-muted-foreground text-sm">Company accounts are set up by our team after a demo — no self-signup required</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Invite team members, assign roles, and set company admins</span>
+                    <span className="text-muted-foreground text-sm">Invite team members, assign roles, and set company admins</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Manage all company projects from a single view</span>
+                    <span className="text-muted-foreground text-sm">Manage all company projects from a single view</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Create estimates, send invoices, and track payments</span>
+                    <span className="text-muted-foreground text-sm">Create estimates, send invoices, and track payments</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Collect e-signatures and manage change orders</span>
+                    <span className="text-muted-foreground text-sm">Collect e-signatures and manage change orders</span>
                   </li>
                 </ul>
                 <div className="mt-4">
@@ -297,26 +299,26 @@ export default function LandingPage() {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-foreground mb-5 flex items-center gap-2">
                   <Briefcase className="h-6 w-6 text-orange-500" />
                   For Subcontractors
                 </h2>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Create a free account or accept an invite from your company</span>
+                    <span className="text-muted-foreground text-sm">Create a free account or accept an invite from your company</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Join multiple companies from one account</span>
+                    <span className="text-muted-foreground text-sm">Join multiple companies from one account</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">See only the projects you've been assigned to</span>
+                    <span className="text-muted-foreground text-sm">See only the projects you've been assigned to</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">View project documents, progress, and messages</span>
+                    <span className="text-muted-foreground text-sm">View project documents, progress, and messages</span>
                   </li>
                 </ul>
                 <div className="mt-4">
@@ -328,54 +330,54 @@ export default function LandingPage() {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-5 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-foreground mb-5 flex items-center gap-2">
                   <Users className="h-6 w-6 text-blue-500" />
                   For Clients
                 </h2>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Track your project's progress in real-time</span>
+                    <span className="text-muted-foreground text-sm">Track your project's progress in real-time</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">View photos and updates from your contractor</span>
+                    <span className="text-muted-foreground text-sm">View photos and updates from your contractor</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Review and approve change orders</span>
+                    <span className="text-muted-foreground text-sm">Review and approve change orders</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Access all project documents in one place</span>
+                    <span className="text-muted-foreground text-sm">Access all project documents in one place</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">See exactly where your budget is being spent</span>
+                    <span className="text-muted-foreground text-sm">See exactly where your budget is being spent</span>
                   </li>
                 </ul>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-purple-700 mb-5 flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-purple-600 dark:text-purple-400 mb-5 flex items-center gap-2">
                   <Stamp className="h-6 w-6 text-purple-600" />
                   For Notaries
                 </h2>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Create a free account or accept an invite from a company</span>
+                    <span className="text-muted-foreground text-sm">Create a free account or accept an invite from a company</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Find documents requiring notarization across projects</span>
+                    <span className="text-muted-foreground text-sm">Find documents requiring notarization across projects</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Upload notarized documents directly to projects</span>
+                    <span className="text-muted-foreground text-sm">Upload notarized documents directly to projects</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-600 text-sm">Streamlined workflow for Florida construction projects</span>
+                    <span className="text-muted-foreground text-sm">Streamlined workflow for Florida construction projects</span>
                   </li>
                 </ul>
                 <div className="mt-4">

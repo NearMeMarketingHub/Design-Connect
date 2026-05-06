@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HardHat, ArrowRight, Eye, EyeOff, CheckCircle2, CalendarCheck } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { parseErrorMessage } from "@/lib/queryClient";
@@ -137,14 +138,17 @@ export default function AuthPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-              <HardHat className="w-7 h-7" />
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+                <HardHat className="w-7 h-7" />
+              </div>
+              <div>
+                <h1 className="font-heading font-bold text-2xl tracking-tight">BuildVision</h1>
+                <p className="text-sm text-muted-foreground">Construction Management Portal</p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-heading font-bold text-2xl tracking-tight">BuildVision</h1>
-              <p className="text-sm text-muted-foreground">Construction Management Portal</p>
-            </div>
+            <ThemeToggle />
           </div>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="w-full">

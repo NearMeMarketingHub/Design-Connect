@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 interface SidebarItem {
@@ -202,6 +203,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             
             {/* Right side - Settings and Logout */}
             <div className="flex items-center gap-2">
+              <ThemeToggle className="text-muted-foreground" />
               <Button variant="ghost" size="icon" className="text-muted-foreground" asChild data-testid="button-settings">
                 <Link href={`${basePath}/settings`}>
                   <Settings className="w-5 h-5" />
@@ -277,6 +279,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             </Button>
           )}
+          <ThemeToggle className="text-muted-foreground" />
           <Button variant="ghost" size="icon" className="text-muted-foreground" asChild data-testid="button-settings">
             <Link href={`${basePath}/settings`}>
               <Settings className="w-5 h-5" />
