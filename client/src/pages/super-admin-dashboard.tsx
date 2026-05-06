@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -469,6 +470,7 @@ export default function SuperAdminDashboard() {
           <Badge variant="outline" className="border-green-600 text-green-600">
             Admin Mode
           </Badge>
+          <ThemeToggle />
           <Button 
             variant="ghost" 
             size="sm" 

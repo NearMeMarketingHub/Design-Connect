@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 
 interface NotaryDocument {
@@ -196,18 +197,19 @@ export default function NotaryPortal() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b p-4">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b border-border p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">BuildVision Notary Portal</h1>
-            <p className="text-sm text-gray-500">Document notarization management</p>
+            <h1 className="text-xl font-bold text-foreground">BuildVision Notary Portal</h1>
+            <p className="text-sm text-muted-foreground">Document notarization management</p>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">Welcome, {user.name || user.username}</span>
+            <span className="text-sm text-muted-foreground">Welcome, {user.name || user.username}</span>
+            <ThemeToggle />
             <button 
               onClick={handleLogout}
-              className="px-4 py-2 border rounded hover:bg-gray-100"
+              className="px-4 py-2 border border-border rounded hover:bg-muted text-foreground"
             >
               Logout
             </button>

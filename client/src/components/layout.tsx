@@ -158,7 +158,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </nav>
 
             {/* Sidebar Footer */}
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border space-y-2">
               <div className="flex items-center gap-3 px-3 py-2">
                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
                   <span className="text-sm font-medium">
@@ -171,6 +171,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     {isCompanyOwner ? "Company Owner" : isCompanyAdmin ? "Company Admin" : user?.contractorType === "notary" ? "Notary" : user?.contractorType === "subcontractor" ? "Sub-Contractor" : "Contractor"}
                   </p>
                 </div>
+              </div>
+              <div className="px-3">
+                <ThemeToggle className="w-full justify-start gap-2 text-muted-foreground text-sm font-medium px-0" />
               </div>
             </div>
           </div>
