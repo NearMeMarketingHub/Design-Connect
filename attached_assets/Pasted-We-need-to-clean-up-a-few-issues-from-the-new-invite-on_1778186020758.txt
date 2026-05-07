@@ -1,0 +1,36 @@
+We need to clean up a few issues from the new invite-only/auth/admin flow.
+
+1. Fix invite acceptance auth state.
+In client/src/pages/accept-invite.tsx, after a successful invite account creation or existing-user invite login, update the frontend auth state properly.
+Use useAuth() and call:
+- setPortal("client")
+- refetch()
+Then invalidate the correct query keys:
+- /api/auth/user
+- /api/projects
+Then redirect to /client/dashboard.
+
+Also update client dashboard/project filtering so if currentPortal is null but user.role === "client", the app still treats the user as a client. This prevents invited clients from seeing “No Projects Yet” immediately after accepting an invite.
+
+2. Fix broken Super Admin project links.
+The Super Admin dashboard currently links to /admin/project/:id and /projects/:id, but these routes do not exist in App.tsx.
+Add admin project detail routes under /admin/project/:id, or update the links to an existing valid route. The admin should be able to open project details from both Platform Projects and Invite Status.
+
+3. Fix company user filtering.
+The Companies table links to /admin/contractors?companyId=<companyId>, but contractor-management.tsx does not read that query param and /api/admin/contractors does not filter by company.
+Update the Users & Approvals / Contractor Management page so when companyId is provided, it filters users to that company.
+Also rename visible “Contractor Management” wording to “Users & Approvals” because this page manages company owners, contractors, clients, and approval workflows.
+
+4. Fix company user counts.
+The Companies table currently uses company_members length for userCount, which may exclude the company owner.
+Update /api/admin/companies so userCount includes all users with user.companyId = company.id, plus any company_members not already counted.
+
+5. Strengthen invite-only account creation validation.
+In POST /api/invites/:token/accept, add backend validation for:
+- username required, min 3 characters
+- password required, min 8 characters
+- name optional but trimmed
+Keep the invited email locked to the invite email and do not allow duplicate accounts.
+
+6. Review public landing page copy.
+Since subcontractor/notary functionality is hidden for now, remove or soften public-facing landing page copy that heavily advertises subcontractor/notary self-use. Do not delete the underlying subcontractor code or database structure.
