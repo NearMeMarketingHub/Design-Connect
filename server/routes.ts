@@ -807,22 +807,18 @@ export async function registerRoutes(
   // ── Admin: Global invite listing ──────────────────────────────────────────────
   app.get("/api/admin/invites", requireAdmin, async (req, res, next) => {
     try {
-      // Get all project invites and contractor invites across the platform
-      const [allProjects, allCompanies, allContractors, allClients] = await Promise.all([
+      // Fetch all invites and lookup data in parallel — no per-project iteration
+      const [allProjectInvites, allContractorInvites, allProjects, allCompanies] = await Promise.all([
+        storage.getAllProjectInvites(),
+        storage.getAllContractorInvites(),
         storage.getProjects(),
         storage.getAllCompanies(),
-        storage.getUsersByRole("contractor"),
-        storage.getUsersByRole("client"),
       ]);
 
       const projectMap = new Map(allProjects.map(p => [p.id, p]));
       const companyMap = new Map(allCompanies.map(c => [c.id, c]));
 
-      // Gather all project invites by fetching per-project
-      const projectInviteArrays = await Promise.all(
-        allProjects.map(p => storage.getProjectInvitesByProjectId(p.id))
-      );
-      const projectInvites = projectInviteArrays.flat().map(inv => {
+      const projectInvites = allProjectInvites.map(inv => {
         const project = inv.projectId ? projectMap.get(inv.projectId) : null;
         const companyId = project ? (project as any).companyId : null;
         return {
@@ -834,16 +830,12 @@ export async function registerRoutes(
           projectName: project?.name ?? null,
           companyName: companyId ? (companyMap.get(companyId)?.name ?? null) : null,
           sentAt: inv.createdAt,
-          acceptedAt: null,
+          acceptedAt: null, // projectInvites schema has no acceptedAt column
           expiresAt: inv.expiresAt,
         };
       });
 
-      // Gather all contractor invites
-      const contractorInviteArrays = await Promise.all(
-        allProjects.map(p => storage.getContractorInvitesByProject(p.id))
-      );
-      const contractorInvites = contractorInviteArrays.flat().map(inv => {
+      const contractorInvites = allContractorInvites.map(inv => {
         const project = inv.projectId ? projectMap.get(inv.projectId) : null;
         const company = inv.companyId ? companyMap.get(inv.companyId) : null;
         return {
@@ -855,7 +847,7 @@ export async function registerRoutes(
           projectName: project?.name ?? null,
           companyName: company?.name ?? (inv.companyName ?? null),
           sentAt: inv.createdAt,
-          acceptedAt: null,
+          acceptedAt: null, // contractorInvites schema has no acceptedAt timestamp column
           expiresAt: inv.expiresAt,
         };
       });
@@ -890,16 +882,23 @@ export async function registerRoutes(
     try {
       const { type } = req.body as { type?: string };
       let invite: any;
-      if (type === "contractor" || type === "subcontractor" || type === "notary") {
+      const isContractorType = type === "contractor" || type === "subcontractor" || type === "notary";
+
+      if (isContractorType) {
         invite = await storage.getContractorInviteById(req.params.id);
       } else {
-        invite = await storage.getProjectInvitesByProjectId("").then(() => null).catch(() => null);
-        // For project invites we don't have getById, try contractor as fallback
+        // Try project invite first (client invite type)
+        invite = await storage.getProjectInviteById(req.params.id);
+        // Fallback to contractor invite if not found in project_invites
         if (!invite) invite = await storage.getContractorInviteById(req.params.id);
       }
+
       if (!invite) return res.status(404).json({ message: "Invite not found" });
-      // Just return success with the invite data — email resend would require email integration
-      res.json({ success: true, invite });
+      if (invite.status !== "pending") {
+        return res.status(400).json({ message: `Cannot resend a ${invite.status} invite` });
+      }
+      // Email resend is best-effort — production would call sendInviteEmail here
+      res.json({ success: true, email: invite.email });
     } catch (error) { next(error); }
   });
 

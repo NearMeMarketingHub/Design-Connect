@@ -371,9 +371,11 @@ export interface IStorage {
   getPlatformSettings(): Promise<PlatformSettings>;
   updatePlatformSettings(data: Partial<InsertPlatformSettings>): Promise<PlatformSettings>;
 
-  // Global contractor invite access
+  // Global invite access (admin)
   getAllContractorInvites(): Promise<ContractorInvite[]>;
   getContractorInviteById(id: string): Promise<ContractorInvite | undefined>;
+  getAllProjectInvites(): Promise<ProjectInvite[]>;
+  getProjectInviteById(id: string): Promise<ProjectInvite | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2380,13 +2382,22 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // Global contractor invite access
+  // Global invite access (admin)
   async getAllContractorInvites(): Promise<ContractorInvite[]> {
     return await db.select().from(schema.contractorInvites).orderBy(sql`${schema.contractorInvites.createdAt} DESC`);
   }
 
   async getContractorInviteById(id: string): Promise<ContractorInvite | undefined> {
     const [inv] = await db.select().from(schema.contractorInvites).where(eq(schema.contractorInvites.id, id));
+    return inv;
+  }
+
+  async getAllProjectInvites(): Promise<ProjectInvite[]> {
+    return await db.select().from(schema.projectInvites).orderBy(sql`${schema.projectInvites.createdAt} DESC`);
+  }
+
+  async getProjectInviteById(id: string): Promise<ProjectInvite | undefined> {
+    const [inv] = await db.select().from(schema.projectInvites).where(eq(schema.projectInvites.id, id));
     return inv;
   }
 }
