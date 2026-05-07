@@ -473,6 +473,36 @@ export async function registerRoutes(
   };
 
   // Admin contractor approval routes
+  // Admin: send a password reset email on behalf of any user
+  app.post("/api/admin/users/:id/send-password-reset", requireAdmin, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (!user.email) {
+        return res.status(400).json({ message: "User has no email address on file." });
+      }
+
+      // Invalidate any existing unused tokens for this user
+      await storage.invalidateUserPasswordResetTokens(user.id);
+
+      // Generate a secure random token
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await storage.createPasswordResetToken(user.id, tokenHash, expiresAt);
+
+      await sendPasswordResetEmail(user.email, { userName: user.name ?? undefined, resetToken: rawToken });
+
+      res.json({ message: `Password reset email sent to ${user.email}` });
+    } catch (err) {
+      console.error("[admin send-password-reset] Error:", err);
+      next(err);
+    }
+  });
+
   app.get("/api/admin/contractors/pending", requireAdmin, async (req, res, next) => {
     try {
       const contractors = await storage.getPendingContractors();
@@ -621,6 +651,8 @@ export async function registerRoutes(
           ...company,
           memberCount: members.length,
           ownerName: owner ? (owner.name || owner.username) : null,
+          ownerUserId: owner?.id ?? null,
+          ownerEmail: owner?.email ?? null,
         };
       }));
       res.json(enriched);

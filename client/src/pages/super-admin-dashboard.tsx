@@ -57,7 +57,8 @@ import {
   Trash2,
   Pencil,
   CreditCard,
-  CheckCircle
+  CheckCircle,
+  Mail
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
@@ -387,6 +388,17 @@ export default function SuperAdminDashboard() {
         description: parseErrorMessage(error) || "Could not reject request",
         variant: "destructive",
       });
+    },
+  });
+
+  const sendPasswordResetMutation = useMutation({
+    mutationFn: (userId: string) =>
+      apiRequest("POST", `/api/admin/users/${userId}/send-password-reset`).then(r => r.json()),
+    onSuccess: (data) => {
+      toast({ title: "Password Reset Sent", description: data.message });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to Send Reset", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -856,15 +868,30 @@ export default function SuperAdminDashboard() {
                             {trialEnd ? trialEnd.toLocaleDateString() : "—"}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openCompanySubEdit(company)}
-                              data-testid={`button-edit-sub-${company.id}`}
-                            >
-                              <Pencil className="w-3.5 h-3.5 mr-1" />
-                              Edit Plan
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              {company.ownerUserId && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => sendPasswordResetMutation.mutate(company.ownerUserId)}
+                                  disabled={sendPasswordResetMutation.isPending || !company.ownerEmail}
+                                  data-testid={`button-send-reset-${company.id}`}
+                                  title={company.ownerEmail ? `Send password reset to ${company.ownerEmail}` : "Owner has no email address on file"}
+                                >
+                                  <Mail className="w-3.5 h-3.5 mr-1" />
+                                  Send Reset
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openCompanySubEdit(company)}
+                                data-testid={`button-edit-sub-${company.id}`}
+                              >
+                                <Pencil className="w-3.5 h-3.5 mr-1" />
+                                Edit Plan
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -874,6 +901,58 @@ export default function SuperAdminDashboard() {
               </CardContent>
             </Card>
           )}
+        </div>
+
+        {/* User Accounts Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <Users className="w-5 h-5 text-violet-600" /> User Accounts
+            </h2>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...contractors.filter((u: any) => !u.isSandbox), ...clients.filter((u: any) => !u.isSandbox)].map((u: any) => (
+                    <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+                      <TableCell className="font-medium">{u.name || u.username || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{u.email || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">{u.role?.replace("_", " ") || "—"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => sendPasswordResetMutation.mutate(u.id)}
+                          disabled={sendPasswordResetMutation.isPending || !u.email}
+                          data-testid={`button-send-reset-user-${u.id}`}
+                          title={u.email ? `Send password reset to ${u.email}` : "No email address on file"}
+                        >
+                          <Mail className="w-3.5 h-3.5 mr-1" />
+                          Send Reset
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {[...contractors, ...clients].filter((u: any) => !u.isSandbox).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No users found.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Subscription Tiers Section */}
