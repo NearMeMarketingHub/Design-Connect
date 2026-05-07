@@ -173,12 +173,12 @@ export default function SuperAdminDashboard() {
   const [companySearch, setCompanySearch] = useState("");
   const [companyStatusFilter, setCompanyStatusFilter] = useState("all");
   const [companiesPage, setCompaniesPage] = useState(1);
+  const [companiesPageSize, setCompaniesPageSize] = useState(25);
 
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [usersPage, setUsersPage] = useState(1);
-
-  const PAGE_SIZE = 25;
+  const [usersPageSize, setUsersPageSize] = useState(25);
 
   const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
   const [editingRoleDef, setEditingRoleDef] = useState<RoleDef | null>(null);
@@ -352,14 +352,14 @@ export default function SuperAdminDashboard() {
   );
 
   // ── Pagination slices ────────────────────────────────────────────────────
-  const companiesTotalPages = Math.max(1, Math.ceil(companies.length / PAGE_SIZE));
-  const companiesStart = (companiesPage - 1) * PAGE_SIZE;
-  const companiesEnd = Math.min(companiesStart + PAGE_SIZE, companies.length);
+  const companiesTotalPages = Math.max(1, Math.ceil(companies.length / companiesPageSize));
+  const companiesStart = (companiesPage - 1) * companiesPageSize;
+  const companiesEnd = Math.min(companiesStart + companiesPageSize, companies.length);
   const pagedCompanies = companies.slice(companiesStart, companiesEnd);
 
-  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-  const usersStart = (usersPage - 1) * PAGE_SIZE;
-  const usersEnd = Math.min(usersStart + PAGE_SIZE, filteredUsers.length);
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / usersPageSize));
+  const usersStart = (usersPage - 1) * usersPageSize;
+  const usersEnd = Math.min(usersStart + usersPageSize, filteredUsers.length);
   const pagedUsers = filteredUsers.slice(usersStart, usersEnd);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -912,11 +912,33 @@ export default function SuperAdminDashboard() {
                     })}
                   </TableBody>
                 </Table>
-                {companies.length > PAGE_SIZE && (
+                {companies.length > 0 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
-                    <span data-testid="companies-pagination-info">
-                      Showing {companiesStart + 1}–{companiesEnd} of {companies.length}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span data-testid="companies-pagination-info">
+                        Showing {companiesStart + 1}–{companiesEnd} of {companies.length}
+                      </span>
+                      <span className="text-xs">·</span>
+                      <label className="text-xs flex items-center gap-1.5">
+                        Rows per page
+                        <Select
+                          value={String(companiesPageSize)}
+                          onValueChange={(val) => {
+                            setCompaniesPageSize(Number(val));
+                            setCompaniesPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-[70px] text-xs" data-testid="select-companies-page-size">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[10, 25, 50, 100].map(n => (
+                              <SelectItem key={n} value={String(n)} className="text-xs">{n}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    </div>
                     <div className="flex items-center gap-1">
                       <Button
                         size="sm"
@@ -1244,11 +1266,33 @@ export default function SuperAdminDashboard() {
                   )}
                 </TableBody>
               </Table>
-              {filteredUsers.length > PAGE_SIZE && (
+              {filteredUsers.length > 0 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
-                  <span data-testid="users-pagination-info">
-                    Showing {usersStart + 1}–{usersEnd} of {filteredUsers.length}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span data-testid="users-pagination-info">
+                      Showing {usersStart + 1}–{usersEnd} of {filteredUsers.length}
+                    </span>
+                    <span className="text-xs">·</span>
+                    <label className="text-xs flex items-center gap-1.5">
+                      Rows per page
+                      <Select
+                        value={String(usersPageSize)}
+                        onValueChange={(val) => {
+                          setUsersPageSize(Number(val));
+                          setUsersPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-[70px] text-xs" data-testid="select-users-page-size">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[10, 25, 50, 100].map(n => (
+                            <SelectItem key={n} value={String(n)} className="text-xs">{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                  </div>
                   <div className="flex items-center gap-1">
                     <Button
                       size="sm"
