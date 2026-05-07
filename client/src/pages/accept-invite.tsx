@@ -179,35 +179,37 @@ export default function AcceptInvite() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Mode switcher */}
-          <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1 bg-muted/30">
-            <button
-              type="button"
-              onClick={() => setMode("new-user")}
-              className={`flex items-center justify-center gap-2 rounded-md py-2 px-3 text-sm font-medium transition-colors ${
-                mode === "new-user"
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid="button-mode-new-user"
-            >
-              <UserPlus className="w-4 h-4" />
-              Create Account
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("existing-user")}
-              className={`flex items-center justify-center gap-2 rounded-md py-2 px-3 text-sm font-medium transition-colors ${
-                mode === "existing-user"
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid="button-mode-existing-user"
-            >
-              <LogIn className="w-4 h-4" />
-              Already Have an Account
-            </button>
-          </div>
+          {/* Mode switcher — hidden when invite is for an existing user (only login path available) */}
+          {!inviteData?.existingUser && (
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1 bg-muted/30">
+              <button
+                type="button"
+                onClick={() => setMode("new-user")}
+                className={`flex items-center justify-center gap-2 rounded-md py-2 px-3 text-sm font-medium transition-colors ${
+                  mode === "new-user"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid="button-mode-new-user"
+              >
+                <UserPlus className="w-4 h-4" />
+                Create Account
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("existing-user")}
+                className={`flex items-center justify-center gap-2 rounded-md py-2 px-3 text-sm font-medium transition-colors ${
+                  mode === "existing-user"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid="button-mode-existing-user"
+              >
+                <LogIn className="w-4 h-4" />
+                Already Have an Account
+              </button>
+            </div>
+          )}
 
           {/* New user form */}
           {mode === "new-user" && (

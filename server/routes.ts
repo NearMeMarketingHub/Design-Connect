@@ -3706,9 +3706,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This invitation has already been used" });
       }
 
+      // Block duplicate accounts — if email already has an account, use the login path
+      const existingByEmail = await storage.getUserByEmail(invite.email);
+      if (existingByEmail) {
+        return res.status(409).json({ message: "An account already exists for this email. Please use 'Already Have an Account' to sign in and accept the invitation." });
+      }
+
       // Check if username exists
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
+      const existingByUsername = await storage.getUserByUsername(username);
+      if (existingByUsername) {
         return res.status(400).json({ message: "Username already taken" });
       }
 

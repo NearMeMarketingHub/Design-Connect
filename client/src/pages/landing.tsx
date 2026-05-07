@@ -31,9 +31,6 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-4">
               <ThemeToggle />
-              <Link href="/auth">
-                <Button variant="ghost" data-testid="link-login">Log In</Button>
-              </Link>
               <Link href="/demo">
                 <Button data-testid="link-request-demo">Request a Demo</Button>
               </Link>
