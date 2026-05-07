@@ -3664,11 +3664,16 @@ export async function registerRoutes(
         return res.status(403).json({ message: "This invitation was sent to a different email address. Please log in with the account registered to " + invite.email });
       }
 
+      // These project invites are for client accounts only
+      if (existingUser.role !== "client") {
+        return res.status(403).json({ message: "This project invitation is for client accounts. Contractors and team members are invited through a separate link." });
+      }
+
       // Mark invite accepted
       await storage.acceptProjectInvite(req.params.token, existingUser.id);
 
-      // Assign user to project if they are a client
-      if (invite.projectId && existingUser.role === "client") {
+      // Attach user to project as client
+      if (invite.projectId) {
         await storage.updateProject(invite.projectId, { clientId: existingUser.id });
       }
 

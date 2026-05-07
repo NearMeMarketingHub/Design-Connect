@@ -27,6 +27,7 @@ export default function AcceptInvite() {
   });
 
   const [loginForm, setLoginForm] = useState({
+    email: "",
     password: "",
   });
 
@@ -46,6 +47,9 @@ export default function AcceptInvite() {
   useEffect(() => {
     if (inviteData?.clientName) {
       setNewUserForm(prev => ({ ...prev, name: inviteData.clientName }));
+    }
+    if (inviteData?.email) {
+      setLoginForm(prev => ({ ...prev, email: inviteData.email }));
     }
     if (inviteData?.existingUser) {
       setMode("existing-user");
@@ -77,23 +81,18 @@ export default function AcceptInvite() {
   const loginMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/invites/${token}/login`, {
-        email: inviteData?.email,
+        email: loginForm.email,
         password: loginForm.password,
       });
       return res.json();
     },
-    onSuccess: async (data) => {
+    onSuccess: async () => {
       toast({
         title: "Invitation accepted!",
         description: "You've been added to the project.",
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      const role = data.user?.role;
-      if (role === "contractor" || role === "company_owner") {
-        setLocation("/contractor/dashboard");
-      } else {
-        setLocation("/client/dashboard");
-      }
+      setLocation("/client/dashboard");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: parseErrorMessage(error), variant: "destructive" });
@@ -314,13 +313,14 @@ export default function AcceptInvite() {
                   <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="login-email"
-                    value={inviteData?.email || ""}
-                    disabled
-                    className="pl-10 bg-muted"
+                    type="email"
+                    className="pl-10"
+                    value={loginForm.email}
+                    onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
                     data-testid="input-login-email"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">Log in with the account registered to this email</p>
+                <p className="text-xs text-muted-foreground">Log in with the account registered to this invitation</p>
               </div>
 
               <div className="space-y-2">
