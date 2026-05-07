@@ -145,10 +145,9 @@ function Router() {
   }
 
   // Subcontractor Portal Routes (with Layout)
-  // The Sub/Notary hub is used by both subcontractors and notaries (see replit.md architecture)
+  // Strictly restricted to users with role=contractor and contractorType=subcontractor
   if (location.startsWith("/subcontractor")) {
-    const isSubOrNotary = user?.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary");
-    if (!authLoading && !isSubOrNotary) {
+    if (!authLoading && !(user?.role === "contractor" && user.contractorType === "subcontractor")) {
       setLocation("/auth");
       return null;
     }

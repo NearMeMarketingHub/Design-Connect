@@ -3650,16 +3650,17 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Only platform admins, the project's assigned contractor, or company members of the same company may send invites
+      // Only platform admins or company members of the project's company may send invites.
+      // The project's company is derived from the assigned contractor's companyId (projects have no
+      // direct companyId column in the current schema — this is the canonical company link).
       const isAdmin = user.role === "admin";
-      const isProjectContractor = user.id === project.contractorId;
       let projectCompanyId: string | null = null;
-      if (project.contractorId && !isAdmin && !isProjectContractor) {
+      if (!isAdmin && project.contractorId) {
         const projectContractor = await storage.getUser(project.contractorId);
         projectCompanyId = projectContractor?.companyId ?? null;
       }
-      const isSameCompany = projectCompanyId && user.companyId && user.companyId === projectCompanyId;
-      const isAuthorized = isAdmin || isProjectContractor || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
+      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
       if (!isAuthorized) {
         return res.status(403).json({ message: "You are not authorized to send invitations for this project." });
       }
@@ -3715,20 +3716,21 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
 
-      // Only platform admins, the project's assigned contractor, or company members of the same company may view invites
+      // Only platform admins or company members of the project's company may view invites.
+      // The project's company is derived from the assigned contractor's companyId (projects have no
+      // direct companyId column in the current schema — this is the canonical company link).
       const project = await storage.getProject(req.params.projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
       const isAdmin = user.role === "admin";
-      const isProjectContractor = user.id === project.contractorId;
       let projectCompanyId: string | null = null;
-      if (project.contractorId && !isAdmin && !isProjectContractor) {
+      if (!isAdmin && project.contractorId) {
         const projectContractor = await storage.getUser(project.contractorId);
         projectCompanyId = projectContractor?.companyId ?? null;
       }
-      const isSameCompany = projectCompanyId && user.companyId && user.companyId === projectCompanyId;
-      const isAuthorized = isAdmin || isProjectContractor || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
+      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
       if (!isAuthorized) {
         return res.status(403).json({ message: "You are not authorized to view invitations for this project." });
       }
