@@ -80,7 +80,8 @@ export interface IStorage {
   getPasswordResetToken(tokenHash: string): Promise<schema.PasswordResetToken | undefined>;
   consumePasswordResetToken(tokenHash: string): Promise<schema.PasswordResetToken | undefined>;
   invalidateUserPasswordResetTokens(userId: string): Promise<void>;
-  
+  deleteExpiredPasswordResetTokens(): Promise<number>;
+
   // Project methods
   getProjects(): Promise<Project[]>;
   getProjectsByClientId(clientId: string): Promise<Project[]>;
@@ -423,6 +424,15 @@ export class DatabaseStorage implements IStorage {
     await db.update(schema.passwordResetTokens)
       .set({ usedAt: new Date() })
       .where(and(eq(schema.passwordResetTokens.userId, userId), isNull(schema.passwordResetTokens.usedAt)));
+  }
+
+  async deleteExpiredPasswordResetTokens(): Promise<number> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const deleted = await db
+      .delete(schema.passwordResetTokens)
+      .where(sql`${schema.passwordResetTokens.expiresAt} < ${cutoff}`)
+      .returning({ id: schema.passwordResetTokens.id });
+    return deleted.length;
   }
 
   // Project methods

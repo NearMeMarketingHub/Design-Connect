@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { storage } from "./storage";
 
 // Global handlers to prevent server crashes from unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
@@ -79,8 +80,23 @@ app.use((req, res, next) => {
   next();
 });
 
+async function runPasswordResetTokenCleanup() {
+  try {
+    const count = await storage.deleteExpiredPasswordResetTokens();
+    if (count > 0) {
+      log(`Cleaned up ${count} expired password reset token(s)`, "cleanup");
+    }
+  } catch (err) {
+    console.error("Failed to clean up expired password reset tokens:", err);
+  }
+}
+
 (async () => {
   await registerRoutes(httpServer, app);
+
+  // Run once at startup, then every hour
+  await runPasswordResetTokenCleanup();
+  setInterval(runPasswordResetTokenCleanup, 60 * 60 * 1000);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error("Express error:", err);
