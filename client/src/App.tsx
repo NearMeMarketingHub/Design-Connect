@@ -50,7 +50,7 @@ import { useRealtimeUpdates } from "@/lib/useRealtimeUpdates";
 
 function Router() {
   const [location, setLocation] = useLocation();
-  const { user, authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Landing Page (home)
   if (location === "/") {

@@ -3650,10 +3650,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Only platform admins, company owners/admins, and internal contractors for this company may send invites
+      // Only platform admins, the project's assigned contractor, or company members of the same company may send invites
       const isAdmin = user.role === "admin";
-      const isCompanyMember = user.companyId && project.companyId && user.companyId === project.companyId;
-      const isAuthorized = isAdmin || (isCompanyMember && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      const isProjectContractor = user.id === project.contractorId;
+      let projectCompanyId: string | null = null;
+      if (project.contractorId && !isAdmin && !isProjectContractor) {
+        const projectContractor = await storage.getUser(project.contractorId);
+        projectCompanyId = projectContractor?.companyId ?? null;
+      }
+      const isSameCompany = projectCompanyId && user.companyId && user.companyId === projectCompanyId;
+      const isAuthorized = isAdmin || isProjectContractor || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
       if (!isAuthorized) {
         return res.status(403).json({ message: "You are not authorized to send invitations for this project." });
       }
@@ -3709,14 +3715,20 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
 
-      // Only platform admins, company owners/admins, and internal contractors for this company may view invites
+      // Only platform admins, the project's assigned contractor, or company members of the same company may view invites
       const project = await storage.getProject(req.params.projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
       const isAdmin = user.role === "admin";
-      const isCompanyMember = user.companyId && project.companyId && user.companyId === project.companyId;
-      const isAuthorized = isAdmin || (isCompanyMember && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      const isProjectContractor = user.id === project.contractorId;
+      let projectCompanyId: string | null = null;
+      if (project.contractorId && !isAdmin && !isProjectContractor) {
+        const projectContractor = await storage.getUser(project.contractorId);
+        projectCompanyId = projectContractor?.companyId ?? null;
+      }
+      const isSameCompany = projectCompanyId && user.companyId && user.companyId === projectCompanyId;
+      const isAuthorized = isAdmin || isProjectContractor || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
       if (!isAuthorized) {
         return res.status(403).json({ message: "You are not authorized to view invitations for this project." });
       }
