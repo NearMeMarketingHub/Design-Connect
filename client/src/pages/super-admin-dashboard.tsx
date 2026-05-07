@@ -108,7 +108,6 @@ interface AdminInvite {
   projectName?: string | null;
   companyName?: string | null;
   sentAt: string;
-  acceptedAt?: string | null;
   expiresAt?: string | null;
 }
 
@@ -930,7 +929,6 @@ export default function SuperAdminDashboard() {
                       <TableHead>Project</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Sent At</TableHead>
-                      <TableHead>Accepted At</TableHead>
                       <TableHead>Expires</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -953,9 +951,6 @@ export default function SuperAdminDashboard() {
                         <TableCell><InviteStatusBadge status={inv.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {new Date(inv.sentAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {inv.acceptedAt ? new Date(inv.acceptedAt).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : "—"}
@@ -1029,7 +1024,7 @@ export default function SuperAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allUsers.map((u: any) => (
+                  {allUsers.map((u) => (
                     <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
                       <TableCell className="font-medium">{u.name || u.username || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email || "—"}</TableCell>
@@ -1108,7 +1103,7 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProjects.map((project: any) => (
+                    {filteredProjects.map((project) => (
                       <TableRow key={project.id}>
                         <TableCell className="font-medium">{project.name}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{project.companyName || "—"}</TableCell>
@@ -1685,7 +1680,7 @@ export default function SuperAdminDashboard() {
             <Select value={selectedContractorId} onValueChange={setSelectedContractorId}>
               <SelectTrigger><SelectValue placeholder="Select a contractor" /></SelectTrigger>
               <SelectContent>
-                {contractors.map((contractor: any) => (
+                {contractors.map((contractor) => (
                   <SelectItem key={contractor.id} value={contractor.id}>
                     {contractor.name || contractor.username} - {contractor.email}
                   </SelectItem>

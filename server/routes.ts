@@ -735,7 +735,7 @@ export async function registerRoutes(
   });
 
   // ── Admin: Update company subscription ───────────────────────────────────────
-  const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled"] as const;
+  const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled", "suspended"] as const;
 
   const adminCompanySubscriptionSchema = z.object({
     // Plan name is open-ended — matches any admin-defined tier or legacy "free"
@@ -751,13 +751,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid subscription data", errors: parsed.error.flatten().fieldErrors });
       }
       const { subscriptionPlan, subscriptionStatus, trialStartedAt } = parsed.data;
-      const updateData: any = {};
+      const updateData: Record<string, string | Date | null> = {};
       if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
       if (trialStartedAt !== undefined) {
         updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
       } else if (subscriptionStatus === "trialing") {
-        // Auto-reset trial start to now so the 7-day window starts fresh
         updateData.trialStartedAt = new Date();
       }
       const company = await storage.updateCompany(req.params.id, updateData);
@@ -834,7 +833,6 @@ export async function registerRoutes(
           projectName: project?.name ?? null,
           companyName: companyFromUser?.name ?? null,
           sentAt: inv.createdAt,
-          acceptedAt: null as string | null,
           expiresAt: inv.expiresAt,
         };
       });
@@ -851,7 +849,6 @@ export async function registerRoutes(
           projectName: project?.name ?? null,
           companyName: company?.name ?? (inv.companyName ?? null),
           sentAt: inv.createdAt,
-          acceptedAt: null, // contractorInvites schema has no acceptedAt timestamp column
           expiresAt: inv.expiresAt,
         };
       });
