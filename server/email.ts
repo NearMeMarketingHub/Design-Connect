@@ -57,6 +57,7 @@ export async function sendProjectInviteEmail(
     contractorName: string;
     inviteToken: string;
     clientName?: string;
+    isExistingUser?: boolean;
   }
 ) {
   const { client, fromEmail } = await getResendClient();
@@ -67,11 +68,16 @@ export async function sendProjectInviteEmail(
       ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
       : 'http://localhost:5000';
   
-  const inviteUrl = `${baseUrl}/accept-invite/${inviteData.inviteToken}`;
+  const inviteUrl = `${baseUrl}/invite/${inviteData.inviteToken}`;
   
   const greeting = inviteData.clientName 
     ? `Hello ${inviteData.clientName},` 
     : 'Hello,';
+
+  const ctaText = inviteData.isExistingUser ? 'Log In & Accept Invitation' : 'Accept Invitation & Create Account';
+  const bodyText = inviteData.isExistingUser
+    ? 'Click below to log in with your existing BuildVision account and accept this invitation.'
+    : 'Click below to create your account and access your project dashboard.';
 
   const { data, error } = await client.emails.send({
     from: fromEmail || 'BuildVision <onboarding@resend.dev>',
@@ -97,11 +103,11 @@ export async function sendProjectInviteEmail(
           
           <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h2 style="margin: 0 0 10px; color: #1a1a2e; font-size: 20px;">${inviteData.projectName}</h2>
-            <p style="margin: 0; color: #64748b;">Click below to create your account and access your project dashboard.</p>
+            <p style="margin: 0; color: #64748b;">${bodyText}</p>
           </div>
           
           <a href="${inviteUrl}" style="display: inline-block; background: #3b82f6; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 10px 0;">
-            Accept Invitation
+            ${ctaText}
           </a>
           
           <p style="color: #64748b; font-size: 14px; margin-top: 30px;">

@@ -74,8 +74,8 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="mt-6 text-sm text-muted-foreground">
-              Company accounts are set up through our onboarding process. 
-              Subcontractors and notaries can create an account or accept an invite from their company.
+              Company accounts are set up through our onboarding process.
+              Clients and team members access the platform by invitation only.
             </p>
           </div>
         </section>
@@ -306,7 +306,7 @@ export default function LandingPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <span className="text-muted-foreground text-sm">Create a free account or accept an invite from your company</span>
+                    <span className="text-muted-foreground text-sm">Access the platform by invitation from your company</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
@@ -322,9 +322,9 @@ export default function LandingPage() {
                   </li>
                 </ul>
                 <div className="mt-4">
-                  <Link href="/auth?mode=register&tab=contractor">
-                    <Button size="sm" variant="outline" className="w-full border-orange-300 text-orange-700 hover:bg-orange-50" data-testid="button-sub-signup">
-                      Create Subcontractor Account
+                  <Link href="/auth?tab=contractor">
+                    <Button size="sm" variant="outline" className="w-full border-orange-300 text-orange-700 hover:bg-orange-50" data-testid="button-sub-login">
+                      Sub/Notary Login
                     </Button>
                   </Link>
                 </div>
@@ -365,7 +365,7 @@ export default function LandingPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-muted-foreground text-sm">Create a free account or accept an invite from a company</span>
+                    <span className="text-muted-foreground text-sm">Access the platform by invitation from a company</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-purple-500 flex-shrink-0 mt-0.5" />
@@ -380,13 +380,6 @@ export default function LandingPage() {
                     <span className="text-muted-foreground text-sm">Streamlined workflow for Florida construction projects</span>
                   </li>
                 </ul>
-                <div className="mt-4">
-                  <Link href="/auth?mode=register&tab=contractor">
-                    <Button size="sm" variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-50" data-testid="button-notary-signup">
-                      Create Notary Account
-                    </Button>
-                  </Link>
-                </div>
               </div>
             </div>
           </div>
