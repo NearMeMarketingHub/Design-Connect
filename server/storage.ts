@@ -1432,7 +1432,7 @@ export class DatabaseStorage implements IStorage {
 
   async acceptProjectInvite(token: string, userId: string): Promise<ProjectInvite | undefined> {
     const [invite] = await db.update(schema.projectInvites)
-      .set({ status: "accepted", invitedUserId: userId })
+      .set({ status: "accepted", invitedUserId: userId, acceptedAt: new Date() })
       .where(eq(schema.projectInvites.token, token))
       .returning();
     return invite;
@@ -1683,7 +1683,7 @@ export class DatabaseStorage implements IStorage {
     
     // Mark invite as accepted
     const [updated] = await db.update(schema.contractorInvites)
-      .set({ status: 'accepted', acceptedUserId: userId })
+      .set({ status: 'accepted', acceptedUserId: userId, acceptedAt: new Date() })
       .where(eq(schema.contractorInvites.id, invite.id))
       .returning();
     

@@ -833,6 +833,7 @@ export async function registerRoutes(
           projectName: project?.name ?? null,
           companyName: companyFromUser?.name ?? null,
           sentAt: inv.createdAt,
+          acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
           expiresAt: inv.expiresAt,
         };
       });
@@ -849,6 +850,7 @@ export async function registerRoutes(
           projectName: project?.name ?? null,
           companyName: company?.name ?? (inv.companyName ?? null),
           sentAt: inv.createdAt,
+          acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
           expiresAt: inv.expiresAt,
         };
       });

@@ -108,6 +108,7 @@ interface AdminInvite {
   projectName?: string | null;
   companyName?: string | null;
   sentAt: string;
+  acceptedAt?: string | null;
   expiresAt?: string | null;
 }
 
@@ -745,7 +746,7 @@ export default function SuperAdminDashboard() {
                           <TableCell className="text-center text-sm">{company.projectCount ?? 0}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1.5 flex-wrap">
-                              <Link href={`/admin/contractors`}>
+                              <Link href={`/admin/contractors?companyId=${company.id}`}>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -929,6 +930,7 @@ export default function SuperAdminDashboard() {
                       <TableHead>Project</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Sent At</TableHead>
+                      <TableHead>Accepted At</TableHead>
                       <TableHead>Expires</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -942,21 +944,32 @@ export default function SuperAdminDashboard() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{inv.companyName || "—"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {inv.projectId ? (
-                            <Link href={`/projects/${inv.projectId}`} className="text-blue-600 hover:underline text-sm">
-                              {inv.projectName || inv.projectId}
-                            </Link>
-                          ) : (inv.projectName || "—")}
+                          {inv.projectName || "—"}
                         </TableCell>
                         <TableCell><InviteStatusBadge status={inv.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {new Date(inv.sentAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {inv.acceptedAt ? new Date(inv.acceptedAt).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
+                            {inv.projectId && (
+                              <Link href={`/projects/${inv.projectId}`}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="View related project"
+                                  data-testid={`button-view-project-${inv.id}`}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
+                              </Link>
+                            )}
                             {inv.status === "pending" && (
                               <>
                                 <Button

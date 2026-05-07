@@ -399,9 +399,10 @@ export const projectInvites = pgTable("project_invites", {
   email: text("email").notNull(),
   token: text("token").notNull().unique(),
   clientName: text("client_name"),
-  status: text("status").notNull().default("pending"), // pending, accepted, expired
+  status: text("status").notNull().default("pending"), // pending, accepted, expired, revoked
   invitedBy: varchar("invited_by").references(() => users.id),
   invitedUserId: varchar("invited_user_id").references(() => users.id),
+  acceptedAt: timestamp("accepted_at"),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -486,9 +487,10 @@ export const contractorInvites = pgTable("contractor_invites", {
   contractorType: text("contractor_type"), // 'contractor' | 'notary' | 'subcontractor'
   subcontractorSpecialty: text("subcontractor_specialty"), // For subcontractor invites
   token: text("token").notNull().unique(),
-  status: text("status").notNull().default("pending"), // pending, accepted, expired
+  status: text("status").notNull().default("pending"), // pending, accepted, expired, revoked
   invitedBy: varchar("invited_by").references(() => users.id),
   acceptedUserId: varchar("accepted_user_id").references(() => users.id), // Set when invite is accepted
+  acceptedAt: timestamp("accepted_at"),
   expiresAt: timestamp("expires_at").notNull(),
   permissions: jsonb("permissions"), // Per-project permissions to apply when invite is accepted
   createdAt: timestamp("created_at").notNull().defaultNow(),
