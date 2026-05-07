@@ -221,7 +221,7 @@ class ApiClient {
 
   // Admin methods
   async getAdminProjects() {
-    return this.fetch<(Project & { clientName?: string; contractorName?: string })[]>("/admin/projects");
+    return this.fetch<(Project & { clientName?: string; contractorName?: string; companyName?: string })[]>("/admin/projects");
   }
 
   async getContractors() {

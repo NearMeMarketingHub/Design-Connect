@@ -197,7 +197,7 @@ export interface IStorage {
 
   // Admin methods
   getUsersByRole(role: string): Promise<User[]>;
-  getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string })[]>;
+  getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string; companyName?: string })[]>;
   getPendingContractors(): Promise<User[]>;
   approveContractor(id: string): Promise<User | undefined>;
   rejectContractor(id: string): Promise<void>;
@@ -1102,24 +1102,29 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.users).where(eq(schema.users.role, role));
   }
 
-  async getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string })[]> {
+  async getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string; companyName?: string })[]> {
     const projects = await db.select().from(schema.projects);
     const projectsWithDetails = await Promise.all(
       projects.map(async (project) => {
         let clientName: string | undefined;
         let contractorName: string | undefined;
-        
+        let companyName: string | undefined;
+
         if (project.clientId) {
           const client = await this.getUser(project.clientId);
           clientName = client?.name || client?.username;
         }
-        
+
         if (project.contractorId) {
           const contractor = await this.getUser(project.contractorId);
           contractorName = contractor?.name || contractor?.username;
+          if (contractor?.companyId) {
+            const company = await this.getCompany(contractor.companyId);
+            companyName = company?.name;
+          }
         }
-        
-        return { ...project, clientName, contractorName };
+
+        return { ...project, clientName, contractorName, companyName };
       })
     );
     return projectsWithDetails;

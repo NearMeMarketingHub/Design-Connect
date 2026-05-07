@@ -15,7 +15,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pkg from "pg";
 const { Pool } = pkg;
-import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions } from "@shared/schema";
+import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions, ContractorInvite, ProjectInvite } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
@@ -769,7 +769,7 @@ export async function registerRoutes(
   // ── Admin: Suspend / Reactivate company ──────────────────────────────────────
   app.patch("/api/admin/companies/:id/suspend", requireAdmin, async (req, res, next) => {
     try {
-      const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "suspended" } as any);
+      const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "suspended" });
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
     } catch (error) { next(error); }
@@ -777,7 +777,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/companies/:id/reactivate", requireAdmin, async (req, res, next) => {
     try {
-      const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "active" } as any);
+      const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "active" });
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
     } catch (error) { next(error); }
@@ -820,7 +820,6 @@ export async function registerRoutes(
 
       const projectInvites = allProjectInvites.map(inv => {
         const project = inv.projectId ? projectMap.get(inv.projectId) : null;
-        const companyId = project ? (project as any).companyId : null;
         return {
           id: inv.id,
           inviteType: "client",
@@ -828,9 +827,9 @@ export async function registerRoutes(
           status: inv.status,
           projectId: inv.projectId,
           projectName: project?.name ?? null,
-          companyName: companyId ? (companyMap.get(companyId)?.name ?? null) : null,
+          companyName: null as string | null,
           sentAt: inv.createdAt,
-          acceptedAt: null, // projectInvites schema has no acceptedAt column
+          acceptedAt: null as string | null,
           expiresAt: inv.expiresAt,
         };
       });
@@ -862,15 +861,13 @@ export async function registerRoutes(
   app.post("/api/admin/invites/:id/revoke", requireAdmin, async (req, res, next) => {
     try {
       const { type } = req.body as { type?: string };
-      let updated: any;
+      let updated: ContractorInvite | ProjectInvite | undefined;
       if (type === "contractor" || type === "subcontractor" || type === "notary") {
-        updated = await storage.updateContractorInvite(req.params.id, { status: "expired" } as any);
+        updated = await storage.updateContractorInvite(req.params.id, { status: "revoked" });
       } else {
-        // Default: project invite (client invite)
-        updated = await storage.updateProjectInvite(req.params.id, { status: "revoked" } as any);
+        updated = await storage.updateProjectInvite(req.params.id, { status: "revoked" });
         if (!updated) {
-          // Fallback: try contractor invite table if not found as project invite
-          updated = await storage.updateContractorInvite(req.params.id, { status: "expired" } as any);
+          updated = await storage.updateContractorInvite(req.params.id, { status: "revoked" });
         }
       }
       if (!updated) return res.status(404).json({ message: "Invite not found" });
@@ -881,23 +878,58 @@ export async function registerRoutes(
   app.post("/api/admin/invites/:id/resend", requireAdmin, async (req, res, next) => {
     try {
       const { type } = req.body as { type?: string };
-      let invite: any;
       const isContractorType = type === "contractor" || type === "subcontractor" || type === "notary";
+
+      let invite: ContractorInvite | ProjectInvite | undefined;
+      let inviteKind: "project" | "contractor" = "project";
 
       if (isContractorType) {
         invite = await storage.getContractorInviteById(req.params.id);
+        inviteKind = "contractor";
       } else {
-        // Try project invite first (client invite type)
         invite = await storage.getProjectInviteById(req.params.id);
-        // Fallback to contractor invite if not found in project_invites
-        if (!invite) invite = await storage.getContractorInviteById(req.params.id);
+        if (!invite) {
+          invite = await storage.getContractorInviteById(req.params.id);
+          inviteKind = "contractor";
+        }
       }
 
       if (!invite) return res.status(404).json({ message: "Invite not found" });
       if (invite.status !== "pending") {
         return res.status(400).json({ message: `Cannot resend a ${invite.status} invite` });
       }
-      // Email resend is best-effort — production would call sendInviteEmail here
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS?.split(",")[0]
+          ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+          : "http://localhost:5000";
+
+      if (inviteKind === "project") {
+        const projectInvite = invite as ProjectInvite;
+        const project = projectInvite.projectId ? await storage.getProject(projectInvite.projectId) : null;
+        const { sendProjectInviteEmail } = await import("./email");
+        await sendProjectInviteEmail(projectInvite.email, {
+          projectName: project?.name ?? "Your Project",
+          contractorName: "BuildVision",
+          inviteToken: projectInvite.token,
+          clientName: projectInvite.clientName ?? undefined,
+          isExistingUser: !!projectInvite.invitedUserId,
+        });
+      } else {
+        const contractorInvite = invite as ContractorInvite;
+        const project = contractorInvite.projectId ? await storage.getProject(contractorInvite.projectId) : null;
+        const role: "subcontractor" | "notary" = contractorInvite.contractorType === "notary" ? "notary" : "subcontractor";
+        const { sendExternalInviteEmail } = await import("./email");
+        await sendExternalInviteEmail(contractorInvite.email, {
+          inviterName: "BuildVision Admin",
+          projectName: project?.name ?? "Your Project",
+          role,
+          loginUrl: `${baseUrl}/auth`,
+          isNewUser: !contractorInvite.acceptedUserId,
+        });
+      }
+
       res.json({ success: true, email: invite.email });
     } catch (error) { next(error); }
   });
@@ -921,7 +953,7 @@ export async function registerRoutes(
       });
       const parsed = settingsSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
-      const updated = await storage.updatePlatformSettings(parsed.data as any);
+      const updated = await storage.updatePlatformSettings(parsed.data);
       res.json(updated);
     } catch (error) { next(error); }
   });
