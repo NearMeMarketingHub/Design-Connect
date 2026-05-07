@@ -658,6 +658,8 @@ export async function registerRoutes(
   // Admin: list all companies with owner and member count
   app.get("/api/admin/companies", requireAdmin, async (req, res, next) => {
     try {
+      const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
+      const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
       const companies = await storage.getAllCompanies();
       const enriched = await Promise.all(companies.map(async (company) => {
         const [members, owner, projects] = await Promise.all([
@@ -675,7 +677,50 @@ export async function registerRoutes(
           ownerEmail: owner?.email ?? null,
         };
       }));
-      res.json(enriched);
+      let filtered = enriched;
+      if (search) {
+        filtered = filtered.filter(c =>
+          c.name.toLowerCase().includes(search) ||
+          (c.ownerEmail?.toLowerCase() || "").includes(search) ||
+          (c.ownerName?.toLowerCase() || "").includes(search)
+        );
+      }
+      if (status && status !== "all") {
+        filtered = filtered.filter(c => {
+          const trialStart = c.trialStartedAt ? new Date(c.trialStartedAt) : null;
+          const trialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+          const now = new Date();
+          const effectiveStatus =
+            c.subscriptionStatus === "suspended" ? "suspended" :
+            (c.subscriptionStatus === "trialing" && trialEnd && now > trialEnd) ? "expired" :
+            c.subscriptionStatus === "expired" ? "expired" :
+            c.subscriptionStatus || "trialing";
+          return effectiveStatus === status;
+        });
+      }
+      res.json(filtered);
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: List all users (with optional search/role filtering) ────────────
+  app.get("/api/admin/users", requireAdmin, async (req, res, next) => {
+    try {
+      const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
+      const role = typeof req.query.role === "string" ? req.query.role.trim() : "";
+      let users = await storage.getAllUsers();
+      users = users.filter(u => !u.isSandbox);
+      if (search) {
+        users = users.filter(u =>
+          (u.name?.toLowerCase() || "").includes(search) ||
+          (u.username?.toLowerCase() || "").includes(search) ||
+          (u.email?.toLowerCase() || "").includes(search) ||
+          (u.role?.toLowerCase() || "").includes(search)
+        );
+      }
+      if (role && role !== "all") {
+        users = users.filter(u => u.role === role);
+      }
+      res.json(users.map(u => ({ ...u, password: undefined })));
     } catch (error) { next(error); }
   });
 

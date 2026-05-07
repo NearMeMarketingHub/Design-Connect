@@ -168,6 +168,11 @@ export default function SuperAdminDashboard() {
   const [selectedContractorId, setSelectedContractorId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [companySearch, setCompanySearch] = useState("");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState("all");
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
+
   const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
   const [editingRoleDef, setEditingRoleDef] = useState<RoleDef | null>(null);
   const [roleDefForm, setRoleDefForm] = useState({ name: "", type: "contractor", permissions: {} as Record<string, boolean> });
@@ -258,9 +263,21 @@ export default function SuperAdminDashboard() {
     enabled: user?.role === "admin",
   });
 
-  const { data: companies = [] } = useQuery<AdminCompany[]>({
+  const { data: allCompaniesRaw = [] } = useQuery<AdminCompany[]>({
     queryKey: ["/api/admin/companies"],
     queryFn: () => apiRequest("GET", "/api/admin/companies").then(r => r.json()),
+    enabled: user?.role === "admin",
+  });
+
+  const { data: companies = [] } = useQuery<AdminCompany[]>({
+    queryKey: ["/api/admin/companies", companySearch, companyStatusFilter],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (companySearch) params.set("search", companySearch);
+      if (companyStatusFilter !== "all") params.set("status", companyStatusFilter);
+      const qs = params.toString();
+      return apiRequest("GET", `/api/admin/companies${qs ? `?${qs}` : ""}`).then(r => r.json());
+    },
     enabled: user?.role === "admin",
   });
 
@@ -294,10 +311,27 @@ export default function SuperAdminDashboard() {
     enabled: user?.role === "admin",
   });
 
+  const { data: allUsersRaw = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+    queryFn: () => apiRequest("GET", "/api/admin/users").then(r => r.json()),
+    enabled: user?.role === "admin",
+  });
+
+  const { data: filteredUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/users", userSearch, userRoleFilter],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (userSearch) params.set("search", userSearch);
+      if (userRoleFilter !== "all") params.set("role", userRoleFilter);
+      const qs = params.toString();
+      return apiRequest("GET", `/api/admin/users${qs ? `?${qs}` : ""}`).then(r => r.json());
+    },
+    enabled: user?.role === "admin",
+  });
+
   // ── Computed stats ────────────────────────────────────────────────────────
   const realProjects = projects.filter(p => !p.isSandbox);
-  const allUsers = [...contractors.filter(u => !u.isSandbox), ...clients.filter(u => !u.isSandbox)];
-  const activeCompanies = companies.filter(c => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing");
+  const activeCompanies = allCompaniesRaw.filter(c => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing");
   const newDemoRequests = demoRequests.filter(d => d.status === "new");
   const pendingInvitesCount = adminInvites.filter(i => i.status === "pending").length;
   const pendingTotal = pendingContractors.length + contractorRequests.length + pendingInvitesCount;
@@ -681,7 +715,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Users</p>
-                  <h3 className="text-2xl font-bold">{allUsers.length}</h3>
+                  <h3 className="text-2xl font-bold">{allUsersRaw.length}</h3>
                 </div>
               </div>
             </CardContent>
@@ -699,7 +733,35 @@ export default function SuperAdminDashboard() {
               <Plus className="w-4 h-4 mr-1" /> Create Company
             </Button>
           </div>
-          {companies.length === 0 ? (
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or owner email..."
+                className="pl-9"
+                value={companySearch}
+                onChange={(e) => setCompanySearch(e.target.value)}
+                data-testid="input-search-companies"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(["all", "active", "trialing", "suspended", "expired"] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setCompanyStatusFilter(status)}
+                  data-testid={`filter-company-${status}`}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors capitalize ${
+                    companyStatusFilter === status
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {allCompaniesRaw.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">No companies registered yet.</CardContent>
             </Card>
@@ -722,6 +784,11 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {companies.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-8">No companies match your search.</TableCell>
+                      </TableRow>
+                    )}
                     {companies.map((company) => {
                       const trialStart = company.trialStartedAt ? new Date(company.trialStartedAt) : null;
                       const trialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
@@ -1038,6 +1105,40 @@ export default function SuperAdminDashboard() {
               </Button>
             </Link>
           </div>
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email..."
+                className="pl-9"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                data-testid="input-search-users"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {([
+                { value: "all", label: "All" },
+                { value: "admin", label: "Admin" },
+                { value: "company_owner", label: "Company Owner" },
+                { value: "contractor", label: "Contractor" },
+                { value: "client", label: "Client" },
+              ]).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setUserRoleFilter(value)}
+                  data-testid={`filter-user-${value}`}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    userRoleFilter === value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -1051,7 +1152,7 @@ export default function SuperAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allUsers.map((u) => (
+                  {filteredUsers.map((u) => (
                     <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
                       <TableCell className="font-medium">{u.name || u.username || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email || "—"}</TableCell>
@@ -1080,9 +1181,11 @@ export default function SuperAdminDashboard() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {allUsers.length === 0 && (
+                  {filteredUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No users found.</TableCell>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        {allUsersRaw.length === 0 ? "No users found." : "No users match your search."}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
