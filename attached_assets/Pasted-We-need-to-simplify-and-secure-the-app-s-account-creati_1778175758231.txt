@@ -1,0 +1,64 @@
+We need to simplify and secure the app’s account creation and invite flow.
+
+The app should no longer allow any public-facing account creation.
+
+Remove public self-registration for:
+- Clients
+- Company owners
+- Notaries
+
+For subcontractors, do not delete the functionality or database structure. Hide/disable subcontractor-facing UI and public access for now because we may reuse that feature later.
+
+Company accounts and company owner accounts should only be created by Super Admins from the admin dashboard.
+
+Update /auth:
+- Keep only Client Login and Contractor Login.
+- Remove all “Create Account” / public signup links.
+- Remove Sub / Notary login and registration.
+- Remove public client registration.
+- Hide subcontractor registration/login flows from the public UI for now.
+- Add helper text:
+  “Need access? Clients and team members must be invited. Companies can request a demo to get started.”
+- Add a “Request Demo” link/button.
+
+Update landing page:
+- Keep Request Demo, Contractor Login, and Client Login.
+- Remove Subcontractor/Notary as a public login path.
+- Remove wording that tells subcontractors/notaries to self-register.
+- Do not delete subcontractor-related code yet; just hide it from the public flow.
+
+Create/clean up invite-only signup flow:
+- Project invite links should go to /invite/:token.
+- The invite page should load invite details by token and show:
+  - company name
+  - project name
+  - invited email
+  - options for “Create Account” and “I Already Have an Account”
+
+For new invited users:
+- The invite page should allow account creation only through a valid invite token.
+- Prefill and lock the invited email address.
+- After account creation, automatically attach the new user to the invited project.
+- Mark the invite as accepted/used.
+- Redirect to the correct dashboard, usually /client/dashboard for clients.
+
+For existing users:
+- Add an “I Already Have an Account” path on the invite page.
+- This should take the user to a specialized invite login flow tied to the invite token.
+- After successful login, check that the logged-in user’s email matches the invited email.
+- If the email matches, attach the invited project to the existing user account, mark the invite accepted, and redirect to the dashboard.
+- If the email does not match, do not attach the project. Show an error explaining that the invite was sent to a different email address.
+
+Update invite sending logic:
+- When sending a project invite, check whether the invited email already belongs to an existing user.
+- If the user exists, send an invite that asks them to log in and accept the project.
+- If the user does not exist, send an invite that lets them create an account through the invite link.
+- In both cases, avoid duplicate user accounts for the same email.
+
+Important:
+- Clients are global users, not owned by one company.
+- A client can be invited to projects from multiple companies.
+- Client project access should come from project assignments/invites, not company ownership.
+- Company owners and internal company users should log in through the Contractor login.
+- Super Admins remain separate at /admin-login.
+- Subcontractor functionality should be hidden/disabled for now, not permanently deleted.
