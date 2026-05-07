@@ -62,6 +62,8 @@ import {
   CalendarCheck,
   MessageSquare,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   AlertCircle,
   Wrench,
 } from "lucide-react";
@@ -170,8 +172,13 @@ export default function SuperAdminDashboard() {
 
   const [companySearch, setCompanySearch] = useState("");
   const [companyStatusFilter, setCompanyStatusFilter] = useState("all");
+  const [companiesPage, setCompaniesPage] = useState(1);
+
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [usersPage, setUsersPage] = useState(1);
+
+  const PAGE_SIZE = 25;
 
   const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
   const [editingRoleDef, setEditingRoleDef] = useState<RoleDef | null>(null);
@@ -225,6 +232,10 @@ export default function SuperAdminDashboard() {
       setLocation("/admin-login");
     }
   }, [user, authLoading, setLocation]);
+
+  // ── Reset pagination when filters change ──────────────────────────────────
+  useEffect(() => { setCompaniesPage(1); }, [companySearch, companyStatusFilter]);
+  useEffect(() => { setUsersPage(1); }, [userSearch, userRoleFilter]);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
@@ -339,6 +350,17 @@ export default function SuperAdminDashboard() {
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
   );
+
+  // ── Pagination slices ────────────────────────────────────────────────────
+  const companiesTotalPages = Math.max(1, Math.ceil(companies.length / PAGE_SIZE));
+  const companiesStart = (companiesPage - 1) * PAGE_SIZE;
+  const companiesEnd = Math.min(companiesStart + PAGE_SIZE, companies.length);
+  const pagedCompanies = companies.slice(companiesStart, companiesEnd);
+
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const usersStart = (usersPage - 1) * PAGE_SIZE;
+  const usersEnd = Math.min(usersStart + PAGE_SIZE, filteredUsers.length);
+  const pagedUsers = filteredUsers.slice(usersStart, usersEnd);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const deleteRoleDefMutation = useMutation({
@@ -784,12 +806,12 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {companies.length === 0 && (
+                    {pagedCompanies.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={10} className="text-center text-muted-foreground py-8">No companies match your search.</TableCell>
                       </TableRow>
                     )}
-                    {companies.map((company) => {
+                    {pagedCompanies.map((company) => {
                       const trialStart = company.trialStartedAt ? new Date(company.trialStartedAt) : null;
                       const trialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
                       const now = new Date();
@@ -890,6 +912,38 @@ export default function SuperAdminDashboard() {
                     })}
                   </TableBody>
                 </Table>
+                {companies.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                    <span data-testid="companies-pagination-info">
+                      Showing {companiesStart + 1}–{companiesEnd} of {companies.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCompaniesPage(p => Math.max(1, p - 1))}
+                        disabled={companiesPage === 1}
+                        data-testid="button-companies-prev"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                      </Button>
+                      <span className="px-3 text-xs font-medium">
+                        Page {companiesPage} of {companiesTotalPages}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCompaniesPage(p => Math.min(companiesTotalPages, p + 1))}
+                        disabled={companiesPage === companiesTotalPages}
+                        data-testid="button-companies-next"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -1152,7 +1206,7 @@ export default function SuperAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((u) => (
+                  {pagedUsers.map((u) => (
                     <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
                       <TableCell className="font-medium">{u.name || u.username || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email || "—"}</TableCell>
@@ -1190,6 +1244,38 @@ export default function SuperAdminDashboard() {
                   )}
                 </TableBody>
               </Table>
+              {filteredUsers.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                  <span data-testid="users-pagination-info">
+                    Showing {usersStart + 1}–{usersEnd} of {filteredUsers.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                      disabled={usersPage === 1}
+                      data-testid="button-users-prev"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Previous
+                    </Button>
+                    <span className="px-3 text-xs font-medium">
+                      Page {usersPage} of {usersTotalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setUsersPage(p => Math.min(usersTotalPages, p + 1))}
+                      disabled={usersPage === usersTotalPages}
+                      data-testid="button-users-next"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
