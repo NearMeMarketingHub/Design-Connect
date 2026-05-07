@@ -3610,6 +3610,14 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Expire any existing pending invites for this email on this project
+      const existingInvites = await storage.getProjectInvitesByProjectId(req.params.projectId);
+      for (const existing of existingInvites) {
+        if (existing.email.toLowerCase() === email.toLowerCase() && existing.status === "pending") {
+          await storage.updateProjectInvite(existing.id, { status: "expired" });
+        }
+      }
+
       // Generate unique token
       const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days

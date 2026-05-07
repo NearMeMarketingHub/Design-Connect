@@ -975,6 +975,54 @@ export default function ProjectDetails() {
   const messageAttachmentInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // Client invite state
+  const [clientInviteEmail, setClientInviteEmail] = useState("");
+  const [clientInviteName, setClientInviteName] = useState("");
+
+  // Fetch client invites for this project (contractors only)
+  const { data: projectInvites = [], refetch: refetchProjectInvites } = useQuery<Array<{
+    id: string;
+    email: string;
+    clientName: string | null;
+    status: string;
+    expiresAt: string;
+    createdAt: string;
+  }>>({
+    queryKey: ["/api/projects", projectId, "invites"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/invites`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId && isContractorView && !staticProject,
+  });
+
+  // Send / resend client invite mutation
+  const sendClientInviteMutation = useMutation({
+    mutationFn: async ({ email, clientName }: { email: string; clientName?: string }) => {
+      const res = await fetch(`/api/projects/${projectId}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, clientName }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(err?.message || "Failed to send invite");
+      }
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      refetchProjectInvites();
+      setClientInviteEmail("");
+      setClientInviteName("");
+      toast({ title: "Invitation sent", description: `Invite sent to ${vars.email}` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to send invite", description: err.message, variant: "destructive" });
+    },
+  });
+
   // Invite external sub/notary state
   const [inviteExternalOpen, setInviteExternalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -3121,7 +3169,7 @@ export default function ProjectDetails() {
               {/* Right Column - Team and Quick Links */}
               <div className="space-y-6">
                 {/* Client Info Card - Only visible to contractors */}
-                {isContractorView && apiProject?.client && (
+                {isContractorView && !staticProject && (
                   <Card data-testid="card-client-info">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -3130,38 +3178,117 @@ export default function ProjectDetails() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={apiProject.client.profilePicture || undefined} />
-                          <AvatarFallback>{getInitials(apiProject.client.name || apiProject.client.username)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium" data-testid="text-client-name">{apiProject.client.name || apiProject.client.username}</p>
-                          <p className="text-sm text-muted-foreground">Project Client</p>
+                      {apiProject?.client ? (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={apiProject.client.profilePicture || undefined} />
+                              <AvatarFallback>{getInitials(apiProject.client.name || apiProject.client.username)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium" data-testid="text-client-name">{apiProject.client.name || apiProject.client.username}</p>
+                              <p className="text-sm text-muted-foreground">Project Client</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2 pt-2 border-t">
+                            {apiProject.client.email && (
+                              <a 
+                                href={`mailto:${apiProject.client.email}`} 
+                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                data-testid="link-client-email"
+                              >
+                                <Mail className="h-4 w-4" />
+                                {apiProject.client.email}
+                              </a>
+                            )}
+                            {apiProject.client.phone && (
+                              <a 
+                                href={`tel:${apiProject.client.phone}`} 
+                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                data-testid="link-client-phone"
+                              >
+                                <Phone className="h-4 w-4" />
+                                {apiProject.client.phone}
+                              </a>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-sm text-muted-foreground">No client assigned yet. Send an invitation to give a client access to this project.</p>
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="Client email address"
+                              type="email"
+                              value={clientInviteEmail}
+                              onChange={e => setClientInviteEmail(e.target.value)}
+                              data-testid="input-client-invite-email"
+                            />
+                            <Input
+                              placeholder="Client name (optional)"
+                              value={clientInviteName}
+                              onChange={e => setClientInviteName(e.target.value)}
+                              data-testid="input-client-invite-name"
+                            />
+                            <Button
+                              className="w-full"
+                              size="sm"
+                              disabled={!clientInviteEmail || sendClientInviteMutation.isPending}
+                              onClick={() => sendClientInviteMutation.mutate({ email: clientInviteEmail, clientName: clientInviteName || undefined })}
+                              data-testid="button-send-client-invite"
+                            >
+                              <Send className="h-4 w-4 mr-2" />
+                              {sendClientInviteMutation.isPending ? "Sending..." : "Send Invite"}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="space-y-2 pt-2 border-t">
-                        {apiProject.client.email && (
-                          <a 
-                            href={`mailto:${apiProject.client.email}`} 
-                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                            data-testid="link-client-email"
-                          >
-                            <Mail className="h-4 w-4" />
-                            {apiProject.client.email}
-                          </a>
-                        )}
-                        {apiProject.client.phone && (
-                          <a 
-                            href={`tel:${apiProject.client.phone}`} 
-                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                            data-testid="link-client-phone"
-                          >
-                            <Phone className="h-4 w-4" />
-                            {apiProject.client.phone}
-                          </a>
-                        )}
-                      </div>
+                      )}
+
+                      {/* Invite Status Panel */}
+                      {projectInvites.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t" data-testid="invite-status-panel">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Invitations</p>
+                          {projectInvites
+                            .slice()
+                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                            .map(invite => {
+                              const isExpiredByDate = new Date(invite.expiresAt) < new Date();
+                              const computedStatus = invite.status === "accepted"
+                                ? "accepted"
+                                : (invite.status === "expired" || isExpiredByDate)
+                                  ? "expired"
+                                  : "pending";
+                              return (
+                                <div key={invite.id} className="flex items-center justify-between gap-2 py-1" data-testid={`invite-row-${invite.id}`}>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{invite.clientName || invite.email}</p>
+                                    {invite.clientName && <p className="text-xs text-muted-foreground truncate">{invite.email}</p>}
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Badge
+                                      variant={computedStatus === "accepted" ? "default" : computedStatus === "expired" ? "destructive" : "secondary"}
+                                      data-testid={`badge-invite-status-${invite.id}`}
+                                    >
+                                      {computedStatus === "accepted" ? "Accepted" : computedStatus === "expired" ? "Expired" : "Pending"}
+                                    </Badge>
+                                    {computedStatus === "expired" && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        disabled={sendClientInviteMutation.isPending}
+                                        onClick={() => sendClientInviteMutation.mutate({ email: invite.email, clientName: invite.clientName || undefined })}
+                                        data-testid={`button-resend-invite-${invite.id}`}
+                                      >
+                                        Resend
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
