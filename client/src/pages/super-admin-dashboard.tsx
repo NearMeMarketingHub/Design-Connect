@@ -531,8 +531,8 @@ export default function SuperAdminDashboard() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-100 rounded-lg">
-                  <Building2 className="w-6 h-6 text-amber-600" />
+                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                  <Building2 className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">In Progress</p>
@@ -542,11 +542,11 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
           <Link href="/admin/contractors">
-            <Card className={`cursor-pointer hover:shadow-md transition-shadow ${(pendingContractors.length + contractorRequests.length) > 0 ? "border-orange-300 bg-orange-50" : ""}`}>
+            <Card className={`cursor-pointer hover:shadow-md transition-shadow ${(pendingContractors.length + contractorRequests.length) > 0 ? "border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30" : ""}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-lg ${(pendingContractors.length + contractorRequests.length) > 0 ? "bg-orange-200" : "bg-orange-100"}`}>
-                    <Clock className={`w-6 h-6 ${(pendingContractors.length + contractorRequests.length) > 0 ? "text-orange-700" : "text-orange-600"}`} />
+                  <div className={`p-3 rounded-lg ${(pendingContractors.length + contractorRequests.length) > 0 ? "bg-orange-200 dark:bg-orange-900/40" : "bg-orange-100 dark:bg-orange-900/30"}`}>
+                    <Clock className={`w-6 h-6 ${(pendingContractors.length + contractorRequests.length) > 0 ? "text-orange-700 dark:text-orange-400" : "text-orange-600 dark:text-orange-400"}`} />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Pending Requests</p>
@@ -782,7 +782,7 @@ export default function SuperAdminDashboard() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      className="w-full text-amber-600 border-amber-300 hover:bg-amber-50"
+                      className="w-full text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                       onClick={() => resetSandboxMutation.mutate()}
                       disabled={resetSandboxMutation.isPending}
                       data-testid="button-reset-sandbox"

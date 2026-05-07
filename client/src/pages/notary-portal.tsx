@@ -176,13 +176,13 @@ export default function NotaryPortal() {
   const isNotary = user.role === 'notary' || (user.role === 'contractor' && user.contractorType === 'notary');
   if (!isNotary && user.role !== 'admin') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center p-8 bg-white rounded-lg shadow max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center p-8 bg-card rounded-lg shadow max-w-md">
           <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted-foreground mb-4">
             The Notary Portal is only accessible to notary accounts.
           </p>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             Please log out and sign in with a notary account to access this portal.
           </p>
           <button 
@@ -218,8 +218,8 @@ export default function NotaryPortal() {
       </header>
 
       <main className="max-w-7xl mx-auto p-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Documents Requiring Notarization</h2>
+        <div className="bg-card rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Documents Requiring Notarization</h2>
           
           <div className="mb-6">
             <input
@@ -227,7 +227,7 @@ export default function NotaryPortal() {
               placeholder="Search by project name, address, or document name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border rounded"
+              className="w-full px-4 py-2 border border-border rounded bg-background text-foreground placeholder:text-muted-foreground"
               data-testid="input-search-documents"
             />
           </div>
@@ -247,58 +247,58 @@ export default function NotaryPortal() {
               <p>Loading documents...</p>
             </div>
           ) : documents.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-muted-foreground">
               <p>No documents found matching your criteria</p>
             </div>
           ) : (
-            <div className="border rounded overflow-hidden">
+            <div className="border border-border rounded overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="text-left p-3 font-medium">Document</th>
-                    <th className="text-left p-3 font-medium">Project</th>
-                    <th className="text-left p-3 font-medium">Client</th>
-                    <th className="text-left p-3 font-medium">Status</th>
-                    <th className="text-left p-3 font-medium">Due Date</th>
-                    <th className="text-right p-3 font-medium">Actions</th>
+                    <th className="text-left p-3 font-medium text-foreground">Document</th>
+                    <th className="text-left p-3 font-medium text-foreground">Project</th>
+                    <th className="text-left p-3 font-medium text-foreground">Client</th>
+                    <th className="text-left p-3 font-medium text-foreground">Status</th>
+                    <th className="text-left p-3 font-medium text-foreground">Due Date</th>
+                    <th className="text-right p-3 font-medium text-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {documents.map((doc) => (
-                    <tr key={doc.id} className="border-t hover:bg-gray-50">
-                      <td className="p-3 font-medium">{doc.name}</td>
+                    <tr key={doc.id} className="border-t border-border hover:bg-muted/50">
+                      <td className="p-3 font-medium text-foreground">{doc.name}</td>
                       <td className="p-3">
                         <div>
-                          <p className="font-medium">{doc.projectName}</p>
-                          <p className="text-xs text-gray-500">{doc.projectAddress}</p>
+                          <p className="font-medium text-foreground">{doc.projectName}</p>
+                          <p className="text-xs text-muted-foreground">{doc.projectAddress}</p>
                         </div>
                       </td>
-                      <td className="p-3">{doc.clientName}</td>
+                      <td className="p-3 text-foreground">{doc.clientName}</td>
                       <td className="p-3">
                         <div>
                           <span className={`px-2 py-1 text-xs rounded ${
                             doc.notarizationStatus === 'completed' 
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
                               : doc.notarizationStatus === 'awaiting_approval'
-                              ? 'bg-blue-100 text-blue-800'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400'
                               : doc.notarizationRejectionReason
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
+                              : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400'
                           }`}>
                             {doc.notarizationRejectionReason ? 'Rejected' : (doc.notarizationStatus || 'Pending')}
                           </span>
                           {doc.notarizationRejectionReason && (
-                            <p className="text-xs text-red-600 mt-1 max-w-xs">{doc.notarizationRejectionReason}</p>
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1 max-w-xs">{doc.notarizationRejectionReason}</p>
                           )}
                         </div>
                       </td>
-                      <td className="p-3 text-gray-600">{doc.notarizationDueDate || 'No due date'}</td>
+                      <td className="p-3 text-muted-foreground">{doc.notarizationDueDate || 'No due date'}</td>
                       <td className="p-3 text-right space-x-2">
                         <a 
                           href={doc.fileUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline text-sm"
+                          className="text-primary hover:underline text-sm"
                         >
                           View
                         </a>
@@ -307,7 +307,7 @@ export default function NotaryPortal() {
                             href={doc.notarizedFileUrl} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-green-600 hover:underline text-sm"
+                            className="text-green-600 dark:text-green-400 hover:underline text-sm"
                           >
                             View Notarized
                           </a>
@@ -315,7 +315,7 @@ export default function NotaryPortal() {
                           <button
                             onClick={() => handleUploadClick(doc.id)}
                             disabled={uploadingDocId === doc.id}
-                            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                            className="px-3 py-1 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90 disabled:opacity-50"
                           >
                             {uploadingDocId === doc.id ? 'Uploading...' : 'Upload Notarized'}
                           </button>
