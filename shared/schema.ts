@@ -771,3 +771,19 @@ export const changeOrderLineItems = pgTable("change_order_line_items", {
 export const insertChangeOrderLineItemSchema = createInsertSchema(changeOrderLineItems).omit({ id: true });
 export type InsertChangeOrderLineItem = z.infer<typeof insertChangeOrderLineItemSchema>;
 export type ChangeOrderLineItem = typeof changeOrderLineItems.$inferSelect;
+
+// Demo requests - submitted via the /demo page contact form
+export const demoRequests = pgTable("demo_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  company: text("company").notNull().default(""),
+  email: text("email").notNull(),
+  phone: text("phone").notNull().default(""),
+  message: text("message").notNull().default(""),
+  status: text("status").notNull().default("new"), // new, contacted, demo_scheduled, converted, closed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ id: true, createdAt: true });
+export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
+export type DemoRequest = typeof demoRequests.$inferSelect;

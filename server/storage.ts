@@ -63,7 +63,8 @@ import type {
   ClientMaterialItem, InsertClientMaterialItem,
   ChangeOrder, InsertChangeOrder,
   ChangeOrderLineItem, InsertChangeOrderLineItem,
-  ExternalMemberPermissions
+  ExternalMemberPermissions,
+  DemoRequest, InsertDemoRequest
 } from "@shared/schema";
 
 export interface IStorage {
@@ -358,6 +359,12 @@ export interface IStorage {
   createSubscriptionTier(tier: InsertSubscriptionTier): Promise<SubscriptionTier>;
   updateSubscriptionTier(id: string, data: Partial<InsertSubscriptionTier>): Promise<SubscriptionTier | undefined>;
   deleteSubscriptionTier(id: string): Promise<void>;
+
+  // Demo request methods
+  createDemoRequest(data: InsertDemoRequest): Promise<DemoRequest>;
+  getDemoRequests(): Promise<DemoRequest[]>;
+  getDemoRequest(id: string): Promise<DemoRequest | undefined>;
+  updateDemoRequest(id: string, data: Partial<InsertDemoRequest>): Promise<DemoRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2321,6 +2328,26 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSubscriptionTier(id: string): Promise<void> {
     await db.delete(schema.subscriptionTiers).where(eq(schema.subscriptionTiers.id, id));
+  }
+
+  // Demo request methods
+  async createDemoRequest(data: InsertDemoRequest): Promise<DemoRequest> {
+    const [created] = await db.insert(schema.demoRequests).values(data).returning();
+    return created;
+  }
+
+  async getDemoRequests(): Promise<DemoRequest[]> {
+    return await db.select().from(schema.demoRequests).orderBy(sql`${schema.demoRequests.createdAt} DESC`);
+  }
+
+  async getDemoRequest(id: string): Promise<DemoRequest | undefined> {
+    const [req] = await db.select().from(schema.demoRequests).where(eq(schema.demoRequests.id, id));
+    return req;
+  }
+
+  async updateDemoRequest(id: string, data: Partial<InsertDemoRequest>): Promise<DemoRequest | undefined> {
+    const [updated] = await db.update(schema.demoRequests).set(data).where(eq(schema.demoRequests.id, id)).returning();
+    return updated;
   }
 }
 

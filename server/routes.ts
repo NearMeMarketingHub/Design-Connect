@@ -146,6 +146,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.errors[0].message });
       }
       const { name, company, email, phone, message } = parsed.data;
+      // Persist to DB first, then email (non-blocking failure allowed)
+      try {
+        await storage.createDemoRequest({ name, company, email, phone, message, status: "new" });
+      } catch (dbErr) {
+        console.error("Failed to save demo request to DB:", dbErr);
+      }
       await sendDemoRequestEmail({ name, company, email, phone, message });
       res.json({ success: true });
     } catch (err) {
@@ -653,11 +659,16 @@ export async function registerRoutes(
     try {
       const companies = await storage.getAllCompanies();
       const enriched = await Promise.all(companies.map(async (company) => {
-        const members = await storage.getCompanyMembers(company.id);
-        const owner = await storage.getUserByCompanyOwner(company.id);
+        const [members, owner, projects] = await Promise.all([
+          storage.getCompanyMembers(company.id),
+          storage.getUserByCompanyOwner(company.id),
+          storage.getProjectsByCompanyId(company.id),
+        ]);
         return {
           ...company,
           memberCount: members.length,
+          userCount: members.length,
+          projectCount: projects.length,
           ownerName: owner ? (owner.name || owner.username) : null,
           ownerUserId: owner?.id ?? null,
           ownerEmail: owner?.email ?? null,
@@ -751,6 +762,115 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Suspend / Reactivate company ──────────────────────────────────────
+  app.patch("/api/admin/companies/:id/suspend", requireAdmin, async (req, res, next) => {
+    try {
+      const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "suspended" } as any);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+      res.json(company);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/admin/companies/:id/reactivate", requireAdmin, async (req, res, next) => {
+    try {
+      const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "active" } as any);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+      res.json(company);
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Demo requests ──────────────────────────────────────────────────────
+  app.get("/api/admin/demo-requests", requireAdmin, async (req, res, next) => {
+    try {
+      const requests = await storage.getDemoRequests();
+      res.json(requests);
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/admin/demo-requests/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const updateSchema = z.object({
+        status: z.enum(["new", "contacted", "demo_scheduled", "converted", "closed"]).optional(),
+      });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid data" });
+      const updated = await storage.updateDemoRequest(req.params.id, parsed.data);
+      if (!updated) return res.status(404).json({ message: "Demo request not found" });
+      res.json(updated);
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Global invite listing ──────────────────────────────────────────────
+  app.get("/api/admin/invites", requireAdmin, async (req, res, next) => {
+    try {
+      // Get all project invites and contractor invites across the platform
+      const [allProjects, allCompanies, allContractors, allClients] = await Promise.all([
+        storage.getProjects(),
+        storage.getAllCompanies(),
+        storage.getUsersByRole("contractor"),
+        storage.getUsersByRole("client"),
+      ]);
+
+      const projectMap = new Map(allProjects.map(p => [p.id, p]));
+      const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+
+      // Gather all project invites by fetching per-project
+      const projectInviteArrays = await Promise.all(
+        allProjects.map(p => storage.getProjectInvitesByProjectId(p.id))
+      );
+      const projectInvites = projectInviteArrays.flat().map(inv => {
+        const project = inv.projectId ? projectMap.get(inv.projectId) : null;
+        const companyId = project ? (project as any).companyId : null;
+        return {
+          id: inv.id,
+          inviteType: "client",
+          email: inv.email,
+          status: inv.status,
+          projectId: inv.projectId,
+          projectName: project?.name ?? null,
+          companyName: companyId ? (companyMap.get(companyId)?.name ?? null) : null,
+          sentAt: inv.createdAt,
+          acceptedAt: null,
+          expiresAt: inv.expiresAt,
+        };
+      });
+
+      // Gather all contractor invites
+      const contractorInviteArrays = await Promise.all(
+        allProjects.map(p => storage.getContractorInvitesByProject(p.id))
+      );
+      const contractorInvites = contractorInviteArrays.flat().map(inv => {
+        const project = inv.projectId ? projectMap.get(inv.projectId) : null;
+        const company = inv.companyId ? companyMap.get(inv.companyId) : null;
+        return {
+          id: inv.id,
+          inviteType: inv.contractorType || "contractor",
+          email: inv.email,
+          status: inv.status,
+          projectId: inv.projectId,
+          projectName: project?.name ?? null,
+          companyName: company?.name ?? (inv.companyName ?? null),
+          sentAt: inv.createdAt,
+          acceptedAt: null,
+          expiresAt: inv.expiresAt,
+        };
+      });
+
+      const allInvites = [...projectInvites, ...contractorInvites]
+        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+
+      res.json(allInvites);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/admin/invites/:id/revoke", requireAdmin, async (req, res, next) => {
+    try {
+      const updated = await storage.updateProjectInvite(req.params.id, { status: "revoked" } as any);
+      if (!updated) return res.status(404).json({ message: "Invite not found" });
+      res.json(updated);
     } catch (error) { next(error); }
   });
 
