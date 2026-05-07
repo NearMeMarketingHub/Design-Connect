@@ -64,7 +64,8 @@ import type {
   ChangeOrder, InsertChangeOrder,
   ChangeOrderLineItem, InsertChangeOrderLineItem,
   ExternalMemberPermissions,
-  DemoRequest, InsertDemoRequest
+  DemoRequest, InsertDemoRequest,
+  PlatformSettings, InsertPlatformSettings
 } from "@shared/schema";
 
 export interface IStorage {
@@ -365,6 +366,14 @@ export interface IStorage {
   getDemoRequests(): Promise<DemoRequest[]>;
   getDemoRequest(id: string): Promise<DemoRequest | undefined>;
   updateDemoRequest(id: string, data: Partial<InsertDemoRequest>): Promise<DemoRequest | undefined>;
+
+  // Platform settings methods
+  getPlatformSettings(): Promise<PlatformSettings>;
+  updatePlatformSettings(data: Partial<InsertPlatformSettings>): Promise<PlatformSettings>;
+
+  // Global contractor invite access
+  getAllContractorInvites(): Promise<ContractorInvite[]>;
+  getContractorInviteById(id: string): Promise<ContractorInvite | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2348,6 +2357,37 @@ export class DatabaseStorage implements IStorage {
   async updateDemoRequest(id: string, data: Partial<InsertDemoRequest>): Promise<DemoRequest | undefined> {
     const [updated] = await db.update(schema.demoRequests).set(data).where(eq(schema.demoRequests.id, id)).returning();
     return updated;
+  }
+
+  // Platform settings — singleton row with id=1; upsert on update
+  async getPlatformSettings(): Promise<PlatformSettings> {
+    const [row] = await db.select().from(schema.platformSettings).where(eq(schema.platformSettings.id, 1));
+    if (row) return row;
+    // Auto-create the default singleton row
+    const [created] = await db.insert(schema.platformSettings)
+      .values({ id: 1, defaultTrialDays: 7, manualBillingEnabled: true, freeAccessEnabled: false, prepaidAccessEnabled: false, defaultMonthlyPrice: "0" })
+      .returning();
+    return created;
+  }
+
+  async updatePlatformSettings(data: Partial<InsertPlatformSettings>): Promise<PlatformSettings> {
+    // Ensure row exists first
+    await this.getPlatformSettings();
+    const [updated] = await db.update(schema.platformSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.platformSettings.id, 1))
+      .returning();
+    return updated;
+  }
+
+  // Global contractor invite access
+  async getAllContractorInvites(): Promise<ContractorInvite[]> {
+    return await db.select().from(schema.contractorInvites).orderBy(sql`${schema.contractorInvites.createdAt} DESC`);
+  }
+
+  async getContractorInviteById(id: string): Promise<ContractorInvite | undefined> {
+    const [inv] = await db.select().from(schema.contractorInvites).where(eq(schema.contractorInvites.id, id));
+    return inv;
   }
 }
 

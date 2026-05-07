@@ -773,6 +773,9 @@ export type InsertChangeOrderLineItem = z.infer<typeof insertChangeOrderLineItem
 export type ChangeOrderLineItem = typeof changeOrderLineItems.$inferSelect;
 
 // Demo requests - submitted via the /demo page contact form
+export const DEMO_REQUEST_STATUSES = ["new", "contacted", "demo_scheduled", "converted", "closed"] as const;
+export type DemoRequestStatus = typeof DEMO_REQUEST_STATUSES[number];
+
 export const demoRequests = pgTable("demo_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -780,10 +783,25 @@ export const demoRequests = pgTable("demo_requests", {
   email: text("email").notNull(),
   phone: text("phone").notNull().default(""),
   message: text("message").notNull().default(""),
-  status: text("status").notNull().default("new"), // new, contacted, demo_scheduled, converted, closed
+  status: text("status", { enum: DEMO_REQUEST_STATUSES }).notNull().default("new"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ id: true, createdAt: true });
 export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
 export type DemoRequest = typeof demoRequests.$inferSelect;
+
+// Platform-wide settings (singleton row, id always = 1)
+export const platformSettings = pgTable("platform_settings", {
+  id: integer("id").primaryKey().default(1),
+  defaultTrialDays: integer("default_trial_days").notNull().default(7),
+  manualBillingEnabled: boolean("manual_billing_enabled").notNull().default(true),
+  freeAccessEnabled: boolean("free_access_enabled").notNull().default(false),
+  prepaidAccessEnabled: boolean("prepaid_access_enabled").notNull().default(false),
+  defaultMonthlyPrice: numeric("default_monthly_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPlatformSettingsSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
+export type InsertPlatformSettings = z.infer<typeof insertPlatformSettingsSchema>;
+export type PlatformSettings = typeof platformSettings.$inferSelect;

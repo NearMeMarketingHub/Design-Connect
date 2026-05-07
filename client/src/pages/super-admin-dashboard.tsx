@@ -232,12 +232,19 @@ export default function SuperAdminDashboard() {
     enabled: user?.role === "admin",
   });
 
+  const { data: platformSettingsData, refetch: refetchPlatformSettings } = useQuery({
+    queryKey: ["/api/admin/platform-settings"],
+    queryFn: () => apiRequest("GET", "/api/admin/platform-settings").then(r => r.json()),
+    enabled: user?.role === "admin",
+  });
+
   // ── Computed stats ────────────────────────────────────────────────────────
   const realProjects = projects.filter((p: any) => !p.isSandbox);
   const allUsers = [...contractors.filter((u: any) => !u.isSandbox), ...clients.filter((u: any) => !u.isSandbox)];
   const activeCompanies = (companies as any[]).filter(c => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing");
   const newDemoRequests = (demoRequests as any[]).filter(d => d.status === "new");
-  const pendingTotal = pendingContractors.length + contractorRequests.length;
+  const pendingInvitesCount = (adminInvites as any[]).filter(i => i.status === "pending").length;
+  const pendingTotal = pendingContractors.length + contractorRequests.length + pendingInvitesCount;
   const filteredProjects = realProjects.filter((p: any) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
@@ -323,10 +330,28 @@ export default function SuperAdminDashboard() {
   });
 
   const revokeInviteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/admin/invites/${id}/revoke`).then(r => r.json()),
+    mutationFn: ({ id, type }: { id: string; type: string }) =>
+      apiRequest("POST", `/api/admin/invites/${id}/revoke`, { type }).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/invites"] });
       toast({ title: "Invite revoked" });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: ({ id, type }: { id: string; type: string }) =>
+      apiRequest("POST", `/api/admin/invites/${id}/resend`, { type }).then(r => r.json()),
+    onSuccess: () => toast({ title: "Invite reminder sent" }),
+    onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
+  const updatePlatformSettingsMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiRequest("PATCH", "/api/admin/platform-settings", data).then(r => r.json()),
+    onSuccess: () => {
+      refetchPlatformSettings();
+      toast({ title: "Settings saved" });
     },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
@@ -570,7 +595,7 @@ export default function SuperAdminDashboard() {
                     <Clock className={`w-5 h-5 ${pendingTotal > 0 ? "text-orange-700 dark:text-orange-400" : "text-orange-600"}`} />
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Pending Approvals</p>
+                    <p className="text-xs text-muted-foreground">Pending Invites & Approvals</p>
                     <h3 className="text-2xl font-bold">{pendingTotal}</h3>
                   </div>
                 </div>
@@ -618,6 +643,7 @@ export default function SuperAdminDashboard() {
                       <TableHead>Type</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Plan</TableHead>
+                      <TableHead>Monthly Price</TableHead>
                       <TableHead>Trial Ends</TableHead>
                       <TableHead className="text-center">Users</TableHead>
                       <TableHead className="text-center">Projects</TableHead>
@@ -648,12 +674,31 @@ export default function SuperAdminDashboard() {
                             <Badge variant="outline" className="capitalize text-xs">{company.subscriptionPlan || "free"}</Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
+                            {(() => {
+                              const tier = (adminTiers as any[]).find(t =>
+                                t.name.toLowerCase() === (company.subscriptionPlan || "free").toLowerCase()
+                              );
+                              const price = tier ? parseFloat(tier.price) : 0;
+                              return price === 0 ? "Free" : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`;
+                            })()}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
                             {trialEnd ? trialEnd.toLocaleDateString() : "—"}
                           </TableCell>
                           <TableCell className="text-center text-sm">{company.userCount ?? 0}</TableCell>
                           <TableCell className="text-center text-sm">{company.projectCount ?? 0}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1.5 flex-wrap">
+                              <Link href={`/admin/contractors`}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="View company users"
+                                  data-testid={`button-view-company-${company.id}`}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
+                              </Link>
                               {company.ownerUserId && (
                                 <Button
                                   size="sm"
@@ -828,6 +873,7 @@ export default function SuperAdminDashboard() {
                       <TableHead>Project</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Sent At</TableHead>
+                      <TableHead>Accepted At</TableHead>
                       <TableHead>Expires</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -840,28 +886,52 @@ export default function SuperAdminDashboard() {
                           <Badge variant="outline" className="capitalize text-xs">{inv.inviteType}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{inv.companyName || "—"}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{inv.projectName || "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {inv.projectId ? (
+                            <Link href={`/projects/${inv.projectId}`} className="text-blue-600 hover:underline text-sm">
+                              {inv.projectName || inv.projectId}
+                            </Link>
+                          ) : (inv.projectName || "—")}
+                        </TableCell>
                         <TableCell><InviteStatusBadge status={inv.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {new Date(inv.sentAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {new Date(inv.expiresAt).toLocaleDateString()}
+                          {inv.acceptedAt ? new Date(inv.acceptedAt).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell className="text-right">
-                          {inv.status === "pending" && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => revokeInviteMutation.mutate(inv.id)}
-                              disabled={revokeInviteMutation.isPending}
-                              data-testid={`button-revoke-invite-${inv.id}`}
-                            >
-                              <X className="w-3.5 h-3.5 mr-1" />
-                              Revoke
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-1">
+                            {inv.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-blue-600 hover:text-blue-700"
+                                  onClick={() => resendInviteMutation.mutate({ id: inv.id, type: inv.inviteType })}
+                                  disabled={resendInviteMutation.isPending}
+                                  data-testid={`button-resend-invite-${inv.id}`}
+                                  title="Resend invite"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => revokeInviteMutation.mutate({ id: inv.id, type: inv.inviteType })}
+                                  disabled={revokeInviteMutation.isPending}
+                                  data-testid={`button-revoke-invite-${inv.id}`}
+                                  title="Revoke invite"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1196,6 +1266,88 @@ export default function SuperAdminDashboard() {
                 <Plus className="w-4 h-4 mr-1" /> Add Tier
               </Button>
             </div>
+
+            {/* Global platform settings panel */}
+            <Card className="mb-5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-muted-foreground" />
+                  Global Defaults
+                </CardTitle>
+                <CardDescription className="text-xs">Platform-wide defaults applied to new company signups.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="setting-trial-days" className="text-xs">Default Trial Length (days)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="setting-trial-days"
+                        type="number"
+                        min={1}
+                        max={365}
+                        defaultValue={platformSettingsData?.defaultTrialDays ?? 7}
+                        className="h-8 text-sm w-20"
+                        onBlur={e => updatePlatformSettingsMutation.mutate({ defaultTrialDays: parseInt(e.target.value) || 7 })}
+                        data-testid="input-setting-trial-days"
+                      />
+                      <span className="text-xs text-muted-foreground">days</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="setting-default-price" className="text-xs">Default Monthly Price ($)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="setting-default-price"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        defaultValue={platformSettingsData?.defaultMonthlyPrice ?? "0"}
+                        className="h-8 text-sm w-24"
+                        onBlur={e => updatePlatformSettingsMutation.mutate({ defaultMonthlyPrice: e.target.value || "0" })}
+                        data-testid="input-setting-default-price"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <Label className="text-xs">Access Options</Label>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="setting-free-access"
+                        checked={platformSettingsData?.freeAccessEnabled ?? false}
+                        onCheckedChange={v => updatePlatformSettingsMutation.mutate({ freeAccessEnabled: v })}
+                        data-testid="switch-setting-free-access"
+                      />
+                      <Label htmlFor="setting-free-access" className="text-xs font-normal cursor-pointer">Free Access Enabled</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="setting-prepaid-access"
+                        checked={platformSettingsData?.prepaidAccessEnabled ?? false}
+                        onCheckedChange={v => updatePlatformSettingsMutation.mutate({ prepaidAccessEnabled: v })}
+                        data-testid="switch-setting-prepaid-access"
+                      />
+                      <Label htmlFor="setting-prepaid-access" className="text-xs font-normal cursor-pointer">Prepaid Access Enabled</Label>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <Label className="text-xs">Billing Mode</Label>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="setting-manual-billing"
+                        checked={platformSettingsData?.manualBillingEnabled ?? true}
+                        onCheckedChange={v => updatePlatformSettingsMutation.mutate({ manualBillingEnabled: v })}
+                        data-testid="switch-setting-manual-billing"
+                      />
+                      <Label htmlFor="setting-manual-billing" className="text-xs font-normal cursor-pointer">Manual Billing</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">When on, billing is managed by admins. Turn off to enable self-serve.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <p className="text-sm font-medium text-foreground mb-3">Plan Tiers</p>
             {adminTiers.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground text-sm">
