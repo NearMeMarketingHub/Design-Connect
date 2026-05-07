@@ -178,15 +178,17 @@ export default function AuthPage() {
             </TabsContent>
           </Tabs>
 
-          <div className="rounded-lg border border-border bg-muted/40 p-4 text-center space-y-2">
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-center space-y-3">
             <p className="text-sm text-muted-foreground">
               Need access? Clients and team members must be invited.
-              Companies can <Link href="/demo" className="underline text-foreground hover:text-primary">request a demo</Link> to get started.
+              Companies can request a demo to get started.
             </p>
-            <a href="mailto:hello@buildvision.io?subject=Demo Request" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
-              <CalendarCheck className="h-4 w-4" />
-              Request a Demo
-            </a>
+            <Link href="/demo">
+              <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-request-demo-auth">
+                <CalendarCheck className="h-4 w-4" />
+                Request a Demo
+              </Button>
+            </Link>
           </div>
 
           <div className="pt-4 border-t border-border">

@@ -77,6 +77,7 @@ export default function AcceptInvite() {
   const loginMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/invites/${token}/login`, {
+        email: inviteData?.email,
         password: loginForm.password,
       });
       return res.json();
@@ -172,7 +173,10 @@ export default function AcceptInvite() {
           </div>
           <CardTitle className="text-2xl">Welcome to BuildVision</CardTitle>
           <CardDescription>
-            You've been invited to join the project: <strong>{inviteData?.projectName}</strong>
+            {inviteData?.companyName && (
+              <span className="block"><strong>{inviteData.companyName}</strong> has invited you to collaborate on:</span>
+            )}
+            <span className="block mt-1">Project: <strong>{inviteData?.projectName}</strong></span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

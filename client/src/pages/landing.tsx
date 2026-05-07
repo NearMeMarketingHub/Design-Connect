@@ -321,13 +321,6 @@ export default function LandingPage() {
                     <span className="text-muted-foreground text-sm">View project documents, progress, and messages</span>
                   </li>
                 </ul>
-                <div className="mt-4">
-                  <Link href="/auth?tab=contractor">
-                    <Button size="sm" variant="outline" className="w-full border-orange-300 text-orange-700 hover:bg-orange-50" data-testid="button-sub-login">
-                      Sub/Notary Login
-                    </Button>
-                  </Link>
-                </div>
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-foreground mb-5 flex items-center gap-2">

@@ -3600,14 +3600,25 @@ export async function registerRoutes(
       const project = invite.projectId ? await storage.getProject(invite.projectId) : null;
 
       // Check if the invited email already has an account
-      const existingUser = await storage.getUserByEmail(invite.email);
+      const existingEmailUser = await storage.getUserByEmail(invite.email);
+
+      // Get company name from the inviting user
+      let companyName: string | null = null;
+      if (invite.invitedBy) {
+        const inviter = await storage.getUser(invite.invitedBy);
+        if (inviter?.companyId) {
+          const company = await storage.getCompany(inviter.companyId);
+          companyName = company?.name ?? null;
+        }
+      }
 
       res.json({
         email: invite.email,
         clientName: invite.clientName,
         projectName: project?.name,
         projectId: invite.projectId,
-        existingUser: !!existingUser,
+        companyName,
+        existingUser: !!existingEmailUser,
       });
     } catch (error) {
       next(error);
@@ -3617,7 +3628,11 @@ export async function registerRoutes(
   // Accept invite via login for existing users
   app.post("/api/invites/:token/login", async (req, res, next) => {
     try {
-      const { password } = req.body;
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
 
       const invite = await storage.getProjectInviteByToken(req.params.token);
       if (!invite) {
@@ -3632,16 +3647,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This invitation has already been used" });
       }
 
-      // Find the existing user by the invite email
-      const existingUser = await storage.getUserByEmail(invite.email);
+      // Find the user by the submitted email
+      const existingUser = await storage.getUserByEmail(email);
       if (!existingUser) {
-        return res.status(400).json({ message: "No account found for this email. Please create a new account." });
+        return res.status(401).json({ message: "No account found for this email. Please create a new account." });
       }
 
       // Verify password
       const passwordMatch = await bcrypt.compare(password, existingUser.password);
       if (!passwordMatch) {
         return res.status(401).json({ message: "Incorrect password" });
+      }
+
+      // Enforce that the authenticated user's email matches the invite email
+      if (existingUser.email?.toLowerCase() !== invite.email.toLowerCase()) {
+        return res.status(403).json({ message: "This invitation was sent to a different email address. Please log in with the account registered to " + invite.email });
       }
 
       // Mark invite accepted
