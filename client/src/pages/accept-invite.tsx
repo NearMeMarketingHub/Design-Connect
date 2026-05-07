@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Building2, User, Lock, Mail, CheckCircle, AlertCircle, Loader2, LogIn, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-context";
 
 type Mode = "new-user" | "existing-user";
 
@@ -16,6 +17,7 @@ export default function AcceptInvite() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { setPortal, refetch } = useAuth();
 
   const [mode, setMode] = useState<Mode>("new-user");
 
@@ -70,7 +72,10 @@ export default function AcceptInvite() {
         title: "Welcome to BuildVision!",
         description: "Your account has been created and you're now logged in.",
       });
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setPortal("client");
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setLocation("/client/dashboard");
     },
     onError: (error: Error) => {
@@ -91,7 +96,10 @@ export default function AcceptInvite() {
         title: "Invitation accepted!",
         description: "You've been added to the project.",
       });
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      setPortal("client");
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setLocation("/client/dashboard");
     },
     onError: (error: Error) => {
@@ -101,12 +109,12 @@ export default function AcceptInvite() {
 
   const handleCreateAccount = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserForm.username.trim()) {
-      toast({ title: "Missing Information", description: "Please enter a username.", variant: "destructive" });
+    if (newUserForm.username.trim().length < 3) {
+      toast({ title: "Username Too Short", description: "Username must be at least 3 characters.", variant: "destructive" });
       return;
     }
-    if (newUserForm.password.length < 6) {
-      toast({ title: "Password Too Short", description: "Password must be at least 6 characters.", variant: "destructive" });
+    if (newUserForm.password.length < 8) {
+      toast({ title: "Password Too Short", description: "Password must be at least 8 characters.", variant: "destructive" });
       return;
     }
     if (newUserForm.password !== newUserForm.confirmPassword) {

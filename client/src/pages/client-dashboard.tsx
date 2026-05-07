@@ -33,8 +33,8 @@ export default function ClientDashboard() {
 
   // Filter projects based on portal context
   const myProjects = allProjects.filter(p => {
-    // When logged into client portal, only show projects where user is the client
-    if (currentPortal === 'client') {
+    // Client portal OR role=client with no portal (e.g. arrived via invite link)
+    if (currentPortal === 'client' || (currentPortal === null && user?.role === 'client')) {
       return p.clientId === user?.id;
     }
     // When logged into admin/contractor portal, admins see all, contractors see assigned

@@ -4107,6 +4107,16 @@ export async function registerRoutes(
     try {
       const { username, password, name } = req.body;
 
+      // Validate inputs before touching the DB
+      const trimmedUsername = typeof username === "string" ? username.trim() : "";
+      const trimmedName = typeof name === "string" ? name.trim() : "";
+      if (!trimmedUsername || trimmedUsername.length < 3) {
+        return res.status(400).json({ message: "Username must be at least 3 characters." });
+      }
+      if (!password || typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters." });
+      }
+
       const invite = await storage.getProjectInviteByToken(req.params.token);
       if (!invite) {
         return res.status(404).json({ message: "Invalid invitation" });
@@ -4127,7 +4137,7 @@ export async function registerRoutes(
       }
 
       // Check if username exists
-      const existingByUsername = await storage.getUserByUsername(username);
+      const existingByUsername = await storage.getUserByUsername(trimmedUsername);
       if (existingByUsername) {
         return res.status(400).json({ message: "Username already taken" });
       }
@@ -4135,11 +4145,11 @@ export async function registerRoutes(
       // Create new client account
       const hashedPassword = await bcrypt.hash(password, 10);
       const newUser = await storage.createUser({
-        username,
+        username: trimmedUsername,
         email: invite.email,
         password: hashedPassword,
         role: "client",
-        name: name || invite.clientName,
+        name: trimmedName || invite.clientName || undefined,
         isApproved: true,
       });
 
