@@ -1124,7 +1124,7 @@ export default function SuperAdminDashboard() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             {inv.projectId && (
-                              <Link href={`/projects/${inv.projectId}`}>
+                              <Link href={`/admin/project/${inv.projectId}`}>
                                 <Button
                                   size="sm"
                                   variant="ghost"

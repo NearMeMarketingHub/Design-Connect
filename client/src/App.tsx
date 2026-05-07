@@ -187,6 +187,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/admin/dashboard" component={SuperAdminDashboard} />
+        <Route path="/admin/project/:id" component={ProjectDetails} />
         <Route path="/admin/contractors" component={ContractorManagement} />
         <Route path="/admin/contractors/:id" component={ContractorProfile} />
         <Route path="/admin/budget" component={BudgetAdmin} />

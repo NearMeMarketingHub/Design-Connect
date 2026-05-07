@@ -661,22 +661,30 @@ export async function registerRoutes(
       const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
       const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
       const companies = await storage.getAllCompanies();
-      const enriched = await Promise.all(companies.map(async (company) => {
-        const [members, owner, projects] = await Promise.all([
-          storage.getCompanyMembers(company.id),
-          storage.getUserByCompanyOwner(company.id),
-          storage.getProjectsByCompanyId(company.id),
-        ]);
+      const [allUsers, ...companyExtras] = await Promise.all([
+        storage.getAllUsers(),
+        ...companies.map(c => Promise.all([
+          storage.getUserByCompanyOwner(c.id),
+          storage.getProjectsByCompanyId(c.id),
+        ])),
+      ]);
+      const usersByCompany = new Map<string, number>();
+      for (const u of allUsers) {
+        if (u.companyId) {
+          usersByCompany.set(u.companyId, (usersByCompany.get(u.companyId) ?? 0) + 1);
+        }
+      }
+      const enriched = companies.map((company, idx) => {
+        const [owner, projects] = companyExtras[idx] as [typeof allUsers[0] | undefined, { id: string }[]];
         return {
           ...company,
-          memberCount: members.length,
-          userCount: members.length,
+          userCount: usersByCompany.get(company.id) ?? 0,
           projectCount: projects.length,
           ownerName: owner ? (owner.name || owner.username) : null,
           ownerUserId: owner?.id ?? null,
           ownerEmail: owner?.email ?? null,
         };
-      }));
+      });
       let filtered = enriched;
       if (search) {
         filtered = filtered.filter(c =>

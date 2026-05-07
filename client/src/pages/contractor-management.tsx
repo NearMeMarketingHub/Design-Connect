@@ -31,7 +31,7 @@ import {
   Building2,
   ArrowUpDown
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { parseErrorMessage } from "@/lib/queryClient";
@@ -44,12 +44,18 @@ type SortOrder = "asc" | "desc";
 
 export default function ContractorManagement() {
   const [_, setLocation] = useLocation();
+  const search = useSearch();
   const { user, loading: authLoading, logout } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("active");
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+
+  const filterCompanyId = useMemo(() => {
+    const params = new URLSearchParams(search);
+    return params.get("companyId") ?? null;
+  }, [search]);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) {
@@ -152,8 +158,13 @@ export default function ContractorManagement() {
   const activeContractors = contractors.filter((c: Omit<User, "password">) => c.isApproved && !c.isSandbox);
   const totalPending = pendingContractors.length + contractorRequests.length;
 
+  const filteredContractors = useMemo(() => {
+    if (!filterCompanyId) return activeContractors;
+    return activeContractors.filter((c: Omit<User, "password">) => c.companyId === filterCompanyId);
+  }, [activeContractors, filterCompanyId]);
+
   const sortedContractors = useMemo(() => {
-    return [...activeContractors].sort((a, b) => {
+    return [...filteredContractors].sort((a, b) => {
       let aVal = "";
       let bVal = "";
       
@@ -222,8 +233,8 @@ export default function ContractorManagement() {
                   <Users className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold">Contractor Management</h1>
-                  <p className="text-sm text-muted-foreground">Manage contractors and access requests</p>
+                  <h1 className="text-xl font-bold">Users & Approvals</h1>
+                  <p className="text-sm text-muted-foreground">Manage users, contractors, and access requests</p>
                 </div>
               </div>
             </div>
@@ -282,6 +293,20 @@ export default function ContractorManagement() {
           </Card>
         </div>
 
+        {filterCompanyId && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-4 py-3" data-testid="banner-company-filter">
+            <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="text-sm text-blue-800 dark:text-blue-300">
+              Showing users for company <span className="font-semibold">{filteredContractors[0]?.companyName ?? filterCompanyId}</span>
+            </span>
+            <Link href="/admin/contractors">
+              <Button variant="ghost" size="sm" className="ml-auto text-blue-700 dark:text-blue-300 hover:text-blue-900" data-testid="btn-clear-company-filter">
+                Clear filter
+              </Button>
+            </Link>
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="active" data-testid="tab-active-contractors">
@@ -335,8 +360,10 @@ export default function ContractorManagement() {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : activeContractors.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No active contractors</p>
+                ) : sortedContractors.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    {filterCompanyId ? "No users found for this company." : "No active contractors"}
+                  </p>
                 ) : (
                   <Table>
                     <TableHeader>

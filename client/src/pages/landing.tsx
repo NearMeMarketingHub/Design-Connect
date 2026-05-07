@@ -99,7 +99,7 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">2. Build Your Team</h3>
                 <p className="text-muted-foreground">
-                  Invite contractors, subcontractors, and notaries to your company by email. 
+                  Invite team members to your company by email.
                   Assign roles and control what each member can see and do.
                 </p>
               </div>
@@ -185,7 +185,7 @@ export default function LandingPage() {
                   <Users className="h-10 w-10 text-blue-600 mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Team Management</h3>
                   <p className="text-muted-foreground text-sm">
-                    Invite contractors, subcontractors, and notaries to your company. 
+                    Invite team members to your company.
                     Assign roles and control project-level access per member.
                   </p>
                 </CardContent>
