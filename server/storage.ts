@@ -196,6 +196,7 @@ export interface IStorage {
   getPostReactionByUser(postId: string, userId: string): Promise<PostReaction | undefined>;
 
   // Admin methods
+  getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
   getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string; companyName?: string })[]>;
   getPendingContractors(): Promise<User[]>;
@@ -1098,36 +1099,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Admin methods
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(schema.users);
+  }
+
   async getUsersByRole(role: string): Promise<User[]> {
     return await db.select().from(schema.users).where(eq(schema.users.role, role));
   }
 
   async getAllProjectsWithDetails(): Promise<(Project & { clientName?: string; contractorName?: string; companyName?: string })[]> {
-    const projects = await db.select().from(schema.projects);
-    const projectsWithDetails = await Promise.all(
-      projects.map(async (project) => {
-        let clientName: string | undefined;
-        let contractorName: string | undefined;
-        let companyName: string | undefined;
+    const [projects, allUsers, allCompanies, allTeamMembers] = await Promise.all([
+      db.select().from(schema.projects),
+      db.select().from(schema.users),
+      db.select().from(schema.companies),
+      db.select().from(schema.projectTeamMembers),
+    ]);
 
-        if (project.clientId) {
-          const client = await this.getUser(project.clientId);
-          clientName = client?.name || client?.username;
-        }
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    const companyMap = new Map(allCompanies.map(c => [c.id, c]));
 
-        if (project.contractorId) {
-          const contractor = await this.getUser(project.contractorId);
-          contractorName = contractor?.name || contractor?.username;
-          if (contractor?.companyId) {
-            const company = await this.getCompany(contractor.companyId);
-            companyName = company?.name;
+    const teamByProject = new Map<string, typeof allTeamMembers>();
+    for (const member of allTeamMembers) {
+      const list = teamByProject.get(member.projectId) ?? [];
+      list.push(member);
+      teamByProject.set(member.projectId, list);
+    }
+
+    return projects.map((project) => {
+      const client = project.clientId ? userMap.get(project.clientId) : undefined;
+      const clientName = client?.name || client?.username;
+
+      const contractor = project.contractorId ? userMap.get(project.contractorId) : undefined;
+      const contractorName = contractor?.name || contractor?.username;
+
+      let companyName: string | undefined;
+      if (contractor?.companyId) {
+        companyName = companyMap.get(contractor.companyId)?.name;
+      }
+      if (!companyName) {
+        const members = teamByProject.get(project.id) ?? [];
+        for (const member of members) {
+          const memberUser = userMap.get(member.contractorId);
+          if (memberUser?.companyId) {
+            companyName = companyMap.get(memberUser.companyId)?.name;
+            if (companyName) break;
           }
         }
+      }
 
-        return { ...project, clientName, contractorName, companyName };
-      })
-    );
-    return projectsWithDetails;
+      return { ...project, clientName, contractorName, companyName };
+    });
   }
 
   async getPendingContractors(): Promise<User[]> {

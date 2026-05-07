@@ -73,7 +73,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import type { Project, User } from "@shared/schema";
 
-// ─── Admin data shapes ────────────────────────────────────────────────────────
 interface AdminCompany {
   id: string;
   name: string;
@@ -130,7 +129,6 @@ interface RoleDef {
   isDefault?: boolean;
 }
 
-// ─── Status helpers ──────────────────────────────────────────────────────────
 const DEMO_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   new: { label: "New", color: "bg-blue-100 text-blue-700" },
   contacted: { label: "Contacted", color: "bg-amber-100 text-amber-700" },
@@ -698,8 +696,8 @@ export default function SuperAdminDashboard() {
                       <TableHead>Company</TableHead>
                       <TableHead>Owner</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Plan</TableHead>
+                      <TableHead>Access Status</TableHead>
+                      <TableHead>Billing Type</TableHead>
                       <TableHead>Monthly Price</TableHead>
                       <TableHead>Trial Ends</TableHead>
                       <TableHead className="text-center">Users</TableHead>

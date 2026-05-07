@@ -807,18 +807,17 @@ export async function registerRoutes(
   app.get("/api/admin/invites", requireAdmin, async (req, res, next) => {
     try {
       // Fetch all invites and lookup data in parallel — no per-project iteration
-      const [allProjectInvites, allContractorInvites, allProjects, allCompanies, allContractors, allCompanyOwners] = await Promise.all([
-        storage.getAllProjectInvites(),
-        storage.getAllContractorInvites(),
-        storage.getProjects(),
-        storage.getAllCompanies(),
-        storage.getUsersByRole("contractor"),
-        storage.getUsersByRole("company_owner"),
+      const [allProjectInvites, allContractorInvites, allProjects, allCompanies, allUsers] = await Promise.all([
+        storage.getAllProjectInvites() as Promise<import("@shared/schema").ProjectInvite[]>,
+        storage.getAllContractorInvites() as Promise<import("@shared/schema").ContractorInvite[]>,
+        storage.getProjects() as Promise<import("@shared/schema").Project[]>,
+        storage.getAllCompanies() as Promise<import("@shared/schema").Company[]>,
+        storage.getAllUsers() as Promise<import("@shared/schema").User[]>,
       ]);
 
       const projectMap = new Map(allProjects.map(p => [p.id, p]));
       const companyMap = new Map(allCompanies.map(c => [c.id, c]));
-      const userMap = new Map([...allContractors, ...allCompanyOwners].map(u => [u.id, u]));
+      const userMap = new Map(allUsers.map(u => [u.id, u]));
 
       const projectInvites = allProjectInvites.map(inv => {
         const project = inv.projectId ? projectMap.get(inv.projectId) : null;
