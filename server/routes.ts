@@ -7,7 +7,7 @@ import path from "path";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { storage } from "./storage";
-import { sendDemoRequestEmail } from "./email";
+import { sendDemoRequestEmail, sendPasswordResetEmail } from "./email";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
@@ -290,6 +290,84 @@ export async function registerRoutes(
       return res.json({ user: userWithoutPassword });
     }
     res.status(401).json({ message: "Not authenticated" });
+  });
+
+  // Forgot password — send a reset link via email
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const schema = z.object({ email: z.string().email() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        // Always return 200 to avoid email enumeration
+        return res.json({ message: "If that email exists, a reset link has been sent." });
+      }
+      const { email } = parsed.data;
+      const user = await storage.getUserByEmail(email);
+      if (user) {
+        // Invalidate any existing unused tokens for this user
+        await storage.invalidateUserPasswordResetTokens(user.id);
+
+        // Generate a secure random token
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await storage.createPasswordResetToken(user.id, tokenHash, expiresAt);
+
+        // Send the email (best-effort — don't fail the request if email fails)
+        sendPasswordResetEmail(email, { userName: user.name ?? undefined, resetToken: rawToken })
+          .catch((err) => console.error("[forgot-password] Email send failed:", err));
+      }
+      // Always return the same response regardless of whether user exists
+      res.json({ message: "If that email exists, a reset link has been sent." });
+    } catch (err) {
+      console.error("[forgot-password] Error:", err);
+      res.status(500).json({ message: "Something went wrong. Please try again." });
+    }
+  });
+
+  // Validate a password reset token (GET)
+  app.get("/api/auth/reset-password/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+      const record = await storage.getPasswordResetToken(tokenHash);
+      if (!record || record.usedAt || new Date() > record.expiresAt) {
+        return res.status(400).json({ message: "This reset link is invalid or has expired." });
+      }
+      res.json({ valid: true });
+    } catch (err) {
+      console.error("[reset-password GET] Error:", err);
+      res.status(500).json({ message: "Something went wrong." });
+    }
+  });
+
+  // Consume a password reset token and update the password (POST)
+  app.post("/api/auth/reset-password/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const bodySchema = z.object({ password: z.string().min(8) });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Password must be at least 8 characters." });
+      }
+
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+      // Atomically consume the token — marks used_at only if token is valid, unused, and unexpired
+      const record = await storage.consumePasswordResetToken(tokenHash);
+      if (!record) {
+        return res.status(400).json({ message: "This reset link is invalid or has expired." });
+      }
+
+      const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
+      await storage.updateUserPassword(record.userId, hashedPassword);
+
+      res.json({ message: "Password updated successfully." });
+    } catch (err) {
+      console.error("[reset-password POST] Error:", err);
+      res.status(500).json({ message: "Something went wrong." });
+    }
   });
 
   // Admin-only middleware

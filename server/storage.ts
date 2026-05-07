@@ -73,6 +73,13 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsernameOrEmail(identifier: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+
+  // Password reset token methods
+  createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+  getPasswordResetToken(tokenHash: string): Promise<schema.PasswordResetToken | undefined>;
+  consumePasswordResetToken(tokenHash: string): Promise<schema.PasswordResetToken | undefined>;
+  invalidateUserPasswordResetTokens(userId: string): Promise<void>;
   
   // Project methods
   getProjects(): Promise<Project[]>;
@@ -380,6 +387,42 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(schema.users).values(insertUser).returning();
     return user;
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    await db.update(schema.users).set({ password: hashedPassword }).where(eq(schema.users.id, userId));
+  }
+
+  // Password reset token methods
+  async createPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await db.insert(schema.passwordResetTokens).values({ userId, tokenHash, expiresAt });
+  }
+
+  async getPasswordResetToken(tokenHash: string): Promise<schema.PasswordResetToken | undefined> {
+    const [token] = await db.select().from(schema.passwordResetTokens).where(eq(schema.passwordResetTokens.tokenHash, tokenHash));
+    return token;
+  }
+
+  async consumePasswordResetToken(tokenHash: string): Promise<schema.PasswordResetToken | undefined> {
+    const now = new Date();
+    const [consumed] = await db
+      .update(schema.passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(schema.passwordResetTokens.tokenHash, tokenHash),
+          isNull(schema.passwordResetTokens.usedAt),
+          sql`${schema.passwordResetTokens.expiresAt} > ${now}`
+        )
+      )
+      .returning();
+    return consumed;
+  }
+
+  async invalidateUserPasswordResetTokens(userId: string): Promise<void> {
+    await db.update(schema.passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(schema.passwordResetTokens.userId, userId), isNull(schema.passwordResetTokens.usedAt)));
   }
 
   // Project methods

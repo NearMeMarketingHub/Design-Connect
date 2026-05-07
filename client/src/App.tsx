@@ -41,6 +41,8 @@ import CompanyDashboard from "@/pages/company-dashboard";
 import SubcontractorDashboard from "@/pages/subcontractor-dashboard";
 import AcceptSubcontractorInvite from "@/pages/accept-subcontractor-invite";
 import DemoPage from "@/pages/demo";
+import ResetPasswordPage from "@/pages/reset-password";
+import ForgotPasswordPage from "@/pages/forgot-password";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import ErrorBoundary from "@/components/error-boundary";
@@ -57,6 +59,20 @@ function Router() {
   // Demo / Contact page (public)
   if (location === "/demo") {
     return <DemoPage />;
+  }
+
+  // Password reset pages (public)
+  if (location === "/forgot-password") {
+    return <ForgotPasswordPage />;
+  }
+
+  if (location.startsWith("/reset-password/")) {
+    return (
+      <Switch>
+        <Route path="/reset-password/:token" component={ResetPasswordPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
   }
   
   // Auth Routes

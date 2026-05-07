@@ -170,6 +170,15 @@ export default function AuthPage() {
                 </CardHeader>
                 <form onSubmit={handleClientAuth}>
                   <CardContent className="space-y-4">
+                    {isLogin && (
+                      <div className="flex justify-end -mb-2">
+                        <Link href="/forgot-password">
+                          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground" data-testid="link-forgot-password-client">
+                            Forgot password?
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                     {/* Preserved: client registration fields (hidden in invite-only mode) */}
                     {REGISTRATION_ENABLED && !isLogin && (
                       <>
@@ -273,6 +282,13 @@ export default function AuthPage() {
                       <CardContent className="space-y-4">
                         {isLogin ? (
                           <>
+                            <div className="flex justify-end -mb-2">
+                              <Link href="/forgot-password">
+                                <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground" data-testid="link-forgot-password-contractor">
+                                  Forgot password?
+                                </Button>
+                              </Link>
+                            </div>
                             <div className="space-y-2">
                               <Label htmlFor="contractor-email">Email or Username</Label>
                               <Input id="contractor-email" name="contractor-email" type="text" placeholder="email or username" required data-testid="input-contractor-email" />

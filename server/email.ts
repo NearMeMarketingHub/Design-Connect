@@ -403,6 +403,79 @@ export async function sendDemoRequestEmail(formData: {
   return data;
 }
 
+// Send password reset email
+export async function sendPasswordResetEmail(
+  toEmail: string,
+  resetData: {
+    userName?: string;
+    resetToken: string;
+  }
+) {
+  const { client, fromEmail } = await getResendClient();
+
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : process.env.REPLIT_DOMAINS?.split(',')[0]
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : 'http://localhost:5000';
+
+  const resetUrl = `${baseUrl}/reset-password/${resetData.resetToken}`;
+  const greeting = resetData.userName ? `Hi ${escapeHtml(resetData.userName)},` : 'Hi there,';
+
+  const { data, error } = await client.emails.send({
+    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    to: toEmail,
+    subject: 'Reset your BuildVision password',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <p style="color: #94a3b8; margin: 5px 0 0;">Password Reset Request</p>
+        </div>
+
+        <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
+          <p style="font-size: 16px; margin-top: 0;">${greeting}</p>
+
+          <p>We received a request to reset the password for your BuildVision account. Click the button below to choose a new password.</p>
+
+          <div style="background: #fef9c3; padding: 15px; border-radius: 8px; border-left: 4px solid #eab308; margin: 20px 0;">
+            <p style="margin: 0; font-size: 13px; color: #854d0e;">
+              <strong>This link expires in 1 hour.</strong> If you did not request a password reset, you can safely ignore this email — your account is not at risk.
+            </p>
+          </div>
+
+          <a href="${resetUrl}" style="display: inline-block; background: #3b82f6; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 10px 0;">
+            Reset My Password
+          </a>
+
+          <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+            Or copy and paste this link into your browser:<br>
+            <a href="${resetUrl}" style="color: #3b82f6; word-break: break-all;">${resetUrl}</a>
+          </p>
+        </div>
+
+        <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+
+  if (error) {
+    console.error('Failed to send password reset email:', error);
+    throw new Error(`Failed to send password reset email: ${error.message}`);
+  }
+
+  return data;
+}
+
 // Send external sub/notary project invite email
 export async function sendExternalInviteEmail(
   toEmail: string,

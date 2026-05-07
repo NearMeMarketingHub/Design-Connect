@@ -743,6 +743,20 @@ export const insertChangeOrderSchema = createInsertSchema(changeOrders).omit({ i
 export type InsertChangeOrder = z.infer<typeof insertChangeOrderSchema>;
 export type ChangeOrder = typeof changeOrders.$inferSelect;
 
+// Password Reset Tokens - Time-limited tokens for self-service password recovery
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  tokenHash: text("token_hash").notNull().unique(), // SHA-256 hash of the raw token
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"), // null = not yet used
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
 // Change Order Line Items - Itemized breakdown of costs in a change order
 export const changeOrderLineItems = pgTable("change_order_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
