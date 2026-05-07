@@ -129,7 +129,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== "admin")) {
-      setLocation("/admin/login");
+      setLocation("/admin-login");
     }
   }, [user, authLoading, setLocation]);
 

@@ -49,7 +49,8 @@ import ErrorBoundary from "@/components/error-boundary";
 import { useRealtimeUpdates } from "@/lib/useRealtimeUpdates";
 
 function Router() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { user, authLoading } = useAuth();
 
   // Landing Page (home)
   if (location === "/") {
@@ -106,6 +107,11 @@ function Router() {
   
   // Notary Portal Routes (has its own header)
   if (location.startsWith("/notary")) {
+    if (!authLoading && (!user || user.role !== "contractor" || user.contractorType !== "notary") && user?.role !== "admin") {
+      setLocation("/auth");
+      return null;
+    }
+    if (authLoading) return null;
     return (
       <Switch>
         <Route path="/notary/portal" component={NotaryPortal} />
@@ -138,7 +144,14 @@ function Router() {
   }
 
   // Subcontractor Portal Routes (with Layout)
+  // Accessible by contractors with contractorType of 'subcontractor' or 'notary' (Sub/Notary hub)
   if (location.startsWith("/subcontractor")) {
+    const isSubOrNotary = user?.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary");
+    if (!authLoading && !isSubOrNotary && user?.role !== "admin") {
+      setLocation("/auth");
+      return null;
+    }
+    if (authLoading) return null;
     return (
       <Layout>
         <Switch>

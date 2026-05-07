@@ -155,7 +155,15 @@ export async function registerRoutes(
   });
 
   // Auth routes
+  // PUBLIC_REGISTRATION_ENABLED: set to true to re-open self-registration.
+  // While false, all direct POST requests are rejected — invite-based creation
+  // via /api/invites/:token/accept and /api/contractor-invites/accept/:token is unaffected.
+  const PUBLIC_REGISTRATION_ENABLED = false;
+
   app.post("/api/auth/register", async (req, res, next) => {
+    if (!PUBLIC_REGISTRATION_ENABLED) {
+      return res.status(403).json({ message: "Public registration is disabled. Please use an invitation link." });
+    }
     try {
       const { username, email, password, role, name, companyName, companyType, phone, contractorType } = req.body;
       
@@ -3642,6 +3650,14 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Only platform admins, company owners/admins, and internal contractors for this company may send invites
+      const isAdmin = user.role === "admin";
+      const isCompanyMember = user.companyId && project.companyId && user.companyId === project.companyId;
+      const isAuthorized = isAdmin || (isCompanyMember && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "You are not authorized to send invitations for this project." });
+      }
+
       // Expire any existing pending invites for this email on this project
       const existingInvites = await storage.getProjectInvitesByProjectId(req.params.projectId);
       for (const existing of existingInvites) {
@@ -3691,6 +3707,20 @@ export async function registerRoutes(
   // Get invites for a project
   app.get("/api/projects/:projectId/invites", requireAuth, async (req, res, next) => {
     try {
+      const user = req.user as User;
+
+      // Only platform admins, company owners/admins, and internal contractors for this company may view invites
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      const isAdmin = user.role === "admin";
+      const isCompanyMember = user.companyId && project.companyId && user.companyId === project.companyId;
+      const isAuthorized = isAdmin || (isCompanyMember && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "You are not authorized to view invitations for this project." });
+      }
+
       const invites = await storage.getProjectInvitesByProjectId(req.params.projectId);
       res.json(invites);
     } catch (error) {
