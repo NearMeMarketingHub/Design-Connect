@@ -106,8 +106,9 @@ function Router() {
   }
   
   // Notary Portal Routes (has its own header)
+  // Strictly restricted to users with role=contractor and contractorType=notary
   if (location.startsWith("/notary")) {
-    if (!authLoading && (!user || user.role !== "contractor" || user.contractorType !== "notary") && user?.role !== "admin") {
+    if (!authLoading && !(user?.role === "contractor" && user.contractorType === "notary")) {
       setLocation("/auth");
       return null;
     }
@@ -144,10 +145,10 @@ function Router() {
   }
 
   // Subcontractor Portal Routes (with Layout)
-  // Accessible by contractors with contractorType of 'subcontractor' or 'notary' (Sub/Notary hub)
+  // The Sub/Notary hub is used by both subcontractors and notaries (see replit.md architecture)
   if (location.startsWith("/subcontractor")) {
     const isSubOrNotary = user?.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary");
-    if (!authLoading && !isSubOrNotary && user?.role !== "admin") {
+    if (!authLoading && !isSubOrNotary) {
       setLocation("/auth");
       return null;
     }
