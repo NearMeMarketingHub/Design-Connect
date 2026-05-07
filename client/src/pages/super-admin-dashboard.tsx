@@ -181,6 +181,7 @@ export default function SuperAdminDashboard() {
   const [companySubForm, setCompanySubForm] = useState({ subscriptionPlan: "free", subscriptionStatus: "trialing" });
 
   const [createCompanyDialogOpen, setCreateCompanyDialogOpen] = useState(false);
+  const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
   const [createCompanyForm, setCreateCompanyForm] = useState({
     companyName: "",
     ownerName: "",
@@ -368,11 +369,25 @@ export default function SuperAdminDashboard() {
   const createCompanyMutation = useMutation({
     mutationFn: (data: typeof createCompanyForm) =>
       apiRequest("POST", "/api/admin/companies", data).then(r => r.json()),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
+      const leadId = convertingLeadId;
+      setConvertingLeadId(null);
       setCreateCompanyDialogOpen(false);
       setCreateCompanyForm({ companyName: "", ownerName: "", ownerEmail: "", ownerUsername: "", password: "", companyType: "", subscriptionPlan: "free" });
       toast({ title: "Company created", description: "The company and owner account have been created." });
+      if (leadId) {
+        try {
+          await apiRequest("PATCH", `/api/admin/demo-requests/${leadId}`, { status: "converted" });
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/demo-requests"] });
+        } catch {
+          toast({
+            title: "Lead status not updated",
+            description: "Company was created successfully, but the demo request could not be marked as converted. Please update it manually.",
+            variant: "destructive",
+          });
+        }
+      }
     },
     onError: (err: Error) => toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
   });
@@ -531,6 +546,7 @@ export default function SuperAdminDashboard() {
   };
 
   const convertLeadToCompany = (lead: DemoRequest) => {
+    setConvertingLeadId(lead.id);
     setCreateCompanyForm({
       companyName: lead.company || "",
       ownerName: lead.name || "",
@@ -1613,7 +1629,7 @@ export default function SuperAdminDashboard() {
       </Dialog>
 
       {/* Create Company Dialog */}
-      <Dialog open={createCompanyDialogOpen} onOpenChange={setCreateCompanyDialogOpen}>
+      <Dialog open={createCompanyDialogOpen} onOpenChange={(open) => { if (!open) { setConvertingLeadId(null); setCreateCompanyForm({ companyName: "", ownerName: "", ownerEmail: "", ownerUsername: "", password: "", companyType: "", subscriptionPlan: "free" }); } setCreateCompanyDialogOpen(open); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Create Company</DialogTitle>
@@ -1661,7 +1677,7 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => { setCreateCompanyDialogOpen(false); setCreateCompanyForm({ companyName: "", ownerName: "", ownerEmail: "", ownerUsername: "", password: "", companyType: "", subscriptionPlan: "free" }); }}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setCreateCompanyDialogOpen(false)}>Cancel</Button>
             <Button
               onClick={() => createCompanyMutation.mutate(createCompanyForm)}
               disabled={
