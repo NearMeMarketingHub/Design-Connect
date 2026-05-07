@@ -1,0 +1,125 @@
+We are ready to clean up the Super Admin dashboard.
+
+The app is now a SaaS platform where Super Admins are the platform owners. The Super Admin dashboard should focus on managing customer companies, demo requests/leads, users, invites, and platform access. It should no longer feel like a single-company construction admin dashboard.
+
+Do not change BuildVision branding.
+
+Update the Super Admin dashboard structure:
+
+1. Update the dashboard header text.
+Change the description from project/contractor-focused wording to:
+“Manage companies, users, demo requests, invites, and platform access.”
+
+2. Replace the current stat cards with platform-focused cards:
+- Total Companies
+- Active Companies
+- Demo Requests
+- Pending Invites / Approvals
+- Total Users
+
+3. Move the company/subscription section higher on the dashboard and rename it from “Subscriptions” to “Companies.”
+This should be the main operational section for customer accounts.
+
+The Companies table should include:
+- Company
+- Owner
+- Company Type
+- Access Status
+- Billing Type
+- Monthly Price
+- Trial Ends
+- Users
+- Projects
+- Actions
+
+Company actions should include:
+- View Company
+- Edit Access
+- Send Password Reset to Owner
+- Suspend Company
+- Reactivate Company
+
+4. Add or improve a “Demo Requests / Leads” section.
+Since companies no longer self-register, demo requests are now the start of the customer account flow.
+
+The Demo Requests table should include:
+- Name
+- Company
+- Email
+- Phone
+- Message/Needs
+- Status
+- Submitted Date
+- Actions
+
+Statuses should include:
+- New
+- Contacted
+- Demo Scheduled
+- Converted
+- Closed
+
+Add an action called “Convert to Company” that opens the Create Company modal with the lead’s information prefilled.
+
+5. Add or improve an “Invite Status” section.
+Since account creation is now invite-only, Super Admins need visibility into invite activity.
+
+The Invite Status table should include:
+- Invited Email
+- Invite Type
+- Company
+- Project
+- Status
+- Sent At
+- Accepted At
+- Expires At
+- Actions
+
+Statuses should include:
+- Pending
+- Accepted
+- Expired
+- Revoked
+
+Actions should include:
+- Resend Invite
+- Revoke Invite
+- View Related Project
+
+6. Rename the “Manage Contractors” button/section to “Users & Approvals.”
+This area should manage all platform users and approval workflows, not just contractors.
+
+It should include:
+- Company owners
+- Company team members/internal contractors
+- Clients
+- Pending approvals
+- Password reset actions
+- User status controls
+
+7. Keep the All Projects table, but make it secondary.
+Rename it to “Platform Projects” or keep “All Projects,” but add a Company column.
+
+Columns should be:
+- Project
+- Company
+- Client
+- Project Owner / Contractor
+- Status
+- Actions
+
+8. Move Budget Manager, Financial Management, Sandbox Testing, Role Definitions, and Subscription Tiers into a lower “Platform Tools” or “Admin Tools” section.
+
+9. Since we currently use a one-price/manual billing model instead of true tiers, simplify Subscription Tiers into “Pricing & Access Settings.”
+Include:
+- Default Monthly Price
+- Trial Length
+- Manual Billing
+- Free/Prepaid access options
+
+10. Make sure company owners created from Super Admin are treated as customer company owners, not platform admins.
+They should:
+- have role = company_owner
+- belong to their company
+- log in through Contractor Login
+- route to /company/dashboard
