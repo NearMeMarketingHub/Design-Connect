@@ -179,6 +179,9 @@ export default function SuperAdminDashboard() {
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [usersPage, setUsersPage] = useState(1);
   const [usersPageSize, setUsersPageSize] = useState(25);
+  const [projectsPage, setProjectsPage] = useState(1);
+
+  const PAGE_SIZE = 25;
 
   const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
   const [editingRoleDef, setEditingRoleDef] = useState<RoleDef | null>(null);
@@ -361,6 +364,11 @@ export default function SuperAdminDashboard() {
   const usersStart = (usersPage - 1) * usersPageSize;
   const usersEnd = Math.min(usersStart + usersPageSize, filteredUsers.length);
   const pagedUsers = filteredUsers.slice(usersStart, usersEnd);
+
+  const projectsTotalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
+  const projectsStart = (projectsPage - 1) * PAGE_SIZE;
+  const projectsEnd = Math.min(projectsStart + PAGE_SIZE, filteredProjects.length);
+  const pagedProjects = filteredProjects.slice(projectsStart, projectsEnd);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const deleteRoleDefMutation = useMutation({
@@ -1337,7 +1345,7 @@ export default function SuperAdminDashboard() {
                 placeholder="Search projects..."
                 className="pl-9"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setProjectsPage(1); }}
                 data-testid="input-search-projects"
               />
             </div>
@@ -1363,7 +1371,7 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProjects.map((project) => (
+                    {pagedProjects.map((project) => (
                       <TableRow key={project.id}>
                         <TableCell className="font-medium">{project.name}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{project.companyName || "—"}</TableCell>
@@ -1404,6 +1412,38 @@ export default function SuperAdminDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+              {filteredProjects.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                  <span data-testid="projects-pagination-info">
+                    Showing {projectsStart + 1}–{projectsEnd} of {filteredProjects.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setProjectsPage(p => Math.max(1, p - 1))}
+                      disabled={projectsPage === 1}
+                      data-testid="button-projects-prev"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Previous
+                    </Button>
+                    <span className="px-3 text-xs font-medium">
+                      Page {projectsPage} of {projectsTotalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setProjectsPage(p => Math.min(projectsTotalPages, p + 1))}
+                      disabled={projectsPage === projectsTotalPages}
+                      data-testid="button-projects-next"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
