@@ -808,18 +808,23 @@ export async function registerRoutes(
   app.get("/api/admin/invites", requireAdmin, async (req, res, next) => {
     try {
       // Fetch all invites and lookup data in parallel — no per-project iteration
-      const [allProjectInvites, allContractorInvites, allProjects, allCompanies] = await Promise.all([
+      const [allProjectInvites, allContractorInvites, allProjects, allCompanies, allContractors, allCompanyOwners] = await Promise.all([
         storage.getAllProjectInvites(),
         storage.getAllContractorInvites(),
         storage.getProjects(),
         storage.getAllCompanies(),
+        storage.getUsersByRole("contractor"),
+        storage.getUsersByRole("company_owner"),
       ]);
 
       const projectMap = new Map(allProjects.map(p => [p.id, p]));
       const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+      const userMap = new Map([...allContractors, ...allCompanyOwners].map(u => [u.id, u]));
 
       const projectInvites = allProjectInvites.map(inv => {
         const project = inv.projectId ? projectMap.get(inv.projectId) : null;
+        const invitedByUser = inv.invitedBy ? userMap.get(inv.invitedBy) : null;
+        const companyFromUser = invitedByUser?.companyId ? companyMap.get(invitedByUser.companyId) : null;
         return {
           id: inv.id,
           inviteType: "client",
@@ -827,7 +832,7 @@ export async function registerRoutes(
           status: inv.status,
           projectId: inv.projectId,
           projectName: project?.name ?? null,
-          companyName: null as string | null,
+          companyName: companyFromUser?.name ?? null,
           sentAt: inv.createdAt,
           acceptedAt: null as string | null,
           expiresAt: inv.expiresAt,

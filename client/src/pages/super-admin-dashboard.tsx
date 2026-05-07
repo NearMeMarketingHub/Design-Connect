@@ -73,6 +73,63 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import type { Project, User } from "@shared/schema";
 
+// ─── Admin data shapes ────────────────────────────────────────────────────────
+interface AdminCompany {
+  id: string;
+  name: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerUserId?: string;
+  companyType?: string;
+  subscriptionStatus?: string;
+  subscriptionPlan?: string;
+  trialStartedAt?: string | null;
+  userCount?: number;
+  projectCount?: number;
+}
+
+interface DemoRequest {
+  id: string;
+  name: string;
+  company?: string;
+  email: string;
+  phone?: string;
+  message?: string;
+  status: string;
+  createdAt: string;
+}
+
+interface AdminInvite {
+  id: string;
+  inviteType: string;
+  email: string;
+  status: string;
+  projectId?: string | null;
+  projectName?: string | null;
+  companyName?: string | null;
+  sentAt: string;
+  acceptedAt?: string | null;
+  expiresAt?: string | null;
+}
+
+interface SubscriptionTier {
+  id: string;
+  name: string;
+  price: string;
+  maxProjects?: number | null;
+  features?: string[];
+  sortOrder?: number;
+  isActive: boolean;
+}
+
+interface RoleDef {
+  id: string;
+  name: string;
+  type: string;
+  permissions: Record<string, boolean>;
+  isDefault?: boolean;
+}
+
 // ─── Status helpers ──────────────────────────────────────────────────────────
 const DEMO_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   new: { label: "New", color: "bg-blue-100 text-blue-700" },
@@ -114,15 +171,15 @@ export default function SuperAdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [roleDefDialogOpen, setRoleDefDialogOpen] = useState(false);
-  const [editingRoleDef, setEditingRoleDef] = useState<any | null>(null);
+  const [editingRoleDef, setEditingRoleDef] = useState<RoleDef | null>(null);
   const [roleDefForm, setRoleDefForm] = useState({ name: "", type: "contractor", permissions: {} as Record<string, boolean> });
 
   const [tierDialogOpen, setTierDialogOpen] = useState(false);
-  const [editingTier, setEditingTier] = useState<any | null>(null);
+  const [editingTier, setEditingTier] = useState<SubscriptionTier | null>(null);
   const [tierForm, setTierForm] = useState({ name: "", price: "0", maxProjects: "", features: "", sortOrder: "0", isActive: true });
 
   const [companySubDialogOpen, setCompanySubDialogOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState<any | null>(null);
+  const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
   const [companySubForm, setCompanySubForm] = useState({ subscriptionPlan: "free", subscriptionStatus: "trialing" });
 
   const [createCompanyDialogOpen, setCreateCompanyDialogOpen] = useState(false);
@@ -152,7 +209,7 @@ export default function SuperAdminDashboard() {
     setRoleDefDialogOpen(true);
   };
 
-  const openEditRoleDef = (def: any) => {
+  const openEditRoleDef = (def: RoleDef) => {
     setEditingRoleDef(def);
     setRoleDefForm({ name: def.name, type: def.type, permissions: def.permissions || {} });
     setRoleDefDialogOpen(true);
@@ -202,31 +259,31 @@ export default function SuperAdminDashboard() {
     enabled: user?.role === "admin",
   });
 
-  const { data: companies = [] } = useQuery({
+  const { data: companies = [] } = useQuery<AdminCompany[]>({
     queryKey: ["/api/admin/companies"],
     queryFn: () => apiRequest("GET", "/api/admin/companies").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
-  const { data: roleDefs = [], refetch: refetchRoleDefs } = useQuery({
+  const { data: roleDefs = [], refetch: refetchRoleDefs } = useQuery<RoleDef[]>({
     queryKey: ["/api/admin/role-definitions"],
     queryFn: () => apiRequest("GET", "/api/admin/role-definitions").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
-  const { data: adminTiers = [], refetch: refetchTiers } = useQuery({
+  const { data: adminTiers = [], refetch: refetchTiers } = useQuery<SubscriptionTier[]>({
     queryKey: ["/api/admin/subscription/tiers"],
     queryFn: () => apiRequest("GET", "/api/admin/subscription/tiers").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
-  const { data: demoRequests = [] } = useQuery({
+  const { data: demoRequests = [] } = useQuery<DemoRequest[]>({
     queryKey: ["/api/admin/demo-requests"],
     queryFn: () => apiRequest("GET", "/api/admin/demo-requests").then(r => r.json()),
     enabled: user?.role === "admin",
   });
 
-  const { data: adminInvites = [] } = useQuery({
+  const { data: adminInvites = [] } = useQuery<AdminInvite[]>({
     queryKey: ["/api/admin/invites"],
     queryFn: () => apiRequest("GET", "/api/admin/invites").then(r => r.json()),
     enabled: user?.role === "admin",
@@ -239,13 +296,13 @@ export default function SuperAdminDashboard() {
   });
 
   // ── Computed stats ────────────────────────────────────────────────────────
-  const realProjects = projects.filter((p: any) => !p.isSandbox);
-  const allUsers = [...contractors.filter((u: any) => !u.isSandbox), ...clients.filter((u: any) => !u.isSandbox)];
-  const activeCompanies = (companies as any[]).filter(c => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing");
-  const newDemoRequests = (demoRequests as any[]).filter(d => d.status === "new");
-  const pendingInvitesCount = (adminInvites as any[]).filter(i => i.status === "pending").length;
+  const realProjects = projects.filter(p => !p.isSandbox);
+  const allUsers = [...contractors.filter(u => !u.isSandbox), ...clients.filter(u => !u.isSandbox)];
+  const activeCompanies = companies.filter(c => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing");
+  const newDemoRequests = demoRequests.filter(d => d.status === "new");
+  const pendingInvitesCount = adminInvites.filter(i => i.status === "pending").length;
   const pendingTotal = pendingContractors.length + contractorRequests.length + pendingInvitesCount;
-  const filteredProjects = realProjects.filter((p: any) =>
+  const filteredProjects = realProjects.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
   );
@@ -450,7 +507,7 @@ export default function SuperAdminDashboard() {
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const openCompanySubEdit = (company: any) => {
+  const openCompanySubEdit = (company: AdminCompany) => {
     setEditingCompany(company);
     setCompanySubForm({ subscriptionPlan: company.subscriptionPlan || "free", subscriptionStatus: company.subscriptionStatus || "trialing" });
     setCompanySubDialogOpen(true);
@@ -462,7 +519,7 @@ export default function SuperAdminDashboard() {
     setTierDialogOpen(true);
   };
 
-  const openTierEdit = (tier: any) => {
+  const openTierEdit = (tier: SubscriptionTier) => {
     setEditingTier(tier);
     setTierForm({
       name: tier.name,
@@ -475,7 +532,7 @@ export default function SuperAdminDashboard() {
     setTierDialogOpen(true);
   };
 
-  const convertLeadToCompany = (lead: any) => {
+  const convertLeadToCompany = (lead: DemoRequest) => {
     setCreateCompanyForm({
       companyName: lead.company || "",
       ownerName: lead.name || "",
@@ -556,7 +613,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Companies</p>
-                  <h3 className="text-2xl font-bold">{(companies as any[]).length}</h3>
+                  <h3 className="text-2xl font-bold">{companies.length}</h3>
                 </div>
               </div>
             </CardContent>
@@ -628,7 +685,7 @@ export default function SuperAdminDashboard() {
               <Plus className="w-4 h-4 mr-1" /> Create Company
             </Button>
           </div>
-          {(companies as any[]).length === 0 ? (
+          {companies.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">No companies registered yet.</CardContent>
             </Card>
@@ -651,7 +708,7 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(companies as any[]).map((company) => {
+                    {companies.map((company) => {
                       const trialStart = company.trialStartedAt ? new Date(company.trialStartedAt) : null;
                       const trialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
                       const now = new Date();
@@ -675,7 +732,7 @@ export default function SuperAdminDashboard() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {(() => {
-                              const tier = (adminTiers as any[]).find(t =>
+                              const tier = adminTiers.find(t =>
                                 t.name.toLowerCase() === (company.subscriptionPlan || "free").toLowerCase()
                               );
                               const price = tier ? parseFloat(tier.price) : 0;
@@ -703,7 +760,7 @@ export default function SuperAdminDashboard() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => sendPasswordResetMutation.mutate(company.ownerUserId)}
+                                  onClick={() => sendPasswordResetMutation.mutate(company.ownerUserId!)}
                                   disabled={sendPasswordResetMutation.isPending || !company.ownerEmail}
                                   data-testid={`button-send-reset-${company.id}`}
                                   title={company.ownerEmail ? `Send password reset to ${company.ownerEmail}` : "Owner has no email"}
@@ -764,9 +821,9 @@ export default function SuperAdminDashboard() {
               <CalendarCheck className="w-5 h-5 text-purple-600" />
               Demo Requests / Leads
             </h2>
-            <Badge variant="secondary">{(demoRequests as any[]).length} total</Badge>
+            <Badge variant="secondary">{demoRequests.length} total</Badge>
           </div>
-          {(demoRequests as any[]).length === 0 ? (
+          {demoRequests.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">
                 No demo requests yet. They'll appear here when submitted via the /demo page.
@@ -789,7 +846,7 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(demoRequests as any[]).map((lead) => (
+                    {demoRequests.map((lead) => (
                       <TableRow key={lead.id} data-testid={`demo-request-${lead.id}`}>
                         <TableCell className="font-medium whitespace-nowrap">{lead.name}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
@@ -853,9 +910,9 @@ export default function SuperAdminDashboard() {
               <Link2 className="w-5 h-5 text-teal-600" />
               Invite Status
             </h2>
-            <Badge variant="secondary">{(adminInvites as any[]).length} total</Badge>
+            <Badge variant="secondary">{adminInvites.length} total</Badge>
           </div>
-          {(adminInvites as any[]).length === 0 ? (
+          {adminInvites.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-muted-foreground">
                 No invites found across the platform.
@@ -879,7 +936,7 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(adminInvites as any[]).map((inv, idx) => (
+                    {adminInvites.map((inv, idx) => (
                       <TableRow key={`${inv.id}-${idx}`} data-testid={`invite-row-${inv.id}`}>
                         <TableCell className="text-sm font-medium">{inv.email}</TableCell>
                         <TableCell>
@@ -1231,7 +1288,7 @@ export default function SuperAdminDashboard() {
                   <p className="text-sm text-muted-foreground">No role definitions yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {(roleDefs as any[]).map((def) => (
+                    {roleDefs.map((def) => (
                       <div key={def.id} className="flex items-center justify-between py-2 px-3 rounded-lg border" data-testid={`role-def-${def.id}`}>
                         <div>
                           <p className="font-medium text-sm">{def.name}</p>
@@ -1356,7 +1413,7 @@ export default function SuperAdminDashboard() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(adminTiers as any[]).map((tier) => {
+                {adminTiers.map((tier) => {
                   const price = parseFloat(tier.price);
                   return (
                     <Card key={tier.id} className={!tier.isActive ? "opacity-60" : ""} data-testid={`tier-card-${tier.id}`}>
@@ -1458,7 +1515,7 @@ export default function SuperAdminDashboard() {
                 <SelectTrigger data-testid="select-company-plan"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="free">Free</SelectItem>
-                  {(adminTiers as any[]).map((t) => (
+                  {adminTiers.map((t) => (
                     <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1571,7 +1628,7 @@ export default function SuperAdminDashboard() {
                 <SelectTrigger data-testid="select-create-company-plan"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="free">Free</SelectItem>
-                  {(adminTiers as any[]).map((t) => (
+                  {adminTiers.map((t) => (
                     <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
                   ))}
                 </SelectContent>
