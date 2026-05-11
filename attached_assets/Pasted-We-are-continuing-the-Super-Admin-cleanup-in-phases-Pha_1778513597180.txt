@@ -1,0 +1,162 @@
+We are continuing the Super Admin cleanup in phases.
+
+Phase 1 is complete:
+- The Super Admin area now has sidebar navigation and separate pages.
+- Budget Manager and Financial Management were removed from Super Admin and moved to the company owner side.
+- Platform Projects has a company filter.
+- Role Definitions has been moved to its own page.
+
+For this phase, focus only on improving company management by making Companies the central customer-account area for Super Admins.
+
+Goal:
+Build a dedicated Company Detail page so Super Admins can click into a company and manage/view that customer account in one place.
+
+Main route to add:
+- /admin/companies/:companyId
+
+1. Update the Companies list page at /admin/companies.
+- Keep the existing company table and filters.
+- Make the existing view/eye action open the new dedicated Company Detail page for that company.
+- Keep existing actions such as edit access, password reset, suspend/reactivate, etc.
+- Do not remove current company table functionality.
+
+2. Create a dedicated Company Detail page.
+This page should represent one customer company account and should be accessible only to Super Admins.
+
+At the top of the page, show a company summary header with:
+- Company name
+- Company type
+- Owner name
+- Owner email
+- Access status
+- Billing type
+- Monthly price
+- Trial end date, if applicable
+- Created date
+- Quick actions:
+  - Edit Access
+  - Send Password Reset to Owner
+  - Suspend / Reactivate Company
+  - Back to Companies
+
+3. Add tabs or clearly separated sections on the Company Detail page:
+- Overview
+- Users
+- Projects
+- Invites
+- Billing & Access
+- Notes
+
+4. Overview tab:
+Show a clean summary of the company:
+- Company information
+- Owner information
+- Number of users
+- Number of projects
+- Number of pending invites
+- Current access/billing summary
+- Recent activity placeholders are okay for now if full audit logging is not built yet
+
+5. Users tab:
+Show only users associated with this company.
+Columns should include:
+- Name
+- Email
+- Role
+- Status
+- Last login, if available
+- Actions
+
+Actions should include where currently supported:
+- View user
+- Send password reset
+- Disable / Reactivate user
+
+Important:
+- Company owners and internal company team members should appear here.
+- Clients should only appear here if they are actually related to this company through projects; do not incorrectly treat clients as company-owned users.
+- If including related clients is useful, separate them visually from company-owned users so the distinction is clear.
+
+6. Projects tab:
+Show only projects belonging to this company.
+Columns should include:
+- Project name
+- Client
+- Status
+- Project owner / contractor
+- Created date, if available
+- Actions
+
+Actions should include:
+- View project
+
+7. Invites tab:
+Show only invites related to this company.
+Columns should include:
+- Invited email
+- Invite type
+- Project
+- Status
+- Sent at
+- Accepted at
+- Expires at
+- Actions
+
+Actions should include where currently supported:
+- Resend invite
+- Revoke invite
+- View related project
+
+8. Billing & Access tab:
+This should be the company-specific place for managing that company’s access settings.
+
+Add or confirm support for real company-level fields, not just display labels:
+- accessStatus
+  - trialing
+  - active
+  - free
+  - prepaid
+  - suspended
+  - cancelled
+  - expired
+- billingType
+  - manual
+  - free
+  - prepaid
+  - future_in_app
+- monthlyPrice
+- trialStartedAt
+- trialEndsAt
+- prepaidThroughDate, if useful
+- billingNotes / accessNotes
+
+If any of these do not exist yet in the database/schema, add them in a clean migration-safe way and wire them into company creation/editing.
+
+This tab should let Super Admins update company-specific access/billing settings without relying on plan tiers.
+The platform-wide defaults will continue to live separately under Pricing & Access.
+
+9. Notes tab:
+Add a simple internal-notes area for Super Admins to store notes about the company/customer account.
+- Notes are internal only and should never be visible to company owners or clients.
+- This can be a simple editable text field for now if that is the fastest clean implementation.
+- Save notes on the company record or in a clearly associated company-notes structure.
+
+10. Company counts/data correctness:
+Verify that company-level counts are accurate:
+- Users should include company-owned users such as the company owner and internal team members.
+- Projects should count projects belonging to that company.
+- Pending invites should count only invites for that company.
+- Do not count global clients as owned company users unless specifically shown as related clients.
+
+11. Keep company ownership logic clear:
+- Company owners are customer users, not Super Admins.
+- Clients are global users and may be related to multiple companies through projects.
+- Project access should remain project-based for clients.
+
+12. Keep the UI aligned with the new Super Admin layout:
+- Use the existing Super Admin sidebar layout.
+- Keep the page clean and easy to scan.
+- The Company Detail page should feel like the main account record for a customer company.
+
+Do not redesign Users, Invites, Demo Requests, Pricing & Access, Audit Log, or View As User beyond what is necessary to support the Company Detail page.
+Those areas will be handled in later phases.
