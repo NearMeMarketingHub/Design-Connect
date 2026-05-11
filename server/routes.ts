@@ -1405,7 +1405,10 @@ export async function registerRoutes(
   app.get("/api/estimates", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const companyId = user.role === "admin" ? undefined : (user.companyId ?? undefined);
+      if (user.role !== "admin" && !user.companyId) {
+        return res.status(403).json({ message: "No company associated with your account" });
+      }
+      const companyId = user.role === "admin" ? undefined : user.companyId!;
       const estimates = await storage.getEstimates(companyId);
       res.json(estimates);
     } catch (error) {
@@ -1415,9 +1418,24 @@ export async function registerRoutes(
 
   app.get("/api/estimates/:id", requireAuth, async (req, res, next) => {
     try {
+      const user = req.user as User;
       const estimate = await storage.getEstimate(req.params.id);
       if (!estimate) {
         return res.status(404).json({ message: "Estimate not found" });
+      }
+      if (user.role !== "admin") {
+        if (!user.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (estimate.projectId) {
+          const project = await storage.getProject(estimate.projectId);
+          if (project && project.contractorId) {
+            const contractor = await storage.getUser(project.contractorId);
+            if (!contractor || contractor.companyId !== user.companyId) {
+              return res.status(403).json({ message: "Access denied" });
+            }
+          }
+        }
       }
       const lineItems = await storage.getEstimateLineItems(req.params.id);
       res.json({ ...estimate, lineItems });
@@ -1458,7 +1476,10 @@ export async function registerRoutes(
   app.get("/api/invoices", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
-      const companyId = user.role === "admin" ? undefined : (user.companyId ?? undefined);
+      if (user.role !== "admin" && !user.companyId) {
+        return res.status(403).json({ message: "No company associated with your account" });
+      }
+      const companyId = user.role === "admin" ? undefined : user.companyId!;
       const invoices = await storage.getInvoices(companyId);
       res.json(invoices);
     } catch (error) {
@@ -1468,9 +1489,24 @@ export async function registerRoutes(
 
   app.get("/api/invoices/:id", requireAuth, async (req, res, next) => {
     try {
+      const user = req.user as User;
       const invoice = await storage.getInvoice(req.params.id);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
+      }
+      if (user.role !== "admin") {
+        if (!user.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (invoice.projectId) {
+          const project = await storage.getProject(invoice.projectId);
+          if (project && project.contractorId) {
+            const contractor = await storage.getUser(project.contractorId);
+            if (!contractor || contractor.companyId !== user.companyId) {
+              return res.status(403).json({ message: "Access denied" });
+            }
+          }
+        }
       }
       const lineItems = await storage.getInvoiceLineItems(req.params.id);
       res.json({ ...invoice, lineItems });
