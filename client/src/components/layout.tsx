@@ -15,7 +15,9 @@ import {
   X,
   Box,
   Building2,
-  Users
+  Users,
+  TrendingUp,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -73,6 +75,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     ] : []),
     ...(isCompanyOwner ? [
       { label: "Team", icon: <Users className="w-5 h-5" />, href: "/company/team" },
+    ] : []),
+    ...(canAccessAdminCenter ? [
+      { label: "Budget Manager", icon: <BookOpen className="w-5 h-5" />, href: "/company/budget" },
+      { label: "Financials", icon: <TrendingUp className="w-5 h-5" />, href: "/company/financials" },
     ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
     { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },

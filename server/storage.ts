@@ -92,14 +92,14 @@ export interface IStorage {
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined>;
   
   // Estimate methods
-  getEstimates(): Promise<Estimate[]>;
+  getEstimates(companyId?: string): Promise<Estimate[]>;
   getEstimate(id: string): Promise<Estimate | undefined>;
   createEstimate(estimate: InsertEstimate): Promise<Estimate>;
   getEstimateLineItems(estimateId: string): Promise<EstimateLineItem[]>;
   createEstimateLineItem(lineItem: InsertEstimateLineItem): Promise<EstimateLineItem>;
   
   // Invoice methods
-  getInvoices(): Promise<Invoice[]>;
+  getInvoices(companyId?: string): Promise<Invoice[]>;
   getInvoice(id: string): Promise<Invoice | undefined>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   getInvoiceLineItems(invoiceId: string): Promise<InvoiceLineItem[]>;
@@ -509,8 +509,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Estimate methods
-  async getEstimates(): Promise<Estimate[]> {
-    return await db.select().from(schema.estimates);
+  async getEstimates(companyId?: string): Promise<Estimate[]> {
+    if (!companyId) {
+      return await db.select().from(schema.estimates);
+    }
+    const rows = await db
+      .select({ estimate: schema.estimates })
+      .from(schema.estimates)
+      .leftJoin(schema.projects, eq(schema.estimates.projectId, schema.projects.id))
+      .leftJoin(schema.users, eq(schema.projects.contractorId, schema.users.id))
+      .where(eq(schema.users.companyId, companyId));
+    return rows.map((r) => r.estimate);
   }
 
   async getEstimate(id: string): Promise<Estimate | undefined> {
@@ -533,8 +542,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invoice methods
-  async getInvoices(): Promise<Invoice[]> {
-    return await db.select().from(schema.invoices);
+  async getInvoices(companyId?: string): Promise<Invoice[]> {
+    if (!companyId) {
+      return await db.select().from(schema.invoices);
+    }
+    const rows = await db
+      .select({ invoice: schema.invoices })
+      .from(schema.invoices)
+      .leftJoin(schema.projects, eq(schema.invoices.projectId, schema.projects.id))
+      .leftJoin(schema.users, eq(schema.projects.contractorId, schema.users.id))
+      .where(eq(schema.users.companyId, companyId));
+    return rows.map((r) => r.invoice);
   }
 
   async getInvoice(id: string): Promise<Invoice | undefined> {

@@ -27,6 +27,7 @@ import AdminInvites from "@/pages/admin/invites";
 import AdminProjects from "@/pages/admin/projects";
 import AdminPricingAccess from "@/pages/admin/pricing-access";
 import AdminTools from "@/pages/admin/tools";
+import AdminRoleDefinitions from "@/pages/admin/role-definitions";
 import AdminAuditLog from "@/pages/admin/audit-log";
 import AdminViewAsUser from "@/pages/admin/view-as-user";
 import SandboxDashboard from "@/pages/sandbox-dashboard";
@@ -47,6 +48,7 @@ import SignAuthenticatedPage from "@/pages/sign-authenticated";
 import SignatureSetup from "@/pages/signature-setup";
 import NotaryPortal from "@/pages/notary-portal";
 import CompanyDashboard from "@/pages/company-dashboard";
+import CompanyFinancials from "@/pages/company-financials";
 import SubcontractorDashboard from "@/pages/subcontractor-dashboard";
 import AcceptSubcontractorInvite from "@/pages/accept-subcontractor-invite";
 import DemoPage from "@/pages/demo";
@@ -147,6 +149,12 @@ function Router() {
         <Switch>
           <Route path="/company/dashboard" component={CompanyDashboard} />
           <Route path="/company/team" component={CompanyDashboard} />
+          <Route path="/company/budget" component={BudgetAdmin} />
+          <Route path="/company/financials" component={CompanyFinancials} />
+          <Route path="/company/sales">{() => <SalesDashboard />}</Route>
+          <Route path="/company/estimates">{() => <Estimator />}</Route>
+          <Route path="/company/accounting">{() => <AccountingDashboard />}</Route>
+          <Route path="/company/invoice/new">{() => <CreateInvoice />}</Route>
           <Route component={NotFound} />
         </Switch>
       </Layout>
@@ -204,6 +212,7 @@ function Router() {
         <Route path="/admin/projects" component={AdminProjects} />
         <Route path="/admin/pricing-access" component={AdminPricingAccess} />
         <Route path="/admin/tools" component={AdminTools} />
+        <Route path="/admin/role-definitions" component={AdminRoleDefinitions} />
         <Route path="/admin/audit-log" component={AdminAuditLog} />
         <Route path="/admin/view-as-user" component={AdminViewAsUser} />
         <Route path="/admin/project/:id" component={ProjectDetails} />

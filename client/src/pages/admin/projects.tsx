@@ -52,6 +52,7 @@ export default function AdminProjects() {
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("__all__");
   const [projectsPage, setProjectsPage] = useState(1);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -87,11 +88,23 @@ export default function AdminProjects() {
   });
 
   const realProjects = projects.filter((p) => !p.isSandbox);
-  const filteredProjects = realProjects.filter(
-    (p) =>
+
+  const companyOptions = Array.from(
+    new Map(
+      realProjects
+        .filter((p) => p.companyName)
+        .map((p) => [p.companyName, p.companyName])
+    ).entries()
+  ).sort(([a], [b]) => a!.localeCompare(b!));
+
+  const filteredProjects = realProjects.filter((p) => {
+    const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase())
-  );
+      (p.clientName?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+    const matchesCompany =
+      companyFilter === "__all__" || p.companyName === companyFilter;
+    return matchesSearch && matchesCompany;
+  });
 
   const projectsTotalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const projectsStart = (projectsPage - 1) * PAGE_SIZE;
@@ -106,18 +119,39 @@ export default function AdminProjects() {
             <FolderOpen className="w-5 h-5 text-blue-600" />
             <h1 className="text-2xl font-bold text-foreground">Platform Projects</h1>
           </div>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search projects..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
+          <div className="flex items-center gap-2">
+            <Select
+              value={companyFilter}
+              onValueChange={(v) => {
+                setCompanyFilter(v);
                 setProjectsPage(1);
               }}
-              data-testid="input-search-projects"
-            />
+            >
+              <SelectTrigger className="w-48" data-testid="select-filter-company">
+                <SelectValue placeholder="All Companies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Companies</SelectItem>
+                {companyOptions.map(([name]) => (
+                  <SelectItem key={name} value={name!}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative w-56">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search projects..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setProjectsPage(1);
+                }}
+                data-testid="input-search-projects"
+              />
+            </div>
           </div>
         </div>
 

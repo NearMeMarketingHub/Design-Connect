@@ -1404,7 +1404,9 @@ export async function registerRoutes(
   // Estimate routes
   app.get("/api/estimates", requireAuth, async (req, res, next) => {
     try {
-      const estimates = await storage.getEstimates();
+      const user = req.user as User;
+      const companyId = user.role === "admin" ? undefined : (user.companyId ?? undefined);
+      const estimates = await storage.getEstimates(companyId);
       res.json(estimates);
     } catch (error) {
       next(error);
@@ -1455,7 +1457,9 @@ export async function registerRoutes(
   // Invoice routes
   app.get("/api/invoices", requireAuth, async (req, res, next) => {
     try {
-      const invoices = await storage.getInvoices();
+      const user = req.user as User;
+      const companyId = user.role === "admin" ? undefined : (user.companyId ?? undefined);
+      const invoices = await storage.getInvoices(companyId);
       res.json(invoices);
     } catch (error) {
       next(error);

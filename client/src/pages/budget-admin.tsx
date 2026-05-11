@@ -71,29 +71,36 @@ export default function BudgetAdmin() {
     notes: "",
   });
 
+  const isAdmin = user?.role === "admin";
+  const isCompanyUser = user?.role === "company_owner" || !!user?.isCompanyAdmin;
+  const canAccess = !!(isAdmin || isCompanyUser);
+
+  const categoryApiBase = isAdmin ? "/api/budget" : "/api/company/price-book";
+  const itemApiBase = isAdmin ? "/api/budget" : "/api/company/price-book";
+
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== "admin")) {
-      setLocation("/admin-login");
+    if (!authLoading && !canAccess) {
+      setLocation(isAdmin === false && user?.role === "client" ? "/" : "/admin-login");
     }
-  }, [user, authLoading, setLocation]);
+  }, [user, authLoading, canAccess]);
 
   const { data: categories = [], isLoading } = useQuery<BudgetCategory[]>({
-    queryKey: ["/api/budget/categories"],
-    queryFn: () => apiRequest("GET", "/api/budget/categories").then(r => r.json()),
-    enabled: user?.role === "admin",
+    queryKey: [`${categoryApiBase}/categories`],
+    queryFn: () => apiRequest("GET", `${categoryApiBase}/categories`).then(r => r.json()),
+    enabled: canAccess && !authLoading,
   });
 
   const { data: allItems = [] } = useQuery<BudgetItem[]>({
-    queryKey: ["/api/budget/items"],
-    queryFn: () => apiRequest("GET", "/api/budget/items").then(r => r.json()),
-    enabled: user?.role === "admin",
+    queryKey: [`${itemApiBase}/items`],
+    queryFn: () => apiRequest("GET", `${itemApiBase}/items`).then(r => r.json()),
+    enabled: canAccess && !authLoading,
   });
 
   const updateItemMutation = useMutation({
     mutationFn: (item: Partial<BudgetItem> & { id: string }) =>
-      apiRequest("PATCH", `/api/budget/items/${item.id}`, item).then(r => r.json()),
+      apiRequest("PATCH", `${itemApiBase}/items/${item.id}`, item).then(r => r.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/items"] });
+      queryClient.invalidateQueries({ queryKey: [`${itemApiBase}/items`] });
       toast({ title: "Item Updated", description: "The pricing has been saved." });
       setEditDialogOpen(false);
       setEditingItem(null);
@@ -109,9 +116,9 @@ export default function BudgetAdmin() {
 
   const createItemMutation = useMutation({
     mutationFn: (item: Omit<BudgetItem, "id">) =>
-      apiRequest("POST", "/api/budget/items", item).then(r => r.json()),
+      apiRequest("POST", `${itemApiBase}/items`, item).then(r => r.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/items"] });
+      queryClient.invalidateQueries({ queryKey: [`${itemApiBase}/items`] });
       toast({ title: "Item Created", description: "New line item has been added." });
       setAddItemDialogOpen(false);
       setNewItem({
@@ -137,9 +144,9 @@ export default function BudgetAdmin() {
   });
 
   const deleteItemMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/budget/items/${id}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `${itemApiBase}/items/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budget/items"] });
+      queryClient.invalidateQueries({ queryKey: [`${itemApiBase}/items`] });
       toast({ title: "Item Deleted", description: "The line item has been removed." });
     },
     onError: (error: Error) => {
@@ -159,7 +166,7 @@ export default function BudgetAdmin() {
     );
   }
 
-  if (!user || user.role !== "admin") {
+  if (!canAccess) {
     return null;
   }
 

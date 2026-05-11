@@ -15,6 +15,7 @@ import {
   FileText,
   Eye,
   Wrench,
+  Layers,
   LogOut,
   Menu,
   Loader2,
@@ -64,6 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Audit Log", href: "/admin/audit-log", icon: FileText },
       { label: "View As User", href: "/admin/view-as-user", icon: Eye },
+      { label: "Role Definitions", href: "/admin/role-definitions", icon: Layers },
       { label: "Admin Tools", href: "/admin/tools", icon: Wrench },
     ],
   },
