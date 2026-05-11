@@ -21,6 +21,7 @@ import SettingsPage from "@/pages/settings";
 import AdminLogin from "@/pages/admin-login";
 import AdminOverview from "@/pages/admin/overview";
 import AdminCompanies from "@/pages/admin/companies";
+import AdminCompanyDetail from "@/pages/admin/company-detail";
 import AdminDemoRequests from "@/pages/admin/demo-requests";
 import AdminUsers from "@/pages/admin/users";
 import AdminInvites from "@/pages/admin/invites";
@@ -205,6 +206,7 @@ function Router() {
       <Switch>
         <Route path="/admin/dashboard" component={AdminOverview} />
         <Route path="/admin/overview"><Redirect to="/admin/dashboard" /></Route>
+        <Route path="/admin/companies/:companyId" component={AdminCompanyDetail} />
         <Route path="/admin/companies" component={AdminCompanies} />
         <Route path="/admin/demo-requests" component={AdminDemoRequests} />
         <Route path="/admin/users" component={AdminUsers} />

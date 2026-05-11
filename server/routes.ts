@@ -835,6 +835,59 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
+  // ── Admin: Get company detail ─────────────────────────────────────────────
+  app.get("/api/admin/companies/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const company = await storage.getCompany(req.params.id);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+      const [owner, users, projects, invites] = await Promise.all([
+        storage.getUserByCompanyOwner(company.id),
+        storage.getUsersByCompanyId(company.id),
+        storage.getProjectsByCompanyId(company.id),
+        storage.getContractorInvitesByCompanyId(company.id),
+      ]);
+      res.json({
+        ...company,
+        owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, isApproved: owner.isApproved, createdAt: owner.createdAt } : null,
+        users: users.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email, role: u.role, contractorType: u.contractorType, isApproved: u.isApproved, createdAt: u.createdAt })),
+        projects: projects.map(p => ({ id: p.id, name: p.name, status: p.status, progress: p.progress, budget: p.budget, createdAt: p.createdAt, dueDate: p.dueDate })),
+        invites,
+      });
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Update company general fields (billing, notes, etc.) ───────────
+  const adminCompanyUpdateSchema = z.object({
+    name: z.string().min(1).max(200).optional(),
+    billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
+    monthlyPrice: z.string().nullable().optional(),
+    trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
+    prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
+    billingNotes: z.string().max(2000).nullable().optional(),
+    adminNotes: z.string().max(5000).nullable().optional(),
+  });
+
+  app.patch("/api/admin/companies/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const parsed = adminCompanyUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
+      }
+      const data = parsed.data;
+      const updateData: Record<string, unknown> = {};
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.billingType !== undefined) updateData.billingType = data.billingType;
+      if (data.monthlyPrice !== undefined) updateData.monthlyPrice = data.monthlyPrice;
+      if (data.trialEndsAt !== undefined) updateData.trialEndsAt = data.trialEndsAt ? new Date(data.trialEndsAt) : null;
+      if (data.prepaidThroughDate !== undefined) updateData.prepaidThroughDate = data.prepaidThroughDate ? new Date(data.prepaidThroughDate) : null;
+      if (data.billingNotes !== undefined) updateData.billingNotes = data.billingNotes;
+      if (data.adminNotes !== undefined) updateData.adminNotes = data.adminNotes;
+      const company = await storage.updateCompany(req.params.id, updateData as any);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+      res.json(company);
+    } catch (error) { next(error); }
+  });
+
   // ── Admin: Demo requests ──────────────────────────────────────────────────────
   app.get("/api/admin/demo-requests", requireAdmin, async (req, res, next) => {
     try {

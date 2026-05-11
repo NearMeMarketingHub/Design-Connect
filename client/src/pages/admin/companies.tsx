@@ -325,11 +325,11 @@ export default function AdminCompanies() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1.5 flex-wrap">
-                            <Link href={`/admin/users?companyId=${company.id}`}>
+                            <Link href={`/admin/companies/${company.id}`}>
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                title="View company users"
+                                title="View company detail"
                                 data-testid={`button-view-company-${company.id}`}
                               >
                                 <Eye className="w-3.5 h-3.5" />

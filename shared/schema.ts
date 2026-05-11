@@ -13,6 +13,13 @@ export const companies = pgTable("companies", {
   subscriptionPlan: text("subscription_plan").default("free"), // free, starter, professional, enterprise
   subscriptionStatus: text("subscription_status").default("trialing"), // trialing, active, expired, past_due, cancelled
   trialStartedAt: timestamp("trial_started_at"), // When the 7-day trial began
+  // Billing & access fields (admin-managed, not tied to subscription tiers)
+  billingType: text("billing_type").default("manual"), // manual | free | prepaid | future_in_app
+  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }), // Override price; null = use tier price
+  trialEndsAt: timestamp("trial_ends_at"), // Explicit trial end; null = computed from trialStartedAt + 7 days
+  prepaidThroughDate: timestamp("prepaid_through_date"), // For prepaid billing: access guaranteed through
+  billingNotes: text("billing_notes"), // Admin notes on billing/access arrangement
+  adminNotes: text("admin_notes"), // Internal-only notes about this company/customer
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

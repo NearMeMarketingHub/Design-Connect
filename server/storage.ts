@@ -377,6 +377,10 @@ export interface IStorage {
   getContractorInviteById(id: string): Promise<ContractorInvite | undefined>;
   getAllProjectInvites(): Promise<ProjectInvite[]>;
   getProjectInviteById(id: string): Promise<ProjectInvite | undefined>;
+
+  // Company-scoped admin queries
+  getUsersByCompanyId(companyId: string): Promise<User[]>;
+  getContractorInvitesByCompanyId(companyId: string): Promise<ContractorInvite[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2443,6 +2447,23 @@ export class DatabaseStorage implements IStorage {
   async getProjectInviteById(id: string): Promise<ProjectInvite | undefined> {
     const [inv] = await db.select().from(schema.projectInvites).where(eq(schema.projectInvites.id, id));
     return inv;
+  }
+
+  // Company-scoped admin queries
+  async getUsersByCompanyId(companyId: string): Promise<User[]> {
+    return await db.select().from(schema.users).where(eq(schema.users.companyId, companyId));
+  }
+
+  async getContractorInvitesByCompanyId(companyId: string): Promise<ContractorInvite[]> {
+    // contractorInvites are linked to projects; get invites via projects owned by this company
+    const projects = await this.getProjectsByCompanyId(companyId);
+    if (projects.length === 0) return [];
+    const allInvites: ContractorInvite[] = [];
+    for (const project of projects) {
+      const invites = await this.getContractorInvitesByProject(project.id);
+      allInvites.push(...invites);
+    }
+    return allInvites;
   }
 }
 
