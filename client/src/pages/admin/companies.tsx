@@ -55,6 +55,7 @@ interface AdminCompany {
   ownerUserId?: string;
   companyType?: string;
   subscriptionStatus?: string;
+  billingType?: string | null;
   monthlyPrice?: string | null;
   trialStartedAt?: string | null;
   trialEndsAt?: string | null;
@@ -222,6 +223,7 @@ export default function AdminCompanies() {
                     <TableHead>Owner</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Access Status</TableHead>
+                    <TableHead>Billing Type</TableHead>
                     <TableHead>Monthly Price</TableHead>
                     <TableHead>Trial Ends</TableHead>
                     <TableHead className="text-center">Users</TableHead>
@@ -233,7 +235,7 @@ export default function AdminCompanies() {
                   {pagedCompanies.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={9}
+                        colSpan={10}
                         className="text-center text-muted-foreground py-8"
                       >
                         No companies match your search.
@@ -282,6 +284,9 @@ export default function AdminCompanies() {
                               ? "Expired"
                               : company.subscriptionStatus}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground capitalize">
+                          {company.billingType?.replace("_", " ") || "manual"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {price === null
@@ -448,7 +453,7 @@ export default function AdminCompanies() {
           <DialogHeader>
             <DialogTitle>Edit Access</DialogTitle>
             <DialogDescription>
-              Update plan and status for {editingCompany?.name}.
+              Update access status for {editingCompany?.name}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

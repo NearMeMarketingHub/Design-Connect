@@ -1036,6 +1036,7 @@ export async function registerRoutes(
     prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
     billingNotes: z.string().max(2000).nullable().optional(),
     adminNotes: z.string().max(5000).nullable().optional(),
+    accessNotes: z.string().max(2000).nullable().optional(),
   });
 
   app.patch("/api/admin/companies/:id", requireAdmin, async (req, res, next) => {
@@ -1044,7 +1045,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { name, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes } = parsed.data;
+      const { name, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes, accessNotes } = parsed.data;
       const updateData: Partial<InsertCompany> = {};
       if (name !== undefined) updateData.name = name;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
@@ -1055,6 +1056,7 @@ export async function registerRoutes(
       if (prepaidThroughDate !== undefined) updateData.prepaidThroughDate = prepaidThroughDate ? new Date(prepaidThroughDate) : null;
       if (billingNotes !== undefined) updateData.billingNotes = billingNotes;
       if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+      if (accessNotes !== undefined) updateData.accessNotes = accessNotes;
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);

@@ -159,7 +159,7 @@ export default function AdminOverview() {
     },
     {
       label: "Pricing & Access",
-      description: "Configure subscription tiers and platform defaults",
+      description: "Configure platform pricing defaults and access settings.",
       icon: Receipt,
       href: "/admin/pricing-access",
       color: "text-emerald-600",

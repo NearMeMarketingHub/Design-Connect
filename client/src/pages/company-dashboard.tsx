@@ -1495,9 +1495,9 @@ export default function CompanyDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5" />
-                Subscription Plan
+                Billing & Access
               </CardTitle>
-              <CardDescription>Manage your BuildVision subscription</CardDescription>
+              <CardDescription>Your BuildVision subscription details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Current status card */}
@@ -1528,7 +1528,40 @@ export default function CompanyDashboard() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground" data-testid="contact-support-note">
+              <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm" data-testid="billing-details">
+                <div>
+                  <dt className="text-muted-foreground text-xs mb-0.5">Billing Type</dt>
+                  <dd className="font-medium capitalize" data-testid="display-billing-type">
+                    {company?.billingType?.replace("_", " ") || "Manual"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs mb-0.5">Monthly Price</dt>
+                  <dd className="font-medium" data-testid="display-monthly-price">
+                    {company?.monthlyPrice
+                      ? `$${parseFloat(company.monthlyPrice).toFixed(2)}/mo`
+                      : "—"}
+                  </dd>
+                </div>
+                {trialEndsAt && (
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-0.5">Trial End</dt>
+                    <dd className="font-medium" data-testid="display-trial-end">
+                      {trialEndsAt.toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+                {company?.prepaidThroughDate && (
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-0.5">Prepaid Through</dt>
+                    <dd className="font-medium" data-testid="display-prepaid-through">
+                      {new Date(company.prepaidThroughDate).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+
+              <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground" data-testid="contact-support-note">
                 <p className="text-sm">To change your subscription or billing, contact BuildVision support.</p>
               </div>
             </CardContent>

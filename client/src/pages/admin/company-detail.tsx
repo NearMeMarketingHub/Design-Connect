@@ -161,6 +161,7 @@ export default function AdminCompanyDetail() {
     trialEndsAt: "",
     prepaidThroughDate: "",
     billingNotes: "",
+    accessNotes: "",
   });
 
   const [notesForm, setNotesForm] = useState({ adminNotes: "" });
@@ -258,6 +259,7 @@ export default function AdminCompanyDetail() {
       trialEndsAt: company.trialEndsAt ? company.trialEndsAt.slice(0, 10) : "",
       prepaidThroughDate: company.prepaidThroughDate ? company.prepaidThroughDate.slice(0, 10) : "",
       billingNotes: company.billingNotes ?? "",
+      accessNotes: company.accessNotes ?? "",
     });
     setEditingBilling(true);
   }
@@ -271,6 +273,7 @@ export default function AdminCompanyDetail() {
       trialEndsAt: billingForm.trialEndsAt ? new Date(billingForm.trialEndsAt).toISOString() : null,
       prepaidThroughDate: billingForm.prepaidThroughDate ? new Date(billingForm.prepaidThroughDate).toISOString() : null,
       billingNotes: billingForm.billingNotes || null,
+      accessNotes: billingForm.accessNotes || null,
     });
   }
 
@@ -903,6 +906,16 @@ export default function AdminCompanyDetail() {
                         data-testid="textarea-billing-notes"
                       />
                     </div>
+                    <div className="space-y-1.5">
+                      <Label>Access Notes</Label>
+                      <Textarea
+                        placeholder="Notes about access level, feature overrides, or special arrangements…"
+                        value={billingForm.accessNotes}
+                        onChange={(e) => setBillingForm((f) => ({ ...f, accessNotes: e.target.value }))}
+                        rows={2}
+                        data-testid="textarea-access-notes"
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -967,6 +980,14 @@ export default function AdminCompanyDetail() {
                         <dt className="text-muted-foreground text-xs mb-0.5">Billing Notes</dt>
                         <dd className="whitespace-pre-wrap" data-testid="display-billing-notes">
                           {company.billingNotes}
+                        </dd>
+                      </div>
+                    )}
+                    {company.accessNotes && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-muted-foreground text-xs mb-0.5">Access Notes</dt>
+                        <dd className="whitespace-pre-wrap" data-testid="display-access-notes">
+                          {company.accessNotes}
                         </dd>
                       </div>
                     )}
