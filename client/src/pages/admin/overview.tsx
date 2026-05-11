@@ -124,7 +124,7 @@ export default function AdminOverview() {
   const quickLinks = [
     {
       label: "Companies",
-      description: "Manage company accounts, plans, and access",
+      description: "Manage company accounts and access",
       icon: Building2,
       href: "/admin/companies",
       color: "text-blue-600",

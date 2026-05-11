@@ -340,6 +340,9 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: Cre
             onClick={() => createCompanyMutation.mutate(form)}
             disabled={
               !form.companyName.trim() ||
+              !form.ownerName.trim() ||
+              !form.ownerEmail.trim() ||
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.ownerEmail) ||
               !form.ownerUsername.trim() ||
               !form.password.trim() ||
               createCompanyMutation.isPending

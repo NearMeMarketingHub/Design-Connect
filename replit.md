@@ -48,7 +48,6 @@ Key data models include:
 - Inspiration images and messaging
 - E-Signature system (signing packets, participants, audit events)
 - Change orders with line items (for scope/budget/timeline changes)
-- Subscription tiers (admin-configurable plan definitions with pricing and features)
 
 ### Subscription Trial System
 BuildVision uses a 7-day free trial model for company accounts:

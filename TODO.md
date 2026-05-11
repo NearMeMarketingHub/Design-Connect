@@ -157,7 +157,7 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 **New User Hierarchy:**
 - Super Admin (Platform Owner) - Manages all companies, can bypass subscriptions
 - Company Admin - Construction company owner, pays subscription, manages team
-- Project Manager - Full access, manages sub-contractors, COUNTED toward tier seats
+- Project Manager - Full access, manages sub-contractors
 - Sub-Contractor - Limited role, assigned to projects by PM, UNLIMITED
 - Client - View their projects, belongs to company, UNLIMITED
 
@@ -168,16 +168,12 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Create new role types (company_admin, project_manager, subcontractor)
 - [ ] Link clients to companies instead of standalone users
 
-**Phase 2: Stripe Integration**
-- [ ] Set up Stripe subscription products and pricing tiers
+**Phase 2: Billing Integration (future)**
 - [ ] Implement subscription checkout for new companies
 - [ ] Add billing portal for plan management
-- [ ] Handle subscription webhooks (payment success, failed, cancelled)
+- [ ] Handle billing webhooks (payment success, failed, cancelled)
 
-**Phase 3: Tier Enforcement**
-- [ ] Seat counting logic (only count project_managers)
-- [ ] Feature gating based on tier
-- [ ] Upgrade prompts when hitting limits
+**Phase 3: Access Controls (future)**
 - [ ] Usage dashboard for company admins
 
 **Phase 4: Super Admin Controls**
@@ -191,11 +187,6 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - [ ] Company Admin manages Project Managers
 - [ ] Sub-contractors see only assigned projects
 - [ ] Client access scoped to their company's projects
-
-**Tier Structure (Example):**
-- Starter: 3 Project Managers, 10 projects
-- Professional: 10 Project Managers, 50 projects
-- Business: Unlimited PMs, unlimited projects
 
 ---
 

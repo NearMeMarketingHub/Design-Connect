@@ -559,7 +559,7 @@ export default function CompanyDashboard() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-heading font-bold" data-testid="company-name">{company?.name || "My Company"}</h1>
-          <p className="text-muted-foreground mt-1">Manage your company, team, and subscription</p>
+          <p className="text-muted-foreground mt-1">Manage your company, team, and billing</p>
         </div>
         <div className="flex items-center gap-3">
           <Badge
@@ -577,7 +577,7 @@ export default function CompanyDashboard() {
           <TabsTrigger value="overview" disabled={isExpired} data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="team" disabled={isExpired} data-testid="tab-team">Team</TabsTrigger>
           <TabsTrigger value="price-book" disabled={isExpired} data-testid="tab-price-book">Price Book</TabsTrigger>
-          <TabsTrigger value="subscription" data-testid="tab-subscription">Subscription</TabsTrigger>
+          <TabsTrigger value="subscription" data-testid="tab-subscription">Billing & Access</TabsTrigger>
           <TabsTrigger value="settings" disabled={isExpired} data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -1497,7 +1497,7 @@ export default function CompanyDashboard() {
                 <CreditCard className="w-5 h-5" />
                 Billing & Access
               </CardTitle>
-              <CardDescription>Your BuildVision subscription details</CardDescription>
+              <CardDescription>Your BuildVision billing and access details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Current status card */}
