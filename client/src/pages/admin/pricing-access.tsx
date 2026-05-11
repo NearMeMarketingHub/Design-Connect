@@ -256,90 +256,105 @@ export default function AdminPricingAccess() {
           </CardContent>
         </Card>
 
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-base font-semibold text-foreground">Plan Tiers</p>
-            <Button size="sm" onClick={openTierCreate} data-testid="button-add-tier">
-              <Plus className="w-4 h-4 mr-1" /> Add Tier
-            </Button>
-          </div>
-
-          {adminTiers.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                No plan tiers defined. Add tiers to show plans to company users.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {adminTiers.map((tier) => {
-                const price = parseFloat(tier.price);
-                return (
-                  <Card
-                    key={tier.id}
-                    className={!tier.isActive ? "opacity-60" : ""}
-                    data-testid={`tier-card-${tier.id}`}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">{tier.name}</CardTitle>
-                        <div className="flex items-center gap-1">
-                          {!tier.isActive && (
-                            <Badge variant="secondary" className="text-xs">
-                              Inactive
-                            </Badge>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="w-7 h-7"
-                            onClick={() => openTierEdit(tier)}
-                            data-testid={`button-edit-tier-${tier.id}`}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="w-7 h-7 text-destructive hover:text-destructive"
-                            onClick={() => deleteTierMutation.mutate(tier.id)}
-                            disabled={deleteTierMutation.isPending}
-                            data-testid={`button-delete-tier-${tier.id}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                      <p className="text-2xl font-bold">
-                        {price === 0
-                          ? "Free"
-                          : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`}
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      {tier.maxProjects && (
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Up to {tier.maxProjects} projects
-                        </p>
-                      )}
-                      <ul className="space-y-1">
-                        {(tier.features || []).map((f: string) => (
-                          <li
-                            key={f}
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground"
-                          >
-                            <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
-                            {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+        <details className="group" data-testid="section-plan-tiers">
+          <summary className="flex cursor-pointer items-center justify-between rounded-lg border bg-card px-4 py-3 hover:bg-muted/40 transition-colors list-none">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-semibold text-foreground">Plan Tiers</span>
+              {adminTiers.length > 0 && (
+                <Badge variant="secondary" className="text-xs">{adminTiers.length}</Badge>
+              )}
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={(e) => { e.preventDefault(); openTierCreate(); }}
+                data-testid="button-add-tier"
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add Tier
+              </Button>
+              <span className="text-xs text-muted-foreground group-open:hidden">Show</span>
+              <span className="text-xs text-muted-foreground hidden group-open:inline">Hide</span>
+            </div>
+          </summary>
+
+          <div className="mt-3">
+            {adminTiers.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                  No plan tiers defined. Add tiers to show plans to company users.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {adminTiers.map((tier) => {
+                  const price = parseFloat(tier.price);
+                  return (
+                    <Card
+                      key={tier.id}
+                      className={!tier.isActive ? "opacity-60" : ""}
+                      data-testid={`tier-card-${tier.id}`}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">{tier.name}</CardTitle>
+                          <div className="flex items-center gap-1">
+                            {!tier.isActive && (
+                              <Badge variant="secondary" className="text-xs">
+                                Inactive
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-7 h-7"
+                              onClick={() => openTierEdit(tier)}
+                              data-testid={`button-edit-tier-${tier.id}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-7 h-7 text-destructive hover:text-destructive"
+                              onClick={() => deleteTierMutation.mutate(tier.id)}
+                              disabled={deleteTierMutation.isPending}
+                              data-testid={`button-delete-tier-${tier.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-2xl font-bold">
+                          {price === 0
+                            ? "Free"
+                            : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`}
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        {tier.maxProjects && (
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Up to {tier.maxProjects} projects
+                          </p>
+                        )}
+                        <ul className="space-y-1">
+                          {(tier.features || []).map((f: string) => (
+                            <li
+                              key={f}
+                              className="flex items-center gap-1.5 text-sm text-muted-foreground"
+                            >
+                              <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </details>
       </div>
 
       <Dialog open={tierDialogOpen} onOpenChange={setTierDialogOpen}>

@@ -92,11 +92,12 @@ interface CompanyProject {
 interface CompanyInvite {
   id: string;
   email: string;
+  inviteKind: "contractor" | "project";
   contractorType: string | null;
   projectId: string | null;
   projectName: string | null;
   status: string;
-  createdAt: string;
+  createdAt: string | null;
   acceptedAt: string | null;
   expiresAt: string | null;
 }
@@ -247,8 +248,8 @@ export default function AdminCompanyDetail() {
   });
 
   const revokeInviteMutation = useMutation({
-    mutationFn: (inviteId: string) =>
-      apiRequest("POST", `/api/admin/invites/${inviteId}/revoke`, { type: "contractor" }).then((r) => r.json()),
+    mutationFn: ({ id, inviteKind }: { id: string; inviteKind: string }) =>
+      apiRequest("POST", `/api/admin/invites/${id}/revoke`, { type: inviteKind === "project" ? "project" : "contractor" }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
       toast({ title: "Invite revoked" });
@@ -258,8 +259,8 @@ export default function AdminCompanyDetail() {
   });
 
   const resendInviteMutation = useMutation({
-    mutationFn: (inviteId: string) =>
-      apiRequest("POST", `/api/admin/invites/${inviteId}/resend`, { type: "contractor" }).then((r) => r.json()),
+    mutationFn: ({ id, inviteKind }: { id: string; inviteKind: string }) =>
+      apiRequest("POST", `/api/admin/invites/${id}/resend`, { type: inviteKind === "project" ? "project" : "contractor" }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
       toast({ title: "Invite resent" });
@@ -777,7 +778,7 @@ export default function AdminCompanyDetail() {
                     {company.invites.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          No contractor invites found for this company.
+                          No invites found for this company.
                         </TableCell>
                       </TableRow>
                     )}
@@ -785,7 +786,9 @@ export default function AdminCompanyDetail() {
                       <TableRow key={inv.id} data-testid={`invite-row-${inv.id}`}>
                         <TableCell className="font-medium text-sm">{inv.email}</TableCell>
                         <TableCell className="text-sm text-muted-foreground capitalize">
-                          {inv.contractorType ?? "contractor"}
+                          {inv.inviteKind === "project"
+                            ? "Client"
+                            : (inv.contractorType ?? "Contractor")}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {inv.projectName ?? (inv.projectId ? "Unknown project" : "—")}
@@ -812,7 +815,7 @@ export default function AdminCompanyDetail() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => resendInviteMutation.mutate(inv.id)}
+                                  onClick={() => resendInviteMutation.mutate({ id: inv.id, inviteKind: inv.inviteKind })}
                                   disabled={resendInviteMutation.isPending}
                                   data-testid={`button-resend-invite-${inv.id}`}
                                   title="Resend invite email"
@@ -822,7 +825,7 @@ export default function AdminCompanyDetail() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => revokeInviteMutation.mutate(inv.id)}
+                                  onClick={() => revokeInviteMutation.mutate({ id: inv.id, inviteKind: inv.inviteKind })}
                                   disabled={revokeInviteMutation.isPending}
                                   data-testid={`button-revoke-invite-${inv.id}`}
                                   title="Revoke invite"

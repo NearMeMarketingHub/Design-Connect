@@ -220,11 +220,11 @@ function Router() {
         <Route path="/admin/project/:id" component={ProjectDetails} />
         <Route path="/admin/contractors" component={ContractorManagement} />
         <Route path="/admin/contractors/:id" component={ContractorProfile} />
-        <Route path="/admin/budget" component={BudgetAdmin} />
-        <Route path="/admin/sales">{() => <AdminShell><SalesDashboard /></AdminShell>}</Route>
-        <Route path="/admin/estimates">{() => <AdminShell><Estimator /></AdminShell>}</Route>
-        <Route path="/admin/accounting">{() => <AdminShell><AccountingDashboard /></AdminShell>}</Route>
-        <Route path="/admin/invoice/new">{() => <AdminShell><CreateInvoice /></AdminShell>}</Route>
+        <Route path="/admin/budget"><Redirect to="/admin/tools" /></Route>
+        <Route path="/admin/sales"><Redirect to="/admin/tools" /></Route>
+        <Route path="/admin/estimates"><Redirect to="/admin/tools" /></Route>
+        <Route path="/admin/accounting"><Redirect to="/admin/tools" /></Route>
+        <Route path="/admin/invoice/new"><Redirect to="/admin/tools" /></Route>
         <Route component={NotFound} />
       </Switch>
     );

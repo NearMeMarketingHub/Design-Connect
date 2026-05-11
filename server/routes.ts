@@ -741,6 +741,10 @@ export async function registerRoutes(
     password: z.string().min(6),
     companyType: z.string().optional(),
     subscriptionPlan: z.string().min(1).max(100).default("free"),
+    subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).default("trialing"),
+    billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).default("manual"),
+    monthlyPrice: z.string().nullable().optional(),
+    trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
   });
 
   app.post("/api/admin/companies", requireAdmin, async (req, res, next) => {
@@ -749,7 +753,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionPlan } = parsed.data;
+      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt } = parsed.data;
 
       const existingByUsername = await storage.getUserByUsername(ownerUsername);
       if (existingByUsername) {
@@ -767,8 +771,10 @@ export async function registerRoutes(
         {
           name: companyName.trim(),
           subscriptionPlan,
-          subscriptionStatus: "trialing",
-          trialStartedAt: new Date(),
+          subscriptionStatus,
+          billingType,
+          monthlyPrice: monthlyPrice || null,
+          trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
         },
         {
           username: ownerUsername.trim(),
@@ -840,7 +846,7 @@ export async function registerRoutes(
     try {
       const company = await storage.getCompany(req.params.id);
       if (!company) return res.status(404).json({ message: "Company not found" });
-      const [owner, users, projects, invites, allUsers] = await Promise.all([
+      const [owner, users, projects, contractorInvites, allUsers] = await Promise.all([
         storage.getUserByCompanyOwner(company.id),
         storage.getUsersByCompanyId(company.id),
         storage.getProjectsByCompanyId(company.id),
@@ -848,7 +854,15 @@ export async function registerRoutes(
         storage.getAllUsers(),
       ]);
       const usersById = new Map(allUsers.map(u => [u.id, u]));
-      const pendingInviteCount = invites.filter(i => i.status === "pending").length;
+
+      // Fetch client/project invites for all company projects
+      const projectInviteArrays = await Promise.all(
+        projects.map(p => storage.getProjectInvitesByProjectId(p.id))
+      );
+      const projectInvites = projectInviteArrays.flat();
+
+      const pendingInviteCount = [...contractorInvites, ...projectInvites].filter(i => i.status === "pending").length;
+
       const enrichedProjects = projects.map(p => {
         const client = p.clientId ? usersById.get(p.clientId) : undefined;
         const contractor = p.contractorId ? usersById.get(p.contractorId) : undefined;
@@ -866,20 +880,50 @@ export async function registerRoutes(
           contractorName: contractor ? (contractor.name || contractor.username) : null,
         };
       });
-      const enrichedInvites = invites.map(inv => {
+
+      const enrichedContractorInvites = contractorInvites.map(inv => {
         const project = inv.projectId ? projects.find(p => p.id === inv.projectId) : null;
         return {
-          ...inv,
+          id: inv.id,
+          email: inv.email,
+          inviteKind: "contractor" as const,
+          contractorType: inv.contractorType,
+          projectId: inv.projectId,
           projectName: project?.name ?? null,
+          status: inv.status,
+          createdAt: inv.createdAt?.toISOString() ?? null,
+          acceptedAt: inv.acceptedAt?.toISOString() ?? null,
+          expiresAt: inv.expiresAt?.toISOString() ?? null,
         };
       });
+
+      const enrichedProjectInvites = projectInvites.map(inv => {
+        const project = inv.projectId ? projects.find(p => p.id === inv.projectId) : null;
+        return {
+          id: inv.id,
+          email: inv.email,
+          inviteKind: "project" as const,
+          contractorType: null,
+          projectId: inv.projectId,
+          projectName: project?.name ?? null,
+          status: inv.status,
+          createdAt: inv.createdAt?.toISOString() ?? null,
+          acceptedAt: inv.acceptedAt?.toISOString() ?? null,
+          expiresAt: inv.expiresAt?.toISOString() ?? null,
+        };
+      });
+
+      const allInvites = [...enrichedContractorInvites, ...enrichedProjectInvites].sort(
+        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      );
+
       res.json({
         ...company,
         pendingInviteCount,
         owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, companyType: owner.companyType, isApproved: owner.isApproved } : null,
         users: users.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email, role: u.role, contractorType: u.contractorType, isApproved: u.isApproved })),
         projects: enrichedProjects,
-        invites: enrichedInvites,
+        invites: allInvites,
       });
     } catch (error) { next(error); }
   });

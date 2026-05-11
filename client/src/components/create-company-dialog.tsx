@@ -43,7 +43,10 @@ const EMPTY_FORM = {
   ownerUsername: "",
   password: "",
   companyType: "",
-  subscriptionPlan: "free",
+  subscriptionStatus: "trialing",
+  billingType: "manual",
+  monthlyPrice: "",
+  trialStartedAt: "",
 };
 
 export function CreateCompanyDialog({
@@ -140,24 +143,74 @@ export function CreateCompanyDialog({
               data-testid="input-create-company-type"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Subscription Plan</Label>
-            <Select
-              value={form.subscriptionPlan}
-              onValueChange={(v) => set("subscriptionPlan", v)}
-            >
-              <SelectTrigger data-testid="select-create-company-plan">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">Free</SelectItem>
-                {adminTiers.map((t) => (
-                  <SelectItem key={t.id} value={t.name.toLowerCase()}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Access Status</Label>
+              <Select
+                value={form.subscriptionStatus}
+                onValueChange={(v) => set("subscriptionStatus", v)}
+              >
+                <SelectTrigger data-testid="select-create-company-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trialing">Trialing</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="prepaid">Prepaid</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Billing Type</Label>
+              <Select
+                value={form.billingType}
+                onValueChange={(v) => set("billingType", v)}
+              >
+                <SelectTrigger data-testid="select-create-company-billing-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="prepaid">Prepaid</SelectItem>
+                  <SelectItem value="future_in_app">Future In-App</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="cc-monthly-price">
+                Monthly Price{" "}
+                <span className="text-muted-foreground text-xs">(optional)</span>
+              </Label>
+              <Input
+                id="cc-monthly-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.monthlyPrice}
+                onChange={(e) => set("monthlyPrice", e.target.value)}
+                placeholder="0.00"
+                data-testid="input-create-company-monthly-price"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cc-trial-start">
+                Trial Start{" "}
+                <span className="text-muted-foreground text-xs">(optional)</span>
+              </Label>
+              <Input
+                id="cc-trial-start"
+                type="date"
+                value={form.trialStartedAt}
+                onChange={(e) => set("trialStartedAt", e.target.value)}
+                data-testid="input-create-company-trial-start"
+              />
+            </div>
           </div>
           <div className="border-t pt-3 space-y-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">

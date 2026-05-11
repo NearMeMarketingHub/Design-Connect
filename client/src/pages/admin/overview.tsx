@@ -166,7 +166,7 @@ export default function AdminOverview() {
     },
     {
       label: "Admin Tools",
-      description: "Budget manager, sandbox testing, and role definitions",
+      description: "Sandbox testing, role definitions, and platform utilities.",
       icon: Wrench,
       href: "/admin/tools",
       color: "text-gray-600",
