@@ -6,8 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Download, MoreHorizontal, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth-context";
 
 export default function AccountingDashboard() {
+  const { user } = useAuth();
+  const isCompanyUser = user?.role === "company_owner" || !!user?.isCompanyAdmin;
+  const newInvoicePath = isCompanyUser ? "/company/invoice/new" : "/admin/invoice/new";
   const invoices = [
     { id: "INV-2024-001", client: "Sarah Jenkins", project: "Jenkins Residence", amount: "$45,000", due: "Dec 15, 2025", status: "Unpaid", type: "Standard" },
     { id: "INV-2024-002", client: "West Lake Dev", project: "West Lake Build", amount: "$12,500", due: "Dec 20, 2025", status: "Paid", type: "Recurring" },
@@ -26,8 +30,8 @@ export default function AccountingDashboard() {
           <h1 className="text-3xl font-heading font-bold text-foreground">Accounting</h1>
           <p className="text-muted-foreground mt-1">Manage invoices, payments, and recurring billing.</p>
         </div>
-        <Link href="/admin/invoice/new">
-          <Button className="bg-primary text-primary-foreground">
+        <Link href={newInvoicePath}>
+          <Button className="bg-primary text-primary-foreground" data-testid="button-new-invoice">
             <Plus className="w-4 h-4 mr-2" />
             New Invoice
           </Button>

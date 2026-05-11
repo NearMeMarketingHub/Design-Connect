@@ -5,8 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, FileText, ArrowUpRight, TrendingUp, DollarSign } from "lucide-react";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SalesDashboard() {
+  const { user } = useAuth();
+  const isCompanyUser = user?.role === "company_owner" || !!user?.isCompanyAdmin;
+  const estimatesPath = isCompanyUser ? "/company/estimates" : "/admin/estimates";
+
   const quotes = [
     { id: "EST-1024", client: "Sarah Jenkins", project: "Jenkins Residence", amount: "$145,000", status: "Approved", date: "Dec 10, 2025" },
     { id: "EST-1025", client: "Mike Miller", project: "Miller Kitchen", amount: "$65,000", status: "Draft", date: "Dec 11, 2025" },
@@ -21,8 +26,8 @@ export default function SalesDashboard() {
           <h1 className="text-3xl font-heading font-bold text-foreground">Sales Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage quotes, estimates, and pipeline.</p>
         </div>
-        <Link href="/admin/estimates">
-          <Button className="bg-primary text-primary-foreground">
+        <Link href={estimatesPath}>
+          <Button className="bg-primary text-primary-foreground" data-testid="button-create-quote">
             <Plus className="w-4 h-4 mr-2" />
             Create Quote
           </Button>
