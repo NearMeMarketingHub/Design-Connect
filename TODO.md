@@ -162,7 +162,7 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 - Client - View their projects, belongs to company, UNLIMITED
 
 **Phase 1: Database Restructure**
-- [ ] Create Companies table (name, subscriptionTier, subscriptionStatus, settings)
+- [ ] Create Companies table (name, subscriptionStatus, billingType, accessNotes, settings)
 - [ ] Add subscription bypass fields (isComped, compedReason, compedBy)
 - [ ] Add companyId to users table
 - [ ] Create new role types (company_admin, project_manager, subcontractor)
