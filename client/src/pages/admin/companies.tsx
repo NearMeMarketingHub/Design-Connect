@@ -55,17 +55,11 @@ interface AdminCompany {
   ownerUserId?: string;
   companyType?: string;
   subscriptionStatus?: string;
-  subscriptionPlan?: string;
+  monthlyPrice?: string | null;
   trialStartedAt?: string | null;
+  trialEndsAt?: string | null;
   userCount?: number;
   projectCount?: number;
-}
-
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: string;
-  isActive: boolean;
 }
 
 export default function AdminCompanies() {
@@ -82,7 +76,6 @@ export default function AdminCompanies() {
   const [companySubDialogOpen, setCompanySubDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
   const [companySubForm, setCompanySubForm] = useState({
-    subscriptionPlan: "free",
     subscriptionStatus: "trialing",
   });
 
@@ -105,12 +98,6 @@ export default function AdminCompanies() {
       const qs = params.toString();
       return apiRequest("GET", `/api/admin/companies${qs ? `?${qs}` : ""}`).then((r) => r.json());
     },
-    enabled: user?.role === "admin",
-  });
-
-  const { data: adminTiers = [] } = useQuery<SubscriptionTier[]>({
-    queryKey: ["/api/admin/subscription/tiers"],
-    queryFn: () => apiRequest("GET", "/api/admin/subscription/tiers").then((r) => r.json()),
     enabled: user?.role === "admin",
   });
 
@@ -168,7 +155,6 @@ export default function AdminCompanies() {
   const openCompanySubEdit = (company: AdminCompany) => {
     setEditingCompany(company);
     setCompanySubForm({
-      subscriptionPlan: company.subscriptionPlan || "free",
       subscriptionStatus: company.subscriptionStatus || "trialing",
     });
     setCompanySubDialogOpen(true);
@@ -236,7 +222,6 @@ export default function AdminCompanies() {
                     <TableHead>Owner</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Access Status</TableHead>
-                    <TableHead>Billing Type</TableHead>
                     <TableHead>Monthly Price</TableHead>
                     <TableHead>Trial Ends</TableHead>
                     <TableHead className="text-center">Users</TableHead>
@@ -248,7 +233,7 @@ export default function AdminCompanies() {
                   {pagedCompanies.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={10}
+                        colSpan={9}
                         className="text-center text-muted-foreground py-8"
                       >
                         No companies match your search.
@@ -256,11 +241,10 @@ export default function AdminCompanies() {
                     </TableRow>
                   )}
                   {pagedCompanies.map((company) => {
-                    const trialStart = company.trialStartedAt
-                      ? new Date(company.trialStartedAt)
-                      : null;
-                    const trialEnd = trialStart
-                      ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+                    const trialEnd = company.trialEndsAt
+                      ? new Date(company.trialEndsAt)
+                      : company.trialStartedAt
+                      ? new Date(new Date(company.trialStartedAt).getTime() + 7 * 24 * 60 * 60 * 1000)
                       : null;
                     const now = new Date();
                     const isSuspended = company.subscriptionStatus === "suspended";
@@ -269,12 +253,7 @@ export default function AdminCompanies() {
                       (company.subscriptionStatus === "trialing" &&
                         trialEnd &&
                         now > trialEnd);
-                    const tier = adminTiers.find(
-                      (t) =>
-                        t.name.toLowerCase() ===
-                        (company.subscriptionPlan || "free").toLowerCase()
-                    );
-                    const price = tier ? parseFloat(tier.price) : 0;
+                    const price = company.monthlyPrice ? parseFloat(company.monthlyPrice) : null;
                     return (
                       <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
                         <TableCell className="font-medium">{company.name}</TableCell>
@@ -304,13 +283,10 @@ export default function AdminCompanies() {
                               : company.subscriptionStatus}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize text-xs">
-                            {company.subscriptionPlan || "free"}
-                          </Badge>
-                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {price === 0
+                          {price === null
+                            ? "—"
+                            : price === 0
                             ? "Free"
                             : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`}
                         </TableCell>
@@ -465,7 +441,6 @@ export default function AdminCompanies() {
       <CreateCompanyDialog
         open={createCompanyOpen}
         onOpenChange={setCreateCompanyOpen}
-        adminTiers={adminTiers}
       />
 
       <Dialog open={companySubDialogOpen} onOpenChange={setCompanySubDialogOpen}>
@@ -477,27 +452,6 @@ export default function AdminCompanies() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Plan</Label>
-              <Select
-                value={companySubForm.subscriptionPlan}
-                onValueChange={(v) =>
-                  setCompanySubForm((f) => ({ ...f, subscriptionPlan: v }))
-                }
-              >
-                <SelectTrigger data-testid="select-company-plan">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free</SelectItem>
-                  {adminTiers.map((t) => (
-                    <SelectItem key={t.id} value={t.name.toLowerCase()}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
               <Select

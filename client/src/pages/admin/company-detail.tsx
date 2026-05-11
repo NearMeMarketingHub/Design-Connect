@@ -107,7 +107,6 @@ interface CompanyDetail {
   name: string;
   logo: string | null;
   ownerId: string | null;
-  subscriptionPlan: string | null;
   subscriptionStatus: string | null;
   trialStartedAt: string | null;
   billingType: string | null;
@@ -116,19 +115,13 @@ interface CompanyDetail {
   prepaidThroughDate: string | null;
   billingNotes: string | null;
   adminNotes: string | null;
+  accessNotes: string | null;
   createdAt: string;
   pendingInviteCount: number;
   owner: CompanyUser | null;
   users: CompanyUser[];
   projects: CompanyProject[];
   invites: CompanyInvite[];
-}
-
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: string;
-  isActive: boolean;
 }
 
 function statusBadge(status: string | null | undefined) {
@@ -159,11 +152,9 @@ export default function AdminCompanyDetail() {
 
   const [editingBilling, setEditingBilling] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
-  const [editAccessOpen, setEditAccessOpen] = useState(false);
 
   const [billingForm, setBillingForm] = useState({
     subscriptionStatus: "trialing",
-    subscriptionPlan: "free",
     billingType: "manual",
     monthlyPrice: "",
     trialStartedAt: "",
@@ -174,21 +165,10 @@ export default function AdminCompanyDetail() {
 
   const [notesForm, setNotesForm] = useState({ adminNotes: "" });
 
-  const [accessForm, setAccessForm] = useState({
-    subscriptionPlan: "free",
-    subscriptionStatus: "trialing",
-  });
-
   const { data: company, isLoading } = useQuery<CompanyDetail>({
     queryKey: [`/api/admin/companies/${companyId}`],
     queryFn: () => apiRequest("GET", `/api/admin/companies/${companyId}`).then((r) => r.json()),
     enabled: !!companyId && user?.role === "admin",
-  });
-
-  const { data: adminTiers = [] } = useQuery<SubscriptionTier[]>({
-    queryKey: ["/api/admin/subscription/tiers"],
-    queryFn: () => apiRequest("GET", "/api/admin/subscription/tiers").then((r) => r.json()),
-    enabled: user?.role === "admin",
   });
 
   const updateMutation = useMutation({
@@ -199,7 +179,6 @@ export default function AdminCompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       setEditingBilling(false);
       setEditingNotes(false);
-      setEditAccessOpen(false);
       toast({ title: "Company updated" });
     },
     onError: (err: Error) =>
@@ -273,7 +252,6 @@ export default function AdminCompanyDetail() {
     if (!company) return;
     setBillingForm({
       subscriptionStatus: company.subscriptionStatus ?? "trialing",
-      subscriptionPlan: company.subscriptionPlan ?? "free",
       billingType: company.billingType ?? "manual",
       monthlyPrice: company.monthlyPrice ?? "",
       trialStartedAt: company.trialStartedAt ? company.trialStartedAt.slice(0, 10) : "",
@@ -287,7 +265,6 @@ export default function AdminCompanyDetail() {
   function saveBilling() {
     updateMutation.mutate({
       subscriptionStatus: billingForm.subscriptionStatus,
-      subscriptionPlan: billingForm.subscriptionPlan,
       billingType: billingForm.billingType,
       monthlyPrice: billingForm.monthlyPrice || null,
       trialStartedAt: billingForm.trialStartedAt ? new Date(billingForm.trialStartedAt).toISOString() : null,
@@ -305,22 +282,6 @@ export default function AdminCompanyDetail() {
 
   function saveNotes() {
     updateMutation.mutate({ adminNotes: notesForm.adminNotes || null });
-  }
-
-  function openEditAccess() {
-    if (!company) return;
-    setAccessForm({
-      subscriptionPlan: company.subscriptionPlan ?? "free",
-      subscriptionStatus: company.subscriptionStatus ?? "trialing",
-    });
-    setEditAccessOpen(true);
-  }
-
-  function saveAccess() {
-    updateMutation.mutate({
-      subscriptionPlan: accessForm.subscriptionPlan,
-      subscriptionStatus: accessForm.subscriptionStatus,
-    });
   }
 
   if (isLoading || !company) {
@@ -377,7 +338,6 @@ export default function AdminCompanyDetail() {
                     {company.owner?.companyType && (
                       <span>Type: <span className="font-medium text-foreground">{company.owner.companyType}</span></span>
                     )}
-                    <span>Plan: <span className="capitalize font-medium text-foreground">{company.subscriptionPlan ?? "free"}</span></span>
                     <span>Billing: <span className="capitalize font-medium text-foreground">{company.billingType ?? "manual"}</span></span>
                     {company.monthlyPrice && (
                       <span>Price: <span className="font-medium text-foreground">${parseFloat(company.monthlyPrice).toFixed(2)}/mo</span></span>
@@ -395,10 +355,10 @@ export default function AdminCompanyDetail() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={openEditAccess}
+                  onClick={openBillingEdit}
                   data-testid="button-edit-access"
                 >
-                  <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Access
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Billing
                 </Button>
                 {company.owner?.email && (
                   <Button
@@ -507,10 +467,6 @@ export default function AdminCompanyDetail() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Created</span>
                     <span>{safeFormat(company.createdAt, "MMM d, yyyy")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plan</span>
-                    <span className="capitalize font-medium">{company.subscriptionPlan ?? "free"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status</span>
@@ -881,23 +837,6 @@ export default function AdminCompanyDetail() {
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Plan</Label>
-                        <Select
-                          value={billingForm.subscriptionPlan}
-                          onValueChange={(v) => setBillingForm((f) => ({ ...f, subscriptionPlan: v }))}
-                        >
-                          <SelectTrigger data-testid="select-billing-plan">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="free">Free</SelectItem>
-                            {adminTiers.map(t => (
-                              <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
                         <Label>Billing Type</Label>
                         <Select
                           value={billingForm.billingType}
@@ -915,12 +854,12 @@ export default function AdminCompanyDetail() {
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Monthly Price Override ($)</Label>
+                        <Label>Monthly Price ($)</Label>
                         <Input
                           type="number"
                           min="0"
                           step="0.01"
-                          placeholder="Leave blank to use tier price"
+                          placeholder="Leave blank for no set price"
                           value={billingForm.monthlyPrice}
                           onChange={(e) => setBillingForm((f) => ({ ...f, monthlyPrice: e.target.value }))}
                           data-testid="input-monthly-price"
@@ -990,10 +929,6 @@ export default function AdminCompanyDetail() {
                       <dd data-testid="display-access-status">{statusBadge(company.subscriptionStatus)}</dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground text-xs mb-0.5">Plan</dt>
-                      <dd className="font-medium capitalize" data-testid="display-plan">{company.subscriptionPlan ?? "free"}</dd>
-                    </div>
-                    <div>
                       <dt className="text-muted-foreground text-xs mb-0.5">Billing Type</dt>
                       <dd className="font-medium capitalize" data-testid="display-billing-type">
                         {company.billingType ?? "manual"}
@@ -1004,7 +939,7 @@ export default function AdminCompanyDetail() {
                       <dd className="font-medium" data-testid="display-monthly-price">
                         {company.monthlyPrice
                           ? `$${parseFloat(company.monthlyPrice).toFixed(2)}/mo`
-                          : "— (use tier price)"}
+                          : "—"}
                       </dd>
                     </div>
                     <div>
@@ -1108,56 +1043,6 @@ export default function AdminCompanyDetail() {
         </Tabs>
       </div>
 
-      {/* Edit Access Dialog (plan + status quick-edit from header) */}
-      <Dialog open={editAccessOpen} onOpenChange={setEditAccessOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Edit Access</DialogTitle>
-            <DialogDescription>Update plan and status for {company.name}.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Plan</Label>
-              <Select
-                value={accessForm.subscriptionPlan}
-                onValueChange={(v) => setAccessForm((f) => ({ ...f, subscriptionPlan: v }))}
-              >
-                <SelectTrigger data-testid="select-access-plan">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free</SelectItem>
-                  {adminTiers.map(t => (
-                    <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select
-                value={accessForm.subscriptionStatus}
-                onValueChange={(v) => setAccessForm((f) => ({ ...f, subscriptionStatus: v }))}
-              >
-                <SelectTrigger data-testid="select-access-status-dialog">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["trialing", "active", "expired", "past_due", "cancelled", "suspended"].map(s => (
-                    <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditAccessOpen(false)}>Cancel</Button>
-            <Button onClick={saveAccess} disabled={updateMutation.isPending} data-testid="button-save-access">
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SuperAdminLayout>
   );
 }

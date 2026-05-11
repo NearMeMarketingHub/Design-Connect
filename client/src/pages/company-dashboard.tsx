@@ -225,15 +225,6 @@ export default function CompanyDashboard() {
     enabled: !!company?.id,
   });
 
-  const { data: subscriptionTiers = [] } = useQuery({
-    queryKey: ["/api/subscription/tiers"],
-    queryFn: async () => {
-      const res = await fetch("/api/subscription/tiers", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
-
   // Price book queries
   const { data: priceCategories = [], refetch: refetchCategories } = useQuery({
     queryKey: ["/api/company/price-book/categories"],
@@ -576,7 +567,7 @@ export default function CompanyDashboard() {
             className="capitalize"
             data-testid="subscription-status"
           >
-            {isExpired ? "Expired" : isTrialing ? `Trial — ${trialDaysRemaining}d left` : (company?.subscriptionPlan || "free")}
+            {isExpired ? "Expired" : isTrialing ? `Trial — ${trialDaysRemaining}d left` : (company?.subscriptionStatus || "active")}
           </Badge>
         </div>
       </div>
@@ -1514,7 +1505,7 @@ export default function CompanyDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold capitalize text-lg">
-                      {isExpired ? "Trial Expired" : isTrialing ? "Free Trial" : `${company?.subscriptionPlan || "Free"} Plan`}
+                      {isExpired ? "Trial Expired" : isTrialing ? "Free Trial" : "Active"}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {isExpired
@@ -1537,55 +1528,9 @@ export default function CompanyDashboard() {
                 </div>
               </div>
 
-              {/* Plan tiers from DB */}
-              {subscriptionTiers.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {subscriptionTiers.map((tier: any) => {
-                    const isCurrent = !isTrialing && !isExpired && company?.subscriptionPlan === tier.name.toLowerCase();
-                    const price = parseFloat(tier.price);
-                    const priceStr = price === 0 ? "$0/mo" : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`;
-                    return (
-                      <div
-                        key={tier.id}
-                        className={`rounded-lg border p-4 space-y-3 ${isCurrent ? "border-primary bg-primary/5" : ""}`}
-                        data-testid={`plan-card-${tier.name.toLowerCase()}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold">{tier.name}</p>
-                          {isCurrent && <Badge className="text-xs">Current</Badge>}
-                        </div>
-                        <p className="text-2xl font-bold">{priceStr}</p>
-                        {tier.maxProjects && (
-                          <p className="text-xs text-muted-foreground">Up to {tier.maxProjects} projects</p>
-                        )}
-                        <ul className="space-y-1">
-                          {(tier.features || []).map((f: string) => (
-                            <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <CheckCircle className="w-3 h-3 text-green-500 shrink-0" />
-                              {f}
-                            </li>
-                          ))}
-                        </ul>
-                        {!isCurrent && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            data-testid={`button-upgrade-${tier.name.toLowerCase()}`}
-                            onClick={() => toast({ title: "Coming soon", description: "Subscription upgrades will be available soon. Contact support to upgrade." })}
-                          >
-                            {price === 0 ? "Select" : "Upgrade"}
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
-                  <p className="text-sm">No plans available yet. Contact support to upgrade your subscription.</p>
-                </div>
-              )}
+              <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground" data-testid="contact-support-note">
+                <p className="text-sm">To change your subscription or billing, contact BuildVision support.</p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

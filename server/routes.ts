@@ -838,7 +838,6 @@ export async function registerRoutes(
     ownerUsername: z.string().min(3).max(100),
     password: z.string().min(6),
     companyType: z.string().optional(),
-    subscriptionPlan: z.string().min(1).max(100).default("free"),
     subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).default("trialing"),
     billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).default("manual"),
     monthlyPrice: z.string().nullable().optional(),
@@ -853,7 +852,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate } = parsed.data;
+      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate } = parsed.data;
 
       const existingByUsername = await storage.getUserByUsername(ownerUsername);
       if (existingByUsername) {
@@ -870,7 +869,6 @@ export async function registerRoutes(
       const { company, user } = await storage.createCompanyWithOwner(
         {
           name: companyName.trim(),
-          subscriptionPlan,
           subscriptionStatus,
           billingType,
           monthlyPrice: monthlyPrice || null,
@@ -899,8 +897,6 @@ export async function registerRoutes(
   const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled", "suspended"] as const;
 
   const adminCompanySubscriptionSchema = z.object({
-    // Plan name is open-ended — matches any admin-defined tier or legacy "free"
-    subscriptionPlan: z.string().min(1).max(100).optional(),
     subscriptionStatus: z.enum(VALID_SUBSCRIPTION_STATUSES).optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
   });
@@ -911,9 +907,8 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid subscription data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { subscriptionPlan, subscriptionStatus, trialStartedAt } = parsed.data;
+      const { subscriptionStatus, trialStartedAt } = parsed.data;
       const updateData: Record<string, string | Date | null> = {};
-      if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
       if (trialStartedAt !== undefined) {
         updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
@@ -1033,7 +1028,6 @@ export async function registerRoutes(
   // ── Admin: Update company general fields (billing, notes, etc.) ───────────
   const adminCompanyUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
-    subscriptionPlan: z.string().min(1).max(100).optional(),
     subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).optional(),
     billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
     monthlyPrice: z.string().nullable().optional(),
@@ -1050,10 +1044,9 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { name, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes } = parsed.data;
+      const { name, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes } = parsed.data;
       const updateData: Partial<InsertCompany> = {};
       if (name !== undefined) updateData.name = name;
-      if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
       if (billingType !== undefined) updateData.billingType = billingType;
       if (monthlyPrice !== undefined) updateData.monthlyPrice = monthlyPrice;
@@ -1247,33 +1240,6 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  // ── Subscription tier routes ──────────────────────────────────────────────────
-  // GET active tiers — for company dashboard (any authenticated user)
-  app.get("/api/subscription/tiers", requireAuth, async (req, res, next) => {
-    try {
-      const tiers = await storage.getActiveSubscriptionTiers();
-      res.json(tiers);
-    } catch (error) { next(error); }
-  });
-
-  // Admin CRUD for subscription tiers
-  app.get("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
-    try {
-      const tiers = await storage.getSubscriptionTiers();
-      res.json(tiers);
-    } catch (error) { next(error); }
-  });
-
-  const tierSchema = z.object({
-    name: z.string().min(1).max(100),
-    // Accept numeric string from forms or number from API calls
-    price: z.coerce.number().nonnegative(),
-    maxProjects: z.coerce.number().int().positive().nullable().optional(),
-    features: z.array(z.string()).optional(),
-    isActive: z.boolean().optional(),
-    sortOrder: z.coerce.number().int().nonnegative().optional(),
-  });
-
   // ── Write-route validation schemas ─────────────────────────────────────────
   // Schemas for key POST/PATCH routes — catch bad data before it reaches the DB
 
@@ -1366,40 +1332,6 @@ export async function registerRoutes(
     lineItems: z.array(z.any()).optional(),
   });
   // ───────────────────────────────────────────────────────────────────────────
-
-  app.post("/api/admin/subscription/tiers", requireAdmin, async (req, res, next) => {
-    try {
-      const parsed = tierSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid tier data", errors: parsed.error.flatten().fieldErrors });
-      }
-      // Drizzle numeric column expects string; convert coerced number back
-      const tierData = { ...parsed.data, price: String(parsed.data.price) } as any;
-      const tier = await storage.createSubscriptionTier(tierData);
-      res.json(tier);
-    } catch (error) { next(error); }
-  });
-
-  app.patch("/api/admin/subscription/tiers/:id", requireAdmin, async (req, res, next) => {
-    try {
-      const parsed = tierSchema.partial().safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid tier data", errors: parsed.error.flatten().fieldErrors });
-      }
-      const updateData: any = { ...parsed.data };
-      if (parsed.data.price !== undefined) updateData.price = String(parsed.data.price);
-      const tier = await storage.updateSubscriptionTier(req.params.id, updateData);
-      if (!tier) return res.status(404).json({ message: "Tier not found" });
-      res.json(tier);
-    } catch (error) { next(error); }
-  });
-
-  app.delete("/api/admin/subscription/tiers/:id", requireAdmin, async (req, res, next) => {
-    try {
-      await storage.deleteSubscriptionTier(req.params.id);
-      res.json({ message: "Tier deleted" });
-    } catch (error) { next(error); }
-  });
 
   // ── Contractor Role Definition routes (admin only) ───────────────────────────
 

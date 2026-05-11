@@ -35,7 +35,6 @@ export async function runRoleMigration(): Promise<void> {
       .values({
         name: companyName,
         ownerId: user.id,
-        subscriptionPlan: "free",
         subscriptionStatus: "active",
       })
       .returning();

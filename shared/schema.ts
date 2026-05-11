@@ -10,16 +10,16 @@ export const companies = pgTable("companies", {
   name: text("name").notNull(),
   logo: text("logo"), // Optional company logo URL
   ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
-  subscriptionPlan: text("subscription_plan").default("free"), // free, starter, professional, enterprise
   subscriptionStatus: text("subscription_status").default("trialing"), // trialing, active, expired, past_due, cancelled
   trialStartedAt: timestamp("trial_started_at"), // When the 7-day trial began
-  // Billing & access fields (admin-managed, not tied to subscription tiers)
+  // Billing & access fields (admin-managed)
   billingType: text("billing_type").default("manual"), // manual | free | prepaid | future_in_app
-  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }), // Override price; null = use tier price
-  trialEndsAt: timestamp("trial_ends_at"), // Explicit trial end; null = computed from trialStartedAt + 7 days
+  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }), // Company-specific monthly price
+  trialEndsAt: timestamp("trial_ends_at"), // Explicit trial end; null = computed from trialStartedAt + defaultTrialDays
   prepaidThroughDate: timestamp("prepaid_through_date"), // For prepaid billing: access guaranteed through
   billingNotes: text("billing_notes"), // Admin notes on billing/access arrangement
   adminNotes: text("admin_notes"), // Internal-only notes about this company/customer
+  accessNotes: text("access_notes"), // Short public-facing access note shown to company owner
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -27,21 +27,6 @@ export const insertCompanySchema = createInsertSchema(companies).omit({ id: true
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
 
-// Subscription tiers — admin-configurable plan definitions
-export const subscriptionTiers = pgTable("subscription_tiers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
-  maxProjects: integer("max_projects"), // null = unlimited
-  features: text("features").array().notNull().default(sql`ARRAY[]::text[]`),
-  isActive: boolean("is_active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertSubscriptionTierSchema = createInsertSchema(subscriptionTiers).omit({ id: true, createdAt: true });
-export type InsertSubscriptionTier = z.infer<typeof insertSubscriptionTierSchema>;
-export type SubscriptionTier = typeof subscriptionTiers.$inferSelect;
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

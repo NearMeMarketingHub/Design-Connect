@@ -22,13 +22,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: string;
-  isActive: boolean;
-}
-
 interface PlatformSettings {
   defaultTrialDays: number;
   defaultMonthlyPrice: string;
@@ -38,7 +31,6 @@ interface PlatformSettings {
 interface CreateCompanyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  adminTiers?: SubscriptionTier[];
   prefill?: { companyName?: string; ownerName?: string; ownerEmail?: string } | null;
   leadId?: string | null;
 }
@@ -82,12 +74,7 @@ function buildPayload(f: typeof EMPTY_FORM) {
   };
 }
 
-export function CreateCompanyDialog({
-  open,
-  onOpenChange,
-  prefill,
-  leadId,
-}: CreateCompanyDialogProps) {
+export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: CreateCompanyDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY_FORM);

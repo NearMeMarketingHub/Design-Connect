@@ -36,13 +36,6 @@ interface DemoRequest {
   createdAt: string;
 }
 
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: string;
-  isActive: boolean;
-}
-
 const DEMO_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   new: { label: "New", color: "bg-blue-100 text-blue-700" },
   contacted: { label: "Contacted", color: "bg-amber-100 text-amber-700" },
@@ -71,12 +64,6 @@ export default function AdminDemoRequests() {
   const { data: demoRequests = [] } = useQuery<DemoRequest[]>({
     queryKey: ["/api/admin/demo-requests"],
     queryFn: () => apiRequest("GET", "/api/admin/demo-requests").then((r) => r.json()),
-    enabled: user?.role === "admin",
-  });
-
-  const { data: adminTiers = [] } = useQuery<SubscriptionTier[]>({
-    queryKey: ["/api/admin/subscription/tiers"],
-    queryFn: () => apiRequest("GET", "/api/admin/subscription/tiers").then((r) => r.json()),
     enabled: user?.role === "admin",
   });
 
@@ -212,7 +199,6 @@ export default function AdminDemoRequests() {
       <CreateCompanyDialog
         open={createCompanyOpen}
         onOpenChange={handleCreateClose}
-        adminTiers={adminTiers}
         prefill={
           convertingLead
             ? {
