@@ -103,9 +103,6 @@ export async function registerRoutes(
         if (!isValidPassword) {
           return done(null, false, { message: "Incorrect password." });
         }
-        if (user.isDisabled) {
-          return done(null, false, { message: "This account has been disabled. Please contact support." });
-        }
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -250,7 +247,12 @@ export async function registerRoutes(
       if (!user) {
         return res.status(400).json({ message: info?.message || "Login failed" });
       }
-      
+
+      // Disabled accounts cannot log in — return 401 distinct from auth failure (400)
+      if ((user as User).isDisabled) {
+        return res.status(401).json({ message: "This account has been disabled. Please contact support." });
+      }
+
       // Contractor portal roles: company_owner, contractor (any subtype)
       const isContractorPortalRole = (role: string) =>
         role === "company_owner" || role === "contractor";
@@ -760,7 +762,6 @@ export async function registerRoutes(
       let projects: { id: string; name: string; status: string; companyName?: string }[] = [];
       if (u.role === "client") {
         const clientProjects = await storage.getProjectsByClientId(u.id);
-        // Get companies for each project
         const allCompanies = await storage.getAllCompanies();
         const companyMap = new Map(allCompanies.map(c => [c.id, c.name]));
         const allUsers = await storage.getAllUsers();
@@ -780,7 +781,13 @@ export async function registerRoutes(
         const companyProjects = await storage.getProjectsByCompanyId(u.companyId);
         projects = companyProjects.map(p => ({ id: p.id, name: p.name, status: p.status }));
       }
-      res.json({ ...safeUser, company, projects });
+      // Pending invite count (contractor invites for company-based users)
+      let pendingInviteCount = 0;
+      if (u.companyId) {
+        const companyInvites = await storage.getContractorInvitesByCompanyId(u.companyId);
+        pendingInviteCount = companyInvites.filter(i => i.status === "pending").length;
+      }
+      res.json({ ...safeUser, company, projects, pendingInviteCount });
     } catch (error) { next(error); }
   });
 

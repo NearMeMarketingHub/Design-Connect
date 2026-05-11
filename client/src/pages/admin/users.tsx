@@ -58,6 +58,7 @@ type UserWithoutPassword = Omit<User, "password">;
 type UserDetail = UserWithoutPassword & {
   company: { id: string; name: string } | null;
   projects: { id: string; name: string; status: string; companyName?: string }[];
+  pendingInviteCount: number;
 };
 
 function getUserStatus(u: UserWithoutPassword): "active" | "pending" | "disabled" {
@@ -229,6 +230,11 @@ function UserDetailDrawer({ userId, onClose, onActionDone, currentAdminId }: Use
                 <FolderOpen className="w-4 h-4 text-muted-foreground" />
                 Related Projects
                 <Badge variant="secondary" className="text-xs">{detail.projects.length}</Badge>
+                {detail.pendingInviteCount > 0 && (
+                  <Badge className="text-xs bg-orange-100 text-orange-700 border-0">
+                    {detail.pendingInviteCount} pending invite{detail.pendingInviteCount !== 1 ? "s" : ""}
+                  </Badge>
+                )}
               </div>
               {detail.projects.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">No projects found.</p>
@@ -239,7 +245,13 @@ function UserDetailDrawer({ userId, onClose, onActionDone, currentAdminId }: Use
                       key={p.id}
                       className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1.5 text-xs"
                     >
-                      <span className="font-medium truncate">{p.name}</span>
+                      <a
+                        href={`/admin/project/${p.id}`}
+                        className="font-medium truncate text-primary hover:underline"
+                        data-testid={`link-project-${p.id}`}
+                      >
+                        {p.name}
+                      </a>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
                         {p.companyName && (
                           <span className="text-muted-foreground">{p.companyName}</span>
@@ -635,7 +647,7 @@ export default function AdminUsers() {
   const rejectMutation = useMutation({
     mutationFn: (id: string) => {
       setPendingId(id);
-      return apiRequest("POST", `/api/admin/contractors/${id}/reject`).then((r) => r.json());
+      return apiRequest("POST", `/api/admin/users/${id}/reject`).then((r) => r.json());
     },
     onSuccess: () => { toast({ title: "User Rejected & Removed" }); setPendingId(null); invalidateAll(); },
     onError: (e: Error) => { toast({ title: "Failed", description: parseErrorMessage(e), variant: "destructive" }); setPendingId(null); },
@@ -840,12 +852,6 @@ export default function AdminUsers() {
                 <Badge className="ml-1.5 text-xs bg-red-100 text-red-700 border-0">{disabledCount}</Badge>
               )}
             </TabsTrigger>
-            {legacyCount > 0 && (
-              <TabsTrigger value="legacy" data-testid="tab-legacy">
-                Legacy Requests
-                <Badge variant="secondary" className="ml-1.5 text-xs">{legacyCount}</Badge>
-              </TabsTrigger>
-            )}
           </TabsList>
 
           {/* All Users */}
@@ -1018,58 +1024,65 @@ export default function AdminUsers() {
             </Card>
           </TabsContent>
 
-          {/* Legacy Access Requests */}
-          {legacyCount > 0 && (
-            <TabsContent value="legacy">
-              <Card>
-                <CardContent className="p-0">
-                  <div className="px-4 py-3 border-b bg-amber-50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    These are legacy access requests from the old public signup flow. Public access requests are now
-                    disabled. These records are read-only for historical reference.
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Username</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {legacyRequests.map((r) => (
-                        <TableRow key={r.id} data-testid={`row-legacy-${r.id}`}>
-                          <TableCell className="font-medium">
-                            {r.firstName} {r.lastName}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{r.username}</TableCell>
-                          <TableCell>{r.companyName}</TableCell>
-                          <TableCell>{r.companyType}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                r.status === "approved"
-                                  ? "text-green-700 border-green-400"
-                                  : r.status === "rejected"
-                                  ? "text-red-700 border-red-400"
-                                  : "text-orange-700 border-orange-400"
-                              }
-                            >
-                              {r.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
         </Tabs>
+
+        {/* Legacy Access Requests — collapsible, shown only when records exist */}
+        {legacyCount > 0 && (
+          <details className="mt-6 group" data-testid="section-legacy-requests">
+            <summary className="flex items-center gap-2 cursor-pointer list-none select-none rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-4 py-2.5 text-sm font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-100 transition-colors">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              Legacy Access Requests
+              <Badge variant="secondary" className="ml-1 text-xs">{legacyCount}</Badge>
+              <span className="ml-auto text-xs font-normal text-amber-600 group-open:hidden">Click to expand</span>
+              <span className="ml-auto text-xs font-normal text-amber-600 hidden group-open:inline">Click to collapse</span>
+            </summary>
+            <Card className="mt-2 border-amber-200">
+              <CardContent className="p-0">
+                <div className="px-4 py-2.5 border-b bg-amber-50 dark:bg-amber-950/20 text-xs text-amber-700 dark:text-amber-400">
+                  These are legacy access requests from the old public signup flow. Public access requests are now
+                  disabled. These records are read-only for historical reference.
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {legacyRequests.map((r) => (
+                      <TableRow key={r.id} data-testid={`row-legacy-${r.id}`}>
+                        <TableCell className="font-medium">
+                          {r.firstName} {r.lastName}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{r.username}</TableCell>
+                        <TableCell>{r.companyName}</TableCell>
+                        <TableCell>{r.companyType}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              r.status === "approved"
+                                ? "text-green-700 border-green-400"
+                                : r.status === "rejected"
+                                ? "text-red-700 border-red-400"
+                                : "text-orange-700 border-orange-400"
+                            }
+                          >
+                            {r.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </details>
+        )}
       </div>
 
       {/* User detail drawer */}
