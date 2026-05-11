@@ -876,8 +876,8 @@ export async function registerRoutes(
       res.json({
         ...company,
         pendingInviteCount,
-        owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, companyType: owner.companyType, isApproved: owner.isApproved, createdAt: owner.createdAt } : null,
-        users: users.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email, role: u.role, contractorType: u.contractorType, isApproved: u.isApproved, createdAt: u.createdAt })),
+        owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, companyType: owner.companyType, isApproved: owner.isApproved } : null,
+        users: users.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email, role: u.role, contractorType: u.contractorType, isApproved: u.isApproved })),
         projects: enrichedProjects,
         invites: enrichedInvites,
       });
@@ -905,7 +905,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
       const { name, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes } = parsed.data;
-      const updateData: Partial<schema.InsertCompany> = {};
+      const updateData: Partial<InsertCompany> = {};
       if (name !== undefined) updateData.name = name;
       if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
