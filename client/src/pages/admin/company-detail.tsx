@@ -83,7 +83,9 @@ interface CompanyProject {
   budget: string | null;
   createdAt: string | null;
   dueDate: string | null;
+  clientId: string | null;
   clientName: string | null;
+  clientEmail: string | null;
   contractorName: string | null;
 }
 
@@ -229,6 +231,28 @@ export default function AdminCompanyDetail() {
     mutationFn: (userId: string) =>
       apiRequest("POST", `/api/admin/users/${userId}/send-password-reset`).then((r) => r.json()),
     onSuccess: (data) => toast({ title: "Password Reset Sent", description: data.message }),
+    onError: (err: Error) =>
+      toast({ title: "Failed", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
+  const revokeInviteMutation = useMutation({
+    mutationFn: (inviteId: string) =>
+      apiRequest("POST", `/api/admin/invites/${inviteId}/revoke`, { type: "contractor" }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
+      toast({ title: "Invite revoked" });
+    },
+    onError: (err: Error) =>
+      toast({ title: "Failed", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: (inviteId: string) =>
+      apiRequest("POST", `/api/admin/invites/${inviteId}/resend`, { type: "contractor" }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
+      toast({ title: "Invite resent" });
+    },
     onError: (err: Error) =>
       toast({ title: "Failed", description: parseErrorMessage(err), variant: "destructive" }),
   });
@@ -537,64 +561,122 @@ export default function AdminCompanyDetail() {
 
           {/* ── Users ── */}
           <TabsContent value="users" className="mt-4">
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Login</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {company.users.length === 0 && (
+            <div className="space-y-4">
+              {/* Team members */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Team Members
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          No users found for this company.
-                        </TableCell>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Login</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    )}
-                    {company.users.map((u) => (
-                      <TableRow key={u.id} data-testid={`user-row-${u.id}`}>
-                        <TableCell className="font-medium">{u.name || u.username}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{u.email ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {u.role}{u.contractorType ? ` · ${u.contractorType}` : ""}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {u.isApproved ? (
-                            <Badge variant="default" className="text-xs">Approved</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">Pending</Badge>
+                    </TableHeader>
+                    <TableBody>
+                      {company.users.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No team members found for this company.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {company.users.map((u) => (
+                        <TableRow key={u.id} data-testid={`user-row-${u.id}`}>
+                          <TableCell className="font-medium">{u.name || u.username}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{u.email ?? "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {u.role}{u.contractorType ? ` · ${u.contractorType}` : ""}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {u.isApproved ? (
+                              <Badge variant="default" className="text-xs">Approved</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">Pending</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                          <TableCell className="text-right">
+                            {u.email && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => sendResetMutation.mutate(u.id)}
+                                disabled={sendResetMutation.isPending}
+                                data-testid={`button-send-reset-user-${u.id}`}
+                                title={`Send password reset to ${u.email}`}
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Clients (from projects) — informational, read-only */}
+              {(() => {
+                const uniqueClients = Array.from(
+                  new Map(
+                    company.projects
+                      .filter((p) => p.clientId && p.clientName)
+                      .map((p) => [p.clientId, { id: p.clientId!, name: p.clientName!, email: p.clientEmail }])
+                  ).values()
+                );
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                        Clients via Projects
+                        <span className="text-xs font-normal bg-muted rounded px-1.5 py-0.5">read-only</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Role</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {uniqueClients.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center text-muted-foreground py-6 text-sm">
+                                No clients linked via projects.
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">—</TableCell>
-                        <TableCell className="text-right">
-                          {u.email && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => sendResetMutation.mutate(u.id)}
-                              disabled={sendResetMutation.isPending}
-                              data-testid={`button-send-reset-user-${u.id}`}
-                              title={`Send password reset to ${u.email}`}
-                            >
-                              <Mail className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                          {uniqueClients.map((c) => (
+                            <TableRow key={c.id} data-testid={`client-row-${c.id}`}>
+                              <TableCell className="font-medium text-sm">{c.name}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{c.email ?? "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">client</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </div>
           </TabsContent>
 
           {/* ── Projects ── */}
@@ -697,7 +779,37 @@ export default function AdminCompanyDetail() {
                         <TableCell className="text-sm text-muted-foreground">
                           {safeFormat(inv.expiresAt, "MMM d, yyyy")}
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {inv.status === "pending" ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => resendInviteMutation.mutate(inv.id)}
+                                  disabled={resendInviteMutation.isPending}
+                                  data-testid={`button-resend-invite-${inv.id}`}
+                                  title="Resend invite email"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => revokeInviteMutation.mutate(inv.id)}
+                                  disabled={revokeInviteMutation.isPending}
+                                  data-testid={`button-revoke-invite-${inv.id}`}
+                                  title="Revoke invite"
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -860,7 +860,9 @@ export async function registerRoutes(
           budget: p.budget,
           createdAt: p.createdAt,
           dueDate: p.dueDate,
+          clientId: client?.id ?? null,
           clientName: client ? (client.name || client.username) : null,
+          clientEmail: client?.email ?? null,
           contractorName: contractor ? (contractor.name || contractor.username) : null,
         };
       });
