@@ -1,0 +1,89 @@
+We completed the Super Admin sidebar cleanup and the Company Detail page phase. Before moving to the Users phase, we need a cleanup pass to remove old Super Admin leftovers and align the company/billing/invite UI with the current product model.
+
+Do not change BuildVision branding.
+
+1. Update the Dashboard quick navigation copy.
+On the Super Admin Dashboard Overview page, the Admin Tools quick link still references old tools like Budget Manager.
+Update the Admin Tools description to something accurate, such as:
+“Sandbox testing, role definitions, and platform utilities.”
+Do not mention Budget Manager or Financial Management in Super Admin quick navigation.
+
+2. Remove old Super Admin routes for company-owner tools.
+Budget Manager and Financial Management tools now belong on the company owner side, not Super Admin.
+Remove or redirect these old Super Admin routes:
+- /admin/budget
+- /admin/sales
+- /admin/estimates
+- /admin/accounting
+- /admin/invoice/new
+
+If any user manually visits those routes as Super Admin, redirect them to /admin/tools or /admin/dashboard.
+Keep the company owner routes working:
+- /company/budget
+- /company/financials
+- /company/sales
+- /company/estimates
+- /company/accounting
+- /company/invoice/new
+
+3. Simplify Pricing & Access for the current one-price/manual billing model.
+The app currently does not use true public subscription tiers.
+On /admin/pricing-access, remove or hide the active “Plan Tiers” section from the main view.
+Keep the backend subscription tier code if needed for future use, but do not show Growth/Professional/Add Tier as part of the active workflow.
+
+The main Pricing & Access page should focus on:
+- Default Trial Length
+- Default Monthly Price
+- Manual Billing
+- Free Access Enabled
+- Prepaid Access Enabled
+
+If you want to keep tiers available for later, put them behind a collapsed “Advanced / Future Tier Settings” area, but they should not dominate the page.
+
+4. Update Create Company to match the one-price/manual model.
+The Create Company modal currently asks for “Subscription Plan.”
+Replace or supplement that with company-level access/billing fields:
+- Access Status: trialing, active, free, prepaid, suspended, cancelled, expired
+- Billing Type: manual, free, prepaid, future_in_app
+- Monthly Price
+- Trial Start / Trial End, or use the platform default trial length
+- Prepaid Through Date, if Billing Type is prepaid
+
+When a new company is created, apply the platform defaults from Pricing & Access where appropriate:
+- Default trial length
+- Default monthly price
+- Manual billing setting
+
+The company owner should still be created as role = company_owner and should log in through the Contractor Login.
+
+5. Fix Company Detail invite data.
+The Company Detail page at /admin/companies/:companyId currently appears to only load contractor invites for that company.
+Update it so the Invites tab shows all invites related to that company, including:
+- client/project invites connected to projects owned by that company
+- contractor/team invites if they are still used
+- hidden/future subcontractor invites only if they already exist and are relevant
+
+The Invites tab should clearly show:
+- Invited Email
+- Invite Type
+- Project
+- Status
+- Sent At
+- Accepted At
+- Expires At
+- Actions
+
+Client project invites should be included because account creation is now invite-only.
+
+6. Keep Company Detail tabs working.
+Make sure /admin/companies/:companyId still has:
+- Overview
+- Users
+- Projects
+- Invites
+- Billing & Access
+- Notes
+
+7. Do not redesign the Users page yet.
+That will be the next phase.
+Only touch Users if needed to preserve links or prevent broken routes.
