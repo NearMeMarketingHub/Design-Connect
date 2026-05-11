@@ -19,7 +19,16 @@ import NewProject from "@/pages/new-project";
 import ClientProjects from "@/pages/client-projects";
 import SettingsPage from "@/pages/settings";
 import AdminLogin from "@/pages/admin-login";
-import SuperAdminDashboard from "@/pages/super-admin-dashboard";
+import AdminOverview from "@/pages/admin/overview";
+import AdminCompanies from "@/pages/admin/companies";
+import AdminDemoRequests from "@/pages/admin/demo-requests";
+import AdminUsers from "@/pages/admin/users";
+import AdminInvites from "@/pages/admin/invites";
+import AdminProjects from "@/pages/admin/projects";
+import AdminPricingAccess from "@/pages/admin/pricing-access";
+import AdminTools from "@/pages/admin/tools";
+import AdminAuditLog from "@/pages/admin/audit-log";
+import AdminViewAsUser from "@/pages/admin/view-as-user";
 import SandboxDashboard from "@/pages/sandbox-dashboard";
 import SandboxProject from "@/pages/sandbox-project";
 import SandboxMessages from "@/pages/sandbox-messages";
@@ -182,11 +191,21 @@ function Router() {
     );
   }
 
-  // Admin Portal Routes (have their own headers)
+  // Admin Portal Routes (have their own headers / sidebar layout)
   if (location.startsWith("/admin")) {
     return (
       <Switch>
-        <Route path="/admin/dashboard" component={SuperAdminDashboard} />
+        <Route path="/admin/dashboard" component={AdminOverview} />
+        <Route path="/admin/overview" component={AdminOverview} />
+        <Route path="/admin/companies" component={AdminCompanies} />
+        <Route path="/admin/demo-requests" component={AdminDemoRequests} />
+        <Route path="/admin/users" component={AdminUsers} />
+        <Route path="/admin/invites" component={AdminInvites} />
+        <Route path="/admin/projects" component={AdminProjects} />
+        <Route path="/admin/pricing-access" component={AdminPricingAccess} />
+        <Route path="/admin/tools" component={AdminTools} />
+        <Route path="/admin/audit-log" component={AdminAuditLog} />
+        <Route path="/admin/view-as-user" component={AdminViewAsUser} />
         <Route path="/admin/project/:id" component={ProjectDetails} />
         <Route path="/admin/contractors" component={ContractorManagement} />
         <Route path="/admin/contractors/:id" component={ContractorProfile} />
