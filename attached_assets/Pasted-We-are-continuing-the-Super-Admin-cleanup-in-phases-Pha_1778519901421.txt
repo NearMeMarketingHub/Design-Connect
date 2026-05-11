@@ -1,0 +1,159 @@
+We are continuing the Super Admin cleanup in phases.
+
+Phase 1 completed:
+- Super Admin now has sidebar navigation and separate pages.
+
+Phase 2 completed:
+- Companies page and Company Detail page were added.
+- Company Detail has Overview, Users, Projects, Invites, Billing & Access, and Notes.
+- Old company-operation tools were moved off Super Admin.
+- Admin Tools was cleaned up.
+
+For this phase, focus on cleaning up the Users area and retiring the old Contractor Management experience from the main Super Admin flow.
+
+Current issue:
+The new /admin/users page exists and looks good, but there is still a “Full Users & Approvals” button that links to the old /admin/contractors page. That old page still feels like the legacy Contractor Management page from when the app was built around one company/public contractor signup.
+
+Goal:
+Make /admin/users the true Super Admin user-management and approvals page.
+
+1. Upgrade /admin/users into the full Users & Approvals page.
+It should no longer need to link to /admin/contractors for full functionality.
+
+Add tabs or clear sections:
+- All Users
+- Company Owners
+- Company Team Members
+- Clients
+- Pending Approvals
+- Disabled Users
+
+Optional if useful:
+- Legacy Access Requests
+
+2. Remove the “Full Users & Approvals” button from /admin/users.
+All needed user-management functionality should live directly inside /admin/users.
+
+3. Add better filtering to /admin/users.
+Keep search, but add filters for:
+- Role
+  - All
+  - Admin
+  - Company Owner
+  - Contractor / Team Member
+  - Client
+- Status
+  - All
+  - Active
+  - Pending
+  - Disabled
+- Company
+  - All Companies
+  - each company name
+
+The company filter should apply to company owners and company team members by companyId.
+Clients are global users, so only include clients under a company filter if they are related to that company through projects. Do not treat clients as owned by the company.
+
+4. Update the Users table columns.
+Use columns like:
+- Name
+- Email
+- Role
+- Company / Related Company
+- Status
+- Related Projects
+- Last Login, if available
+- Actions
+
+For clients:
+- Company column can show “Global Client” or “Related through projects.”
+- Related Projects should show count or a short label.
+
+For company owners/team members:
+- Company column should show their company.
+
+5. Add user actions.
+Each user row should support relevant actions where possible:
+- View User
+- Send Password Reset
+- Approve, for pending users
+- Disable User
+- Reactivate User
+- View Company, when applicable
+- View Related Projects, when applicable
+
+If full disable/reactivate does not exist yet in the backend/schema, add it cleanly.
+Prefer adding a user status field if needed, or use existing isApproved carefully only if it will not confuse pending vs disabled.
+
+Important:
+- Pending approval and disabled/suspended are different states.
+- A user who is disabled should not be able to log in.
+- Disabling a user should not delete them or remove historical records.
+
+6. Add a User Detail view.
+This can be a drawer, modal, or dedicated page.
+
+It should show:
+- Name
+- Username
+- Email
+- Role
+- Contractor/team type if applicable
+- Company, if applicable
+- Related projects
+- Approval/status
+- Created date
+- Last login, if available
+- Actions: send reset, approve, disable/reactivate
+
+For clients:
+- Show projects they are attached to.
+- Show the company for each project.
+- Make it clear clients are global users, not owned by a company.
+
+For company owners/team members:
+- Show their company and company role/admin status.
+
+7. Migrate pending approvals into /admin/users.
+The old /admin/contractors page currently has pending contractor approvals and legacy access requests.
+Move the useful approval workflows into /admin/users under the Pending Approvals tab/section.
+
+8. Handle legacy contractor access requests.
+Public account creation is now disabled, and users should not be able to create accounts publicly.
+The old public endpoint /api/contractor-requests still exists and allows public access requests.
+
+Update this legacy flow:
+- Disable public POST /api/contractor-requests, or make it return a clear message that public access requests are disabled and companies must request a demo or be invited.
+- Keep existing old requests visible in Super Admin only if needed for historical cleanup.
+- Do not allow new public contractor access requests.
+
+If keeping old requests visible:
+- Put them in a “Legacy Access Requests” section under /admin/users.
+- Label clearly that these are legacy and not part of the current invite-only flow.
+
+9. Retire /admin/contractors from the main Super Admin workflow.
+Once /admin/users contains all needed functionality:
+- Remove links to /admin/contractors from the Super Admin UI.
+- Either redirect /admin/contractors to /admin/users or keep it only as a hidden legacy route.
+- Prefer redirecting /admin/contractors to /admin/users unless something still depends on it.
+
+10. Keep Company Detail user links working.
+If Company Detail links to users or filters users by company, make sure those continue working with the improved /admin/users page.
+
+Examples:
+- /admin/users?companyId=<companyId> should filter users related to that company.
+- Company-owned users should show clearly.
+- Related clients should be shown separately or clearly labeled.
+
+11. Security requirements:
+- Only Super Admins can access /admin/users and user-management APIs.
+- Do not allow a Super Admin to accidentally disable themselves.
+- Do not expose passwords or password hashes.
+- Password reset should send/reset via the existing secure password reset flow.
+- Do not delete users as part of this phase.
+
+12. Do not redesign unrelated sections.
+Do not change Companies, Demo Requests, Invites, Projects, Pricing & Access, Audit Log, View As User, or Admin Tools except where needed to preserve links into Users.
+
+Deliverable:
+A complete /admin/users page that replaces the old Contractor Management page for day-to-day Super Admin user management and approvals.
