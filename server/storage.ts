@@ -2455,15 +2455,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContractorInvitesByCompanyId(companyId: string): Promise<ContractorInvite[]> {
-    // contractorInvites are linked to projects; get invites via projects owned by this company
+    // Primary: query directly by companyId on the contractorInvites table
+    const direct = await db.select().from(schema.contractorInvites)
+      .where(eq(schema.contractorInvites.companyId, companyId));
+    // Supplement: collect any project-linked invites not already covered (where companyId may be null)
     const projects = await this.getProjectsByCompanyId(companyId);
-    if (projects.length === 0) return [];
-    const allInvites: ContractorInvite[] = [];
+    const directIds = new Set(direct.map(i => i.id));
+    const projectInvites: ContractorInvite[] = [];
     for (const project of projects) {
       const invites = await this.getContractorInvitesByProject(project.id);
-      allInvites.push(...invites);
+      for (const inv of invites) {
+        if (!directIds.has(inv.id)) projectInvites.push(inv);
+      }
     }
-    return allInvites;
+    return [...direct, ...projectInvites];
   }
 }
 

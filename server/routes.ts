@@ -874,7 +874,7 @@ export async function registerRoutes(
       res.json({
         ...company,
         pendingInviteCount,
-        owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, isApproved: owner.isApproved, createdAt: owner.createdAt } : null,
+        owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, companyType: owner.companyType, isApproved: owner.isApproved, createdAt: owner.createdAt } : null,
         users: users.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email, role: u.role, contractorType: u.contractorType, isApproved: u.isApproved, createdAt: u.createdAt })),
         projects: enrichedProjects,
         invites: enrichedInvites,
@@ -886,7 +886,7 @@ export async function registerRoutes(
   const adminCompanyUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
     subscriptionPlan: z.string().min(1).max(100).optional(),
-    subscriptionStatus: z.enum(["trialing", "active", "expired", "past_due", "cancelled", "suspended"]).optional(),
+    subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).optional(),
     billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
     monthlyPrice: z.string().nullable().optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),

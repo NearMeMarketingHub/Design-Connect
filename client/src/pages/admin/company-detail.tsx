@@ -70,6 +70,7 @@ interface CompanyUser {
   email: string | null;
   role: string;
   contractorType: string | null;
+  companyType: string | null;
   isApproved: boolean;
   createdAt: string;
 }
@@ -337,6 +338,9 @@ export default function AdminCompanyDetail() {
                     </p>
                   )}
                   <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground pt-1">
+                    {company.owner?.companyType && (
+                      <span>Type: <span className="font-medium text-foreground">{company.owner.companyType}</span></span>
+                    )}
                     <span>Plan: <span className="capitalize font-medium text-foreground">{company.subscriptionPlan ?? "free"}</span></span>
                     <span>Billing: <span className="capitalize font-medium text-foreground">{company.billingType ?? "manual"}</span></span>
                     {company.monthlyPrice && (
@@ -458,6 +462,12 @@ export default function AdminCompanyDetail() {
                     <span className="text-muted-foreground">Name</span>
                     <span className="font-medium" data-testid="info-company-name">{company.name}</span>
                   </div>
+                  {company.owner?.companyType && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Type</span>
+                      <span className="font-medium" data-testid="info-company-type">{company.owner.companyType}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Created</span>
                     <span>{safeFormat(company.createdAt, "MMM d, yyyy")}</span>
@@ -652,12 +662,13 @@ export default function AdminCompanyDetail() {
                       <TableHead>Sent</TableHead>
                       <TableHead>Accepted</TableHead>
                       <TableHead>Expires</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {company.invites.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                           No contractor invites found for this company.
                         </TableCell>
                       </TableRow>
@@ -686,6 +697,7 @@ export default function AdminCompanyDetail() {
                         <TableCell className="text-sm text-muted-foreground">
                           {safeFormat(inv.expiresAt, "MMM d, yyyy")}
                         </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -721,7 +733,7 @@ export default function AdminCompanyDetail() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {["trialing", "active", "expired", "past_due", "cancelled", "suspended"].map(s => (
+                            {["trialing", "active", "free", "prepaid", "suspended", "cancelled", "expired", "past_due"].map(s => (
                               <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
                             ))}
                           </SelectContent>
