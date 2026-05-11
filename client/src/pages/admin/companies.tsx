@@ -73,7 +73,7 @@ export default function AdminCompanies() {
   const [companiesPage, setCompaniesPage] = useState(1);
   const [companiesPageSize, setCompaniesPageSize] = useState(25);
 
-  const { data: platformSettings } = useQuery<{ defaultMonthlyPrice: string }>({
+  const { data: platformSettings } = useQuery<{ defaultMonthlyPrice: string; defaultTrialLength: number }>({
     queryKey: ["/api/admin/platform-settings"],
     queryFn: () => apiRequest("GET", "/api/admin/platform-settings").then((r) => r.json()),
     enabled: user?.role === "admin",
@@ -249,7 +249,7 @@ export default function AdminCompanies() {
                     </TableRow>
                   )}
                   {pagedCompanies.map((company) => {
-                    const trialLengthDays = (platformSettings as any)?.defaultTrialLength ?? 7;
+                    const trialLengthDays = platformSettings?.defaultTrialLength ?? 7;
                     const trialEnd = company.trialEndsAt
                       ? new Date(company.trialEndsAt)
                       : company.trialStartedAt
