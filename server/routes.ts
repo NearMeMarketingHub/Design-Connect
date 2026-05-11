@@ -844,6 +844,7 @@ export async function registerRoutes(
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
     trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
     prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
+    accessNotes: z.string().max(2000).nullable().optional(),
   });
 
   app.post("/api/admin/companies", requireAdmin, async (req, res, next) => {
@@ -852,7 +853,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate } = parsed.data;
+      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, accessNotes } = parsed.data;
 
       const existingByUsername = await storage.getUserByUsername(ownerUsername);
       if (existingByUsername) {
@@ -875,6 +876,7 @@ export async function registerRoutes(
           trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
           trialEndsAt: trialEndsAt ? new Date(trialEndsAt) : null,
           prepaidThroughDate: prepaidThroughDate ? new Date(prepaidThroughDate) : null,
+          accessNotes: accessNotes || null,
         },
         {
           username: ownerUsername.trim(),
@@ -897,7 +899,7 @@ export async function registerRoutes(
   const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled", "suspended"] as const;
 
   const adminCompanySubscriptionSchema = z.object({
-    subscriptionStatus: z.enum(VALID_SUBSCRIPTION_STATUSES).optional(),
+    subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
     trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
     prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
