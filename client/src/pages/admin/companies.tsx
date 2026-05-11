@@ -249,10 +249,11 @@ export default function AdminCompanies() {
                     </TableRow>
                   )}
                   {pagedCompanies.map((company) => {
+                    const trialLengthDays = (platformSettings as any)?.defaultTrialLength ?? 7;
                     const trialEnd = company.trialEndsAt
                       ? new Date(company.trialEndsAt)
                       : company.trialStartedAt
-                      ? new Date(new Date(company.trialStartedAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+                      ? new Date(new Date(company.trialStartedAt).getTime() + trialLengthDays * 24 * 60 * 60 * 1000)
                       : null;
                     const now = new Date();
                     const isSuspended = company.subscriptionStatus === "suspended";

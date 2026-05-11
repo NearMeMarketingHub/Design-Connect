@@ -55,15 +55,15 @@ BuildVision uses a 7-day free trial model for company accounts:
 - **Trial Start**: New company_owner registrations auto-start a 7-day trial (`subscriptionStatus: "trialing"`, `trialStartedAt: now()`)
 - **Trial Countdown Banner**: Company dashboard shows an amber warning banner with days remaining when status is "trialing"
 - **Expired Screen**: When trial expires, a red "Trial Expired" block appears with an upgrade prompt
-- **Subscription Tab**: Shows real trial dates, days remaining, and tier cards loaded from database (not hardcoded)
+- **Subscription Tab**: Shows billing type, monthly price, real trial dates, and days remaining
 - **Status Values**: `trialing` → `active` (paid) → `expired` / `past_due` / `cancelled`
-- **No payment processing**: Billing is manual/admin-controlled; admins manually set company plans via the Super Admin dashboard
+- **No payment processing**: Billing is manual/admin-controlled; admins manually set company billing fields (status, billing type, monthly price, trial dates) via the Super Admin dashboard
 
 ### Admin Subscription Management
 The Super Admin dashboard includes a "Subscriptions" section:
-- **Company Subscriptions Table**: Lists all companies with plan, status, trial start/end dates; "Edit Plan" button lets admin change plan and status per company
-- **Subscription Tiers**: CRUD interface to define plan tiers (name, monthly price, max projects, features list, active/inactive toggle); displayed to company users in their Subscription tab
-- **API Routes**: `GET/POST/PATCH/DELETE /api/admin/subscription/tiers`, `PATCH /api/admin/companies/:id/subscription`, `GET /api/subscription/tiers` (authenticated)
+- **Company Subscriptions Table**: Lists all companies with billing type, access status, monthly price, trial dates; "Edit Access" button lets admin change status and billing fields per company
+- **Pricing & Access**: Admin page at `/admin/pricing-access` configures platform-wide defaults (default trial length in days, default monthly price, access mode toggles). No subscription tier CRUD — billing is flat per-company
+- **API Routes**: `PATCH /api/admin/companies/:id/subscription` (full billing/access update), `PATCH /api/admin/companies/:id` (general company update including accessNotes), `GET/PATCH /api/admin/platform-settings`
 
 ### Change Order System
 BuildVision includes a comprehensive change order management system:
