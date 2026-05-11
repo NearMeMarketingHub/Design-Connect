@@ -745,6 +745,8 @@ export async function registerRoutes(
     billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).default("manual"),
     monthlyPrice: z.string().nullable().optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
+    trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
+    prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
   });
 
   app.post("/api/admin/companies", requireAdmin, async (req, res, next) => {
@@ -753,7 +755,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt } = parsed.data;
+      const { companyName, ownerName, ownerEmail, ownerUsername, password, companyType, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate } = parsed.data;
 
       const existingByUsername = await storage.getUserByUsername(ownerUsername);
       if (existingByUsername) {
@@ -775,6 +777,8 @@ export async function registerRoutes(
           billingType,
           monthlyPrice: monthlyPrice || null,
           trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
+          trialEndsAt: trialEndsAt ? new Date(trialEndsAt) : null,
+          prepaidThroughDate: prepaidThroughDate ? new Date(prepaidThroughDate) : null,
         },
         {
           username: ownerUsername.trim(),

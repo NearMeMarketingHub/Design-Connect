@@ -260,6 +260,7 @@ export default function AdminPricingAccess() {
           <summary className="flex cursor-pointer items-center justify-between rounded-lg border bg-card px-4 py-3 hover:bg-muted/40 transition-colors list-none">
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold text-foreground">Plan Tiers</span>
+              <span className="text-xs text-muted-foreground">(Advanced / Future Tier Settings — not active billing)</span>
               {adminTiers.length > 0 && (
                 <Badge variant="secondary" className="text-xs">{adminTiers.length}</Badge>
               )}

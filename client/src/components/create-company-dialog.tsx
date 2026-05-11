@@ -18,8 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface SubscriptionTier {
   id: string;
@@ -28,13 +29,21 @@ interface SubscriptionTier {
   isActive: boolean;
 }
 
+interface PlatformSettings {
+  defaultTrialDays: number;
+  defaultMonthlyPrice: string;
+  manualBillingEnabled: boolean;
+}
+
 interface CreateCompanyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  adminTiers: SubscriptionTier[];
+  adminTiers?: SubscriptionTier[];
   prefill?: { companyName?: string; ownerName?: string; ownerEmail?: string } | null;
   leadId?: string | null;
 }
+
+const todayIso = () => format(new Date(), "yyyy-MM-dd");
 
 const EMPTY_FORM = {
   companyName: "",
@@ -46,13 +55,36 @@ const EMPTY_FORM = {
   subscriptionStatus: "trialing",
   billingType: "manual",
   monthlyPrice: "",
-  trialStartedAt: "",
+  trialStartedAt: todayIso(),
+  trialEndsAt: "",
+  prepaidThroughDate: "",
 };
+
+function dateToIso(dateStr: string): string | undefined {
+  if (!dateStr) return undefined;
+  return new Date(dateStr + "T00:00:00.000Z").toISOString();
+}
+
+function buildPayload(f: typeof EMPTY_FORM) {
+  return {
+    companyName: f.companyName,
+    ownerName: f.ownerName,
+    ownerEmail: f.ownerEmail,
+    ownerUsername: f.ownerUsername,
+    password: f.password,
+    companyType: f.companyType || undefined,
+    subscriptionStatus: f.subscriptionStatus,
+    billingType: f.billingType,
+    monthlyPrice: f.monthlyPrice || null,
+    trialStartedAt: dateToIso(f.trialStartedAt),
+    trialEndsAt: dateToIso(f.trialEndsAt) ?? null,
+    prepaidThroughDate: dateToIso(f.prepaidThroughDate) ?? null,
+  };
+}
 
 export function CreateCompanyDialog({
   open,
   onOpenChange,
-  adminTiers,
   prefill,
   leadId,
 }: CreateCompanyDialogProps) {
@@ -60,16 +92,34 @@ export function CreateCompanyDialog({
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY_FORM);
 
+  const { data: platformSettings } = useQuery<PlatformSettings>({
+    queryKey: ["/api/admin/platform-settings"],
+    queryFn: () => apiRequest("GET", "/api/admin/platform-settings").then((r) => r.json()),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
   useEffect(() => {
     if (open) {
+      const defaultPrice = platformSettings?.defaultMonthlyPrice
+        ? parseFloat(platformSettings.defaultMonthlyPrice) > 0
+          ? platformSettings.defaultMonthlyPrice
+          : ""
+        : "";
+      const trialDays = platformSettings?.defaultTrialDays ?? 7;
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + trialDays);
+
       setForm({
         ...EMPTY_FORM,
         companyName: prefill?.companyName || "",
         ownerName: prefill?.ownerName || "",
         ownerEmail: prefill?.ownerEmail || "",
+        monthlyPrice: defaultPrice,
+        trialEndsAt: format(trialEnd, "yyyy-MM-dd"),
       });
     }
-  }, [open, prefill?.companyName, prefill?.ownerName, prefill?.ownerEmail]);
+  }, [open, prefill?.companyName, prefill?.ownerName, prefill?.ownerEmail, platformSettings]);
 
   const handleClose = () => {
     onOpenChange(false);
@@ -77,7 +127,7 @@ export function CreateCompanyDialog({
 
   const createCompanyMutation = useMutation({
     mutationFn: (data: typeof form) =>
-      apiRequest("POST", "/api/admin/companies", data).then((r) => r.json()),
+      apiRequest("POST", "/api/admin/companies", buildPayload(data)).then((r) => r.json()),
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       handleClose();
@@ -108,9 +158,11 @@ export function CreateCompanyDialog({
   const set = (field: keyof typeof EMPTY_FORM, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
 
+  const isPrepaid = form.billingType === "prepaid";
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Company</DialogTitle>
           <DialogDescription>
@@ -143,48 +195,54 @@ export function CreateCompanyDialog({
               data-testid="input-create-company-type"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Access Status</Label>
-              <Select
-                value={form.subscriptionStatus}
-                onValueChange={(v) => set("subscriptionStatus", v)}
-              >
-                <SelectTrigger data-testid="select-create-company-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="trialing">Trialing</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="prepaid">Prepaid</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+
+          {/* Billing section */}
+          <div className="border rounded-lg p-3 space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Billing & Access</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Access Status</Label>
+                <Select
+                  value={form.subscriptionStatus}
+                  onValueChange={(v) => set("subscriptionStatus", v)}
+                >
+                  <SelectTrigger data-testid="select-create-company-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="trialing">Trialing</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="prepaid">Prepaid</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Billing Type</Label>
+                <Select
+                  value={form.billingType}
+                  onValueChange={(v) => set("billingType", v)}
+                >
+                  <SelectTrigger data-testid="select-create-company-billing-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="prepaid">Prepaid</SelectItem>
+                    <SelectItem value="future_in_app">Future In-App</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Billing Type</Label>
-              <Select
-                value={form.billingType}
-                onValueChange={(v) => set("billingType", v)}
-              >
-                <SelectTrigger data-testid="select-create-company-billing-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="prepaid">Prepaid</SelectItem>
-                  <SelectItem value="future_in_app">Future In-App</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+
             <div className="space-y-1.5">
               <Label htmlFor="cc-monthly-price">
-                Monthly Price{" "}
+                Monthly Price ($){" "}
                 <span className="text-muted-foreground text-xs">(optional)</span>
               </Label>
               <Input
@@ -198,20 +256,47 @@ export function CreateCompanyDialog({
                 data-testid="input-create-company-monthly-price"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cc-trial-start">
-                Trial Start{" "}
-                <span className="text-muted-foreground text-xs">(optional)</span>
-              </Label>
-              <Input
-                id="cc-trial-start"
-                type="date"
-                value={form.trialStartedAt}
-                onChange={(e) => set("trialStartedAt", e.target.value)}
-                data-testid="input-create-company-trial-start"
-              />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-trial-start">Trial Start</Label>
+                <Input
+                  id="cc-trial-start"
+                  type="date"
+                  value={form.trialStartedAt}
+                  onChange={(e) => set("trialStartedAt", e.target.value)}
+                  data-testid="input-create-company-trial-start"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-trial-end">
+                  Trial End Override{" "}
+                  <span className="text-muted-foreground text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="cc-trial-end"
+                  type="date"
+                  value={form.trialEndsAt}
+                  onChange={(e) => set("trialEndsAt", e.target.value)}
+                  data-testid="input-create-company-trial-end"
+                />
+              </div>
             </div>
+
+            {isPrepaid && (
+              <div className="space-y-1.5">
+                <Label htmlFor="cc-prepaid-through">Prepaid Through Date</Label>
+                <Input
+                  id="cc-prepaid-through"
+                  type="date"
+                  value={form.prepaidThroughDate}
+                  onChange={(e) => set("prepaidThroughDate", e.target.value)}
+                  data-testid="input-create-company-prepaid-through"
+                />
+              </div>
+            )}
           </div>
+
           <div className="border-t pt-3 space-y-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Owner Account
