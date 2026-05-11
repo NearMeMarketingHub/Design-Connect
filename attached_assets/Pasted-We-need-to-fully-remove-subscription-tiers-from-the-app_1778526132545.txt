@@ -1,0 +1,202 @@
+We need to fully remove subscription tiers from the app.
+
+Important:
+We are not hiding tiers for later. We are removing tier functionality entirely from the current codebase. If we need tiered pricing in the future, we will rebuild it later.
+
+Current product model:
+- BuildVision uses a one-price/manual billing model.
+- Super Admins control company access and billing manually.
+- Each company should have its own access/billing settings.
+- There should be no active subscription tier system.
+
+Do not change BuildVision branding.
+
+Goal:
+Remove subscription tier functionality from frontend, backend, schema/types, routes, storage methods, and Super Admin UI. Replace tier/plan logic with company-level billing/access fields and platform-wide pricing defaults.
+
+1. Remove subscription tier UI completely.
+Remove all visible tier UI from:
+- /admin/pricing-access
+- /admin/companies
+- /admin/companies/:companyId
+- Create Company modal
+- Edit Access modal
+- Dashboard quick links/copy
+- Any other Super Admin page
+
+Remove wording like:
+- Subscription Tiers
+- Plan Tiers
+- Add Tier
+- Growth
+- Professional
+- Starter
+- subscriptionPlan
+- tier price
+- plan price
+
+The Pricing & Access page should only show:
+- Default Monthly Price
+- Default Trial Length
+- Manual Billing
+- Free Access Enabled
+- Prepaid Access Enabled
+
+2. Remove subscription tier routes and APIs.
+Remove backend routes related to subscription tiers, including any routes like:
+- GET /api/admin/subscription/tiers
+- POST /api/admin/subscription/tiers
+- PATCH /api/admin/subscription/tiers/:id
+- DELETE /api/admin/subscription/tiers/:id
+
+Also remove any frontend API calls/query hooks/mutations that use those routes.
+
+3. Remove subscription_tiers from the schema.
+Remove the subscription_tiers table from shared/schema.ts and any related insert/select types.
+
+Also remove related types such as:
+- subscriptionTiers
+- insertSubscriptionTierSchema
+- InsertSubscriptionTier
+- SubscriptionTier
+
+Only do this in a migration-safe way for the current Replit/Drizzle setup.
+
+4. Remove storage methods for tiers.
+Remove storage.ts methods related to tiers, such as:
+- getSubscriptionTiers
+- createSubscriptionTier
+- updateSubscriptionTier
+- deleteSubscriptionTier
+- any seed/default tier setup
+
+Also remove any imports or references that become unused.
+
+5. Remove tier-based company fields from active usage.
+Search for and remove active usage of:
+- subscriptionPlan
+- subscription_tier
+- tierId
+- planId
+- planName
+- planPrice
+- Growth
+- Professional
+
+If a company field like subscriptionPlan still exists in the database/schema, remove it if it is only used for tiers.
+
+Replace with company-level billing/access fields:
+- accessStatus
+  - trialing
+  - active
+  - free
+  - prepaid
+  - suspended
+  - cancelled
+  - expired
+- billingType
+  - manual
+  - free
+  - prepaid
+  - future_in_app
+- monthlyPrice
+- trialStartedAt
+- trialEndsAt
+- prepaidThroughDate
+- billingNotes
+- accessNotes
+
+If some of these fields already exist, use them.
+If some are missing, add them cleanly.
+
+6. Update company creation.
+Create Company should use company-level billing fields only:
+- Company Name
+- Company Type
+- Access Status
+- Billing Type
+- Monthly Price
+- Trial Start
+- Trial End
+- Prepaid Through Date, if prepaid
+- Owner Account fields
+
+When Monthly Price is blank, use the platform default monthly price from Pricing & Access.
+When Trial End is blank and access status is trialing, calculate it from the default trial length.
+
+Do not ask for subscription plan or tier.
+
+7. Update company list.
+On /admin/companies, update columns so they reflect the new model:
+- Company
+- Owner
+- Type
+- Access Status
+- Billing Type
+- Monthly Price
+- Trial Ends
+- Users
+- Projects
+- Actions
+
+Billing Type should come from company.billingType.
+Monthly Price should come from company.monthlyPrice, falling back to the platform default monthly price.
+Do not use subscriptionPlan or tier pricing.
+
+8. Update Company Detail Billing & Access.
+On /admin/companies/:companyId, Billing & Access should allow Super Admins to edit:
+- Access Status
+- Billing Type
+- Monthly Price
+- Trial Start
+- Trial End
+- Prepaid Through Date
+- Billing Notes
+- Access Notes
+
+Remove any Plan/Tier dropdowns completely.
+
+9. Update Pricing & Access settings.
+The Pricing & Access page should manage only platform defaults:
+- Default Monthly Price
+- Default Trial Length
+- Manual Billing
+- Free Access Enabled
+- Prepaid Access Enabled
+
+These are defaults for new companies. Individual companies can still override monthly price and access/billing settings.
+
+10. Clean up dashboard copy.
+Update any Super Admin dashboard quick-link copy that references tiers.
+For Pricing & Access, use:
+“Configure platform pricing defaults and access settings.”
+
+11. Clean up seed/sample data.
+Remove seeded Growth/Professional/Starter subscription tiers.
+Remove any code that creates default tiers automatically.
+
+12. Search and compile cleanly.
+After removing tiers, search the codebase for:
+- subscriptionTier
+- subscription_tiers
+- subscriptionPlan
+- Plan Tiers
+- Subscription Tiers
+- Growth
+- Professional
+- tier price
+
+Remove or replace all active references.
+
+Make sure the app compiles and all Super Admin pages still load:
+- /admin/dashboard
+- /admin/companies
+- /admin/companies/:companyId
+- /admin/pricing-access
+- /admin/users
+- /admin/demo-requests
+- /admin/invites
+- /admin/projects
+
+13. Do not change unrelated features.
+Do not redesign users, invites, demo requests, projects, audit log, view-as-user, or admin tools beyond removing tier references and keeping billing/access consistent.
