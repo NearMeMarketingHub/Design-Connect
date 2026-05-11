@@ -1,0 +1,99 @@
+We are starting a Super Admin cleanup in phases. For this first phase, only focus on restructuring the Super Admin area navigation and page layout. Do not change business logic, billing logic, invite logic, or user permissions yet unless required to preserve the current behavior.
+
+Current issue:
+The Super Admin dashboard has become one long page with many unrelated sections stacked together. We want the Super Admin side to work more like a proper back-office admin app with a sidebar navigation and separate pages for each major section.
+
+Goal:
+Create a dedicated Super Admin layout with left sidebar navigation, and split the current long Super Admin dashboard into separate routed pages.
+
+Use this sidebar structure:
+
+Overview
+
+Customer Management
+- Companies
+- Demo Requests
+- Users
+- Invites
+
+Platform Activity
+- Projects
+
+Billing & Access
+- Pricing & Access
+
+Support & Admin
+- Audit Log
+- View As User
+- Admin Tools
+
+Desired routes:
+- /admin/dashboard or /admin/overview → Overview
+- /admin/companies → Companies
+- /admin/demo-requests → Demo Requests
+- /admin/users → Users
+- /admin/invites → Invites
+- /admin/projects → Projects
+- /admin/pricing-access → Pricing & Access
+- /admin/audit-log → Audit Log
+- /admin/view-as-user → View As User
+- /admin/tools → Admin Tools
+
+Requirements:
+1. Create a reusable Super Admin layout component with:
+   - left sidebar navigation
+   - active-route highlighting
+   - page content area
+   - responsive behavior so it remains usable on smaller screens
+   - existing BuildVision branding can stay as-is
+
+2. Keep /admin/dashboard working, but make it function as the Overview page.
+
+3. Move the existing dashboard sections into the appropriate pages without deleting working functionality:
+   - Companies section → /admin/companies
+   - Demo Requests / Leads section → /admin/demo-requests
+   - Invite Status section → /admin/invites
+   - Platform Projects / All Projects section → /admin/projects
+   - Pricing & Access Settings section → /admin/pricing-access
+   - Existing admin tools such as Budget Manager, Financial Management, Sandbox Testing, Role Definitions, and any legacy utility cards → /admin/tools
+
+4. For pages that are planned but not fully built yet:
+   - /admin/audit-log
+   - /admin/view-as-user
+   create clean placeholder pages inside the new layout that clearly state the feature will be built in a later phase.
+   Do not implement those features yet.
+
+5. Users page:
+   - Route /admin/users should exist in the new sidebar.
+   - For now, it can link to or embed the current Users & Approvals / Contractor Management functionality as it already exists.
+   - Do not fully redesign user management yet; that will be handled in a later phase.
+
+6. Overview page:
+   - Keep it much lighter than the old dashboard.
+   - It should show only high-level admin summary content and quick links/actions, not the full long tables from every section.
+   - Reuse current stat cards if helpful, but do not redesign all dashboard metrics yet; a later phase will refine the overview.
+
+7. Preserve all current actions and features:
+   - Create Company must still work
+   - Send Password Reset must still work
+   - Demo request actions must still work
+   - Invite actions must still work
+   - Project links/actions must still work wherever they currently function
+   - Do not break existing admin authentication or route protection
+
+8. Clean up navigation:
+   - Replace the old single-page scrolling behavior with route-based navigation.
+   - Update any links/buttons inside the Super Admin area so they point to the correct new admin routes where appropriate.
+
+9. Keep the code organized:
+   - Prefer separate page components for each admin section rather than leaving everything in one giant file.
+   - Reuse existing components where possible.
+   - Avoid duplicating large blocks of logic unnecessarily.
+
+Deliverables for this phase:
+- New Super Admin sidebar layout
+- Separate routed pages for each major admin section
+- Existing dashboard content moved into the right pages
+- Overview page reduced to a high-level dashboard
+- Placeholder pages for Audit Log and View As User
+- No major business-logic redesign yet
