@@ -38,8 +38,6 @@ import SandboxDocuments from "@/pages/sandbox-documents";
 import SandboxPhotos from "@/pages/sandbox-photos";
 import BudgetAdmin from "@/pages/budget-admin";
 import AcceptInvite from "@/pages/accept-invite";
-import ContractorManagement from "@/pages/contractor-management";
-import ContractorProfile from "@/pages/contractor-profile";
 import MyProfile from "@/pages/my-profile";
 import ContractorCalculator from "@/pages/contractor-calculator";
 import FloorCalculator from "@/pages/floor-calculator";
@@ -218,8 +216,8 @@ function Router() {
         <Route path="/admin/audit-log" component={AdminAuditLog} />
         <Route path="/admin/view-as-user" component={AdminViewAsUser} />
         <Route path="/admin/project/:id" component={ProjectDetails} />
-        <Route path="/admin/contractors" component={ContractorManagement} />
-        <Route path="/admin/contractors/:id" component={ContractorProfile} />
+        <Route path="/admin/contractors"><Redirect to="/admin/users" /></Route>
+        <Route path="/admin/contractors/:id"><Redirect to="/admin/users" /></Route>
         <Route path="/admin/budget"><Redirect to="/admin/tools" /></Route>
         <Route path="/admin/sales"><Redirect to="/admin/tools" /></Route>
         <Route path="/admin/estimates"><Redirect to="/admin/tools" /></Route>

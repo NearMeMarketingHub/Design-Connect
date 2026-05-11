@@ -62,6 +62,7 @@ export const users = pgTable("users", {
   contractorType: text("contractor_type"), // 'contractor' | 'notary' | 'subcontractor' (only when role='contractor')
   isCompanyAdmin: boolean("is_company_admin").default(false), // For contractorType='contractor': elevated access
   subcontractorSpecialty: text("subcontractor_specialty"), // e.g., 'Plumber', 'Electrician' (for subcontractors)
+  isDisabled: boolean("is_disabled").default(false), // Admin-disabled accounts cannot log in
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });

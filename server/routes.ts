@@ -103,6 +103,9 @@ export async function registerRoutes(
         if (!isValidPassword) {
           return done(null, false, { message: "Incorrect password." });
         }
+        if (user.isDisabled) {
+          return done(null, false, { message: "This account has been disabled. Please contact support." });
+        }
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -715,6 +718,8 @@ export async function registerRoutes(
     try {
       const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
       const role = typeof req.query.role === "string" ? req.query.role.trim() : "";
+      const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
+      const companyId = typeof req.query.companyId === "string" ? req.query.companyId.trim() : "";
       let users = await storage.getAllUsers();
       users = users.filter(u => !u.isSandbox);
       if (search) {
@@ -728,7 +733,93 @@ export async function registerRoutes(
       if (role && role !== "all") {
         users = users.filter(u => u.role === role);
       }
-      res.json(users.map(u => ({ ...u, password: undefined })));
+      if (status && status !== "all") {
+        if (status === "pending") users = users.filter(u => u.isApproved === false && !u.isDisabled);
+        else if (status === "disabled") users = users.filter(u => u.isDisabled === true);
+        else if (status === "active") users = users.filter(u => u.isApproved !== false && !u.isDisabled);
+      }
+      if (companyId) {
+        users = users.filter(u => u.companyId === companyId);
+      }
+      res.json(users.map(({ password: _, ...u }) => u));
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: User detail ─────────────────────────────────────────────────────
+  app.get("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const u = await storage.getUser(req.params.id);
+      if (!u) return res.status(404).json({ message: "User not found" });
+      const { password: _, ...safeUser } = u;
+      // Attach company if applicable
+      let company = null;
+      if (u.companyId) {
+        company = await storage.getCompany(u.companyId) ?? null;
+      }
+      // Related projects
+      let projects: { id: string; name: string; status: string; companyName?: string }[] = [];
+      if (u.role === "client") {
+        const clientProjects = await storage.getProjectsByClientId(u.id);
+        // Get companies for each project
+        const allCompanies = await storage.getAllCompanies();
+        const companyMap = new Map(allCompanies.map(c => [c.id, c.name]));
+        const allUsers = await storage.getAllUsers();
+        const userMap = new Map(allUsers.map(user => [user.id, user]));
+        projects = clientProjects.map(p => {
+          let companyName: string | undefined;
+          if (p.contractorId) {
+            const contractor = userMap.get(p.contractorId);
+            if (contractor?.companyId) companyName = companyMap.get(contractor.companyId);
+          }
+          return { id: p.id, name: p.name, status: p.status, companyName };
+        });
+      } else if (u.role === "contractor" || u.role === "company_owner") {
+        const contProjects = await storage.getContractorProjectsWithDetails(u.id);
+        projects = contProjects.map(p => ({ id: p.id, name: p.name, status: p.status, companyName: p.companyName }));
+      } else if (u.companyId) {
+        const companyProjects = await storage.getProjectsByCompanyId(u.companyId);
+        projects = companyProjects.map(p => ({ id: p.id, name: p.name, status: p.status }));
+      }
+      res.json({ ...safeUser, company, projects });
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Approve / reject user (aliases that work by userId) ────────────
+  app.post("/api/admin/users/:id/approve", requireAdmin, async (req, res, next) => {
+    try {
+      const user = await storage.approveContractor(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      res.json({ message: "User approved successfully" });
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/admin/users/:id/reject", requireAdmin, async (req, res, next) => {
+    try {
+      await storage.rejectContractor(req.params.id);
+      res.json({ message: "User rejected and removed" });
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Disable / reactivate user ──────────────────────────────────────
+  app.patch("/api/admin/users/:id/disable", requireAdmin, async (req, res, next) => {
+    try {
+      const adminUser = req.user as User;
+      if (adminUser.id === req.params.id) {
+        return res.status(400).json({ message: "You cannot disable your own account." });
+      }
+      const target = await storage.getUser(req.params.id);
+      if (!target) return res.status(404).json({ message: "User not found" });
+      await storage.updateUser(req.params.id, { isDisabled: true });
+      res.json({ message: "User disabled successfully" });
+    } catch (error) { next(error); }
+  });
+
+  app.patch("/api/admin/users/:id/reactivate", requireAdmin, async (req, res, next) => {
+    try {
+      const target = await storage.getUser(req.params.id);
+      if (!target) return res.status(404).json({ message: "User not found" });
+      await storage.updateUser(req.params.id, { isDisabled: false });
+      res.json({ message: "User reactivated successfully" });
     } catch (error) { next(error); }
   });
 
@@ -4358,37 +4449,10 @@ export async function registerRoutes(
   });
 
   // Contractor access request routes
-  app.post("/api/contractor-requests", async (req, res, next) => {
-    try {
-      const { firstName, lastName, username, companyName, companyType, email } = req.body;
-      
-      if (!firstName || !lastName || !username || !companyName || !companyType) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already taken" });
-      }
-
-      const request = await storage.createContractorRequest({
-        firstName,
-        lastName,
-        username,
-        companyName,
-        companyType,
-        email: email || null,
-        status: "pending"
-      });
-
-      res.status(201).json({ 
-        message: "Your request has been submitted successfully. You will receive a response shortly.",
-        request 
-      });
-    } catch (error) {
-      next(error);
-    }
+  app.post("/api/contractor-requests", async (_req, res) => {
+    res.status(410).json({
+      message: "Public access requests are no longer accepted. Please contact us to request a demo.",
+    });
   });
 
   app.get("/api/contractor-requests", requireAdmin, async (req, res, next) => {
