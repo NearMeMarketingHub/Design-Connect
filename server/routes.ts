@@ -15,7 +15,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pkg from "pg";
 const { Pool } = pkg;
-import type { User, InsertUser, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions, ContractorInvite, ProjectInvite } from "@shared/schema";
+import type { User, InsertUser, InsertCompany, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions, ContractorInvite, ProjectInvite } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
@@ -840,18 +840,44 @@ export async function registerRoutes(
     try {
       const company = await storage.getCompany(req.params.id);
       if (!company) return res.status(404).json({ message: "Company not found" });
-      const [owner, users, projects, invites] = await Promise.all([
+      const [owner, users, projects, invites, allUsers] = await Promise.all([
         storage.getUserByCompanyOwner(company.id),
         storage.getUsersByCompanyId(company.id),
         storage.getProjectsByCompanyId(company.id),
         storage.getContractorInvitesByCompanyId(company.id),
+        storage.getAllUsers(),
       ]);
+      const usersById = new Map(allUsers.map(u => [u.id, u]));
+      const pendingInviteCount = invites.filter(i => i.status === "pending").length;
+      const enrichedProjects = projects.map(p => {
+        const client = p.clientId ? usersById.get(p.clientId) : undefined;
+        const contractor = p.contractorId ? usersById.get(p.contractorId) : undefined;
+        return {
+          id: p.id,
+          name: p.name,
+          status: p.status,
+          progress: p.progress,
+          budget: p.budget,
+          createdAt: p.createdAt,
+          dueDate: p.dueDate,
+          clientName: client ? (client.name || client.username) : null,
+          contractorName: contractor ? (contractor.name || contractor.username) : null,
+        };
+      });
+      const enrichedInvites = invites.map(inv => {
+        const project = inv.projectId ? projects.find(p => p.id === inv.projectId) : null;
+        return {
+          ...inv,
+          projectName: project?.name ?? null,
+        };
+      });
       res.json({
         ...company,
+        pendingInviteCount,
         owner: owner ? { id: owner.id, name: owner.name, username: owner.username, email: owner.email, role: owner.role, isApproved: owner.isApproved, createdAt: owner.createdAt } : null,
         users: users.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email, role: u.role, contractorType: u.contractorType, isApproved: u.isApproved, createdAt: u.createdAt })),
-        projects: projects.map(p => ({ id: p.id, name: p.name, status: p.status, progress: p.progress, budget: p.budget, createdAt: p.createdAt, dueDate: p.dueDate })),
-        invites,
+        projects: enrichedProjects,
+        invites: enrichedInvites,
       });
     } catch (error) { next(error); }
   });
@@ -859,8 +885,11 @@ export async function registerRoutes(
   // ── Admin: Update company general fields (billing, notes, etc.) ───────────
   const adminCompanyUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
+    subscriptionPlan: z.string().min(1).max(100).optional(),
+    subscriptionStatus: z.enum(["trialing", "active", "expired", "past_due", "cancelled", "suspended"]).optional(),
     billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
     monthlyPrice: z.string().nullable().optional(),
+    trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
     trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
     prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
     billingNotes: z.string().max(2000).nullable().optional(),
@@ -873,16 +902,19 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
-      const data = parsed.data;
-      const updateData: Record<string, unknown> = {};
-      if (data.name !== undefined) updateData.name = data.name;
-      if (data.billingType !== undefined) updateData.billingType = data.billingType;
-      if (data.monthlyPrice !== undefined) updateData.monthlyPrice = data.monthlyPrice;
-      if (data.trialEndsAt !== undefined) updateData.trialEndsAt = data.trialEndsAt ? new Date(data.trialEndsAt) : null;
-      if (data.prepaidThroughDate !== undefined) updateData.prepaidThroughDate = data.prepaidThroughDate ? new Date(data.prepaidThroughDate) : null;
-      if (data.billingNotes !== undefined) updateData.billingNotes = data.billingNotes;
-      if (data.adminNotes !== undefined) updateData.adminNotes = data.adminNotes;
-      const company = await storage.updateCompany(req.params.id, updateData as any);
+      const { name, subscriptionPlan, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes } = parsed.data;
+      const updateData: Partial<schema.InsertCompany> = {};
+      if (name !== undefined) updateData.name = name;
+      if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
+      if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
+      if (billingType !== undefined) updateData.billingType = billingType;
+      if (monthlyPrice !== undefined) updateData.monthlyPrice = monthlyPrice;
+      if (trialStartedAt !== undefined) updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
+      if (trialEndsAt !== undefined) updateData.trialEndsAt = trialEndsAt ? new Date(trialEndsAt) : null;
+      if (prepaidThroughDate !== undefined) updateData.prepaidThroughDate = prepaidThroughDate ? new Date(prepaidThroughDate) : null;
+      if (billingNotes !== undefined) updateData.billingNotes = billingNotes;
+      if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+      const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
     } catch (error) { next(error); }

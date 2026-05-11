@@ -19,6 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -38,26 +46,21 @@ import {
   Pencil,
   Save,
   X,
-  CalendarDays,
   CreditCard,
   StickyNote,
   Link2,
   CheckCircle2,
   Clock,
   XCircle,
+  ExternalLink,
+  Info,
 } from "lucide-react";
-import { format, formatDistanceToNow, isValid } from "date-fns";
+import { format, isValid } from "date-fns";
 
 function safeFormat(value: string | Date | null | undefined, fmt: string, fallback = "—"): string {
   if (!value) return fallback;
   const d = value instanceof Date ? value : new Date(value);
   return isValid(d) ? format(d, fmt) : fallback;
-}
-
-function safeDistanceToNow(value: string | Date | null | undefined): string {
-  if (!value) return "";
-  const d = value instanceof Date ? value : new Date(value);
-  return isValid(d) ? formatDistanceToNow(d, { addSuffix: true }) : "";
 }
 
 interface CompanyUser {
@@ -77,17 +80,21 @@ interface CompanyProject {
   status: string | null;
   progress: number | null;
   budget: string | null;
-  createdAt: string;
+  createdAt: string | null;
   dueDate: string | null;
+  clientName: string | null;
+  contractorName: string | null;
 }
 
 interface CompanyInvite {
   id: string;
   email: string;
-  role: string | null;
-  status: string;
+  contractorType: string | null;
   projectId: string | null;
+  projectName: string | null;
+  status: string;
   createdAt: string;
+  acceptedAt: string | null;
   expiresAt: string | null;
 }
 
@@ -106,10 +113,18 @@ interface CompanyDetail {
   billingNotes: string | null;
   adminNotes: string | null;
   createdAt: string;
+  pendingInviteCount: number;
   owner: CompanyUser | null;
   users: CompanyUser[];
   projects: CompanyProject[];
   invites: CompanyInvite[];
+}
+
+interface SubscriptionTier {
+  id: string;
+  name: string;
+  price: string;
+  isActive: boolean;
 }
 
 function statusBadge(status: string | null | undefined) {
@@ -140,23 +155,36 @@ export default function AdminCompanyDetail() {
 
   const [editingBilling, setEditingBilling] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
+  const [editAccessOpen, setEditAccessOpen] = useState(false);
 
   const [billingForm, setBillingForm] = useState({
+    subscriptionStatus: "trialing",
+    subscriptionPlan: "free",
     billingType: "manual",
     monthlyPrice: "",
+    trialStartedAt: "",
     trialEndsAt: "",
     prepaidThroughDate: "",
     billingNotes: "",
   });
 
-  const [notesForm, setNotesForm] = useState({
-    adminNotes: "",
+  const [notesForm, setNotesForm] = useState({ adminNotes: "" });
+
+  const [accessForm, setAccessForm] = useState({
+    subscriptionPlan: "free",
+    subscriptionStatus: "trialing",
   });
 
   const { data: company, isLoading } = useQuery<CompanyDetail>({
     queryKey: [`/api/admin/companies/${companyId}`],
     queryFn: () => apiRequest("GET", `/api/admin/companies/${companyId}`).then((r) => r.json()),
     enabled: !!companyId && user?.role === "admin",
+  });
+
+  const { data: adminTiers = [] } = useQuery<SubscriptionTier[]>({
+    queryKey: ["/api/admin/subscription/tiers"],
+    queryFn: () => apiRequest("GET", "/api/admin/subscription/tiers").then((r) => r.json()),
+    enabled: user?.role === "admin",
   });
 
   const updateMutation = useMutation({
@@ -167,6 +195,7 @@ export default function AdminCompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       setEditingBilling(false);
       setEditingNotes(false);
+      setEditAccessOpen(false);
       toast({ title: "Company updated" });
     },
     onError: (err: Error) =>
@@ -206,8 +235,11 @@ export default function AdminCompanyDetail() {
   function openBillingEdit() {
     if (!company) return;
     setBillingForm({
+      subscriptionStatus: company.subscriptionStatus ?? "trialing",
+      subscriptionPlan: company.subscriptionPlan ?? "free",
       billingType: company.billingType ?? "manual",
       monthlyPrice: company.monthlyPrice ?? "",
+      trialStartedAt: company.trialStartedAt ? company.trialStartedAt.slice(0, 10) : "",
       trialEndsAt: company.trialEndsAt ? company.trialEndsAt.slice(0, 10) : "",
       prepaidThroughDate: company.prepaidThroughDate ? company.prepaidThroughDate.slice(0, 10) : "",
       billingNotes: company.billingNotes ?? "",
@@ -217,8 +249,11 @@ export default function AdminCompanyDetail() {
 
   function saveBilling() {
     updateMutation.mutate({
+      subscriptionStatus: billingForm.subscriptionStatus,
+      subscriptionPlan: billingForm.subscriptionPlan,
       billingType: billingForm.billingType,
       monthlyPrice: billingForm.monthlyPrice || null,
+      trialStartedAt: billingForm.trialStartedAt ? new Date(billingForm.trialStartedAt).toISOString() : null,
       trialEndsAt: billingForm.trialEndsAt ? new Date(billingForm.trialEndsAt).toISOString() : null,
       prepaidThroughDate: billingForm.prepaidThroughDate ? new Date(billingForm.prepaidThroughDate).toISOString() : null,
       billingNotes: billingForm.billingNotes || null,
@@ -233,6 +268,22 @@ export default function AdminCompanyDetail() {
 
   function saveNotes() {
     updateMutation.mutate({ adminNotes: notesForm.adminNotes || null });
+  }
+
+  function openEditAccess() {
+    if (!company) return;
+    setAccessForm({
+      subscriptionPlan: company.subscriptionPlan ?? "free",
+      subscriptionStatus: company.subscriptionStatus ?? "trialing",
+    });
+    setEditAccessOpen(true);
+  }
+
+  function saveAccess() {
+    updateMutation.mutate({
+      subscriptionPlan: accessForm.subscriptionPlan,
+      subscriptionStatus: accessForm.subscriptionStatus,
+    });
   }
 
   if (isLoading || !company) {
@@ -253,94 +304,101 @@ export default function AdminCompanyDetail() {
   return (
     <SuperAdminLayout>
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Back link + header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <Link href="/admin/companies">
-              <button
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1"
-                data-testid="link-back-companies"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> Companies
-              </button>
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <Building2 className="w-5 h-5 text-primary" />
+        {/* Back link */}
+        <Link href="/admin/companies">
+          <button
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="link-back-companies"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Companies
+          </button>
+        </Link>
+
+        {/* Header card */}
+        <Card>
+          <CardContent className="pt-5 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              {/* Left: identity */}
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Building2 className="w-5 h-5 text-primary" />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl font-bold text-foreground" data-testid="heading-company-name">
+                      {company.name}
+                    </h1>
+                    {statusBadge(company.subscriptionStatus)}
+                  </div>
+                  {company.owner && (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{company.owner.name || company.owner.username}</span>
+                      {company.owner.email && <span> · {company.owner.email}</span>}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground pt-1">
+                    <span>Plan: <span className="capitalize font-medium text-foreground">{company.subscriptionPlan ?? "free"}</span></span>
+                    <span>Billing: <span className="capitalize font-medium text-foreground">{company.billingType ?? "manual"}</span></span>
+                    {company.monthlyPrice && (
+                      <span>Price: <span className="font-medium text-foreground">${parseFloat(company.monthlyPrice).toFixed(2)}/mo</span></span>
+                    )}
+                    {effectiveTrialEnd && (
+                      <span>Trial ends: <span className="font-medium text-foreground">{safeFormat(effectiveTrialEnd, "MMM d, yyyy")}</span></span>
+                    )}
+                    <span>Created: <span className="font-medium text-foreground">{safeFormat(company.createdAt, "MMM d, yyyy")}</span></span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground" data-testid="heading-company-name">
-                  {company.name}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Created {safeFormat(company.createdAt, "MMM d, yyyy")}
-                </p>
+
+              {/* Right: quick actions */}
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={openEditAccess}
+                  data-testid="button-edit-access"
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> Edit Access
+                </Button>
+                {company.owner?.email && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => sendResetMutation.mutate(company.owner!.id)}
+                    disabled={sendResetMutation.isPending}
+                    data-testid="button-send-reset-header"
+                    title={`Send password reset to ${company.owner.email}`}
+                  >
+                    <Mail className="w-3.5 h-3.5 mr-1" /> Password Reset
+                  </Button>
+                )}
+                {isSuspended ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-600 border-green-300 hover:bg-green-50"
+                    onClick={() => reactivateMutation.mutate()}
+                    disabled={reactivateMutation.isPending}
+                    data-testid="button-reactivate"
+                  >
+                    <PlayCircle className="w-3.5 h-3.5 mr-1" /> Reactivate
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => suspendMutation.mutate()}
+                    disabled={suspendMutation.isPending}
+                    data-testid="button-suspend"
+                  >
+                    <Ban className="w-3.5 h-3.5 mr-1" /> Suspend
+                  </Button>
+                )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 pt-6">
-            {statusBadge(company.subscriptionStatus)}
-            {isSuspended ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-green-600 border-green-300 hover:bg-green-50"
-                onClick={() => reactivateMutation.mutate()}
-                disabled={reactivateMutation.isPending}
-                data-testid="button-reactivate"
-              >
-                <PlayCircle className="w-3.5 h-3.5 mr-1" /> Reactivate
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-red-600 border-red-200 hover:bg-red-50"
-                onClick={() => suspendMutation.mutate()}
-                disabled={suspendMutation.isPending}
-                data-testid="button-suspend"
-              >
-                <Ban className="w-3.5 h-3.5 mr-1" /> Suspend
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Summary stat cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <Users className="w-3.5 h-3.5" /> Users
-              </div>
-              <p className="text-2xl font-bold" data-testid="stat-user-count">{company.users.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <FolderOpen className="w-3.5 h-3.5" /> Projects
-              </div>
-              <p className="text-2xl font-bold" data-testid="stat-project-count">{company.projects.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <Link2 className="w-3.5 h-3.5" /> Invites
-              </div>
-              <p className="text-2xl font-bold" data-testid="stat-invite-count">{company.invites.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <CreditCard className="w-3.5 h-3.5" /> Plan
-              </div>
-              <p className="text-sm font-semibold capitalize" data-testid="stat-plan">{company.subscriptionPlan ?? "free"}</p>
-            </CardContent>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Tabs */}
         <Tabs defaultValue="overview">
@@ -361,88 +419,110 @@ export default function AdminCompanyDetail() {
 
           {/* ── Overview ── */}
           <TabsContent value="overview" className="mt-4 space-y-4">
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <Users className="w-3.5 h-3.5" /> Users
+                  </div>
+                  <p className="text-2xl font-bold" data-testid="stat-user-count">{company.users.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <FolderOpen className="w-3.5 h-3.5" /> Projects
+                  </div>
+                  <p className="text-2xl font-bold" data-testid="stat-project-count">{company.projects.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <Link2 className="w-3.5 h-3.5" /> Pending Invites
+                  </div>
+                  <p className="text-2xl font-bold" data-testid="stat-pending-invite-count">{company.pendingInviteCount}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Two-column info */}
             <div className="grid sm:grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Owner</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {company.owner ? (
-                    <>
-                      <p className="font-medium" data-testid="owner-name">{company.owner.name || company.owner.username}</p>
-                      <p className="text-sm text-muted-foreground" data-testid="owner-email">{company.owner.email ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground">@{company.owner.username}</p>
-                      <div className="flex gap-2 pt-1">
-                        {company.owner.email && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => sendResetMutation.mutate(company.owner!.id)}
-                            disabled={sendResetMutation.isPending}
-                            data-testid="button-send-reset-owner"
-                          >
-                            <Mail className="w-3.5 h-3.5 mr-1" /> Send Password Reset
-                          </Button>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No owner set</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Subscription</CardTitle>
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Company Info</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Name</span>
+                    <span className="font-medium" data-testid="info-company-name">{company.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Created</span>
+                    <span>{safeFormat(company.createdAt, "MMM d, yyyy")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Plan</span>
+                    <span className="capitalize font-medium">{company.subscriptionPlan ?? "free"}</span>
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status</span>
                     <span>{statusBadge(company.subscriptionStatus)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plan</span>
-                    <span className="font-medium capitalize">{company.subscriptionPlan ?? "free"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Trial started</span>
-                    <span>{safeFormat(trialStart, "MMM d, yyyy")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Trial ends</span>
-                    <span>{safeFormat(effectiveTrialEnd, "MMM d, yyyy")}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Billing type</span>
                     <span className="capitalize">{company.billingType ?? "manual"}</span>
                   </div>
-                  {company.monthlyPrice && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Monthly price</span>
-                      <span>${parseFloat(company.monthlyPrice).toFixed(2)}/mo</span>
-                    </div>
-                  )}
-                  {company.prepaidThroughDate && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Prepaid through</span>
-                      <span>{safeFormat(company.prepaidThroughDate, "MMM d, yyyy")}</span>
-                    </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Owner Info</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {company.owner ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Name</span>
+                        <span className="font-medium" data-testid="owner-name">{company.owner.name || company.owner.username}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email</span>
+                        <span data-testid="owner-email">{company.owner.email ?? "—"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Username</span>
+                        <span>@{company.owner.username}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Status</span>
+                        <span>
+                          {company.owner.isApproved
+                            ? <Badge variant="default" className="text-xs">Approved</Badge>
+                            : <Badge variant="secondary" className="text-xs">Pending</Badge>}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No owner set for this company.</p>
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {company.billingNotes && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Billing Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm whitespace-pre-wrap" data-testid="billing-notes-preview">{company.billingNotes}</p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Recent Activity placeholder */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground italic" data-testid="recent-activity-placeholder">
+                  No activity logged yet.
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ── Users ── */}
@@ -456,7 +536,7 @@ export default function AdminCompanyDetail() {
                       <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Joined</TableHead>
+                      <TableHead>Last Login</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -484,9 +564,7 @@ export default function AdminCompanyDetail() {
                             <Badge variant="secondary" className="text-xs">Pending</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {safeFormat(u.createdAt, "MMM d, yyyy")}
-                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">—</TableCell>
                         <TableCell className="text-right">
                           {u.email && (
                             <Button
@@ -517,11 +595,11 @@ export default function AdminCompanyDetail() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Project</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Contractor / Owner</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Budget</TableHead>
-                      <TableHead>Due Date</TableHead>
                       <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -535,22 +613,22 @@ export default function AdminCompanyDetail() {
                     {company.projects.map((p) => (
                       <TableRow key={p.id} data-testid={`project-row-${p.id}`}>
                         <TableCell className="font-medium">{p.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.clientName ?? "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.contractorName ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs capitalize">
                             {p.status ?? "active"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {p.progress != null ? `${p.progress}%` : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {p.budget ? `$${parseFloat(p.budget).toLocaleString()}` : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {safeFormat(p.dueDate, "MMM d, yyyy")}
-                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {safeFormat(p.createdAt, "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/admin/project/${p.id}`}>
+                            <Button size="sm" variant="outline" data-testid={`button-view-project-${p.id}`}>
+                              <ExternalLink className="w-3.5 h-3.5 mr-1" /> View
+                            </Button>
+                          </Link>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -568,25 +646,30 @@ export default function AdminCompanyDetail() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Project</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Expires</TableHead>
                       <TableHead>Sent</TableHead>
+                      <TableHead>Accepted</TableHead>
+                      <TableHead>Expires</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {company.invites.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                           No contractor invites found for this company.
                         </TableCell>
                       </TableRow>
                     )}
                     {company.invites.map((inv) => (
                       <TableRow key={inv.id} data-testid={`invite-row-${inv.id}`}>
-                        <TableCell className="font-medium">{inv.email}</TableCell>
+                        <TableCell className="font-medium text-sm">{inv.email}</TableCell>
                         <TableCell className="text-sm text-muted-foreground capitalize">
-                          {inv.role ?? "contractor"}
+                          {inv.contractorType ?? "contractor"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {inv.projectName ?? (inv.projectId ? "Unknown project" : "—")}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
@@ -595,12 +678,13 @@ export default function AdminCompanyDetail() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {inv.expiresAt
-                            ? `${safeFormat(inv.expiresAt, "MMM d, yyyy")} (${safeDistanceToNow(inv.expiresAt)})`
-                            : "—"}
+                          {safeFormat(inv.createdAt, "MMM d, yyyy")}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {safeFormat(inv.createdAt, "MMM d, yyyy")}
+                          {safeFormat(inv.acceptedAt, "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {safeFormat(inv.expiresAt, "MMM d, yyyy")}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -628,6 +712,39 @@ export default function AdminCompanyDetail() {
                   <div className="space-y-4">
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
+                        <Label>Access Status</Label>
+                        <Select
+                          value={billingForm.subscriptionStatus}
+                          onValueChange={(v) => setBillingForm((f) => ({ ...f, subscriptionStatus: v }))}
+                        >
+                          <SelectTrigger data-testid="select-access-status">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["trialing", "active", "expired", "past_due", "cancelled", "suspended"].map(s => (
+                              <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Plan</Label>
+                        <Select
+                          value={billingForm.subscriptionPlan}
+                          onValueChange={(v) => setBillingForm((f) => ({ ...f, subscriptionPlan: v }))}
+                        >
+                          <SelectTrigger data-testid="select-billing-plan">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="free">Free</SelectItem>
+                            {adminTiers.map(t => (
+                              <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
                         <Label>Billing Type</Label>
                         <Select
                           value={billingForm.billingType}
@@ -654,6 +771,15 @@ export default function AdminCompanyDetail() {
                           value={billingForm.monthlyPrice}
                           onChange={(e) => setBillingForm((f) => ({ ...f, monthlyPrice: e.target.value }))}
                           data-testid="input-monthly-price"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Trial Start Date</Label>
+                        <Input
+                          type="date"
+                          value={billingForm.trialStartedAt}
+                          onChange={(e) => setBillingForm((f) => ({ ...f, trialStartedAt: e.target.value }))}
+                          data-testid="input-trial-started-at"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -707,6 +833,14 @@ export default function AdminCompanyDetail() {
                 ) : (
                   <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
                     <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Access Status</dt>
+                      <dd data-testid="display-access-status">{statusBadge(company.subscriptionStatus)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Plan</dt>
+                      <dd className="font-medium capitalize" data-testid="display-plan">{company.subscriptionPlan ?? "free"}</dd>
+                    </div>
+                    <div>
                       <dt className="text-muted-foreground text-xs mb-0.5">Billing Type</dt>
                       <dd className="font-medium capitalize" data-testid="display-billing-type">
                         {company.billingType ?? "manual"}
@@ -721,6 +855,12 @@ export default function AdminCompanyDetail() {
                       </dd>
                     </div>
                     <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Trial Start</dt>
+                      <dd className="font-medium" data-testid="display-trial-started-at">
+                        {safeFormat(company.trialStartedAt, "MMM d, yyyy")}
+                      </dd>
+                    </div>
+                    <div>
                       <dt className="text-muted-foreground text-xs mb-0.5">Trial End Override</dt>
                       <dd className="font-medium" data-testid="display-trial-ends-at">
                         {company.trialEndsAt
@@ -731,9 +871,7 @@ export default function AdminCompanyDetail() {
                     <div>
                       <dt className="text-muted-foreground text-xs mb-0.5">Prepaid Through</dt>
                       <dd className="font-medium" data-testid="display-prepaid-through">
-                        {company.prepaidThroughDate
-                          ? safeFormat(company.prepaidThroughDate, "MMM d, yyyy")
-                          : "—"}
+                        {safeFormat(company.prepaidThroughDate, "MMM d, yyyy")}
                       </dd>
                     </div>
                     {company.billingNotes && (
@@ -763,7 +901,13 @@ export default function AdminCompanyDetail() {
                   </Button>
                 )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
+                {/* Internal-only callout */}
+                <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>These notes are internal only and are never visible to the company or their clients.</span>
+                </div>
+
                 {editingNotes ? (
                   <div className="space-y-3">
                     <Textarea
@@ -780,7 +924,7 @@ export default function AdminCompanyDetail() {
                         disabled={updateMutation.isPending}
                         data-testid="button-save-notes"
                       >
-                        <Save className="w-3.5 h-3.5 mr-1" /> Save
+                        <Save className="w-3.5 h-3.5 mr-1" /> Save Notes
                       </Button>
                       <Button
                         size="sm"
@@ -810,6 +954,57 @@ export default function AdminCompanyDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Access Dialog (plan + status quick-edit from header) */}
+      <Dialog open={editAccessOpen} onOpenChange={setEditAccessOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Access</DialogTitle>
+            <DialogDescription>Update plan and status for {company.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Plan</Label>
+              <Select
+                value={accessForm.subscriptionPlan}
+                onValueChange={(v) => setAccessForm((f) => ({ ...f, subscriptionPlan: v }))}
+              >
+                <SelectTrigger data-testid="select-access-plan">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  {adminTiers.map(t => (
+                    <SelectItem key={t.id} value={t.name.toLowerCase()}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select
+                value={accessForm.subscriptionStatus}
+                onValueChange={(v) => setAccessForm((f) => ({ ...f, subscriptionStatus: v }))}
+              >
+                <SelectTrigger data-testid="select-access-status-dialog">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["trialing", "active", "expired", "past_due", "cancelled", "suspended"].map(s => (
+                    <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditAccessOpen(false)}>Cancel</Button>
+            <Button onClick={saveAccess} disabled={updateMutation.isPending} data-testid="button-save-access">
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SuperAdminLayout>
   );
 }
