@@ -73,6 +73,12 @@ export default function AdminCompanies() {
   const [companiesPage, setCompaniesPage] = useState(1);
   const [companiesPageSize, setCompaniesPageSize] = useState(25);
 
+  const { data: platformSettings } = useQuery<{ defaultMonthlyPrice: string }>({
+    queryKey: ["/api/admin/platform-settings"],
+    queryFn: () => apiRequest("GET", "/api/admin/platform-settings").then((r) => r.json()),
+    enabled: user?.role === "admin",
+  });
+
   const [createCompanyOpen, setCreateCompanyOpen] = useState(false);
   const [companySubDialogOpen, setCompanySubDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
@@ -289,11 +295,13 @@ export default function AdminCompanies() {
                           {company.billingType?.replace("_", " ") || "manual"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {price === null
-                            ? "—"
-                            : price === 0
-                            ? "Free"
-                            : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`}
+                          {price !== null
+                            ? price === 0
+                              ? "Free"
+                              : `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}/mo`
+                            : platformSettings?.defaultMonthlyPrice && parseFloat(platformSettings.defaultMonthlyPrice) > 0
+                              ? `$${parseFloat(platformSettings.defaultMonthlyPrice).toFixed(2)}/mo (default)`
+                              : "—"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {trialEnd ? trialEnd.toLocaleDateString() : "—"}

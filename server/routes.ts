@@ -899,6 +899,12 @@ export async function registerRoutes(
   const adminCompanySubscriptionSchema = z.object({
     subscriptionStatus: z.enum(VALID_SUBSCRIPTION_STATUSES).optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
+    trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
+    prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
+    billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
+    monthlyPrice: z.string().nullable().optional(),
+    billingNotes: z.string().max(2000).nullable().optional(),
+    accessNotes: z.string().max(2000).nullable().optional(),
   });
 
   app.patch("/api/admin/companies/:id/subscription", requireAdmin, async (req, res, next) => {
@@ -907,14 +913,21 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid subscription data", errors: parsed.error.flatten().fieldErrors });
       }
-      const { subscriptionStatus, trialStartedAt } = parsed.data;
-      const updateData: Record<string, string | Date | null> = {};
-      if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
-      if (trialStartedAt !== undefined) {
-        updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
-      } else if (subscriptionStatus === "trialing") {
-        updateData.trialStartedAt = new Date();
+      const { subscriptionStatus, trialStartedAt, trialEndsAt, prepaidThroughDate, billingType, monthlyPrice, billingNotes, accessNotes } = parsed.data;
+      const updateData: Partial<InsertCompany> = {};
+      if (subscriptionStatus !== undefined) {
+        updateData.subscriptionStatus = subscriptionStatus;
+        if (subscriptionStatus === "trialing" && trialStartedAt === undefined) {
+          updateData.trialStartedAt = new Date();
+        }
       }
+      if (trialStartedAt !== undefined) updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
+      if (trialEndsAt !== undefined) updateData.trialEndsAt = trialEndsAt ? new Date(trialEndsAt) : null;
+      if (prepaidThroughDate !== undefined) updateData.prepaidThroughDate = prepaidThroughDate ? new Date(prepaidThroughDate) : null;
+      if (billingType !== undefined) updateData.billingType = billingType;
+      if (monthlyPrice !== undefined) updateData.monthlyPrice = monthlyPrice;
+      if (billingNotes !== undefined) updateData.billingNotes = billingNotes;
+      if (accessNotes !== undefined) updateData.accessNotes = accessNotes;
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
@@ -1229,7 +1242,7 @@ export async function registerRoutes(
   app.patch("/api/admin/platform-settings", requireAdmin, async (req, res, next) => {
     try {
       const settingsSchema = z.object({
-        defaultTrialDays: z.number().int().min(1).max(365).optional(),
+        defaultTrialLength: z.number().int().min(1).max(365).optional(),
         manualBillingEnabled: z.boolean().optional(),
         freeAccessEnabled: z.boolean().optional(),
         prepaidAccessEnabled: z.boolean().optional(),

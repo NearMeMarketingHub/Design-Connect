@@ -66,11 +66,11 @@ export default function AdminPricingAccess() {
                     type="number"
                     min={1}
                     max={365}
-                    defaultValue={platformSettingsData?.defaultTrialDays ?? 7}
+                    defaultValue={platformSettingsData?.defaultTrialLength ?? 7}
                     className="h-8 text-sm w-20"
                     onBlur={(e) =>
                       updatePlatformSettingsMutation.mutate({
-                        defaultTrialDays: parseInt(e.target.value) || 7,
+                        defaultTrialLength: parseInt(e.target.value) || 7,
                       })
                     }
                     data-testid="input-setting-trial-days"

@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 interface PlatformSettings {
-  defaultTrialDays: number;
+  defaultTrialLength: number;
   defaultMonthlyPrice: string;
   manualBillingEnabled: boolean;
 }
@@ -93,7 +93,7 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: Cre
           ? platformSettings.defaultMonthlyPrice
           : ""
         : "";
-      const trialDays = platformSettings?.defaultTrialDays ?? 7;
+      const trialDays = platformSettings?.defaultTrialLength ?? 7;
       const trialEnd = new Date();
       trialEnd.setDate(trialEnd.getDate() + trialDays);
 

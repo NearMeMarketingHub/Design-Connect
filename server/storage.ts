@@ -2376,7 +2376,7 @@ export class DatabaseStorage implements IStorage {
     if (row) return row;
     // Auto-create the default singleton row
     const [created] = await db.insert(schema.platformSettings)
-      .values({ id: 1, defaultTrialDays: 7, manualBillingEnabled: true, freeAccessEnabled: false, prepaidAccessEnabled: false, defaultMonthlyPrice: "0" })
+      .values({ id: 1, defaultTrialLength: 7, manualBillingEnabled: true, freeAccessEnabled: false, prepaidAccessEnabled: false, defaultMonthlyPrice: "0" })
       .returning();
     return created;
   }

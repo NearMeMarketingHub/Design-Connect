@@ -789,7 +789,7 @@ export type DemoRequest = typeof demoRequests.$inferSelect;
 // Platform-wide settings (singleton row, id always = 1)
 export const platformSettings = pgTable("platform_settings", {
   id: integer("id").primaryKey().default(1),
-  defaultTrialDays: integer("default_trial_days").notNull().default(7),
+  defaultTrialLength: integer("default_trial_days").notNull().default(7),
   manualBillingEnabled: boolean("manual_billing_enabled").notNull().default(true),
   freeAccessEnabled: boolean("free_access_enabled").notNull().default(false),
   prepaidAccessEnabled: boolean("prepaid_access_enabled").notNull().default(false),
