@@ -1,0 +1,54 @@
+We successfully removed subscription tier functionality from the active app code. Now do a small cleanup pass to remove stale tier references and polish the billing/access wording.
+
+Do not change BuildVision branding.
+
+1. Remove stale tier references from project documentation.
+Update TODO.md and replit.md to remove outdated references to:
+- subscription tiers
+- pricing tiers
+- tier seats
+- feature gating based on tier
+- Starter / Professional / Growth plans
+
+The app no longer uses tiers. The current model is:
+- one-price/manual billing
+- platform-wide pricing defaults
+- company-level billing/access settings
+
+2. Do not re-add any tier code.
+Do not recreate:
+- subscription_tiers table
+- subscription tier routes
+- tier CRUD
+- plan/tier dropdowns
+- Starter/Growth/Professional plan UI
+
+3. Rename user-facing “Subscription” wording where it now means company access/billing.
+Where appropriate, change labels from “Subscription” to “Billing & Access.”
+
+Examples:
+- Company dashboard tab “Subscription” → “Billing & Access”
+- “Your BuildVision subscription details” → “Your BuildVision billing and access details”
+- “To change your subscription or billing…” → “To change billing or access…”
+- “subscription status” test labels may stay if changing test IDs is risky, but visible UI should use Billing & Access language.
+
+Do not rename database fields like subscriptionStatus in this pass unless it is safe and migration-clean. It is okay for the database field to remain subscriptionStatus internally for now, as long as the UI is clear.
+
+4. Fix Create Company frontend validation.
+In the Create Company dialog, disable the Create Company button unless these required fields are filled:
+- Company Name
+- Owner Name
+- Owner Email
+- Owner Username
+- Password
+
+Also validate owner email format on the frontend before submitting if practical.
+The backend already validates these fields, but the frontend should prevent obvious incomplete submits.
+
+5. Update any dashboard quick-link copy if needed.
+Pricing & Access should be described as:
+“Configure platform pricing defaults and access settings.”
+
+6. Keep this pass small.
+Do not redesign Users, Companies, Invites, Demo Requests, Projects, Audit Log, or View As User.
+Only remove stale tier references, polish billing/access wording, and fix Create Company validation.
