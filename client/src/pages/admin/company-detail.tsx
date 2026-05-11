@@ -235,6 +235,17 @@ export default function AdminCompanyDetail() {
       toast({ title: "Failed", description: parseErrorMessage(err), variant: "destructive" }),
   });
 
+  const approveUserMutation = useMutation({
+    mutationFn: (userId: string) =>
+      apiRequest("POST", `/api/admin/contractors/${userId}/approve`).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/companies/${companyId}`] });
+      toast({ title: "User approved" });
+    },
+    onError: (err: Error) =>
+      toast({ title: "Failed", description: parseErrorMessage(err), variant: "destructive" }),
+  });
+
   const revokeInviteMutation = useMutation({
     mutationFn: (inviteId: string) =>
       apiRequest("POST", `/api/admin/invites/${inviteId}/revoke`, { type: "contractor" }).then((r) => r.json()),
@@ -607,18 +618,33 @@ export default function AdminCompanyDetail() {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">—</TableCell>
                           <TableCell className="text-right">
-                            {u.email && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => sendResetMutation.mutate(u.id)}
-                                disabled={sendResetMutation.isPending}
-                                data-testid={`button-send-reset-user-${u.id}`}
-                                title={`Send password reset to ${u.email}`}
-                              >
-                                <Mail className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-end gap-1">
+                              {!u.isApproved && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => approveUserMutation.mutate(u.id)}
+                                  disabled={approveUserMutation.isPending}
+                                  data-testid={`button-approve-user-${u.id}`}
+                                  title="Approve user"
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                              {u.email && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => sendResetMutation.mutate(u.id)}
+                                  disabled={sendResetMutation.isPending}
+                                  data-testid={`button-send-reset-user-${u.id}`}
+                                  title={`Send password reset to ${u.email}`}
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
