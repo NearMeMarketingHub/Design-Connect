@@ -1,0 +1,71 @@
+We completed the first Super Admin sidebar/navigation phase. Before moving to the next major phase, make these cleanup improvements based on the new layout and the updated product model.
+
+1. Add a Company filter to the Platform Projects page at /admin/projects.
+- Keep the existing project search.
+- Add a company dropdown filter near the search bar.
+- Options should include:
+  - All Companies
+  - each company name
+- When a company is selected, only show projects belonging to that company.
+- The company filter should work together with the existing search input.
+- Preserve the current project table columns and actions.
+
+2. Remove company-operation tools from the Super Admin area.
+The following sections were originally built when the app was for one company, but they do not belong on the Super Admin side anymore:
+- Budget Manager
+- Financial Management
+  - Sales Dashboard
+  - Estimator
+  - Accounting
+  - New Invoice
+
+Remove those tools from /admin/tools and from any Super Admin navigation or quick links.
+
+3. Move Budget Manager and Financial Management to the company owner side.
+- Add them to the company owner area/navigation in a sensible place.
+- Budget Manager should be available to company owners as a company-level pricing/budget tool.
+- Financial Management should be available to company owners as company-level operational tools, including:
+  - Sales Dashboard
+  - Estimator
+  - Accounting
+  - New Invoice
+- Preserve existing functionality where possible, but make sure these are no longer treated as platform-level Super Admin tools.
+
+4. Verify company-level data isolation for the moved tools.
+Because these tools were originally built for a single-company version of the app, inspect the backend/storage logic and ensure all relevant data is correctly scoped to the logged-in company owner’s company.
+At minimum, verify that one company cannot view or manage another company’s:
+- price book / budget data
+- estimates
+- invoices
+- accounting data
+- sales data
+
+If any current data queries are global, update them to filter by company ownership / companyId appropriately.
+
+5. Clean up the Admin Tools page at /admin/tools.
+Current issue:
+- The page feels crowded and visually squished.
+- The Role Definitions section is very long and makes the whole page extend too far down.
+
+Desired change:
+- Keep the Admin Tools page as a clean landing page for true platform-level tools only.
+- Keep Sandbox Testing on the Admin Tools page.
+- Remove Budget Manager and Financial Management from the page entirely.
+- Remove the full Role Definitions list from the Admin Tools page.
+- Replace it with a smaller Role Definitions card that summarizes the tool and has a button such as “Manage Roles.”
+- Create a dedicated Role Definitions page at:
+  - /admin/role-definitions
+- Move the full Role Definitions management UI onto that dedicated page.
+- Add Role Definitions to the Super Admin sidebar under Support & Admin, ideally near Admin Tools.
+- Preserve all existing Role Definitions functionality:
+  - list roles
+  - add roles
+  - edit roles
+  - delete custom roles where currently allowed
+
+6. Improve Admin Tools layout spacing.
+- Since fewer cards will remain, make the layout feel balanced and intentional rather than crowded.
+- Use a cleaner responsive grid with better spacing between the remaining cards.
+
+Do not change unrelated business logic.
+Do not redesign the rest of the Super Admin area yet.
