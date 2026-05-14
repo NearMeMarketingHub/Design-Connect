@@ -167,7 +167,10 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
   if (!lead) return null;
 
   const hasHubSpotRecord = !!(lead.hubspotContactId || lead.hubspotDealId);
-  const canRetrySync = lead.hubspotSyncStatus === "failed" || lead.hubspotSyncStatus === "not_configured";
+  const canRetrySync =
+    lead.hubspotSyncStatus === "failed" ||
+    lead.hubspotSyncStatus === "not_configured" ||
+    lead.hubspotSyncStatus === "pending";
 
   return (
     <Sheet open={!!lead} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -373,7 +376,7 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
                 data-testid="button-retry-hubspot"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${retryHubSpotMutation.isPending ? "animate-spin" : ""}`} />
-                {retryHubSpotMutation.isPending ? "Syncing…" : "Retry HubSpot Sync"}
+                {retryHubSpotMutation.isPending ? "Syncing…" : "Retry / Resume HubSpot Sync"}
               </Button>
             )}
             {hasHubSpotRecord && (

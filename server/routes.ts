@@ -154,15 +154,19 @@ export async function registerRoutes(
       } catch (emailErr) {
         console.error("Failed to send demo request notification email:", emailErr);
       }
-      // HubSpot sync is best-effort — never fail the public request
-      // Mark as pending immediately when a token is configured so status reflects in-progress work
+      // HubSpot sync — best-effort, scoped exclusively to demo requests (see server/hubspot.ts).
+      // When HUBSPOT_ACCESS_TOKEN is absent: syncDemoRequestToHubSpot() returns {status:"not_configured"},
+      // no HubSpot API is called, and hubspotSyncStatus stays "not_configured" in the database.
+      // The public response is always the same success message regardless of sync outcome.
       if (process.env.HUBSPOT_ACCESS_TOKEN?.trim()) {
+        // Mark pending immediately so the admin UI reflects in-progress state
         storage.updateDemoRequest(saved.id, { hubspotSyncStatus: "pending" }).catch(() => {});
       }
       (async () => {
         try {
           const { syncDemoRequestToHubSpot } = await import("./hubspot");
           const syncResult = await syncDemoRequestToHubSpot(saved);
+          // Only write back when we actually attempted a sync (token was configured)
           if (syncResult.status !== "not_configured") {
             await storage.updateDemoRequest(saved.id, {
               hubspotSyncStatus: syncResult.status,
@@ -170,10 +174,11 @@ export async function registerRoutes(
               hubspotCompanyId: syncResult.companyId ?? saved.hubspotCompanyId,
               hubspotDealId: syncResult.dealId ?? saved.hubspotDealId,
               hubspotLastSyncedAt: syncResult.status === "synced" ? new Date() : saved.hubspotLastSyncedAt,
-              hubspotSyncError: syncResult.status === "failed" ? syncResult.error : null,
+              hubspotSyncError: syncResult.status === "failed" ? (syncResult.error ?? null) : null,
             });
           }
         } catch (hubErr) {
+          // Log for server-side visibility only; never surfaced to the public user
           console.error("HubSpot sync error (non-fatal):", hubErr);
         }
       })();
@@ -1141,7 +1146,10 @@ export async function registerRoutes(
         hubspotCompanyId: syncResult.companyId ?? lead.hubspotCompanyId,
         hubspotDealId: syncResult.dealId ?? lead.hubspotDealId,
         hubspotLastSyncedAt: syncResult.status === "synced" ? new Date() : lead.hubspotLastSyncedAt,
-        hubspotSyncError: syncResult.status === "failed" ? (syncResult.error ?? null) : null,
+        // Trim to 500 chars to guard against oversized SDK error payloads
+        hubspotSyncError: syncResult.status === "failed"
+          ? (syncResult.error ?? null)
+          : null,
       });
       res.json(updated);
     } catch (error) { next(error); }

@@ -1,7 +1,20 @@
+/**
+ * SCOPE CONSTRAINT — this module must ONLY be imported by demo-request routes.
+ *
+ * HubSpot sync is intentionally scoped to demo requests submitted via the /demo
+ * page. It must never be used to sync BuildVision users, companies, clients,
+ * contractors, projects, invites, or any other platform entity.
+ *
+ * Allowed callers:
+ *   - POST /api/contact          (server/routes.ts — new demo request)
+ *   - POST /api/admin/demo-requests/:id/retry-hubspot  (server/routes.ts — admin retry)
+ */
 import { Client } from "@hubspot/api-client";
 import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts/models/Filter";
 import { AssociationSpecAssociationCategoryEnum } from "@hubspot/api-client/lib/codegen/crm/associations/v4/models/AssociationSpec";
 import type { DemoRequest } from "@shared/schema";
+
+const MAX_ERROR_LENGTH = 500;
 
 export interface HubspotSyncResult {
   status: "not_configured" | "synced" | "failed";
@@ -24,22 +37,22 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
 }
 
 async function upsertContact(client: Client, req: DemoRequest): Promise<string> {
+  // hs_lead_source is intentionally omitted — it is a portal-enumerated property that may not
+  // exist in every HubSpot account. Source tracking is preserved in the note body instead.
+  const { firstName, lastName } = splitName(req.name);
+  const properties: Record<string, string> = {
+    email: req.email,
+    firstname: firstName,
+    lastname: lastName,
+    phone: req.phone || "",
+    company: req.company || "",
+  };
+
   // If we already have a HubSpot contact ID, update it directly (idempotent retry)
   if (req.hubspotContactId) {
-    const { firstName, lastName } = splitName(req.name);
-    const properties: Record<string, string> = {
-      email: req.email,
-      firstname: firstName,
-      lastname: lastName,
-      phone: req.phone || "",
-      hs_lead_source: "buildvision_demo_request",
-      company: req.company || "",
-    };
     await client.crm.contacts.basicApi.update(req.hubspotContactId, { properties });
     return req.hubspotContactId;
   }
-
-  const { firstName, lastName } = splitName(req.name);
 
   // Search for existing contact by email
   const searchRes = await client.crm.contacts.searchApi.doSearch({
@@ -49,15 +62,6 @@ async function upsertContact(client: Client, req: DemoRequest): Promise<string> 
     after: "0",
     sorts: [],
   });
-
-  const properties: Record<string, string> = {
-    email: req.email,
-    firstname: firstName,
-    lastname: lastName,
-    phone: req.phone || "",
-    hs_lead_source: "buildvision_demo_request",
-    company: req.company || "",
-  };
 
   if (searchRes.results && searchRes.results.length > 0) {
     const existing = searchRes.results[0];
@@ -76,7 +80,7 @@ async function upsertCompany(client: Client, req: DemoRequest): Promise<string |
   // If we already have a HubSpot company ID, update it directly (idempotent retry)
   if (req.hubspotCompanyId) {
     await client.crm.companies.basicApi.update(req.hubspotCompanyId, {
-      properties: { name: companyName, hs_lead_source: "buildvision_demo_request" },
+      properties: { name: companyName },
     });
     return req.hubspotCompanyId;
   }
@@ -95,10 +99,7 @@ async function upsertCompany(client: Client, req: DemoRequest): Promise<string |
   }
 
   const created = await client.crm.companies.basicApi.create({
-    properties: {
-      name: companyName,
-      hs_lead_source: "buildvision_demo_request",
-    },
+    properties: { name: companyName },
   });
   return created.id;
 }
@@ -109,7 +110,6 @@ async function createDeal(client: Client, req: DemoRequest): Promise<string> {
       dealname: `BuildVision Demo — ${req.name}`,
       pipeline: "default",
       dealstage: "appointmentscheduled",
-      hs_lead_source: "buildvision_demo_request",
       description: `Demo request submitted on ${new Date(req.createdAt).toLocaleDateString()}. Source: buildvision_demo_request. Request ID: ${req.id}.`,
     },
   });
@@ -198,7 +198,8 @@ export async function syncDemoRequestToHubSpot(req: DemoRequest): Promise<Hubspo
 
     return { status: "synced", contactId, companyId: companyId ?? undefined, dealId };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const raw = err instanceof Error ? err.message : String(err);
+    const message = raw.length > MAX_ERROR_LENGTH ? raw.slice(0, MAX_ERROR_LENGTH) + "…" : raw;
     return { status: "failed", error: message };
   }
 }
