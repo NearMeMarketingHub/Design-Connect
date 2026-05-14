@@ -24,6 +24,21 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
 }
 
 async function upsertContact(client: Client, req: DemoRequest): Promise<string> {
+  // If we already have a HubSpot contact ID, update it directly (idempotent retry)
+  if (req.hubspotContactId) {
+    const { firstName, lastName } = splitName(req.name);
+    const properties: Record<string, string> = {
+      email: req.email,
+      firstname: firstName,
+      lastname: lastName,
+      phone: req.phone || "",
+      hs_lead_source: "buildvision_demo_request",
+      company: req.company || "",
+    };
+    await client.crm.contacts.basicApi.update(req.hubspotContactId, { properties });
+    return req.hubspotContactId;
+  }
+
   const { firstName, lastName } = splitName(req.name);
 
   // Search for existing contact by email
@@ -54,8 +69,17 @@ async function upsertContact(client: Client, req: DemoRequest): Promise<string> 
   return created.id;
 }
 
-async function upsertCompany(client: Client, companyName: string): Promise<string | null> {
-  if (!companyName || companyName.trim() === "") return null;
+async function upsertCompany(client: Client, req: DemoRequest): Promise<string | null> {
+  const companyName = req.company || "";
+  if (!companyName.trim()) return null;
+
+  // If we already have a HubSpot company ID, update it directly (idempotent retry)
+  if (req.hubspotCompanyId) {
+    await client.crm.companies.basicApi.update(req.hubspotCompanyId, {
+      properties: { name: companyName, hs_lead_source: "buildvision_demo_request" },
+    });
+    return req.hubspotCompanyId;
+  }
 
   // Search for existing company by name
   const searchRes = await client.crm.companies.searchApi.doSearch({
@@ -159,7 +183,7 @@ export async function syncDemoRequestToHubSpot(req: DemoRequest): Promise<Hubspo
   try {
     const [contactId, companyId] = await Promise.all([
       upsertContact(client, req),
-      upsertCompany(client, req.company || ""),
+      upsertCompany(client, req),
     ]);
 
     // Create deal only if no existing hubspotDealId stored on the record

@@ -108,6 +108,9 @@ function HubSpotBadge({ status }: { status: string }) {
 function hubspotContactUrl(id: string) {
   return `https://app.hubspot.com/contacts/contact/${id}`;
 }
+function hubspotCompanyUrl(id: string) {
+  return `https://app.hubspot.com/contacts/company/${id}`;
+}
 function hubspotDealUrl(id: string) {
   return `https://app.hubspot.com/contacts/deal/${id}`;
 }
@@ -314,6 +317,20 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
                     data-testid="link-hubspot-contact"
                   >
                     {lead.hubspotContactId} <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+              {lead.hubspotCompanyId && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Company</span>
+                  <a
+                    href={hubspotCompanyUrl(lead.hubspotCompanyId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
+                    data-testid="link-hubspot-company"
+                  >
+                    {lead.hubspotCompanyId} <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               )}
