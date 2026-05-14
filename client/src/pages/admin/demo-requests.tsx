@@ -105,14 +105,18 @@ function HubSpotBadge({ status }: { status: string }) {
   );
 }
 
-function hubspotContactUrl(id: string) {
-  return `https://app.hubspot.com/contacts/contact/${id}`;
+// HubSpot deep-link helpers — use search-based URLs since portal ID is not stored client-side.
+// These reliably navigate to the correct record search within the user's portal.
+function hubspotContactUrl(id: string, email?: string | null) {
+  if (email) return `https://app.hubspot.com/contacts/search?q=${encodeURIComponent(email)}`;
+  return `https://app.hubspot.com/contacts/search?q=${encodeURIComponent(id)}`;
 }
-function hubspotCompanyUrl(id: string) {
-  return `https://app.hubspot.com/contacts/company/${id}`;
+function hubspotCompanyUrl(id: string, name?: string | null) {
+  if (name) return `https://app.hubspot.com/contacts/companies?q=${encodeURIComponent(name)}`;
+  return `https://app.hubspot.com/contacts/companies?q=${encodeURIComponent(id)}`;
 }
 function hubspotDealUrl(id: string) {
-  return `https://app.hubspot.com/contacts/deal/${id}`;
+  return `https://app.hubspot.com/deals/search?q=${encodeURIComponent(id)}`;
 }
 
 interface DrawerProps {
@@ -310,7 +314,7 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Contact</span>
                   <a
-                    href={hubspotContactUrl(lead.hubspotContactId)}
+                    href={hubspotContactUrl(lead.hubspotContactId, lead.email)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
@@ -324,7 +328,7 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Company</span>
                   <a
-                    href={hubspotCompanyUrl(lead.hubspotCompanyId)}
+                    href={hubspotCompanyUrl(lead.hubspotCompanyId, lead.company)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-blue-600 hover:underline flex items-center gap-0.5"
@@ -374,7 +378,7 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
             )}
             {hasHubSpotRecord && (
               <a
-                href={lead.hubspotContactId ? hubspotContactUrl(lead.hubspotContactId) : hubspotDealUrl(lead.hubspotDealId!)}
+                href={lead.hubspotContactId ? hubspotContactUrl(lead.hubspotContactId, lead.email) : hubspotDealUrl(lead.hubspotDealId!)}
                 target="_blank"
                 rel="noopener noreferrer"
               >

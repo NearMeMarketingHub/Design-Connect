@@ -155,6 +155,10 @@ export async function registerRoutes(
         console.error("Failed to send demo request notification email:", emailErr);
       }
       // HubSpot sync is best-effort — never fail the public request
+      // Mark as pending immediately when a token is configured so status reflects in-progress work
+      if (process.env.HUBSPOT_ACCESS_TOKEN?.trim()) {
+        storage.updateDemoRequest(saved.id, { hubspotSyncStatus: "pending" }).catch(() => {});
+      }
       (async () => {
         try {
           const { syncDemoRequestToHubSpot } = await import("./hubspot");
