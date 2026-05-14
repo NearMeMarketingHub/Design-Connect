@@ -1384,17 +1384,19 @@ export async function registerRoutes(
         });
         const project = contractorInvite.projectId ? await storage.getProject(contractorInvite.projectId) : null;
         const role: "subcontractor" | "notary" = contractorInvite.contractorType === "notary" ? "notary" : "subcontractor";
+        const isNewUser = !contractorInvite.acceptedUserId;
         const { sendExternalInviteEmail } = await import("./email");
         await sendExternalInviteEmail(contractorInvite.email, {
           inviterName: "BuildVision Admin",
           projectName: project?.name ?? "Your Project",
           role,
           loginUrl: `${baseUrl}/auth`,
-          isNewUser: !contractorInvite.acceptedUserId,
+          isNewUser,
+          registerUrl: isNewUser ? `${baseUrl}/subcontractor-invite/${newToken}` : undefined,
         });
       }
 
-      res.json({ success: true, email: invite.email, newToken });
+      res.json({ success: true, email: invite.email });
     } catch (error) { next(error); }
   });
 
