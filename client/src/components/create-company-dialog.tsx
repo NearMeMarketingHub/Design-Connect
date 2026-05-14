@@ -116,7 +116,8 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
   const createCompanyMutation = useMutation({
     mutationFn: (data: typeof form) =>
       apiRequest("POST", "/api/admin/companies", buildPayload(data)).then((r) => r.json()),
-    onSuccess: async (company: { id: string }) => {
+    onSuccess: async (result: { company: { id: string }; user: unknown }) => {
+      const companyId = result.company.id;
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       handleClose();
       toast({
@@ -127,7 +128,7 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
         try {
           await apiRequest("PATCH", `/api/admin/demo-requests/${leadId}`, {
             status: "converted",
-            convertedCompanyId: company.id,
+            convertedCompanyId: companyId,
           });
           queryClient.invalidateQueries({ queryKey: ["/api/admin/demo-requests"] });
         } catch {
@@ -139,7 +140,7 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
           });
         }
       }
-      if (onCompanyCreated) onCompanyCreated(company.id);
+      if (onCompanyCreated) onCompanyCreated(companyId);
     },
     onError: (err: Error) =>
       toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),

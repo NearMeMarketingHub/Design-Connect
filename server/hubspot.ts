@@ -189,12 +189,12 @@ export async function syncDemoRequestToHubSpot(req: DemoRequest): Promise<Hubspo
     // Create deal only if no existing hubspotDealId stored on the record
     const dealId = req.hubspotDealId || (await createDeal(client, req));
 
-    // Run associations + note in parallel
+    // Run associations + note — use Promise.all so any failure is surfaced as an error
     const tasks: Promise<void>[] = [];
     if (companyId) tasks.push(associateContactCompany(client, contactId, companyId));
     tasks.push(associateContactDeal(client, contactId, dealId));
     tasks.push(createNote(client, contactId, req));
-    await Promise.allSettled(tasks);
+    await Promise.all(tasks);
 
     return { status: "synced", contactId, companyId: companyId ?? undefined, dealId };
   } catch (err: unknown) {

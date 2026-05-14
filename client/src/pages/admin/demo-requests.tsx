@@ -662,6 +662,12 @@ export default function AdminDemoRequests() {
             : null
         }
         leadId={convertingLead?.id}
+        onCompanyCreated={(companyId) => {
+          // Re-open drawer with the same lead but updated convertedCompanyId so the link appears
+          if (convertingLead) {
+            setSelectedLead({ ...convertingLead, status: "converted", convertedCompanyId: companyId });
+          }
+        }}
       />
     </SuperAdminLayout>
   );
