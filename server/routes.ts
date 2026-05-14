@@ -1189,10 +1189,10 @@ export async function registerRoutes(
       acceptedUserName: acceptedUser ? (acceptedUser.name || acceptedUser.username) : null,
       sentAt: inv.createdAt,
       acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
-      revokedAt: (inv as any).revokedAt ? new Date((inv as any).revokedAt).toISOString() : null,
+      revokedAt: inv.revokedAt ? inv.revokedAt.toISOString() : null,
       expiresAt: inv.expiresAt,
-      resendCount: (inv as any).resendCount ?? 0,
-      lastResentAt: (inv as any).lastResentAt ? new Date((inv as any).lastResentAt).toISOString() : null,
+      resendCount: inv.resendCount,
+      lastResentAt: inv.lastResentAt ? inv.lastResentAt.toISOString() : null,
     };
   }
 
@@ -1222,10 +1222,10 @@ export async function registerRoutes(
       acceptedUserName: acceptedUser ? (acceptedUser.name || acceptedUser.username) : null,
       sentAt: inv.createdAt,
       acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
-      revokedAt: (inv as any).revokedAt ? new Date((inv as any).revokedAt).toISOString() : null,
+      revokedAt: inv.revokedAt ? inv.revokedAt.toISOString() : null,
       expiresAt: inv.expiresAt,
-      resendCount: (inv as any).resendCount ?? 0,
-      lastResentAt: (inv as any).lastResentAt ? new Date((inv as any).lastResentAt).toISOString() : null,
+      resendCount: inv.resendCount,
+      lastResentAt: inv.lastResentAt ? inv.lastResentAt.toISOString() : null,
     };
   }
 
@@ -1296,18 +1296,19 @@ export async function registerRoutes(
       }
 
       if (!existing) return res.status(404).json({ message: "Invite not found" });
-      if (existing.status === "accepted") {
-        return res.status(400).json({ message: "Cannot revoke an accepted invite — the user already has access." });
-      }
-      if (existing.status === "revoked") {
-        return res.status(400).json({ message: "This invite has already been revoked." });
+      if (existing.status !== "pending") {
+        const reason =
+          existing.status === "accepted" ? "Cannot revoke an accepted invite — the user already has access." :
+          existing.status === "revoked" ? "This invite has already been revoked." :
+          `Cannot revoke a ${existing.status} invite.`;
+        return res.status(400).json({ message: reason });
       }
 
       let updated: ContractorInvite | ProjectInvite | undefined;
       if (kind === "contractor") {
-        updated = await storage.updateContractorInvite(req.params.id, { status: "revoked", revokedAt: now } as any);
+        updated = await storage.updateContractorInvite(req.params.id, { status: "revoked", revokedAt: now });
       } else {
-        updated = await storage.updateProjectInvite(req.params.id, { status: "revoked", revokedAt: now } as any);
+        updated = await storage.updateProjectInvite(req.params.id, { status: "revoked", revokedAt: now });
       }
       if (!updated) return res.status(404).json({ message: "Invite not found" });
       res.json(updated);
@@ -1345,7 +1346,7 @@ export async function registerRoutes(
       const newToken = require("crypto").randomBytes(32).toString("hex");
       const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const now = new Date();
-      const currentResendCount = (invite as any).resendCount ?? 0;
+      const currentResendCount = invite.resendCount ?? 0;
 
       const baseUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -1355,14 +1356,13 @@ export async function registerRoutes(
 
       if (inviteKind === "project") {
         const projectInvite = invite as ProjectInvite;
-        // Persist fresh token + expiry + resend metadata
         await storage.updateProjectInvite(req.params.id, {
           token: newToken,
           status: "pending",
           expiresAt: newExpiresAt,
           resendCount: currentResendCount + 1,
           lastResentAt: now,
-        } as any);
+        });
         const project = projectInvite.projectId ? await storage.getProject(projectInvite.projectId) : null;
         const existingUser = await storage.getUserByEmail(projectInvite.email);
         const { sendProjectInviteEmail } = await import("./email");
@@ -1375,14 +1375,13 @@ export async function registerRoutes(
         });
       } else {
         const contractorInvite = invite as ContractorInvite;
-        // Persist fresh token + expiry + resend metadata
         await storage.updateContractorInvite(req.params.id, {
           token: newToken,
           status: "pending",
           expiresAt: newExpiresAt,
           resendCount: currentResendCount + 1,
           lastResentAt: now,
-        } as any);
+        });
         const project = contractorInvite.projectId ? await storage.getProject(contractorInvite.projectId) : null;
         const role: "subcontractor" | "notary" = contractorInvite.contractorType === "notary" ? "notary" : "subcontractor";
         const { sendExternalInviteEmail } = await import("./email");
@@ -4459,8 +4458,14 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This invitation has expired" });
       }
 
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "This invitation has been cancelled. Please contact your project manager for a new invite." });
+      }
+      if (invite.status === "accepted") {
+        return res.status(400).json({ message: "This invitation has already been accepted. Please log in to your account directly." });
+      }
       if (invite.status !== "pending") {
-        return res.status(400).json({ message: "This invitation has already been used" });
+        return res.status(400).json({ message: "This invitation is no longer valid." });
       }
 
       // Find the user by the submitted email
@@ -4528,8 +4533,14 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This invitation has expired" });
       }
 
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "This invitation has been cancelled. Please contact your project manager for a new invite." });
+      }
+      if (invite.status === "accepted") {
+        return res.status(400).json({ message: "This invitation has already been accepted. Please log in to your account directly." });
+      }
       if (invite.status !== "pending") {
-        return res.status(400).json({ message: "This invitation has already been used" });
+        return res.status(400).json({ message: "This invitation is no longer valid." });
       }
 
       // Block duplicate accounts — if email already has an account, use the login path
@@ -5041,8 +5052,14 @@ export async function registerRoutes(
       if (!invite) {
         return res.status(404).json({ message: "Invite not found" });
       }
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "This invitation has been cancelled. Please contact the company for a new invite." });
+      }
+      if (invite.status === "accepted") {
+        return res.status(400).json({ message: "This invitation has already been accepted." });
+      }
       if (invite.status !== 'pending') {
-        return res.status(400).json({ message: "Invite has already been used or expired" });
+        return res.status(400).json({ message: "This invitation is no longer valid." });
       }
       if (new Date(invite.expiresAt) < new Date()) {
         return res.status(400).json({ message: "Invite has expired" });
@@ -5074,8 +5091,14 @@ export async function registerRoutes(
       if (!invite) {
         return res.status(404).json({ message: "Invite not found" });
       }
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "This invitation has been cancelled. Please contact the company for a new invite." });
+      }
+      if (invite.status === "accepted") {
+        return res.status(400).json({ message: "This invitation has already been accepted." });
+      }
       if (invite.status !== 'pending') {
-        return res.status(400).json({ message: "Invite has already been used" });
+        return res.status(400).json({ message: "This invitation is no longer valid." });
       }
       if (new Date(invite.expiresAt) < new Date()) {
         return res.status(400).json({ message: "Invite has expired" });

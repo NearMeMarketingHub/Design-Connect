@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +29,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "wouter";
 import {
@@ -37,7 +47,6 @@ import {
   X,
   Search,
   Eye,
-  Mail,
   Building2,
   FolderOpen,
   UserCheck,
@@ -47,9 +56,12 @@ import {
   XCircle,
   Send,
   RotateCcw,
+  Mail,
+  ExternalLink,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface AdminInvite {
   id: string;
   inviteType: string;
@@ -71,43 +83,36 @@ interface AdminInvite {
   lastResentAt: string | null;
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  pending: {
-    label: "Pending",
-    color: "bg-amber-100 text-amber-700",
-    icon: <Clock className="w-3 h-3" />,
-  },
-  accepted: {
-    label: "Accepted",
-    color: "bg-green-100 text-green-700",
-    icon: <CheckCircle2 className="w-3 h-3" />,
-  },
-  expired: {
-    label: "Expired",
-    color: "bg-red-100 text-red-700",
-    icon: <CalendarX2 className="w-3 h-3" />,
-  },
-  revoked: {
-    label: "Revoked",
-    color: "bg-gray-100 text-gray-500",
-    icon: <XCircle className="w-3 h-3" />,
-  },
+  pending:  { label: "Pending",  color: "bg-amber-100 text-amber-700", icon: <Clock className="w-3 h-3" /> },
+  accepted: { label: "Accepted", color: "bg-green-100 text-green-700", icon: <CheckCircle2 className="w-3 h-3" /> },
+  expired:  { label: "Expired",  color: "bg-red-100 text-red-700",    icon: <CalendarX2 className="w-3 h-3" /> },
+  revoked:  { label: "Revoked",  color: "bg-gray-100 text-gray-500",  icon: <XCircle className="w-3 h-3" /> },
 };
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
-  client: { label: "Client", color: "bg-blue-100 text-blue-700" },
-  contractor: { label: "Contractor", color: "bg-violet-100 text-violet-700" },
-  subcontractor: { label: "Sub", color: "bg-orange-100 text-orange-700" },
-  notary: { label: "Notary", color: "bg-teal-100 text-teal-700" },
+  client:        { label: "Client Invite",    color: "bg-blue-100 text-blue-700" },
+  contractor:    { label: "Team Member",      color: "bg-violet-100 text-violet-700" },
+  subcontractor: { label: "Sub-Contractor",   color: "bg-orange-100 text-orange-700" },
+  notary:        { label: "Notary",           color: "bg-teal-100 text-teal-700" },
 };
 
+// ── Hooks ─────────────────────────────────────────────────────────────────────
+function useDebounce<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_META[status] ?? { label: status, color: "bg-gray-100 text-gray-500", icon: null };
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${s.color}`}
-      data-testid={`badge-status-${status}`}
-    >
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium capitalize ${s.color}`}>
       {s.icon}
       {s.label}
     </span>
@@ -132,20 +137,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+// ── Detail Drawer ─────────────────────────────────────────────────────────────
 interface DrawerProps {
   invite: AdminInvite | null;
   onClose: () => void;
   onResend: (invite: AdminInvite) => void;
-  onRevoke: (invite: AdminInvite) => void;
+  onRevokeRequest: (invite: AdminInvite) => void;
   isResending: boolean;
   isRevoking: boolean;
 }
 
-function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevoking }: DrawerProps) {
+function InviteDrawer({ invite, onClose, onResend, onRevokeRequest, isResending, isRevoking }: DrawerProps) {
   if (!invite) return null;
 
   const canResend = invite.status === "pending" || invite.status === "expired";
-  const canRevoke = invite.status === "pending" || invite.status === "expired";
+  const canRevoke = invite.status === "pending";
   const isProcessing = isResending || isRevoking;
 
   return (
@@ -160,7 +166,7 @@ function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevo
         </SheetHeader>
 
         <div className="space-y-5 pb-10">
-          {/* Identity */}
+          {/* Recipient / accepted user */}
           <div className="grid grid-cols-2 gap-3">
             {invite.clientName && (
               <Field label="Recipient Name">
@@ -169,18 +175,36 @@ function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevo
             )}
             {invite.acceptedUserName && (
               <Field label="Accepted By">
-                <span className="text-green-700 font-medium">{invite.acceptedUserName}</span>
+                <Link
+                  href={`/admin/users?search=${encodeURIComponent(invite.acceptedUserName)}`}
+                  className="text-green-700 font-medium hover:underline inline-flex items-center gap-1"
+                  data-testid="link-accepted-user"
+                >
+                  {invite.acceptedUserName}
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
               </Field>
             )}
           </div>
 
           {/* Context */}
-          <div className="grid grid-cols-1 gap-3">
+          <div className="space-y-3">
             {invite.companyName && (
               <Field label="Company">
                 <div className="flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>{invite.companyName}</span>
+                  {invite.companyId ? (
+                    <Link
+                      href={`/admin/companies/${invite.companyId}`}
+                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                      data-testid="link-company"
+                    >
+                      {invite.companyName}
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  ) : (
+                    <span>{invite.companyName}</span>
+                  )}
                 </div>
               </Field>
             )}
@@ -191,10 +215,11 @@ function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevo
                   {invite.projectId ? (
                     <Link
                       href={`/admin/project/${invite.projectId}`}
-                      className="text-blue-600 hover:underline"
+                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
                       data-testid="link-project"
                     >
                       {invite.projectName}
+                      <ExternalLink className="w-3 h-3" />
                     </Link>
                   ) : (
                     <span>{invite.projectName}</span>
@@ -239,7 +264,7 @@ function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevo
 
           <Separator />
 
-          {/* Resend metadata */}
+          {/* Resend history */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Times Resent">
               <span className="tabular-nums font-medium">{invite.resendCount}</span>
@@ -275,28 +300,16 @@ function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevo
                 size="sm"
                 variant="outline"
                 disabled={isProcessing}
-                onClick={() => onRevoke(invite)}
+                onClick={() => onRevokeRequest(invite)}
                 data-testid="button-drawer-revoke"
               >
                 <XCircle className="w-3.5 h-3.5 text-red-500" />
                 <span className="text-red-600">{isRevoking ? "Revoking…" : "Revoke Invite"}</span>
               </Button>
             )}
-            {invite.projectId && (
-              <Link href={`/admin/project/${invite.projectId}`}>
-                <Button
-                  className="w-full gap-2"
-                  size="sm"
-                  variant="ghost"
-                  data-testid="button-drawer-view-project"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  View Project
-                </Button>
-              </Link>
-            )}
           </div>
 
+          {/* Status callout */}
           {invite.status === "accepted" && (
             <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
               <p className="font-semibold">Accepted</p>
@@ -313,30 +326,43 @@ function InviteDrawer({ invite, onClose, onResend, onRevoke, isResending, isRevo
               <p className="text-xs mt-0.5">This invitation has been cancelled and can no longer be used.</p>
             </div>
           )}
+          {invite.status === "expired" && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <p className="font-semibold">Expired</p>
+              <p className="text-xs mt-0.5">Use "Resend" to issue a fresh 7-day invite to the same address.</p>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
   );
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminInvites() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
-  const [selectedInvite, setSelectedInvite] = useState<AdminInvite | null>(null);
+  const [searchRaw, setSearchRaw] = useState("");
+  const search = useDebounce(searchRaw, 250);
 
+  const [statusFilter, setStatusFilter]   = useState("all");
+  const [typeFilter, setTypeFilter]       = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+
+  const [selectedInvite, setSelectedInvite] = useState<AdminInvite | null>(null);
+  const [revokeTarget, setRevokeTarget]     = useState<AdminInvite | null>(null);
+
+  // ── Data ────────────────────────────────────────────────────────────────────
   const { data: adminInvites = [], isLoading } = useQuery<AdminInvite[]>({
     queryKey: ["/api/admin/invites"],
     queryFn: () => apiRequest("GET", "/api/admin/invites").then((r) => r.json()),
     enabled: user?.role === "admin",
   });
 
-  // Keep drawer in sync with fresh data
+  // Keep drawer in sync with fresh data after mutations
   useEffect(() => {
     if (selectedInvite) {
       const fresh = adminInvites.find((i) => i.id === selectedInvite.id);
@@ -344,12 +370,13 @@ export default function AdminInvites() {
     }
   }, [adminInvites]);
 
+  // ── Mutations ───────────────────────────────────────────────────────────────
   const resendMutation = useMutation({
     mutationFn: ({ id, type }: { id: string; type: string }) =>
       apiRequest("POST", `/api/admin/invites/${id}/resend`, { type }).then((r) => r.json()),
-    onSuccess: (_data, vars) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/invites"] });
-      toast({ title: "Invite resent", description: "A fresh invite email has been sent." });
+      toast({ title: "Invite resent", description: "A fresh 7-day invite has been sent." });
     },
     onError: (err: Error) =>
       toast({ title: "Failed to resend", description: parseErrorMessage(err), variant: "destructive" }),
@@ -360,49 +387,64 @@ export default function AdminInvites() {
       apiRequest("POST", `/api/admin/invites/${id}/revoke`, { type }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/invites"] });
+      setRevokeTarget(null);
       toast({ title: "Invite revoked" });
     },
-    onError: (err: Error) =>
-      toast({ title: "Failed to revoke", description: parseErrorMessage(err), variant: "destructive" }),
+    onError: (err: Error) => {
+      setRevokeTarget(null);
+      toast({ title: "Failed to revoke", description: parseErrorMessage(err), variant: "destructive" });
+    },
   });
 
-  // Build unique company list for filter
-  const companyOptions = Array.from(
-    new Map(
-      adminInvites
-        .filter((i) => i.companyName)
-        .map((i) => [i.companyId ?? i.companyName, i.companyName!])
-    ).entries()
-  ).sort((a, b) => a[1].localeCompare(b[1]));
+  // ── Filter options ──────────────────────────────────────────────────────────
+  const companyOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inv of adminInvites) {
+      if (inv.companyName) map.set(inv.companyId ?? inv.companyName, inv.companyName);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [adminInvites]);
 
-  const filtered = adminInvites.filter((inv) => {
-    if (statusFilter !== "all" && inv.status !== statusFilter) return false;
-    if (typeFilter !== "all" && inv.inviteType !== typeFilter) return false;
+  // Project options constrained to selected company
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const inv of adminInvites) {
+      if (!inv.projectId || !inv.projectName) continue;
+      if (companyFilter !== "all") {
+        const invCompanyKey = inv.companyId ?? inv.companyName;
+        if (invCompanyKey !== companyFilter) continue;
+      }
+      map.set(inv.projectId, inv.projectName);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [adminInvites, companyFilter]);
+
+  // Reset project filter when company changes
+  useEffect(() => { setProjectFilter("all"); }, [companyFilter]);
+
+  // ── Filtered list ───────────────────────────────────────────────────────────
+  const filtered = useMemo(() => adminInvites.filter((inv) => {
+    if (statusFilter  !== "all" && inv.status     !== statusFilter)  return false;
+    if (typeFilter    !== "all" && inv.inviteType  !== typeFilter)    return false;
     if (companyFilter !== "all" && (inv.companyId ?? inv.companyName) !== companyFilter) return false;
+    if (projectFilter !== "all" && inv.projectId  !== projectFilter)  return false;
     if (search.trim()) {
       const q = search.toLowerCase();
-      const fields = [
-        inv.email,
-        inv.clientName,
-        inv.projectName,
-        inv.companyName,
-        inv.invitedByName,
-        inv.acceptedUserName,
-      ];
-      if (!fields.some((f) => f?.toLowerCase().includes(q))) return false;
+      const haystack = [inv.email, inv.clientName, inv.projectName, inv.companyName, inv.invitedByName, inv.acceptedUserName];
+      if (!haystack.some((f) => f?.toLowerCase().includes(q))) return false;
     }
     return true;
-  });
+  }), [adminInvites, statusFilter, typeFilter, companyFilter, projectFilter, search]);
 
-  const hasFilters = search || statusFilter !== "all" || typeFilter !== "all" || companyFilter !== "all";
-
-  // Counts for filter pills
+  const hasFilters = searchRaw || statusFilter !== "all" || typeFilter !== "all" || companyFilter !== "all" || projectFilter !== "all";
   const pendingCount = adminInvites.filter((i) => i.status === "pending").length;
   const expiredCount = adminInvites.filter((i) => i.status === "expired").length;
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <SuperAdminLayout>
       <div className="max-w-7xl mx-auto space-y-5">
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -411,26 +453,16 @@ export default function AdminInvites() {
           </div>
           <div className="flex items-center gap-2">
             {pendingCount > 0 && (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"
-                data-testid="badge-pending-count"
-              >
-                <Clock className="w-3 h-3" />
-                {pendingCount} pending
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700" data-testid="badge-pending-count">
+                <Clock className="w-3 h-3" />{pendingCount} pending
               </span>
             )}
             {expiredCount > 0 && (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"
-                data-testid="badge-expired-count"
-              >
-                <CalendarX2 className="w-3 h-3" />
-                {expiredCount} expired
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700" data-testid="badge-expired-count">
+                <CalendarX2 className="w-3 h-3" />{expiredCount} expired
               </span>
             )}
-            <Badge variant="secondary" data-testid="badge-total-invites">
-              {adminInvites.length} total
-            </Badge>
+            <Badge variant="secondary" data-testid="badge-total-invites">{adminInvites.length} total</Badge>
           </div>
         </div>
 
@@ -441,8 +473,8 @@ export default function AdminInvites() {
             <Input
               className="pl-8 h-9 text-sm"
               placeholder="Search email, project, company…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchRaw}
+              onChange={(e) => setSearchRaw(e.target.value)}
               data-testid="input-search-invites"
             />
           </div>
@@ -458,8 +490,8 @@ export default function AdminInvites() {
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px] h-9 text-sm" data-testid="select-filter-type">
-              <SelectValue placeholder="Type" />
+            <SelectTrigger className="w-[150px] h-9 text-sm" data-testid="select-filter-type">
+              <SelectValue placeholder="Invite Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
@@ -476,7 +508,20 @@ export default function AdminInvites() {
               <SelectContent>
                 <SelectItem value="all">All Companies</SelectItem>
                 {companyOptions.map(([id, name]) => (
-                  <SelectItem key={id ?? name} value={id ?? name} className="text-sm">{name}</SelectItem>
+                  <SelectItem key={id} value={id} className="text-sm">{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {projectOptions.length > 0 && (
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="w-[160px] h-9 text-sm" data-testid="select-filter-project">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{companyFilter !== "all" ? "All Projects" : "All Projects"}</SelectItem>
+                {projectOptions.map(([id, name]) => (
+                  <SelectItem key={id} value={id} className="text-sm">{name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -486,12 +531,7 @@ export default function AdminInvites() {
               variant="ghost"
               size="sm"
               className="h-9 text-sm"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-                setTypeFilter("all");
-                setCompanyFilter("all");
-              }}
+              onClick={() => { setSearchRaw(""); setStatusFilter("all"); setTypeFilter("all"); setCompanyFilter("all"); setProjectFilter("all"); }}
               data-testid="button-clear-filters"
             >
               Clear
@@ -502,24 +542,16 @@ export default function AdminInvites() {
         {/* Table */}
         {isLoading ? (
           <Card>
-            <CardContent className="py-10 text-center text-muted-foreground text-sm">
-              Loading invites…
-            </CardContent>
+            <CardContent className="py-10 text-center text-muted-foreground text-sm">Loading invites…</CardContent>
           </Card>
         ) : filtered.length === 0 ? (
           <Card>
             <CardContent className="py-14 text-center text-muted-foreground space-y-1">
               <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="font-medium">
-                {adminInvites.length === 0
-                  ? "No invites have been sent yet."
-                  : "No invites match your filters."}
+                {adminInvites.length === 0 ? "No invites have been sent yet." : "No invites match your filters."}
               </p>
-              {hasFilters && (
-                <p className="text-xs">
-                  Try clearing filters to see all invites.
-                </p>
-              )}
+              {hasFilters && <p className="text-xs">Try clearing filters to see all invites.</p>}
             </CardContent>
           </Card>
         ) : (
@@ -534,6 +566,7 @@ export default function AdminInvites() {
                     <TableHead>Project</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Sent</TableHead>
+                    <TableHead>Accepted At</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -546,34 +579,30 @@ export default function AdminInvites() {
                       className="cursor-pointer hover:bg-muted/30"
                       onClick={() => setSelectedInvite(inv)}
                     >
-                      <TableCell className="text-sm font-medium max-w-[180px] truncate">
+                      <TableCell className="text-sm font-medium">
                         <div>
                           <span>{inv.email}</span>
-                          {inv.clientName && (
-                            <p className="text-xs text-muted-foreground">{inv.clientName}</p>
-                          )}
+                          {inv.clientName && <p className="text-xs text-muted-foreground">{inv.clientName}</p>}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <TypeBadge type={inv.inviteType} />
-                      </TableCell>
+                      <TableCell><TypeBadge type={inv.inviteType} /></TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
                         {inv.companyName || "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
                         {inv.projectName || "—"}
                       </TableCell>
-                      <TableCell>
-                        <StatusBadge status={inv.status} />
-                      </TableCell>
+                      <TableCell><StatusBadge status={inv.status} /></TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {format(new Date(inv.sentAt), "MMM d, yyyy")}
                         {inv.resendCount > 0 && (
                           <p className="text-xs text-blue-600">
-                            <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />
-                            {inv.resendCount}×
+                            <RotateCcw className="w-2.5 h-2.5 inline mr-0.5" />{inv.resendCount}×
                           </p>
                         )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap" data-testid={`cell-accepted-at-${inv.id}`}>
+                        {inv.acceptedAt ? format(new Date(inv.acceptedAt), "MMM d, yyyy") : "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         <span className={inv.status === "expired" ? "text-red-500" : ""}>
@@ -583,30 +612,30 @@ export default function AdminInvites() {
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           {(inv.status === "pending" || inv.status === "expired") && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => resendMutation.mutate({ id: inv.id, type: inv.inviteType })}
-                                disabled={resendMutation.isPending}
-                                data-testid={`button-resend-${inv.id}`}
-                                title="Resend invite"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => revokeMutation.mutate({ id: inv.id, type: inv.inviteType })}
-                                disabled={revokeMutation.isPending}
-                                data-testid={`button-revoke-${inv.id}`}
-                                title="Revoke invite"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </Button>
-                            </>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => resendMutation.mutate({ id: inv.id, type: inv.inviteType })}
+                              disabled={resendMutation.isPending}
+                              data-testid={`button-resend-${inv.id}`}
+                              title="Resend invite"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {inv.status === "pending" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => setRevokeTarget(inv)}
+                              disabled={revokeMutation.isPending}
+                              data-testid={`button-revoke-${inv.id}`}
+                              title="Revoke invite"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
                           )}
                           <Button
                             size="sm"
@@ -633,14 +662,39 @@ export default function AdminInvites() {
         </p>
       </div>
 
+      {/* Detail drawer */}
       <InviteDrawer
         invite={selectedInvite}
         onClose={() => setSelectedInvite(null)}
         onResend={(inv) => resendMutation.mutate({ id: inv.id, type: inv.inviteType })}
-        onRevoke={(inv) => revokeMutation.mutate({ id: inv.id, type: inv.inviteType })}
+        onRevokeRequest={(inv) => setRevokeTarget(inv)}
         isResending={resendMutation.isPending}
         isRevoking={revokeMutation.isPending}
       />
+
+      {/* Revoke confirmation dialog */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) setRevokeTarget(null); }}>
+        <AlertDialogContent data-testid="dialog-revoke-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this invitation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The invite sent to <strong>{revokeTarget?.email}</strong> will be permanently cancelled. The recipient's link
+              will stop working immediately. This cannot be undone — you would need to send a new invite.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-revoke-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => revokeTarget && revokeMutation.mutate({ id: revokeTarget.id, type: revokeTarget.inviteType })}
+              disabled={revokeMutation.isPending}
+              data-testid="button-revoke-confirm"
+            >
+              {revokeMutation.isPending ? "Revoking…" : "Yes, Revoke"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SuperAdminLayout>
   );
 }
