@@ -2366,7 +2366,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateDemoRequest(id: string, data: Partial<InsertDemoRequest>): Promise<DemoRequest | undefined> {
-    const [updated] = await db.update(schema.demoRequests).set(data).where(eq(schema.demoRequests.id, id)).returning();
+    const [updated] = await db.update(schema.demoRequests)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.demoRequests.id, id))
+      .returning();
     return updated;
   }
 

@@ -771,6 +771,9 @@ export type ChangeOrderLineItem = typeof changeOrderLineItems.$inferSelect;
 export const DEMO_REQUEST_STATUSES = ["new", "contacted", "demo_scheduled", "converted", "closed"] as const;
 export type DemoRequestStatus = typeof DEMO_REQUEST_STATUSES[number];
 
+export const HUBSPOT_SYNC_STATUSES = ["not_configured", "pending", "synced", "failed"] as const;
+export type HubspotSyncStatus = typeof HUBSPOT_SYNC_STATUSES[number];
+
 export const demoRequests = pgTable("demo_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -780,9 +783,19 @@ export const demoRequests = pgTable("demo_requests", {
   message: text("message").notNull().default(""),
   status: text("status", { enum: DEMO_REQUEST_STATUSES }).notNull().default("new"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  convertedCompanyId: text("converted_company_id"),
+  internalNotes: text("internal_notes"),
+  followUpDate: timestamp("follow_up_date"),
+  hubspotSyncStatus: text("hubspot_sync_status", { enum: HUBSPOT_SYNC_STATUSES }).notNull().default("not_configured"),
+  hubspotContactId: text("hubspot_contact_id"),
+  hubspotCompanyId: text("hubspot_company_id"),
+  hubspotDealId: text("hubspot_deal_id"),
+  hubspotLastSyncedAt: timestamp("hubspot_last_synced_at"),
+  hubspotSyncError: text("hubspot_sync_error"),
 });
 
-export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ id: true, createdAt: true });
+export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
 export type DemoRequest = typeof demoRequests.$inferSelect;
 

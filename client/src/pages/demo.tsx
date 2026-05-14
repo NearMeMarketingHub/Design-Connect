@@ -94,7 +94,7 @@ export default function DemoPage() {
               Request Received!
             </h1>
             <p className="text-slate-600 text-lg mb-8" data-testid="text-success-message">
-              Thanks for reaching out. Our team will be in touch within one business day to schedule your demo.
+              Thanks — your demo request has been sent. Our team will reach out soon.
             </p>
             <Link href="/">
               <Button data-testid="button-back-home">Return to Home</Button>

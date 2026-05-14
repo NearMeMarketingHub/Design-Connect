@@ -134,27 +134,46 @@ export async function registerRoutes(
   // Public contact / demo request route
   app.post("/api/contact", async (req, res, next) => {
     try {
-      const schema = z.object({
+      const contactSchema = z.object({
         name: z.string().min(1, "Name is required"),
         company: z.string().optional().default(""),
         email: z.string().email("Valid email is required"),
         phone: z.string().optional().default(""),
         message: z.string().optional().default(""),
       });
-      const parsed = schema.safeParse(req.body);
+      const parsed = contactSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors[0].message });
       }
       const { name, company, email, phone, message } = parsed.data;
       // Persist to DB first — fail request if DB save fails so no leads are silently lost
-      await storage.createDemoRequest({ name, company, email, phone, message, status: "new" });
-      // Email notification is best-effort (don't fail if email is down)
+      const saved = await storage.createDemoRequest({ name, company, email, phone, message, status: "new", hubspotSyncStatus: "not_configured" });
+      // Email notification is best-effort
       try {
         await sendDemoRequestEmail({ name, company, email, phone, message });
       } catch (emailErr) {
         console.error("Failed to send demo request notification email:", emailErr);
       }
-      res.json({ success: true });
+      // HubSpot sync is best-effort — never fail the public request
+      (async () => {
+        try {
+          const { syncDemoRequestToHubSpot } = await import("./hubspot");
+          const syncResult = await syncDemoRequestToHubSpot(saved);
+          if (syncResult.status !== "not_configured") {
+            await storage.updateDemoRequest(saved.id, {
+              hubspotSyncStatus: syncResult.status,
+              hubspotContactId: syncResult.contactId ?? saved.hubspotContactId,
+              hubspotCompanyId: syncResult.companyId ?? saved.hubspotCompanyId,
+              hubspotDealId: syncResult.dealId ?? saved.hubspotDealId,
+              hubspotLastSyncedAt: syncResult.status === "synced" ? new Date() : saved.hubspotLastSyncedAt,
+              hubspotSyncError: syncResult.status === "failed" ? syncResult.error : null,
+            });
+          }
+        } catch (hubErr) {
+          console.error("HubSpot sync error (non-fatal):", hubErr);
+        }
+      })();
+      res.json({ success: true, message: "Thanks — your demo request has been sent. Our team will reach out soon." });
     } catch (err) {
       console.error("Contact form error:", err);
       res.status(502).json({ error: "Failed to send your request. Please try again or email us directly." });
@@ -1090,11 +1109,36 @@ export async function registerRoutes(
     try {
       const updateSchema = z.object({
         status: z.enum(["new", "contacted", "demo_scheduled", "converted", "closed"]).optional(),
+        internalNotes: z.string().nullable().optional(),
+        followUpDate: z.string().nullable().optional(),
+        convertedCompanyId: z.string().nullable().optional(),
       });
       const parsed = updateSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid data" });
-      const updated = await storage.updateDemoRequest(req.params.id, parsed.data);
+      const payload: Record<string, unknown> = { ...parsed.data };
+      if (parsed.data.followUpDate !== undefined) {
+        payload.followUpDate = parsed.data.followUpDate ? new Date(parsed.data.followUpDate) : null;
+      }
+      const updated = await storage.updateDemoRequest(req.params.id, payload as Parameters<typeof storage.updateDemoRequest>[1]);
       if (!updated) return res.status(404).json({ message: "Demo request not found" });
+      res.json(updated);
+    } catch (error) { next(error); }
+  });
+
+  app.post("/api/admin/demo-requests/:id/retry-hubspot", requireAdmin, async (req, res, next) => {
+    try {
+      const lead = await storage.getDemoRequest(req.params.id);
+      if (!lead) return res.status(404).json({ message: "Demo request not found" });
+      const { syncDemoRequestToHubSpot } = await import("./hubspot");
+      const syncResult = await syncDemoRequestToHubSpot(lead);
+      const updated = await storage.updateDemoRequest(lead.id, {
+        hubspotSyncStatus: syncResult.status,
+        hubspotContactId: syncResult.contactId ?? lead.hubspotContactId,
+        hubspotCompanyId: syncResult.companyId ?? lead.hubspotCompanyId,
+        hubspotDealId: syncResult.dealId ?? lead.hubspotDealId,
+        hubspotLastSyncedAt: syncResult.status === "synced" ? new Date() : lead.hubspotLastSyncedAt,
+        hubspotSyncError: syncResult.status === "failed" ? (syncResult.error ?? null) : null,
+      });
       res.json(updated);
     } catch (error) { next(error); }
   });

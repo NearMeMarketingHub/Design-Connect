@@ -33,6 +33,7 @@ interface CreateCompanyDialogProps {
   onOpenChange: (open: boolean) => void;
   prefill?: { companyName?: string; ownerName?: string; ownerEmail?: string } | null;
   leadId?: string | null;
+  onCompanyCreated?: (companyId: string) => void;
 }
 
 const todayIso = () => format(new Date(), "yyyy-MM-dd");
@@ -74,7 +75,7 @@ function buildPayload(f: typeof EMPTY_FORM) {
   };
 }
 
-export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: CreateCompanyDialogProps) {
+export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCompanyCreated }: CreateCompanyDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY_FORM);
@@ -115,7 +116,7 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: Cre
   const createCompanyMutation = useMutation({
     mutationFn: (data: typeof form) =>
       apiRequest("POST", "/api/admin/companies", buildPayload(data)).then((r) => r.json()),
-    onSuccess: async () => {
+    onSuccess: async (company: { id: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/companies"] });
       handleClose();
       toast({
@@ -126,6 +127,7 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: Cre
         try {
           await apiRequest("PATCH", `/api/admin/demo-requests/${leadId}`, {
             status: "converted",
+            convertedCompanyId: company.id,
           });
           queryClient.invalidateQueries({ queryKey: ["/api/admin/demo-requests"] });
         } catch {
@@ -137,6 +139,7 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId }: Cre
           });
         }
       }
+      if (onCompanyCreated) onCompanyCreated(company.id);
     },
     onError: (err: Error) =>
       toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" }),
