@@ -16,6 +16,11 @@ import type { DemoRequest } from "@shared/schema";
 
 const MAX_ERROR_LENGTH = 500;
 
+export function trimError(raw: string): string {
+  if (raw.length <= MAX_ERROR_LENGTH) return raw;
+  return raw.slice(0, MAX_ERROR_LENGTH - 1) + "…"; // always ≤ 500 chars
+}
+
 export interface HubspotSyncResult {
   status: "not_configured" | "synced" | "failed";
   contactId?: string;
@@ -199,7 +204,6 @@ export async function syncDemoRequestToHubSpot(req: DemoRequest): Promise<Hubspo
     return { status: "synced", contactId, companyId: companyId ?? undefined, dealId };
   } catch (err: unknown) {
     const raw = err instanceof Error ? err.message : String(err);
-    const message = raw.length > MAX_ERROR_LENGTH ? raw.slice(0, MAX_ERROR_LENGTH) + "…" : raw;
-    return { status: "failed", error: message };
+    return { status: "failed", error: trimError(raw) };
   }
 }

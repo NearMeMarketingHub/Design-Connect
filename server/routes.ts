@@ -1138,18 +1138,19 @@ export async function registerRoutes(
     try {
       const lead = await storage.getDemoRequest(req.params.id);
       if (!lead) return res.status(404).json({ message: "Demo request not found" });
-      const { syncDemoRequestToHubSpot } = await import("./hubspot");
+      const { syncDemoRequestToHubSpot, trimError } = await import("./hubspot");
       const syncResult = await syncDemoRequestToHubSpot(lead);
+      // Explicitly trim here as well — defence-in-depth against oversized error strings
+      const syncError = syncResult.status === "failed" && syncResult.error
+        ? trimError(syncResult.error)
+        : null;
       const updated = await storage.updateDemoRequest(lead.id, {
         hubspotSyncStatus: syncResult.status,
         hubspotContactId: syncResult.contactId ?? lead.hubspotContactId,
         hubspotCompanyId: syncResult.companyId ?? lead.hubspotCompanyId,
         hubspotDealId: syncResult.dealId ?? lead.hubspotDealId,
         hubspotLastSyncedAt: syncResult.status === "synced" ? new Date() : lead.hubspotLastSyncedAt,
-        // Trim to 500 chars to guard against oversized SDK error payloads
-        hubspotSyncError: syncResult.status === "failed"
-          ? (syncResult.error ?? null)
-          : null,
+        hubspotSyncError: syncError,
       });
       res.json(updated);
     } catch (error) { next(error); }
