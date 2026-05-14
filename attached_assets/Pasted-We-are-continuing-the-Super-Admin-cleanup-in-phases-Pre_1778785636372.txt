@@ -1,0 +1,263 @@
+We are continuing the Super Admin cleanup in phases.
+
+Previous phases completed:
+- Super Admin sidebar navigation was created.
+- Companies and Company Detail pages were added.
+- Users & Approvals was cleaned up.
+- Subscription tiers were fully removed.
+- The app now uses one-price/manual billing with company-level Billing & Access settings.
+- Public company self-registration is removed.
+- Companies now request a demo and are created by Super Admins.
+- Demo requests currently save in the app, send an email notification, appear in Super Admin, and can be converted into companies.
+
+For this phase, focus on Demo Requests and HubSpot integration.
+
+Important integration rule:
+HubSpot integration should ONLY apply to contacts, companies, deals, and notes created/updated from BuildVision demo requests.
+
+Do NOT:
+- import all HubSpot contacts
+- import all HubSpot companies
+- sync all BuildVision users to HubSpot
+- sync all BuildVision companies to HubSpot
+- sync clients, project users, invites, contractors, or company team members to HubSpot
+- create HubSpot records from anything except the Request Demo flow
+
+HubSpot should only be used for the sales/demo lead workflow.
+
+Do not change BuildVision branding.
+
+Goal:
+When someone submits the Request Demo form, BuildVision should save the demo request internally and, if HubSpot is configured, create/update the matching HubSpot Contact, Company, and Deal for that specific demo request only.
+
+1. Improve Demo Requests data model if needed.
+
+Each demo request should support:
+- fullName or name
+- companyName or company
+- email
+- phone
+- message / businessNeeds
+- status
+  - new
+  - contacted
+  - demo_scheduled
+  - converted
+  - closed
+- submittedAt / createdAt
+- updatedAt
+- convertedCompanyId, nullable
+- internalNotes, nullable
+- followUpDate, nullable
+
+Add HubSpot-specific fields:
+- hubspotSyncStatus
+  - not_configured
+  - pending
+  - synced
+  - failed
+- hubspotContactId, nullable
+- hubspotCompanyId, nullable
+- hubspotDealId, nullable
+- hubspotLastSyncedAt, nullable
+- hubspotSyncError, nullable
+
+If some of these fields already exist, reuse them.
+
+2. Update the public Request Demo flow.
+
+The public demo form should continue submitting to the existing endpoint.
+
+On submit:
+- Always save the demo request in BuildVision first.
+- Continue sending the internal notification email if that already works.
+- If HubSpot is configured, attempt to sync only this demo request to HubSpot.
+- If HubSpot sync fails, do not fail the public request.
+- Show the public user a simple success message either way:
+  “Thanks — your demo request has been sent. Our team will reach out soon.”
+
+Do not expose technical HubSpot errors to the public user.
+
+3. HubSpot configuration.
+
+Add server-side environment variable support for:
+- HUBSPOT_ACCESS_TOKEN
+
+If HUBSPOT_ACCESS_TOKEN is not configured:
+- demo requests should still save normally
+- email notification should still work
+- Super Admin should show HubSpot status as “Not Configured”
+- no HubSpot calls should be attempted
+
+4. HubSpot sync behavior.
+
+When a demo request is submitted and HubSpot is configured, sync only that demo request.
+
+For that demo request:
+- create or update a HubSpot Contact using the submitted email
+- create or update a HubSpot Company using the submitted company name
+- create a HubSpot Deal for the demo request
+- associate Contact, Company, and Deal where practical
+- add the submitted message/business needs as a HubSpot Note where practical
+
+Important:
+This sync should be scoped only to the current demo request.
+
+If an existing HubSpot contact with the same email already exists:
+- use that contact instead of creating a duplicate
+- update only relevant demo-request lead fields
+- do not import unrelated HubSpot data into BuildVision
+- do not create a BuildVision user from the HubSpot contact
+
+If an existing HubSpot company with the same company name/domain exists:
+- use that company instead of creating a duplicate where practical
+- update only relevant demo-request lead fields
+- do not import unrelated HubSpot data into BuildVision
+- do not create a BuildVision company automatically from HubSpot
+
+BuildVision company accounts should still only be created when a Super Admin clicks Convert to Company.
+
+5. Add source tracking.
+
+When creating/updating HubSpot records from demo requests, include some kind of source marker if practical, such as:
+- BuildVision Demo Request
+- demo request ID
+- submitted date
+- source = buildvision_demo_request
+
+This can be done through notes, properties, or metadata depending on what is easiest and safe.
+
+This makes it clear in HubSpot that the record came from the BuildVision Request Demo form.
+
+6. Avoid duplicate HubSpot records.
+
+When syncing:
+- search/upsert contacts by email
+- search/upsert companies by company name or domain if available
+- do not blindly create duplicate contacts or companies every time the sync runs
+- retry sync should not create duplicate deals unless there is no existing hubspotDealId for that demo request
+
+7. Super Admin Demo Requests page.
+
+Improve /admin/demo-requests into a better lead-management page.
+
+Add filters:
+- Status
+- HubSpot Sync Status
+- Search by name, company, email
+- Follow-up date if easy
+
+Table columns:
+- Name
+- Company
+- Email
+- Phone
+- Status
+- HubSpot Sync
+- Submitted Date
+- Follow-Up Date
+- Actions
+
+Actions:
+- View Details
+- Update Status
+- Add/Edit Internal Notes
+- Set Follow-Up Date
+- Convert to Company
+- Retry HubSpot Sync
+- Open in HubSpot, if synced
+
+8. Demo Request detail drawer/modal/page.
+
+Add a detail view for each demo request.
+
+Show:
+- full name
+- company name
+- email
+- phone
+- message/business needs
+- status
+- submitted date
+- internal notes
+- follow-up date
+- converted company link if converted
+- HubSpot sync status
+- HubSpot contact/company/deal IDs or links if available
+- HubSpot sync error if failed, visible only to Super Admin
+
+Actions:
+- update status
+- save internal notes
+- set follow-up date
+- retry HubSpot sync
+- convert to company
+- open HubSpot records if available
+
+9. Convert to Company flow.
+
+When Super Admin clicks Convert to Company:
+- open the existing Create Company dialog
+- prefill company name from the demo request
+- prefill owner name from demo request name
+- prefill owner email from demo request email
+- optionally prefill phone if supported
+- do not create the company automatically without Super Admin confirmation
+
+After company creation succeeds:
+- mark the demo request status as converted
+- set convertedCompanyId to the new company ID
+- show a link to the new Company Detail page
+
+Important:
+Converting a demo request into a BuildVision company should not trigger a broad HubSpot sync.
+It may update the HubSpot Deal status/stage for that specific demo request if a hubspotDealId exists, but it should not sync unrelated BuildVision companies/users to HubSpot.
+
+10. Retry HubSpot Sync.
+
+Add a Super Admin-only action to retry HubSpot sync for a demo request.
+
+Retry should:
+- only sync that one demo request
+- use existing hubspotContactId / hubspotCompanyId / hubspotDealId if present
+- avoid creating duplicates
+- update hubspotSyncStatus and hubspotSyncError appropriately
+
+11. HubSpot error handling.
+
+If HubSpot sync fails:
+- keep the demo request saved in BuildVision
+- set hubspotSyncStatus = failed
+- store a readable internal error in hubspotSyncError
+- allow Super Admin to retry
+- do not show technical errors to the public user
+
+12. Permissions/security.
+
+Only Super Admins can:
+- view demo requests
+- update demo request status
+- edit internal notes
+- set follow-up dates
+- convert demo requests to companies
+- retry HubSpot sync
+- see HubSpot metadata/errors
+
+Public users can only submit a demo request.
+
+13. Keep HubSpot integration scoped.
+
+Do not add any background job or bulk process that syncs:
+- existing BuildVision companies
+- existing BuildVision users
+- clients
+- contractors
+- project members
+- invites
+- projects
+
+Only demo requests should create/update HubSpot records.
+
+14. Keep this phase focused.
+
+Do not redesign Companies, Users, Invites, Projects, Pricing & Access, Audit Log, View As User, or Admin Tools except where needed to support converting a demo request into a company or linking from a converted demo request to the new company.
