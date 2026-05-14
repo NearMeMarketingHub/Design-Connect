@@ -1,0 +1,202 @@
+We are continuing the Super Admin cleanup in phases.
+
+Previous phases completed:
+- Super Admin sidebar/navigation was built.
+- Companies and Company Detail pages were added.
+- Users & Approvals was cleaned up.
+- Subscription tiers were fully removed.
+- The app now uses one-price/manual billing with company-level Billing & Access settings.
+- Public registration is disabled.
+- Company accounts are created by Super Admins.
+- Client account creation happens through project invite links.
+- Demo Requests and HubSpot integration were added.
+- HubSpot sync is scoped only to demo requests.
+
+For this phase, focus on cleaning up and strengthening the invite system.
+
+Goal:
+Since BuildVision is now invite-only, the Invites area needs to become a reliable Super Admin support and visibility tool. Super Admins should be able to see invite status, filter invites, troubleshoot access issues, resend invites, revoke invites, and verify that accepted invites correctly attach users to projects.
+
+Do not change BuildVision branding.
+
+1. Improve the Super Admin Invites page at /admin/invites.
+
+The page should clearly show all project/client invites across the platform.
+
+Add or confirm filters for:
+- Status
+  - All
+  - Pending
+  - Accepted
+  - Expired
+  - Revoked
+- Company
+  - All Companies
+  - each company
+- Project
+  - All Projects
+  - projects, ideally filtered by selected company
+- Search
+  - invited email
+  - client name, if available
+  - company name
+  - project name
+- Date range if easy
+
+2. Improve the Invites table.
+
+Use columns like:
+- Invited Email
+- Invite Type
+- Company
+- Project
+- Status
+- Sent At
+- Accepted At
+- Expires At
+- Actions
+
+Invite Type can be:
+- Client Project Invite
+- Company Team Invite, if still used
+- Legacy/Other, if applicable
+
+If the app only currently supports client project invites, focus on those first.
+
+3. Make invite statuses accurate and consistent.
+
+Statuses should behave like this:
+- Pending: invite has not been accepted and has not expired/revoked
+- Accepted: invite was accepted and the user/project association was created
+- Expired: invite is past its expiration date and cannot be accepted
+- Revoked: invite was manually cancelled by an authorized user and cannot be accepted
+
+If the current code calculates expiration only in the UI, move/confirm the backend also enforces expiration.
+
+A revoked or expired invite should not be usable to create an account or attach a project.
+
+4. Add Resend Invite.
+
+For pending or expired invites, Super Admins should be able to resend an invite.
+
+Resend behavior:
+- Generate a fresh token if needed
+- Refresh the expiration date
+- Send the invite email again
+- Update sent/resend metadata if fields exist, such as lastSentAt or resentAt
+- Keep the invite tied to the same invited email, company, and project
+- Do not create duplicate project access records
+
+If the invite was already accepted, do not allow resend.
+
+5. Add Revoke Invite.
+
+For pending invites, Super Admins should be able to revoke/cancel the invite.
+
+Revoke behavior:
+- Mark invite status as revoked
+- Prevent the invite token from being used
+- Do not delete the invite record
+- Do not remove access from users who already accepted the invite
+- If invite is already accepted, show that it cannot be revoked because access already exists
+
+6. Add Invite Detail view.
+
+Add a drawer, modal, or detail page for each invite.
+
+Show:
+- Invited email
+- Invite type
+- Company
+- Project
+- Status
+- Sent at
+- Accepted at
+- Expires at
+- Revoked at, if applicable
+- Accepted user, if applicable
+- Created by / invited by, if available
+- Related project link
+- Related company link
+- Any error/debug info useful for Super Admin support
+
+Actions:
+- Resend invite
+- Revoke invite
+- View company
+- View project
+- View accepted user, if accepted
+
+7. Strengthen invite acceptance behavior.
+
+Review the invite acceptance flow at /invite/:token and backend routes for accepting invites.
+
+Confirm:
+- Invite token must exist
+- Invite must not be expired
+- Invite must not be revoked
+- Invite must not already be accepted unless showing a helpful already-accepted message
+- Invited email is locked for new account creation
+- Existing account login only works if the logged-in user’s email matches the invite email
+- If email does not match, do not attach the project
+- After successful acceptance, the user is attached to the correct project
+- Invite is marked accepted
+- acceptedAt and acceptedUserId are saved if fields exist
+
+8. Prevent duplicate access.
+
+When an invite is accepted:
+- Check whether the user already has access to that project
+- If they already have access, do not create duplicate project/client records
+- Mark the invite accepted or show a clean “You already have access to this project” message
+- Redirect to the client dashboard/project as appropriate
+
+9. Improve company/project-level invite visibility.
+
+Make sure invite data appears correctly in:
+- /admin/invites
+- /admin/companies/:companyId Invites tab
+- Project-level invite/status area, if one exists on the company owner side
+
+The same invite should show consistent status everywhere.
+
+10. Add backend authorization checks.
+
+Only authorized users should be able to create/view/manage invites.
+
+Super Admins:
+- can view all invites
+- can resend/revoke all invites
+
+Company owners / authorized company users:
+- can view/send/resend/revoke invites only for their own company’s projects
+
+Clients:
+- cannot view invite management endpoints
+- can only accept a valid invite intended for their email
+
+Unrelated users should not be able to view or manipulate invites by guessing IDs.
+
+11. Add useful empty states.
+
+If there are no invites, show a clean message like:
+“No invites found.”
+
+If filters return no results:
+“No invites match your filters.”
+
+12. Optional but useful: add resend count or last resent date.
+
+If easy, track:
+- resendCount
+- lastResentAt
+
+This helps Super Admins troubleshoot when someone says they never received an invite.
+
+13. Keep this phase focused.
+
+Do not redesign Companies, Users, Demo Requests, Projects, Pricing & Access, Audit Log, View As User, or Admin Tools except where needed to link to invite details or keep invite status consistent.
+
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not add HubSpot sync outside of demo requests.
