@@ -15,7 +15,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pkg from "pg";
 const { Pool } = pkg;
-import type { User, InsertUser, InsertCompany, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions, ContractorInvite, ProjectInvite } from "@shared/schema";
+import type { User, InsertUser, Company, InsertCompany, Project, InsertProject, InsertEstimate, InsertEstimateLineItem, InsertInvoice, InsertInvoiceLineItem, InsertRecurringBilling, InsertProjectPhase, InsertActionItem, InsertInspirationImage, InsertMessage, ExternalMemberPermissions, ContractorInvite, ProjectInvite } from "@shared/schema";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
@@ -1157,74 +1157,157 @@ export async function registerRoutes(
   });
 
   // ── Admin: Global invite listing ──────────────────────────────────────────────
+  // ── Helper: compute effective invite status (pending past expiresAt → "expired") ─
+  function effectiveStatus(status: string, expiresAt: Date | string): string {
+    if (status === "pending" && new Date() > new Date(expiresAt)) return "expired";
+    return status;
+  }
+
+  // ── Helper: build the full enriched invite shape for admin UI ─────────────────
+  function enrichProjectInvite(
+    inv: ProjectInvite,
+    projectMap: Map<string, Project>,
+    companyMap: Map<string, Company>,
+    userMap: Map<string, User>
+  ) {
+    const project = inv.projectId ? projectMap.get(inv.projectId) : null;
+    const invitedByUser = inv.invitedBy ? userMap.get(inv.invitedBy) : null;
+    const companyFromUser = invitedByUser?.companyId ? companyMap.get(invitedByUser.companyId) : null;
+    const acceptedUser = inv.invitedUserId ? userMap.get(inv.invitedUserId) : null;
+    return {
+      id: inv.id,
+      inviteType: "client",
+      email: inv.email,
+      clientName: inv.clientName ?? null,
+      status: effectiveStatus(inv.status, inv.expiresAt),
+      projectId: inv.projectId ?? null,
+      projectName: project?.name ?? null,
+      companyId: companyFromUser?.id ?? null,
+      companyName: companyFromUser?.name ?? null,
+      invitedByName: invitedByUser ? (invitedByUser.name || invitedByUser.username) : null,
+      acceptedUserId: inv.invitedUserId ?? null,
+      acceptedUserName: acceptedUser ? (acceptedUser.name || acceptedUser.username) : null,
+      sentAt: inv.createdAt,
+      acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
+      revokedAt: (inv as any).revokedAt ? new Date((inv as any).revokedAt).toISOString() : null,
+      expiresAt: inv.expiresAt,
+      resendCount: (inv as any).resendCount ?? 0,
+      lastResentAt: (inv as any).lastResentAt ? new Date((inv as any).lastResentAt).toISOString() : null,
+    };
+  }
+
+  function enrichContractorInvite(
+    inv: ContractorInvite,
+    projectMap: Map<string, Project>,
+    companyMap: Map<string, Company>,
+    userMap: Map<string, User>
+  ) {
+    const project = inv.projectId ? projectMap.get(inv.projectId) : null;
+    const company = inv.companyId ? companyMap.get(inv.companyId) : null;
+    const invitedByUser = inv.invitedBy ? userMap.get(inv.invitedBy) : null;
+    const acceptedUser = inv.acceptedUserId ? userMap.get(inv.acceptedUserId) : null;
+    const typeLabel = inv.contractorType || "contractor";
+    return {
+      id: inv.id,
+      inviteType: typeLabel,
+      email: inv.email,
+      clientName: null,
+      status: effectiveStatus(inv.status, inv.expiresAt),
+      projectId: inv.projectId ?? null,
+      projectName: project?.name ?? null,
+      companyId: company?.id ?? inv.companyId ?? null,
+      companyName: company?.name ?? (inv.companyName ?? null),
+      invitedByName: invitedByUser ? (invitedByUser.name || invitedByUser.username) : null,
+      acceptedUserId: inv.acceptedUserId ?? null,
+      acceptedUserName: acceptedUser ? (acceptedUser.name || acceptedUser.username) : null,
+      sentAt: inv.createdAt,
+      acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
+      revokedAt: (inv as any).revokedAt ? new Date((inv as any).revokedAt).toISOString() : null,
+      expiresAt: inv.expiresAt,
+      resendCount: (inv as any).resendCount ?? 0,
+      lastResentAt: (inv as any).lastResentAt ? new Date((inv as any).lastResentAt).toISOString() : null,
+    };
+  }
+
   app.get("/api/admin/invites", requireAdmin, async (req, res, next) => {
     try {
-      // Fetch all invites and lookup data in parallel — no per-project iteration
       const [allProjectInvites, allContractorInvites, allProjects, allCompanies, allUsers] = await Promise.all([
-        storage.getAllProjectInvites() as Promise<import("@shared/schema").ProjectInvite[]>,
-        storage.getAllContractorInvites() as Promise<import("@shared/schema").ContractorInvite[]>,
-        storage.getProjects() as Promise<import("@shared/schema").Project[]>,
-        storage.getAllCompanies() as Promise<import("@shared/schema").Company[]>,
-        storage.getAllUsers() as Promise<import("@shared/schema").User[]>,
+        storage.getAllProjectInvites() as Promise<ProjectInvite[]>,
+        storage.getAllContractorInvites() as Promise<ContractorInvite[]>,
+        storage.getProjects() as Promise<Project[]>,
+        storage.getAllCompanies() as Promise<Company[]>,
+        storage.getAllUsers() as Promise<User[]>,
       ]);
 
       const projectMap = new Map(allProjects.map(p => [p.id, p]));
       const companyMap = new Map(allCompanies.map(c => [c.id, c]));
       const userMap = new Map(allUsers.map(u => [u.id, u]));
 
-      const projectInvites = allProjectInvites.map(inv => {
-        const project = inv.projectId ? projectMap.get(inv.projectId) : null;
-        const invitedByUser = inv.invitedBy ? userMap.get(inv.invitedBy) : null;
-        const companyFromUser = invitedByUser?.companyId ? companyMap.get(invitedByUser.companyId) : null;
-        return {
-          id: inv.id,
-          inviteType: "client",
-          email: inv.email,
-          status: inv.status,
-          projectId: inv.projectId,
-          projectName: project?.name ?? null,
-          companyName: companyFromUser?.name ?? null,
-          sentAt: inv.createdAt,
-          acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
-          expiresAt: inv.expiresAt,
-        };
-      });
-
-      const contractorInvites = allContractorInvites.map(inv => {
-        const project = inv.projectId ? projectMap.get(inv.projectId) : null;
-        const company = inv.companyId ? companyMap.get(inv.companyId) : null;
-        return {
-          id: inv.id,
-          inviteType: inv.contractorType || "contractor",
-          email: inv.email,
-          status: inv.status,
-          projectId: inv.projectId,
-          projectName: project?.name ?? null,
-          companyName: company?.name ?? (inv.companyName ?? null),
-          sentAt: inv.createdAt,
-          acceptedAt: inv.acceptedAt ? inv.acceptedAt.toISOString() : null,
-          expiresAt: inv.expiresAt,
-        };
-      });
-
-      const allInvites = [...projectInvites, ...contractorInvites]
-        .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+      const allInvites = [
+        ...allProjectInvites.map(inv => enrichProjectInvite(inv, projectMap, companyMap, userMap)),
+        ...allContractorInvites.map(inv => enrichContractorInvite(inv, projectMap, companyMap, userMap)),
+      ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
       res.json(allInvites);
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/admin/invites/:id", requireAdmin, async (req, res, next) => {
+    try {
+      const [allProjects, allCompanies, allUsers] = await Promise.all([
+        storage.getProjects() as Promise<Project[]>,
+        storage.getAllCompanies() as Promise<Company[]>,
+        storage.getAllUsers() as Promise<User[]>,
+      ]);
+      const projectMap = new Map(allProjects.map(p => [p.id, p]));
+      const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+      const userMap = new Map(allUsers.map(u => [u.id, u]));
+
+      const projectInvite = await storage.getProjectInviteById(req.params.id);
+      if (projectInvite) {
+        return res.json(enrichProjectInvite(projectInvite, projectMap, companyMap, userMap));
+      }
+      const contractorInvite = await storage.getContractorInviteById(req.params.id);
+      if (contractorInvite) {
+        return res.json(enrichContractorInvite(contractorInvite, projectMap, companyMap, userMap));
+      }
+      return res.status(404).json({ message: "Invite not found" });
     } catch (error) { next(error); }
   });
 
   app.post("/api/admin/invites/:id/revoke", requireAdmin, async (req, res, next) => {
     try {
       const { type } = req.body as { type?: string };
-      let updated: ContractorInvite | ProjectInvite | undefined;
-      if (type === "contractor" || type === "subcontractor" || type === "notary") {
-        updated = await storage.updateContractorInvite(req.params.id, { status: "revoked" });
+      const isContractorType = type === "contractor" || type === "subcontractor" || type === "notary";
+      const now = new Date();
+
+      let existing: ContractorInvite | ProjectInvite | undefined;
+      let kind: "project" | "contractor" = "project";
+
+      if (isContractorType) {
+        existing = await storage.getContractorInviteById(req.params.id);
+        kind = "contractor";
       } else {
-        updated = await storage.updateProjectInvite(req.params.id, { status: "revoked" });
-        if (!updated) {
-          updated = await storage.updateContractorInvite(req.params.id, { status: "revoked" });
+        existing = await storage.getProjectInviteById(req.params.id);
+        if (!existing) {
+          existing = await storage.getContractorInviteById(req.params.id);
+          kind = "contractor";
         }
+      }
+
+      if (!existing) return res.status(404).json({ message: "Invite not found" });
+      if (existing.status === "accepted") {
+        return res.status(400).json({ message: "Cannot revoke an accepted invite — the user already has access." });
+      }
+      if (existing.status === "revoked") {
+        return res.status(400).json({ message: "This invite has already been revoked." });
+      }
+
+      let updated: ContractorInvite | ProjectInvite | undefined;
+      if (kind === "contractor") {
+        updated = await storage.updateContractorInvite(req.params.id, { status: "revoked", revokedAt: now } as any);
+      } else {
+        updated = await storage.updateProjectInvite(req.params.id, { status: "revoked", revokedAt: now } as any);
       }
       if (!updated) return res.status(404).json({ message: "Invite not found" });
       res.json(updated);
@@ -1251,9 +1334,18 @@ export async function registerRoutes(
       }
 
       if (!invite) return res.status(404).json({ message: "Invite not found" });
-      if (invite.status !== "pending") {
-        return res.status(400).json({ message: `Cannot resend a ${invite.status} invite` });
+      if (invite.status === "accepted") {
+        return res.status(400).json({ message: "Cannot resend an accepted invite — the user already has access." });
       }
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "Cannot resend a revoked invite." });
+      }
+
+      // Generate a fresh token and extend expiry by 7 days
+      const newToken = require("crypto").randomBytes(32).toString("hex");
+      const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const now = new Date();
+      const currentResendCount = (invite as any).resendCount ?? 0;
 
       const baseUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -1263,17 +1355,34 @@ export async function registerRoutes(
 
       if (inviteKind === "project") {
         const projectInvite = invite as ProjectInvite;
+        // Persist fresh token + expiry + resend metadata
+        await storage.updateProjectInvite(req.params.id, {
+          token: newToken,
+          status: "pending",
+          expiresAt: newExpiresAt,
+          resendCount: currentResendCount + 1,
+          lastResentAt: now,
+        } as any);
         const project = projectInvite.projectId ? await storage.getProject(projectInvite.projectId) : null;
+        const existingUser = await storage.getUserByEmail(projectInvite.email);
         const { sendProjectInviteEmail } = await import("./email");
         await sendProjectInviteEmail(projectInvite.email, {
           projectName: project?.name ?? "Your Project",
           contractorName: "BuildVision",
-          inviteToken: projectInvite.token,
+          inviteToken: newToken,
           clientName: projectInvite.clientName ?? undefined,
-          isExistingUser: !!projectInvite.invitedUserId,
+          isExistingUser: !!existingUser,
         });
       } else {
         const contractorInvite = invite as ContractorInvite;
+        // Persist fresh token + expiry + resend metadata
+        await storage.updateContractorInvite(req.params.id, {
+          token: newToken,
+          status: "pending",
+          expiresAt: newExpiresAt,
+          resendCount: currentResendCount + 1,
+          lastResentAt: now,
+        } as any);
         const project = contractorInvite.projectId ? await storage.getProject(contractorInvite.projectId) : null;
         const role: "subcontractor" | "notary" = contractorInvite.contractorType === "notary" ? "notary" : "subcontractor";
         const { sendExternalInviteEmail } = await import("./email");
@@ -1286,7 +1395,7 @@ export async function registerRoutes(
         });
       }
 
-      res.json({ success: true, email: invite.email });
+      res.json({ success: true, email: invite.email, newToken });
     } catch (error) { next(error); }
   });
 
@@ -4293,8 +4402,14 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This invitation has expired" });
       }
 
+      if (invite.status === "revoked") {
+        return res.status(400).json({ message: "This invitation has been cancelled. Please contact your project manager for a new invite." });
+      }
+      if (invite.status === "accepted") {
+        return res.status(400).json({ message: "This invitation has already been accepted." });
+      }
       if (invite.status !== "pending") {
-        return res.status(400).json({ message: "This invitation has already been used" });
+        return res.status(400).json({ message: "This invitation is no longer valid." });
       }
 
       // Get project info

@@ -396,7 +396,10 @@ export const projectInvites = pgTable("project_invites", {
   invitedBy: varchar("invited_by").references(() => users.id),
   invitedUserId: varchar("invited_user_id").references(() => users.id),
   acceptedAt: timestamp("accepted_at"),
+  revokedAt: timestamp("revoked_at"),
   expiresAt: timestamp("expires_at").notNull(),
+  resendCount: integer("resend_count").notNull().default(0),
+  lastResentAt: timestamp("last_resent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -484,7 +487,10 @@ export const contractorInvites = pgTable("contractor_invites", {
   invitedBy: varchar("invited_by").references(() => users.id),
   acceptedUserId: varchar("accepted_user_id").references(() => users.id), // Set when invite is accepted
   acceptedAt: timestamp("accepted_at"),
+  revokedAt: timestamp("revoked_at"),
   expiresAt: timestamp("expires_at").notNull(),
+  resendCount: integer("resend_count").notNull().default(0),
+  lastResentAt: timestamp("last_resent_at"),
   permissions: jsonb("permissions"), // Per-project permissions to apply when invite is accepted
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
