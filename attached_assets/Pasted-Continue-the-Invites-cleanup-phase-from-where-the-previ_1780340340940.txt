@@ -1,0 +1,84 @@
+Continue the Invites cleanup phase from where the previous prompt cut off. Do not redo completed work unless needed to support the items below.
+
+9. Finish company/project-level invite visibility.
+
+Make sure invite data appears consistently in:
+
+* /admin/invites
+* /admin/companies/:companyId Invites tab
+* any project-level invite/status area on the company owner side, if one exists
+
+The same invite should show the same status everywhere:
+
+* Pending
+* Accepted
+* Expired
+* Revoked
+
+If an invite is accepted, revoked, resent, or expired, that updated status should be reflected across all related invite views.
+
+10. Add backend authorization checks for invite management.
+
+Only authorized users should be able to create, view, resend, or revoke invites.
+
+Super Admins:
+
+* can view all invites
+* can resend all invites
+* can revoke all pending invites
+
+Company owners / authorized company users:
+
+* can view invites only for their own company’s projects
+* can create invites only for their own company’s projects
+* can resend/revoke invites only for their own company’s projects
+
+Clients:
+
+* cannot view invite management endpoints
+* cannot resend/revoke invites
+* can only accept a valid invite intended for their email
+
+Unrelated logged-in users should not be able to view or manipulate invites by guessing invite IDs, project IDs, or company IDs.
+
+11. Add clean empty states.
+
+If there are no invites, show:
+“No invites found.”
+
+If filters return no results, show:
+“No invites match your filters.”
+
+These empty states should appear on /admin/invites and any relevant company/project invite views.
+
+12. Add resend tracking if practical.
+
+If the schema already supports it, or if it can be added cleanly, track:
+
+* resendCount
+* lastResentAt
+
+This helps Super Admins troubleshoot when someone says they never received an invite.
+
+If adding these fields would be too large for this pass, skip the schema change and keep the resend behavior working without tracking.
+
+13. Keep this phase focused.
+
+Do not redesign Companies, Users, Demo Requests, Projects, Pricing & Access, Audit Log, View As User, or Admin Tools except where needed to link to invite details or keep invite status consistent.
+
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not add HubSpot sync outside of demo requests.
+
+Final QA for this invite phase:
+
+* Pending invite can be resent
+* Pending invite can be revoked
+* Revoked invite cannot be accepted
+* Expired invite cannot be accepted
+* Accepted invite cannot be resent/revoked as if it were pending
+* Existing-account invite acceptance still checks that the logged-in email matches the invited email
+* New-account invite acceptance still locks the invited email
+* Accepted invite does not create duplicate project access
+* Super Admin can see all invites
+* Company owner can only manage invites for their own company’s projects
