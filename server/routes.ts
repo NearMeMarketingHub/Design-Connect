@@ -1001,7 +1001,8 @@ export async function registerRoutes(
       );
       const projectInvites = projectInviteArrays.flat();
 
-      const pendingInviteCount = [...contractorInvites, ...projectInvites].filter(i => i.status === "pending").length;
+      const allInvitesRaw = [...contractorInvites, ...projectInvites];
+      const pendingInviteCount = allInvitesRaw.filter(i => effectiveStatus(i.status, i.expiresAt) === "pending").length;
 
       const enrichedProjects = projects.map(p => {
         const client = p.clientId ? usersById.get(p.clientId) : undefined;
@@ -1030,10 +1031,13 @@ export async function registerRoutes(
           contractorType: inv.contractorType,
           projectId: inv.projectId,
           projectName: project?.name ?? null,
-          status: inv.status,
+          status: effectiveStatus(inv.status, inv.expiresAt),
           createdAt: inv.createdAt?.toISOString() ?? null,
           acceptedAt: inv.acceptedAt?.toISOString() ?? null,
           expiresAt: inv.expiresAt?.toISOString() ?? null,
+          revokedAt: inv.revokedAt?.toISOString() ?? null,
+          resendCount: inv.resendCount ?? 0,
+          lastResentAt: inv.lastResentAt?.toISOString() ?? null,
         };
       });
 
@@ -1046,10 +1050,13 @@ export async function registerRoutes(
           contractorType: null,
           projectId: inv.projectId,
           projectName: project?.name ?? null,
-          status: inv.status,
+          status: effectiveStatus(inv.status, inv.expiresAt),
           createdAt: inv.createdAt?.toISOString() ?? null,
           acceptedAt: inv.acceptedAt?.toISOString() ?? null,
           expiresAt: inv.expiresAt?.toISOString() ?? null,
+          revokedAt: inv.revokedAt?.toISOString() ?? null,
+          resendCount: inv.resendCount ?? 0,
+          lastResentAt: inv.lastResentAt?.toISOString() ?? null,
         };
       });
 
@@ -4385,7 +4392,10 @@ export async function registerRoutes(
       }
 
       const invites = await storage.getProjectInvitesByProjectId(req.params.projectId);
-      res.json(invites);
+      res.json(invites.map(inv => ({
+        ...inv,
+        status: effectiveStatus(inv.status, inv.expiresAt),
+      })));
     } catch (error) {
       next(error);
     }
@@ -5041,6 +5051,21 @@ export async function registerRoutes(
 
   app.get("/api/contractor-invites/project/:projectId", requireAuth, async (req, res, next) => {
     try {
+      const user = req.user as User;
+      const isAdmin = user.role === "admin";
+      if (!isAdmin) {
+        const project = await storage.getProject(req.params.projectId);
+        if (!project) return res.status(404).json({ message: "Project not found" });
+        let projectCompanyId: string | null = null;
+        if (project.contractorId) {
+          const projectContractor = await storage.getUser(project.contractorId);
+          projectCompanyId = projectContractor?.companyId ?? null;
+        }
+        const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
+        if (!isSameCompany) {
+          return res.status(403).json({ message: "You are not authorized to view invitations for this project." });
+        }
+      }
       const invites = await storage.getContractorInvitesByProject(req.params.projectId);
       res.json(invites);
     } catch (error) {

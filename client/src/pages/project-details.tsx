@@ -987,6 +987,9 @@ export default function ProjectDetails() {
     status: string;
     expiresAt: string;
     createdAt: string;
+    revokedAt: string | null;
+    resendCount: number;
+    lastResentAt: string | null;
   }>>({
     queryKey: ["/api/projects", projectId, "invites"],
     queryFn: async () => {
@@ -3255,9 +3258,11 @@ export default function ProjectDetails() {
                               const isExpiredByDate = new Date(invite.expiresAt) < new Date();
                               const computedStatus = invite.status === "accepted"
                                 ? "accepted"
-                                : (invite.status === "expired" || isExpiredByDate)
-                                  ? "expired"
-                                  : "pending";
+                                : invite.status === "revoked"
+                                  ? "revoked"
+                                  : (invite.status === "expired" || isExpiredByDate)
+                                    ? "expired"
+                                    : "pending";
                               return (
                                 <div key={invite.id} className="flex items-center justify-between gap-2 py-1" data-testid={`invite-row-${invite.id}`}>
                                   <div className="min-w-0">
@@ -3266,12 +3271,19 @@ export default function ProjectDetails() {
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
                                     <Badge
-                                      variant={computedStatus === "accepted" ? "default" : computedStatus === "expired" ? "destructive" : "secondary"}
+                                      variant={
+                                        computedStatus === "accepted" ? "default"
+                                        : computedStatus === "expired" || computedStatus === "revoked" ? "destructive"
+                                        : "secondary"
+                                      }
                                       data-testid={`badge-invite-status-${invite.id}`}
                                     >
-                                      {computedStatus === "accepted" ? "Accepted" : computedStatus === "expired" ? "Expired" : "Pending"}
+                                      {computedStatus === "accepted" ? "Accepted"
+                                        : computedStatus === "expired" ? "Expired"
+                                        : computedStatus === "revoked" ? "Revoked"
+                                        : "Pending"}
                                     </Badge>
-                                    {computedStatus === "expired" && (
+                                    {(computedStatus === "pending" || computedStatus === "expired") && (
                                       <Button
                                         variant="outline"
                                         size="sm"

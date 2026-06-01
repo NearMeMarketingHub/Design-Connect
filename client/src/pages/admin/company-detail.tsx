@@ -100,6 +100,9 @@ interface CompanyInvite {
   createdAt: string | null;
   acceptedAt: string | null;
   expiresAt: string | null;
+  revokedAt: string | null;
+  resendCount: number;
+  lastResentAt: string | null;
 }
 
 interface CompanyDetail {
@@ -769,31 +772,41 @@ export default function AdminCompanyDetail() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {inv.status === "pending" ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => resendInviteMutation.mutate({ id: inv.id, inviteKind: inv.inviteKind })}
-                                  disabled={resendInviteMutation.isPending}
-                                  data-testid={`button-resend-invite-${inv.id}`}
-                                  title="Resend invite email"
-                                >
-                                  <Mail className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => revokeInviteMutation.mutate({ id: inv.id, inviteKind: inv.inviteKind })}
-                                  disabled={revokeInviteMutation.isPending}
-                                  data-testid={`button-revoke-invite-${inv.id}`}
-                                  title="Revoke invite"
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Ban className="w-3.5 h-3.5" />
-                                </Button>
-                              </>
-                            ) : (
+                            {inv.resendCount > 0 && (
+                              <span
+                                className="text-xs text-muted-foreground mr-1"
+                                title={`Resent ${inv.resendCount} time${inv.resendCount !== 1 ? "s" : ""}`}
+                                data-testid={`badge-resend-count-${inv.id}`}
+                              >
+                                ×{inv.resendCount}
+                              </span>
+                            )}
+                            {(inv.status === "pending" || inv.status === "expired") && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => resendInviteMutation.mutate({ id: inv.id, inviteKind: inv.inviteKind })}
+                                disabled={resendInviteMutation.isPending}
+                                data-testid={`button-resend-invite-${inv.id}`}
+                                title="Resend invite email"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            {inv.status === "pending" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => revokeInviteMutation.mutate({ id: inv.id, inviteKind: inv.inviteKind })}
+                                disabled={revokeInviteMutation.isPending}
+                                data-testid={`button-revoke-invite-${inv.id}`}
+                                title="Revoke invite"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            {inv.status !== "pending" && inv.status !== "expired" && (
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
                           </div>
