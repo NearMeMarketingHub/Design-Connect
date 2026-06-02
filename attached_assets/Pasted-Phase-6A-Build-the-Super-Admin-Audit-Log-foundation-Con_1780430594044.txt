@@ -1,0 +1,125 @@
+Phase 6A: Build the Super Admin Audit Log foundation.
+
+Context:
+BuildVision now has a Super Admin area for managing companies, users, demo requests, invites, billing/access, and platform settings. We need an Audit Log so Super Admin actions are tracked for support, accountability, and troubleshooting.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce public account creation.
+Do not add HubSpot sync outside demo requests.
+
+Goal:
+Create a platform-wide Audit Log that records important Super Admin/admin actions and displays them at /admin/audit-log.
+
+1. Add an audit log data model.
+
+Create an audit log table/schema with fields like:
+
+* id
+* actorUserId
+* actorName
+* actorEmail
+* action
+* entityType
+* entityId
+* entityName
+* companyId, nullable
+* projectId, nullable
+* metadata/json details, nullable
+* ipAddress, nullable if available
+* userAgent, nullable if available
+* createdAt
+
+Action examples:
+
+* company_created
+* company_access_updated
+* company_suspended
+* company_reactivated
+* user_approved
+* user_disabled
+* user_reactivated
+* password_reset_sent
+* invite_resent
+* invite_revoked
+* demo_request_status_updated
+* demo_request_converted
+* hubspot_sync_retried
+* pricing_access_updated
+
+2. Add a reusable backend helper.
+
+Create a helper function like logAuditEvent() so routes can easily record audit events.
+
+The helper should:
+
+* accept actor user, action, entity type/id/name, optional company/project IDs, and metadata
+* not break the main action if audit logging fails
+* log errors server-side if an audit insert fails
+
+3. Start logging key existing actions.
+
+Add audit logging to these important Super Admin actions:
+
+* Create Company
+* Update company Billing & Access
+* Suspend company
+* Reactivate company
+* Send password reset
+* Approve user
+* Disable user
+* Reactivate user
+* Resend invite
+* Revoke invite
+* Update demo request status
+* Convert demo request to company
+* Retry HubSpot sync
+* Update Pricing & Access settings
+
+If some actions do not exist exactly by that name, log the closest current action.
+
+4. Build /admin/audit-log page.
+
+The page should use the existing Super Admin sidebar layout.
+
+Show a table with:
+
+* Date/Time
+* Actor
+* Action
+* Entity Type
+* Entity Name
+* Company
+* Details
+* Actions
+
+Add filters:
+
+* Search
+* Action
+* Entity Type
+* Company
+* Date range if easy
+
+Add a details drawer/modal for each audit event showing:
+
+* full timestamp
+* actor name/email
+* action
+* entity type/id/name
+* company/project if available
+* metadata/details formatted clearly
+* IP/user agent if available
+
+5. Add dashboard visibility.
+
+On /admin/dashboard, add a small “Recent Admin Activity” card showing the latest 5 audit log entries with a link to /admin/audit-log.
+
+6. Permissions.
+
+Only Super Admins can view audit logs.
+Company owners, clients, and regular users cannot access /admin/audit-log or audit log APIs.
+
+7. Keep this phase focused.
+
+Do not redesign Companies, Users, Invites, Demo Requests, Projects, Pricing & Access, View As User, or Admin Tools except where audit logging hooks are needed.
