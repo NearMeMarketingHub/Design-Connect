@@ -1179,7 +1179,12 @@ export async function registerRoutes(
   ) {
     const project = inv.projectId ? projectMap.get(inv.projectId) : null;
     const invitedByUser = inv.invitedBy ? userMap.get(inv.invitedBy) : null;
-    const companyFromUser = invitedByUser?.companyId ? companyMap.get(invitedByUser.companyId) : null;
+    // Derive company from the project's contractor chain — reliable even when a Super Admin sent the invite
+    const projectContractor = project?.contractorId ? userMap.get(project.contractorId) : null;
+    const companyFromProject = projectContractor?.companyId ? companyMap.get(projectContractor.companyId) : null;
+    // Fall back to the inviting user's company if the project chain yields nothing
+    const companyFromUser = !companyFromProject && invitedByUser?.companyId ? companyMap.get(invitedByUser.companyId) : null;
+    const resolvedCompany = companyFromProject ?? companyFromUser ?? null;
     const acceptedUser = inv.invitedUserId ? userMap.get(inv.invitedUserId) : null;
     return {
       id: inv.id,
@@ -1189,8 +1194,8 @@ export async function registerRoutes(
       status: effectiveStatus(inv.status, inv.expiresAt),
       projectId: inv.projectId ?? null,
       projectName: project?.name ?? null,
-      companyId: companyFromUser?.id ?? null,
-      companyName: companyFromUser?.name ?? null,
+      companyId: resolvedCompany?.id ?? null,
+      companyName: resolvedCompany?.name ?? null,
       invitedByName: invitedByUser ? (invitedByUser.name || invitedByUser.username) : null,
       acceptedUserId: inv.invitedUserId ?? null,
       acceptedUserName: acceptedUser ? (acceptedUser.name || acceptedUser.username) : null,
@@ -4399,6 +4404,107 @@ export async function registerRoutes(
     } catch (error) {
       next(error);
     }
+  });
+
+  // ── Resend a client/project invite (company-safe) ──────────────────────────
+  app.post("/api/projects/:projectId/invites/:inviteId/resend", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const isAdmin = user.role === "admin";
+      let projectCompanyId: string | null = null;
+      if (!isAdmin && project.contractorId) {
+        const projectContractor = await storage.getUser(project.contractorId);
+        projectCompanyId = projectContractor?.companyId ?? null;
+      }
+      const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
+      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "You are not authorized to manage invitations for this project." });
+      }
+
+      const invite = await storage.getProjectInviteById(req.params.inviteId);
+      if (!invite) return res.status(404).json({ message: "Invite not found" });
+      if (invite.projectId !== req.params.projectId) return res.status(404).json({ message: "Invite not found" });
+
+      const currentStatus = effectiveStatus(invite.status, invite.expiresAt);
+      if (currentStatus === "accepted") return res.status(400).json({ message: "Cannot resend an accepted invitation." });
+      if (currentStatus === "revoked") return res.status(400).json({ message: "Cannot resend a revoked invitation." });
+
+      const crypto = await import("crypto");
+      const newToken = crypto.randomBytes(32).toString("hex");
+      const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const now = new Date();
+
+      const updated = await storage.updateProjectInvite(req.params.inviteId, {
+        token: newToken,
+        status: "pending",
+        expiresAt: newExpiresAt,
+        resendCount: (invite.resendCount ?? 0) + 1,
+        lastResentAt: now,
+      });
+
+      const contractorUser = project.contractorId ? await storage.getUser(project.contractorId) : null;
+      const contractorName = (user.name || user.username) ?? (contractorUser?.name || contractorUser?.username) ?? "BuildVision";
+      const existingUser = await storage.getUserByEmail(invite.email);
+
+      try {
+        const { sendProjectInviteEmail } = await import("./email");
+        await sendProjectInviteEmail(invite.email, {
+          projectName: project.name,
+          contractorName,
+          inviteToken: newToken,
+          clientName: invite.clientName ?? undefined,
+          isExistingUser: !!existingUser,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send resend invite email (non-fatal):", emailErr);
+      }
+
+      res.json({ success: true, invite: updated });
+    } catch (error) { next(error); }
+  });
+
+  // ── Revoke a client/project invite (company-safe) ──────────────────────────
+  app.post("/api/projects/:projectId/invites/:inviteId/revoke", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const isAdmin = user.role === "admin";
+      let projectCompanyId: string | null = null;
+      if (!isAdmin && project.contractorId) {
+        const projectContractor = await storage.getUser(project.contractorId);
+        projectCompanyId = projectContractor?.companyId ?? null;
+      }
+      const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
+      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "You are not authorized to manage invitations for this project." });
+      }
+
+      const invite = await storage.getProjectInviteById(req.params.inviteId);
+      if (!invite) return res.status(404).json({ message: "Invite not found" });
+      if (invite.projectId !== req.params.projectId) return res.status(404).json({ message: "Invite not found" });
+
+      const currentStatus = effectiveStatus(invite.status, invite.expiresAt);
+      if (currentStatus !== "pending") {
+        const msg = currentStatus === "accepted" ? "Cannot revoke an accepted invitation."
+          : currentStatus === "revoked" ? "This invitation has already been revoked."
+          : "Only pending invitations can be revoked.";
+        return res.status(400).json({ message: msg });
+      }
+
+      const updated = await storage.updateProjectInvite(req.params.inviteId, {
+        status: "revoked",
+        revokedAt: new Date(),
+      });
+
+      res.json({ success: true, invite: updated });
+    } catch (error) { next(error); }
   });
 
   // Get invite by token (public - for accepting invites)

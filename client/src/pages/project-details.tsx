@@ -1026,6 +1026,52 @@ export default function ProjectDetails() {
     },
   });
 
+  // Resend an existing client invite (refreshes token, doesn't create a duplicate)
+  const resendProjectInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const res = await fetch(`/api/projects/${projectId}/invites/${inviteId}/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(err?.message || "Failed to resend invite");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchProjectInvites();
+      toast({ title: "Invitation resent", description: "A fresh invite email has been sent." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to resend", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Revoke a pending client invite
+  const revokeProjectInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const res = await fetch(`/api/projects/${projectId}/invites/${inviteId}/revoke`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(err?.message || "Failed to revoke invite");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchProjectInvites();
+      toast({ title: "Invitation revoked" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to revoke", description: err.message, variant: "destructive" });
+    },
+  });
+
   // Invite external sub/notary state
   const [inviteExternalOpen, setInviteExternalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -3264,37 +3310,57 @@ export default function ProjectDetails() {
                                     ? "expired"
                                     : "pending";
                               return (
-                                <div key={invite.id} className="flex items-center justify-between gap-2 py-1" data-testid={`invite-row-${invite.id}`}>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium truncate">{invite.clientName || invite.email}</p>
-                                    {invite.clientName && <p className="text-xs text-muted-foreground truncate">{invite.email}</p>}
-                                  </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <Badge
-                                      variant={
-                                        computedStatus === "accepted" ? "default"
-                                        : computedStatus === "expired" || computedStatus === "revoked" ? "destructive"
-                                        : "secondary"
-                                      }
-                                      data-testid={`badge-invite-status-${invite.id}`}
-                                    >
-                                      {computedStatus === "accepted" ? "Accepted"
-                                        : computedStatus === "expired" ? "Expired"
-                                        : computedStatus === "revoked" ? "Revoked"
-                                        : "Pending"}
-                                    </Badge>
-                                    {(computedStatus === "pending" || computedStatus === "expired") && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-7 px-2 text-xs"
-                                        disabled={sendClientInviteMutation.isPending}
-                                        onClick={() => sendClientInviteMutation.mutate({ email: invite.email, clientName: invite.clientName || undefined })}
-                                        data-testid={`button-resend-invite-${invite.id}`}
+                                <div key={invite.id} className="py-1.5" data-testid={`invite-row-${invite.id}`}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate">{invite.clientName || invite.email}</p>
+                                      {invite.clientName && <p className="text-xs text-muted-foreground truncate">{invite.email}</p>}
+                                      {invite.lastResentAt && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Resent {new Date(invite.lastResentAt).toLocaleDateString()}
+                                          {invite.resendCount > 0 && ` (×${invite.resendCount})`}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <Badge
+                                        variant={
+                                          computedStatus === "accepted" ? "default"
+                                          : computedStatus === "expired" || computedStatus === "revoked" ? "destructive"
+                                          : "secondary"
+                                        }
+                                        data-testid={`badge-invite-status-${invite.id}`}
                                       >
-                                        Resend
-                                      </Button>
-                                    )}
+                                        {computedStatus === "accepted" ? "Accepted"
+                                          : computedStatus === "expired" ? "Expired"
+                                          : computedStatus === "revoked" ? "Revoked"
+                                          : "Pending"}
+                                      </Badge>
+                                      {(computedStatus === "pending" || computedStatus === "expired") && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 px-2 text-xs"
+                                          disabled={resendProjectInviteMutation.isPending}
+                                          onClick={() => resendProjectInviteMutation.mutate(invite.id)}
+                                          data-testid={`button-resend-invite-${invite.id}`}
+                                        >
+                                          Resend
+                                        </Button>
+                                      )}
+                                      {computedStatus === "pending" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                                          disabled={revokeProjectInviteMutation.isPending}
+                                          onClick={() => revokeProjectInviteMutation.mutate(invite.id)}
+                                          data-testid={`button-revoke-invite-${invite.id}`}
+                                        >
+                                          Revoke
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               );
