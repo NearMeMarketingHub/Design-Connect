@@ -4420,7 +4420,7 @@ export async function registerRoutes(
         projectCompanyId = projectContractor?.companyId ?? null;
       }
       const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
-      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin === true));
       if (!isAuthorized) {
         return res.status(403).json({ message: "You are not authorized to manage invitations for this project." });
       }
@@ -4481,7 +4481,7 @@ export async function registerRoutes(
         projectCompanyId = projectContractor?.companyId ?? null;
       }
       const isSameCompany = !!(projectCompanyId && user.companyId && user.companyId === projectCompanyId);
-      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin || user.role === "contractor"));
+      const isAuthorized = isAdmin || (isSameCompany && (user.role === "company_owner" || user.isCompanyAdmin === true));
       if (!isAuthorized) {
         return res.status(403).json({ message: "You are not authorized to manage invitations for this project." });
       }
