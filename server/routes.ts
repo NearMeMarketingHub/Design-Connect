@@ -4614,6 +4614,16 @@ export async function registerRoutes(
       }
 
       res.json({ success: true, invite: updated });
+      if (isAdmin) {
+        logAuditEvent(req, user, {
+          action: "invite_resent",
+          entityType: "invite",
+          entityId: invite.id,
+          entityName: invite.email,
+          projectId: req.params.projectId,
+          metadata: { email: invite.email, projectName: project.name, inviteKind: "project" },
+        });
+      }
     } catch (error) { next(error); }
   });
 
@@ -4654,6 +4664,16 @@ export async function registerRoutes(
       });
 
       res.json({ success: true, invite: updated });
+      if (isAdmin) {
+        logAuditEvent(req, user, {
+          action: "invite_revoked",
+          entityType: "invite",
+          entityId: invite.id,
+          entityName: invite.email,
+          projectId: req.params.projectId,
+          metadata: { email: invite.email, projectName: project.name, inviteKind: "project" },
+        });
+      }
     } catch (error) { next(error); }
   });
 

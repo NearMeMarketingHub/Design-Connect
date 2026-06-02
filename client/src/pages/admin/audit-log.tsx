@@ -29,7 +29,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw } from "lucide-react";
+import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 interface AuditEvent {
@@ -150,6 +150,8 @@ export default function AdminAuditLog() {
   const [actionFilter, setActionFilter] = useState("all");
   const [entityTypeFilter, setEntityTypeFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const [page, setPage] = useState(0);
 
@@ -162,8 +164,14 @@ export default function AdminAuditLog() {
     if (actionFilter !== "all") p.action = actionFilter;
     if (entityTypeFilter !== "all") p.entityType = entityTypeFilter;
     if (companyFilter !== "all") p.companyId = companyFilter;
+    if (startDate) p.startDate = new Date(startDate).toISOString();
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      p.endDate = end.toISOString();
+    }
     return p;
-  }, [search, actionFilter, entityTypeFilter, companyFilter, page]);
+  }, [search, actionFilter, entityTypeFilter, companyFilter, startDate, endDate, page]);
 
   const queryString = useMemo(() => new URLSearchParams(params).toString(), [params]);
 
@@ -192,6 +200,10 @@ export default function AdminAuditLog() {
   const handleActionChange = (v: string) => { setActionFilter(v); setPage(0); };
   const handleEntityTypeChange = (v: string) => { setEntityTypeFilter(v); setPage(0); };
   const handleCompanyChange = (v: string) => { setCompanyFilter(v); setPage(0); };
+  const handleStartDateChange = (v: string) => { setStartDate(v); setPage(0); };
+  const handleEndDateChange = (v: string) => { setEndDate(v); setPage(0); };
+  const clearDateRange = () => { setStartDate(""); setEndDate(""); setPage(0); };
+  const hasDateFilter = !!(startDate || endDate);
 
   return (
     <SuperAdminLayout>
@@ -273,6 +285,36 @@ export default function AdminAuditLog() {
                   </SelectContent>
                 </Select>
               )}
+
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  title="Start date"
+                  data-testid="input-start-date"
+                />
+                <span className="text-muted-foreground text-xs">–</span>
+                <input
+                  type="date"
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  value={endDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  title="End date"
+                  data-testid="input-end-date"
+                />
+                {hasDateFilter && (
+                  <button
+                    onClick={clearDateRange}
+                    className="h-9 w-9 flex items-center justify-center rounded-md border border-input hover:bg-muted text-muted-foreground"
+                    title="Clear date range"
+                    data-testid="button-clear-date-range"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
