@@ -1,0 +1,71 @@
+Finish the Invites cleanup with these final patches. Keep this focused.
+
+1. Fix company lookup for project/client invites.
+
+In /api/admin/invites and /api/admin/invites/:id, project/client invites should derive company from the related project, not only from invitedBy.
+
+For project invites:
+
+* get the project from invite.projectId
+* derive the company from project.contractorId → contractor user → companyId → company
+* use that companyId/companyName for filtering and display
+
+Keep invitedByName as the inviting user, but do not rely on invitedBy to determine the invite’s company.
+
+This should make company filtering on /admin/invites reliable even when a Super Admin sent the invite.
+
+2. Add company-owner invite management endpoints.
+
+Super Admin already has:
+/api/admin/invites/:id/resend
+/api/admin/invites/:id/revoke
+
+Add company-safe endpoints for project/client invites, such as:
+POST /api/projects/:projectId/invites/:inviteId/resend
+POST /api/projects/:projectId/invites/:inviteId/revoke
+
+Authorization:
+
+* platform admin can manage any invite
+* company_owner can manage invites only for projects belonging to their company
+* contractor with isCompanyAdmin can manage invites only for projects belonging to their company
+* clients and unrelated users cannot manage invites
+
+Behavior:
+
+* pending or expired invites can be resent
+* resend generates a fresh token, extends expiration, sends email again, increments resendCount, sets lastResentAt
+* pending invites can be revoked
+* revoked invites cannot be accepted
+* accepted invites cannot be resent/revoked
+* revoked invites cannot be resent unless we explicitly choose to allow that later; for now, block it
+
+3. Update project-level invite UI if needed.
+
+On the company owner/project details invite/status area:
+
+* show accurate invite status
+* show resend count if available
+* show last resent date if available
+* add Revoke for pending invites
+* make Resend call the new resend endpoint instead of creating a totally separate duplicate invite when possible
+
+4. Add a database migration if needed.
+
+The schema now uses these invite fields:
+
+* revokedAt / revoked_at
+* resendCount / resend_count
+* lastResentAt / last_resent_at
+
+Make sure both project_invites and contractor_invites tables have these columns in existing databases.
+
+If the app relies on Drizzle migrations, add a migration file for these fields. If the environment safely uses schema push, confirm no migration is needed.
+
+5. Keep this focused.
+
+Do not redesign Invites, Companies, Users, Demo Requests, Projects, Pricing & Access, Audit Log, View As User, or Admin Tools.
+
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not add HubSpot sync outside of demo requests.
