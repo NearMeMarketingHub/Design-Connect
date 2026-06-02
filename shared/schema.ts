@@ -819,3 +819,25 @@ export const platformSettings = pgTable("platform_settings", {
 export const insertPlatformSettingsSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
 export type InsertPlatformSettings = z.infer<typeof insertPlatformSettingsSchema>;
 export type PlatformSettings = typeof platformSettings.$inferSelect;
+
+// Audit Log - tracks important Super Admin actions for accountability and troubleshooting
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorUserId: varchar("actor_user_id").notNull(),
+  actorName: text("actor_name").notNull(),
+  actorEmail: text("actor_email").notNull(),
+  action: text("action").notNull(), // e.g. company_created, user_approved, invite_revoked
+  entityType: text("entity_type").notNull(), // user, company, invite, demo_request, platform
+  entityId: varchar("entity_id"),
+  entityName: text("entity_name"),
+  companyId: varchar("company_id"),
+  projectId: varchar("project_id"),
+  metadata: jsonb("metadata"), // arbitrary key-value details
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;

@@ -16,7 +16,10 @@ import {
   Wrench,
   Link2,
   ChevronRight,
+  FileText,
+  Activity,
 } from "lucide-react";
+import { format, parseISO } from "date-fns";
 
 interface AdminCompany {
   id: string;
@@ -32,6 +35,34 @@ interface AdminInvite {
   id: string;
   status: string;
 }
+
+interface AuditEvent {
+  id: string;
+  actorName: string;
+  actorEmail: string;
+  action: string;
+  entityType: string;
+  entityName: string | null;
+  companyName?: string | null;
+  createdAt: string;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  company_created: "Company Created",
+  company_access_updated: "Access Updated",
+  company_suspended: "Company Suspended",
+  company_reactivated: "Company Reactivated",
+  user_approved: "User Approved",
+  user_disabled: "User Disabled",
+  user_reactivated: "User Reactivated",
+  password_reset_sent: "Password Reset Sent",
+  invite_resent: "Invite Resent",
+  invite_revoked: "Invite Revoked",
+  demo_request_status_updated: "Lead Status Updated",
+  demo_request_converted: "Lead Converted",
+  hubspot_sync_retried: "HubSpot Sync Retried",
+  pricing_access_updated: "Pricing & Access Updated",
+};
 
 export default function AdminOverview() {
   const { user } = useAuth();
@@ -71,6 +102,14 @@ export default function AdminOverview() {
     queryFn: () => apiRequest("GET", "/api/admin/users").then((r) => r.json()),
     enabled: user?.role === "admin",
   });
+
+  const { data: recentAuditData } = useQuery<{ events: AuditEvent[]; total: number }>({
+    queryKey: ["/api/admin/audit-log", "limit=5&offset=0"],
+    queryFn: () =>
+      apiRequest("GET", "/api/admin/audit-log?limit=5&offset=0").then((r) => r.json()),
+    enabled: user?.role === "admin",
+  });
+  const recentEvents = recentAuditData?.events ?? [];
 
   const activeCompanies = allCompanies.filter(
     (c) => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing"
@@ -237,6 +276,59 @@ export default function AdminOverview() {
               );
             })}
           </div>
+        </div>
+
+        {/* Recent Audit Activity */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <Activity className="w-4 h-4 text-muted-foreground" />
+              Recent Admin Activity
+            </h2>
+            <Link href="/admin/audit-log">
+              <span className="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1">
+                View full log <ChevronRight className="w-3 h-3" />
+              </span>
+            </Link>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {recentEvents.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-sm text-muted-foreground gap-2">
+                  <FileText className="w-4 h-4" />
+                  No audit events recorded yet.
+                </div>
+              ) : (
+                <ul className="divide-y" data-testid="recent-audit-list">
+                  {recentEvents.map((event) => {
+                    const label = ACTION_LABELS[event.action] ?? event.action.replace(/_/g, " ");
+                    let ts = "";
+                    try { ts = format(parseISO(event.createdAt), "MMM d, h:mm a"); } catch { ts = ""; }
+                    return (
+                      <li key={event.id} className="flex items-center gap-3 px-4 py-3" data-testid={`audit-event-${event.id}`}>
+                        <div className="p-1.5 bg-muted rounded-md shrink-0">
+                          <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">
+                            {label}
+                            {event.entityName && (
+                              <span className="text-muted-foreground font-normal"> — {event.entityName}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {event.actorName}
+                            {event.companyName ? ` · ${event.companyName}` : ""}
+                          </p>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">{ts}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </SuperAdminLayout>

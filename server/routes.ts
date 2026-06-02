@@ -21,6 +21,7 @@ import { createProjectBackup, shouldTriggerBackup } from "./backup-service";
 import { runRoleMigration } from "./migrate-roles";
 import { seedTestAccounts } from "./seed-test-accounts";
 import { setupWebSocket, broadcast } from "./websocket";
+import { logAuditEvent } from "./auditLog";
 
 const PgSession = connectPgSimple(session);
 
@@ -545,6 +546,14 @@ export async function registerRoutes(
       await sendPasswordResetEmail(user.email, { userName: user.name ?? undefined, resetToken: rawToken });
 
       res.json({ message: `Password reset email sent to ${user.email}` });
+      logAuditEvent(req, req.user as User, {
+        action: "password_reset_sent",
+        entityType: "user",
+        entityId: user.id,
+        entityName: user.name ?? user.username,
+        companyId: user.companyId ?? null,
+        metadata: { email: user.email },
+      });
     } catch (err) {
       console.error("[admin send-password-reset] Error:", err);
       next(err);
@@ -568,6 +577,14 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Contractor not found" });
       }
       res.json({ message: "Contractor approved successfully" });
+      logAuditEvent(req, req.user as User, {
+        action: "user_approved",
+        entityType: "user",
+        entityId: user.id,
+        entityName: user.name ?? user.username,
+        companyId: user.companyId ?? null,
+        metadata: { role: user.role, email: user.email },
+      });
     } catch (error) {
       next(error);
     }
@@ -825,6 +842,14 @@ export async function registerRoutes(
       const user = await storage.approveContractor(req.params.id);
       if (!user) return res.status(404).json({ message: "User not found" });
       res.json({ message: "User approved successfully" });
+      logAuditEvent(req, req.user as User, {
+        action: "user_approved",
+        entityType: "user",
+        entityId: user.id,
+        entityName: user.name ?? user.username,
+        companyId: user.companyId ?? null,
+        metadata: { role: user.role, email: user.email },
+      });
     } catch (error) { next(error); }
   });
 
@@ -846,6 +871,14 @@ export async function registerRoutes(
       if (!target) return res.status(404).json({ message: "User not found" });
       await storage.updateUser(req.params.id, { isDisabled: true });
       res.json({ message: "User disabled successfully" });
+      logAuditEvent(req, adminUser, {
+        action: "user_disabled",
+        entityType: "user",
+        entityId: target.id,
+        entityName: target.name ?? target.username,
+        companyId: target.companyId ?? null,
+        metadata: { email: target.email, role: target.role },
+      });
     } catch (error) { next(error); }
   });
 
@@ -855,6 +888,14 @@ export async function registerRoutes(
       if (!target) return res.status(404).json({ message: "User not found" });
       await storage.updateUser(req.params.id, { isDisabled: false });
       res.json({ message: "User reactivated successfully" });
+      logAuditEvent(req, req.user as User, {
+        action: "user_reactivated",
+        entityType: "user",
+        entityId: target.id,
+        entityName: target.name ?? target.username,
+        companyId: target.companyId ?? null,
+        metadata: { email: target.email, role: target.role },
+      });
     } catch (error) { next(error); }
   });
 
@@ -920,6 +961,14 @@ export async function registerRoutes(
 
       const { password: _, ...userWithoutPassword } = user;
       res.status(201).json({ company, user: userWithoutPassword });
+      logAuditEvent(req, req.user as User, {
+        action: "company_created",
+        entityType: "company",
+        entityId: company.id,
+        entityName: company.name,
+        companyId: company.id,
+        metadata: { ownerEmail: ownerEmail.trim().toLowerCase(), subscriptionStatus, billingType },
+      });
     } catch (error) { next(error); }
   });
 
@@ -961,6 +1010,14 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+      logAuditEvent(req, req.user as User, {
+        action: "company_access_updated",
+        entityType: "company",
+        entityId: company.id,
+        entityName: company.name,
+        companyId: company.id,
+        metadata: updateData as Record<string, unknown>,
+      });
     } catch (error) { next(error); }
   });
 
@@ -970,6 +1027,13 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "suspended" });
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+      logAuditEvent(req, req.user as User, {
+        action: "company_suspended",
+        entityType: "company",
+        entityId: company.id,
+        entityName: company.name,
+        companyId: company.id,
+      });
     } catch (error) { next(error); }
   });
 
@@ -978,6 +1042,13 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "active" });
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+      logAuditEvent(req, req.user as User, {
+        action: "company_reactivated",
+        entityType: "company",
+        entityId: company.id,
+        entityName: company.name,
+        companyId: company.id,
+      });
     } catch (error) { next(error); }
   });
 
@@ -1110,6 +1181,16 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+      logAuditEvent(req, req.user as User, {
+        action: "company_access_updated",
+        entityType: "company",
+        entityId: company.id,
+        entityName: company.name,
+        companyId: company.id,
+        metadata: Object.fromEntries(
+          Object.entries(updateData).filter(([, v]) => v !== undefined)
+        ) as Record<string, unknown>,
+      });
     } catch (error) { next(error); }
   });
 
@@ -1138,6 +1219,14 @@ export async function registerRoutes(
       const updated = await storage.updateDemoRequest(req.params.id, payload as Parameters<typeof storage.updateDemoRequest>[1]);
       if (!updated) return res.status(404).json({ message: "Demo request not found" });
       res.json(updated);
+      const isConversion = parsed.data.convertedCompanyId != null;
+      logAuditEvent(req, req.user as User, {
+        action: isConversion ? "demo_request_converted" : "demo_request_status_updated",
+        entityType: "demo_request",
+        entityId: updated.id,
+        entityName: updated.name,
+        metadata: { status: updated.status, convertedCompanyId: updated.convertedCompanyId ?? null },
+      });
     } catch (error) { next(error); }
   });
 
@@ -1160,6 +1249,13 @@ export async function registerRoutes(
         hubspotSyncError: syncError,
       });
       res.json(updated);
+      logAuditEvent(req, req.user as User, {
+        action: "hubspot_sync_retried",
+        entityType: "demo_request",
+        entityId: lead.id,
+        entityName: lead.name,
+        metadata: { syncStatus: syncResult.status, error: syncError ?? null },
+      });
     } catch (error) { next(error); }
   });
 
@@ -1324,6 +1420,14 @@ export async function registerRoutes(
       }
       if (!updated) return res.status(404).json({ message: "Invite not found" });
       res.json(updated);
+      logAuditEvent(req, req.user as User, {
+        action: "invite_revoked",
+        entityType: "invite",
+        entityId: updated.id,
+        entityName: existing.email,
+        companyId: (existing as ContractorInvite).companyId ?? null,
+        metadata: { inviteType: kind, email: existing.email },
+      });
     } catch (error) { next(error); }
   });
 
@@ -1409,6 +1513,14 @@ export async function registerRoutes(
       }
 
       res.json({ success: true, email: invite.email });
+      logAuditEvent(req, req.user as User, {
+        action: "invite_resent",
+        entityType: "invite",
+        entityId: invite.id,
+        entityName: invite.email,
+        companyId: (invite as ContractorInvite).companyId ?? null,
+        metadata: { inviteKind, email: invite.email },
+      });
     } catch (error) { next(error); }
   });
 
@@ -1433,6 +1545,44 @@ export async function registerRoutes(
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
       const updated = await storage.updatePlatformSettings(parsed.data);
       res.json(updated);
+      logAuditEvent(req, req.user as User, {
+        action: "pricing_access_updated",
+        entityType: "platform",
+        entityId: "platform",
+        entityName: "Platform Settings",
+        metadata: parsed.data as Record<string, unknown>,
+      });
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: Audit Log ─────────────────────────────────────────────────────────
+  app.get("/api/admin/audit-log/meta", requireAdmin, async (req, res, next) => {
+    try {
+      const meta = await storage.getAuditLogMeta();
+      res.json(meta);
+    } catch (error) { next(error); }
+  });
+
+  app.get("/api/admin/audit-log", requireAdmin, async (req, res, next) => {
+    try {
+      const {
+        search, action, entityType, companyId,
+        startDate, endDate,
+        limit: limitStr, offset: offsetStr,
+      } = req.query as Record<string, string | undefined>;
+      const limit = Math.min(parseInt(limitStr ?? "50", 10) || 50, 200);
+      const offset = parseInt(offsetStr ?? "0", 10) || 0;
+      const result = await storage.listAuditLogs({
+        search: search || undefined,
+        action: action || undefined,
+        entityType: entityType || undefined,
+        companyId: companyId || undefined,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        limit,
+        offset,
+      });
+      res.json(result);
     } catch (error) { next(error); }
   });
 

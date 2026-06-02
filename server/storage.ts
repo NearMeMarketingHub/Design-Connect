@@ -1,4 +1,4 @@
-import { eq, and, or, not, isNull, like, sql } from "drizzle-orm";
+import { eq, and, or, not, isNull, like, ilike, gte, lte, desc, count, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import bcrypt from "bcryptjs";
@@ -64,7 +64,8 @@ import type {
   ChangeOrderLineItem, InsertChangeOrderLineItem,
   ExternalMemberPermissions,
   DemoRequest, InsertDemoRequest,
-  PlatformSettings, InsertPlatformSettings
+  PlatformSettings, InsertPlatformSettings,
+  AuditLog, InsertAuditLog
 } from "@shared/schema";
 
 export interface IStorage {
@@ -372,6 +373,20 @@ export interface IStorage {
   // Company-scoped admin queries
   getUsersByCompanyId(companyId: string): Promise<User[]>;
   getContractorInvitesByCompanyId(companyId: string): Promise<ContractorInvite[]>;
+
+  // Audit log methods
+  insertAuditLog(entry: InsertAuditLog): Promise<AuditLog>;
+  listAuditLogs(filters: {
+    search?: string;
+    action?: string;
+    entityType?: string;
+    companyId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ events: (AuditLog & { companyName?: string | null })[]; total: number }>;
+  getAuditLogMeta(): Promise<{ actions: string[]; entityTypes: string[]; companies: { id: string; name: string }[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2433,6 +2448,102 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return [...direct, ...projectInvites];
+  }
+
+  // Audit log methods
+  async insertAuditLog(entry: InsertAuditLog): Promise<AuditLog> {
+    const [row] = await db.insert(schema.auditLogs).values(entry).returning();
+    return row;
+  }
+
+  async listAuditLogs(filters: {
+    search?: string;
+    action?: string;
+    entityType?: string;
+    companyId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ events: (AuditLog & { companyName?: string | null })[]; total: number }> {
+    const { search, action, entityType, companyId, startDate, endDate, limit = 50, offset = 0 } = filters;
+
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (action) conditions.push(eq(schema.auditLogs.action, action));
+    if (entityType) conditions.push(eq(schema.auditLogs.entityType, entityType));
+    if (companyId) conditions.push(eq(schema.auditLogs.companyId, companyId));
+    if (startDate) conditions.push(gte(schema.auditLogs.createdAt, startDate) as any);
+    if (endDate) conditions.push(lte(schema.auditLogs.createdAt, endDate) as any);
+    if (search) {
+      const q = `%${search.toLowerCase()}%`;
+      conditions.push(
+        or(
+          ilike(schema.auditLogs.actorName, q),
+          ilike(schema.auditLogs.actorEmail, q),
+          ilike(schema.auditLogs.action, q),
+          ilike(schema.auditLogs.entityName, q)
+        ) as any
+      );
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [totalRow] = await db
+      .select({ cnt: count() })
+      .from(schema.auditLogs)
+      .where(where);
+
+    const rows = await db
+      .select()
+      .from(schema.auditLogs)
+      .where(where)
+      .orderBy(desc(schema.auditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with company name
+    const companyIds = [...new Set(rows.map(r => r.companyId).filter(Boolean))] as string[];
+    let companyNameMap: Map<string, string> = new Map();
+    if (companyIds.length > 0) {
+      const comps = await db.select({ id: schema.companies.id, name: schema.companies.name })
+        .from(schema.companies)
+        .where(sql`${schema.companies.id} = ANY(${companyIds})`);
+      companyNameMap = new Map(comps.map(c => [c.id, c.name]));
+    }
+
+    const events = rows.map(r => ({
+      ...r,
+      companyName: r.companyId ? (companyNameMap.get(r.companyId) ?? null) : null,
+    }));
+
+    return { events, total: totalRow?.cnt ?? 0 };
+  }
+
+  async getAuditLogMeta(): Promise<{ actions: string[]; entityTypes: string[]; companies: { id: string; name: string }[] }> {
+    const [actionsRaw, entityTypesRaw] = await Promise.all([
+      db.selectDistinct({ action: schema.auditLogs.action }).from(schema.auditLogs).orderBy(schema.auditLogs.action),
+      db.selectDistinct({ entityType: schema.auditLogs.entityType }).from(schema.auditLogs).orderBy(schema.auditLogs.entityType),
+    ]);
+
+    const companyIds = await db
+      .selectDistinct({ companyId: schema.auditLogs.companyId })
+      .from(schema.auditLogs)
+      .where(sql`${schema.auditLogs.companyId} IS NOT NULL`);
+
+    const ids = companyIds.map(r => r.companyId).filter(Boolean) as string[];
+    let companies: { id: string; name: string }[] = [];
+    if (ids.length > 0) {
+      companies = await db.select({ id: schema.companies.id, name: schema.companies.name })
+        .from(schema.companies)
+        .where(sql`${schema.companies.id} = ANY(${ids})`)
+        .orderBy(schema.companies.name);
+    }
+
+    return {
+      actions: actionsRaw.map(r => r.action),
+      entityTypes: entityTypesRaw.map(r => r.entityType),
+      companies,
+    };
   }
 }
 
