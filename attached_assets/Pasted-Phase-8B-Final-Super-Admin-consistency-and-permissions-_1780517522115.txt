@@ -1,0 +1,149 @@
+Phase 8B: Final Super Admin consistency and permissions polish.
+
+Context:
+Phase 8A cleaned up admin routes, broken links, legacy wording, and the Projects empty state. Now do a final Super Admin polish pass focused on consistency, permissions, empty states, and support-tool behavior.
+
+Do not change BuildVision branding.
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not expand subcontractor/notary functionality.
+Do not redesign the whole UI.
+Do not modify company-owner financial tools.
+
+Goal:
+Make the Super Admin area feel consistent, safe, and ready for regular use.
+
+1. Review empty states across Super Admin pages.
+
+Confirm these pages have clean empty states when there is no data and when filters return no results:
+
+* Companies
+* Demo Requests
+* Users
+* Invites
+* Projects
+* Audit Log
+* Role Definitions
+* Admin Tools
+
+Use clear messages like:
+
+* “No companies found.”
+* “No users match your filters.”
+* “No invites found.”
+* “No audit activity found.”
+
+If a page has filters, include a Reset/Clear Filters option where appropriate.
+
+2. Review filters across admin pages.
+
+Make sure filters work together and reset cleanly on:
+
+* Companies
+* Demo Requests
+* Users
+* Invites
+* Projects
+* Audit Log
+
+Check that filter controls do not leave the table stuck in a confusing state.
+
+3. Check Super Admin sidebar behavior.
+
+Verify the sidebar:
+
+* highlights the active section correctly
+* works on all Super Admin pages
+* remains usable on smaller screens
+* does not hide important content
+* keeps navigation grouped cleanly
+
+Do not redesign it unless a small fix is needed.
+
+4. Verify important API permissions.
+
+Review admin-related API routes and confirm only Super Admins can access platform-wide admin data.
+
+Super Admin-only areas include:
+
+* companies
+* demo requests
+* users
+* invites
+* pricing/access settings
+* audit logs
+* view-as-user
+* admin tools
+* role definitions
+
+Company owners should not be able to access platform-wide admin APIs by guessing URLs.
+
+5. Verify company-owner/project invite permissions.
+
+Company owners or authorized company admins may manage invites only for their own company’s projects.
+
+Confirm:
+
+* they cannot resend/revoke invites for another company’s project
+* clients cannot access invite-management endpoints
+* unrelated users cannot manipulate invites by guessing IDs
+
+6. Check HubSpot not-configured behavior.
+
+If HUBSPOT_ACCESS_TOKEN is missing:
+
+* demo requests still save
+* email notification still works if configured
+* public user sees normal success
+* Super Admin sees HubSpot as Not Configured
+* Retry HubSpot Sync does not crash
+
+HubSpot must remain scoped only to demo requests.
+
+7. Check View As behavior.
+
+Verify:
+
+* View As only supports company_owner and client
+* disabled users cannot be viewed as
+* Super Admin users cannot be viewed as
+* View As banner displays clearly
+* Exit View As works
+* View As timeout restores admin context
+* logout during View As clears session/adminData
+* view_as_started and view_as_ended appear clearly in Audit Log
+
+8. Check Audit Log coverage from real actions.
+
+Verify these actions create readable audit events:
+
+* Create Company
+* Update Billing & Access
+* Send Password Reset
+* Disable/reactivate user
+* Resend/revoke invite
+* Convert demo request
+* Retry HubSpot sync
+* Start/end View As
+
+Fix missing audit hooks only if found.
+
+9. Clean up remaining visible legacy references.
+
+Scan Super Admin UI for visible outdated wording:
+
+* “Subscription” where it means Billing & Access
+* “Subscription tiers”
+* “Plan tiers”
+* “public signup”
+* “self-register”
+* “Contractor Management”
+
+Do not rename internal database fields.
+
+10. Keep this phase focused.
+
+Do not build new features.
+Do not redesign major pages.
+Do not change company owner tools.
+Do not change project/client functionality except to fix Super Admin safety, permissions, or links.
