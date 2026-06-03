@@ -592,8 +592,19 @@ export async function registerRoutes(
 
   app.post("/api/admin/contractors/:id/reject", requireAdmin, async (req, res, next) => {
     try {
+      const targetUser = await storage.getUser(req.params.id);
       await storage.rejectContractor(req.params.id);
       res.json({ message: "Contractor rejected and removed" });
+      if (targetUser) {
+        logAuditEvent(req, req.user as User, {
+          action: "user_rejected",
+          entityType: "user",
+          entityId: targetUser.id,
+          entityName: targetUser.name ?? targetUser.username,
+          companyId: targetUser.companyId ?? null,
+          metadata: { email: targetUser.email, role: targetUser.role },
+        });
+      }
     } catch (error) {
       next(error);
     }
@@ -855,8 +866,19 @@ export async function registerRoutes(
 
   app.post("/api/admin/users/:id/reject", requireAdmin, async (req, res, next) => {
     try {
+      const targetUser = await storage.getUser(req.params.id);
       await storage.rejectContractor(req.params.id);
       res.json({ message: "User rejected and removed" });
+      if (targetUser) {
+        logAuditEvent(req, req.user as User, {
+          action: "user_rejected",
+          entityType: "user",
+          entityId: targetUser.id,
+          entityName: targetUser.name ?? targetUser.username,
+          companyId: targetUser.companyId ?? null,
+          metadata: { email: targetUser.email, role: targetUser.role },
+        });
+      }
     } catch (error) { next(error); }
   });
 
@@ -1225,6 +1247,7 @@ export async function registerRoutes(
         entityType: "demo_request",
         entityId: updated.id,
         entityName: updated.name,
+        companyId: isConversion ? (updated.convertedCompanyId ?? null) : null,
         metadata: { status: updated.status, convertedCompanyId: updated.convertedCompanyId ?? null },
       });
     } catch (error) { next(error); }
@@ -1420,12 +1443,21 @@ export async function registerRoutes(
       }
       if (!updated) return res.status(404).json({ message: "Invite not found" });
       res.json(updated);
+      let revokeCompanyId: string | null = (existing as ContractorInvite).companyId ?? null;
+      if (kind === "project" && (existing as ProjectInvite).projectId) {
+        const revokeProject = await storage.getProject((existing as ProjectInvite).projectId!);
+        if (revokeProject?.contractorId) {
+          const revokeContractor = await storage.getUser(revokeProject.contractorId);
+          revokeCompanyId = revokeContractor?.companyId ?? null;
+        }
+      }
       logAuditEvent(req, req.user as User, {
         action: "invite_revoked",
         entityType: "invite",
         entityId: updated.id,
         entityName: existing.email,
-        companyId: (existing as ContractorInvite).companyId ?? null,
+        companyId: revokeCompanyId,
+        projectId: kind === "project" ? ((existing as ProjectInvite).projectId ?? null) : null,
         metadata: { inviteType: kind, email: existing.email },
       });
     } catch (error) { next(error); }
@@ -1513,12 +1545,21 @@ export async function registerRoutes(
       }
 
       res.json({ success: true, email: invite.email });
+      let resendCompanyId: string | null = (invite as ContractorInvite).companyId ?? null;
+      if (inviteKind === "project" && (invite as ProjectInvite).projectId) {
+        const resendProject = await storage.getProject((invite as ProjectInvite).projectId!);
+        if (resendProject?.contractorId) {
+          const resendContractor = await storage.getUser(resendProject.contractorId);
+          resendCompanyId = resendContractor?.companyId ?? null;
+        }
+      }
       logAuditEvent(req, req.user as User, {
         action: "invite_resent",
         entityType: "invite",
         entityId: invite.id,
         entityName: invite.email,
-        companyId: (invite as ContractorInvite).companyId ?? null,
+        companyId: resendCompanyId,
+        projectId: inviteKind === "project" ? ((invite as ProjectInvite).projectId ?? null) : null,
         metadata: { inviteKind, email: invite.email },
       });
     } catch (error) { next(error); }
@@ -4565,7 +4606,7 @@ export async function registerRoutes(
 
       const isAdmin = user.role === "admin";
       let projectCompanyId: string | null = null;
-      if (!isAdmin && project.contractorId) {
+      if (project.contractorId) {
         const projectContractor = await storage.getUser(project.contractorId);
         projectCompanyId = projectContractor?.companyId ?? null;
       }
@@ -4614,16 +4655,15 @@ export async function registerRoutes(
       }
 
       res.json({ success: true, invite: updated });
-      if (isAdmin) {
-        logAuditEvent(req, user, {
-          action: "invite_resent",
-          entityType: "invite",
-          entityId: invite.id,
-          entityName: invite.email,
-          projectId: req.params.projectId,
-          metadata: { email: invite.email, projectName: project.name, inviteKind: "project" },
-        });
-      }
+      logAuditEvent(req, user, {
+        action: "invite_resent",
+        entityType: "invite",
+        entityId: invite.id,
+        entityName: invite.email,
+        companyId: projectCompanyId,
+        projectId: req.params.projectId,
+        metadata: { email: invite.email, projectName: project.name, inviteKind: "project" },
+      });
     } catch (error) { next(error); }
   });
 
@@ -4636,7 +4676,7 @@ export async function registerRoutes(
 
       const isAdmin = user.role === "admin";
       let projectCompanyId: string | null = null;
-      if (!isAdmin && project.contractorId) {
+      if (project.contractorId) {
         const projectContractor = await storage.getUser(project.contractorId);
         projectCompanyId = projectContractor?.companyId ?? null;
       }
@@ -4664,16 +4704,15 @@ export async function registerRoutes(
       });
 
       res.json({ success: true, invite: updated });
-      if (isAdmin) {
-        logAuditEvent(req, user, {
-          action: "invite_revoked",
-          entityType: "invite",
-          entityId: invite.id,
-          entityName: invite.email,
-          projectId: req.params.projectId,
-          metadata: { email: invite.email, projectName: project.name, inviteKind: "project" },
-        });
-      }
+      logAuditEvent(req, user, {
+        action: "invite_revoked",
+        entityType: "invite",
+        entityId: invite.id,
+        entityName: invite.email,
+        companyId: projectCompanyId,
+        projectId: req.params.projectId,
+        metadata: { email: invite.email, projectName: project.name, inviteKind: "project" },
+      });
     } catch (error) { next(error); }
   });
 
