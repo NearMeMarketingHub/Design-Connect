@@ -41,6 +41,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 import type { Project } from "@shared/schema";
 
@@ -86,6 +87,8 @@ export default function AdminProjects() {
         variant: "destructive",
       }),
   });
+
+  const hasActiveFilters = searchQuery !== "" || companyFilter !== "__all__";
 
   const realProjects = projects.filter((p) => !p.isSandbox);
 
@@ -162,7 +165,26 @@ export default function AdminProjects() {
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             ) : filteredProjects.length === 0 ? (
-              <p className="text-muted-foreground text-center py-10">No projects found</p>
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center" data-testid="projects-empty-state">
+                <div className="p-3 bg-muted rounded-full">
+                  <FolderOpen className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {hasActiveFilters ? "No projects match your filters." : "No projects found."}
+                  </p>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={() => { setSearchQuery(""); setCompanyFilter("__all__"); setProjectsPage(1); }}
+                      className="text-xs text-primary hover:underline mt-1 flex items-center gap-1 mx-auto"
+                      data-testid="button-clear-project-filters"
+                    >
+                      <X className="w-3 h-3" />
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              </div>
             ) : (
               <Table>
                 <TableHeader>

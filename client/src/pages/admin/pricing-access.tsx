@@ -51,7 +51,7 @@ export default function AdminPricingAccess() {
               Global Defaults
             </CardTitle>
             <CardDescription className="text-xs">
-              Platform-wide defaults applied to new company signups.
+              Platform-wide defaults applied to new company accounts.
             </CardDescription>
           </CardHeader>
           <CardContent>
