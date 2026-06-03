@@ -332,11 +332,21 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/auth/user", (req, res) => {
+  app.get("/api/auth/user", async (req, res) => {
     if (req.isAuthenticated()) {
       const user = req.user as User;
       const { password: _, ...userWithoutPassword } = user;
-      return res.json({ user: userWithoutPassword });
+      // Include viewAsAdmin context when a view-as session is active
+      const session = req.session as any;
+      let viewAsAdmin = null;
+      if (session.adminData?.userId) {
+        const adminUser = await storage.getUser(session.adminData.userId);
+        if (adminUser) {
+          const { password: __, ...adminWithoutPassword } = adminUser;
+          viewAsAdmin = adminWithoutPassword;
+        }
+      }
+      return res.json({ user: userWithoutPassword, viewAsAdmin });
     }
     res.status(401).json({ message: "Not authenticated" });
   });
@@ -1655,6 +1665,161 @@ export async function registerRoutes(
         entityName: "Platform Settings",
         metadata: pricingMeta,
       });
+    } catch (error) { next(error); }
+  });
+
+  // ── Admin: View As User ───────────────────────────────────────────────────────
+
+  // Custom middleware: exit requires the view-as session to be active (req.user is viewed user)
+  const requireViewAsSession = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const session = req.session as any;
+    if (!session.adminData?.userId) return res.status(403).json({ message: "No active view-as session" });
+    next();
+  };
+
+  // GET /api/admin/view-as/users — enriched list of company_owner + client users
+  app.get("/api/admin/view-as/users", requireAdmin, async (req, res, next) => {
+    try {
+      const { search, role, companyId } = req.query as Record<string, string>;
+      const [allUsers, allCompanies, allProjects] = await Promise.all([
+        storage.getAllUsers(),
+        storage.getAllCompanies(),
+        storage.getAllProjectsWithDetails(),
+      ]);
+
+      const companyMap = new Map(allCompanies.map((c: any) => [c.id, c.name]));
+
+      // Filter to supported roles, approved, non-disabled, non-sandbox
+      let filtered = allUsers.filter((u: any) =>
+        (u.role === "company_owner" || u.role === "client") &&
+        !u.isDisabled &&
+        u.isApproved !== false &&
+        !u.isSandbox
+      );
+
+      if (role === "company_owner") filtered = filtered.filter((u: any) => u.role === "company_owner");
+      else if (role === "client") filtered = filtered.filter((u: any) => u.role === "client");
+
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter((u: any) =>
+          u.name?.toLowerCase().includes(q) ||
+          u.username.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
+        );
+      }
+
+      // Enrich each user with company name and project count
+      const enriched = filtered.map((user: any) => {
+        const { password: _, ...u } = user;
+        let relatedCompanyId = u.companyId ?? null;
+        let relatedCompanyName = relatedCompanyId ? (companyMap.get(relatedCompanyId) ?? null) : null;
+        let projectCount = 0;
+
+        if (u.role === "company_owner") {
+          projectCount = allProjects.filter((p: any) => p.companyId === relatedCompanyId).length;
+        } else if (u.role === "client") {
+          const clientProjects = allProjects.filter((p: any) => p.clientId === u.id);
+          projectCount = clientProjects.length;
+          if (!relatedCompanyId && clientProjects.length > 0) {
+            relatedCompanyId = clientProjects[0].companyId ?? null;
+            relatedCompanyName = relatedCompanyId ? (companyMap.get(relatedCompanyId) ?? null) : null;
+          }
+        }
+
+        return { ...u, relatedCompanyId, relatedCompanyName, projectCount };
+      });
+
+      // Apply company filter after enrichment
+      const results = companyId && companyId !== "all"
+        ? enriched.filter((r: any) => r.relatedCompanyId === companyId)
+        : enriched;
+
+      res.json(results);
+    } catch (error) { next(error); }
+  });
+
+  // POST /api/admin/view-as — start view-as session (swaps req.user to viewed user)
+  app.post("/api/admin/view-as", requireAdmin, async (req, res, next) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: "userId is required" });
+
+      const admin = req.user as User;
+      const target = await storage.getUser(userId);
+
+      if (!target) return res.status(404).json({ message: "User not found" });
+      if (target.id === admin.id) return res.status(400).json({ message: "Cannot view as yourself" });
+      if (target.role === "admin") return res.status(403).json({ message: "Cannot view as another admin" });
+      if (target.role !== "company_owner" && target.role !== "client") {
+        return res.status(403).json({ message: "View As only supports company owners and clients" });
+      }
+      if (target.isDisabled) return res.status(403).json({ message: "Cannot view as a disabled user" });
+      if (target.isApproved === false) return res.status(403).json({ message: "Cannot view as an unapproved user" });
+
+      const targetDashboard = target.role === "company_owner" ? "/company/dashboard" : "/client/dashboard";
+
+      // Store admin identity before swapping session
+      (req.session as any).adminData = { userId: admin.id };
+
+      // Swap Passport session to viewed user, keeping existing session data (adminData)
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(target, { keepSessionInfo: true }, (err: any) => { if (err) reject(err); else resolve(); });
+      });
+
+      logAuditEvent(req, admin, {
+        action: "view_as_started",
+        entityType: "user",
+        entityId: target.id,
+        entityName: target.name ?? target.username,
+        companyId: target.companyId ?? null,
+        metadata: {
+          viewedUserId: target.id,
+          viewedUserEmail: target.email,
+          viewedUserRole: target.role,
+          viewedUserName: target.name ?? target.username,
+          targetDashboard,
+        },
+      });
+
+      const { password: _, ...targetWithoutPassword } = target;
+      res.json({ user: targetWithoutPassword, targetDashboard });
+    } catch (error) { next(error); }
+  });
+
+  // POST /api/admin/view-as/exit — end view-as session, restore admin
+  app.post("/api/admin/view-as/exit", requireViewAsSession, async (req, res, next) => {
+    try {
+      const session = req.session as any;
+      const adminId = session.adminData.userId;
+      const admin = await storage.getUser(adminId);
+      if (!admin) return res.status(404).json({ message: "Admin user not found" });
+
+      const viewedUser = req.user as User;
+
+      logAuditEvent(req, admin, {
+        action: "view_as_ended",
+        entityType: "user",
+        entityId: viewedUser.id,
+        entityName: viewedUser.name ?? viewedUser.username,
+        companyId: viewedUser.companyId ?? null,
+        metadata: {
+          viewedUserId: viewedUser.id,
+          viewedUserEmail: viewedUser.email,
+          viewedUserRole: viewedUser.role,
+          viewedUserName: viewedUser.name ?? viewedUser.username,
+        },
+      });
+
+      // Restore admin session; delete adminData first, then swap
+      delete session.adminData;
+      await new Promise<void>((resolve, reject) => {
+        req.logIn(admin, { keepSessionInfo: true }, (err: any) => { if (err) reject(err); else resolve(); });
+      });
+
+      const { password: _, ...adminWithoutPassword } = admin;
+      res.json({ user: adminWithoutPassword });
     } catch (error) { next(error); }
   });
 

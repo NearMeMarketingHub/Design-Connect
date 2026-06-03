@@ -1,0 +1,122 @@
+Phase 7: Build Super Admin “View As User” support tool.
+
+Context:
+The Audit Log phase is complete. Now we need a controlled support tool that lets Super Admins view the app as a company owner or client for troubleshooting.
+
+Do not change BuildVision branding.
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not add HubSpot sync outside demo requests.
+
+Goal:
+Create a Super Admin-only View As User feature at /admin/view-as-user.
+
+1. Build /admin/view-as-user page.
+
+Use the existing Super Admin sidebar layout.
+
+The page should let Super Admins search/select users to view as.
+
+Supported user types for this first version:
+
+* company_owner
+* client
+
+Do not support viewing as regular contractors, subcontractors, notaries, or Super Admins in this first version.
+
+2. User search/filtering.
+
+Add search/filter controls:
+
+* Search by name, email, or username
+* Role filter:
+
+  * Company Owners
+  * Clients
+* Company filter:
+
+  * All Companies
+  * each company
+
+For clients, remember they are global users. If a company filter is selected, include clients related to that company through projects.
+
+3. User results table.
+
+Show:
+
+* Name
+* Email
+* Role
+* Company / Related Company
+* Related Projects
+* Status
+* Action: View As
+
+4. Start View As session.
+
+When Super Admin clicks View As:
+
+* start a controlled view-as session
+* keep the Super Admin authenticated as themselves
+* store the viewed user separately in session/state
+* redirect to the appropriate dashboard:
+
+  * company_owner → /company/dashboard
+  * client → /client/dashboard
+
+Do not actually log out the Super Admin.
+Do not change the viewed user’s password.
+Do not require knowing the viewed user’s password.
+
+5. View As banner.
+
+When a View As session is active, show a clear banner across the app:
+“You are viewing as [User Name].”
+
+The banner should include:
+
+* viewed user name/email
+* role
+* Exit View As button
+
+6. Exit View As.
+
+Exit View As should:
+
+* end the view-as session
+* return the Super Admin to /admin/view-as-user or /admin/dashboard
+* restore the normal Super Admin context
+
+7. Permissions and safety.
+
+Only Super Admins can start View As sessions.
+
+Do not allow:
+
+* company owners to use View As
+* clients to use View As
+* viewing as another Super Admin
+* viewing as disabled users
+* viewing as unsupported roles
+
+8. Audit logging.
+
+Log these events:
+
+* view_as_started
+* view_as_ended
+
+Metadata should include:
+
+* viewedUserId
+* viewedUserEmail
+* viewedUserRole
+* viewedUserName
+* target dashboard
+
+9. Keep this first version safe.
+
+If possible, make View As read-only for destructive actions.
+At minimum, show the banner clearly so the Super Admin knows they are viewing another account.
+
+Do not redesign Companies, Users, Invites, Demo Requests, Projects, Pricing & Access, Audit Log, or Admin Tools except where needed to support View As.

@@ -1,0 +1,1 @@
+- [Passport 0.6+ session regeneration](passport-session-regeneration.md) — always use `{ keepSessionInfo: true }` in `req.logIn()` when preserving custom session properties like adminData.

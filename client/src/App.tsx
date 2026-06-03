@@ -57,6 +57,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import ErrorBoundary from "@/components/error-boundary";
 import { useRealtimeUpdates } from "@/lib/useRealtimeUpdates";
+import { ViewAsBanner } from "@/components/view-as-banner";
 
 function Router() {
   const [location, setLocation] = useLocation();
@@ -293,6 +294,18 @@ function RealtimeUpdates() {
   return null;
 }
 
+function AppShell() {
+  const { viewAsAdmin } = useAuth();
+  return (
+    <>
+      <ViewAsBanner />
+      <div className={viewAsAdmin ? "pt-10" : ""}>
+        <Router />
+      </div>
+    </>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -302,7 +315,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <RealtimeUpdates />
-              <Router />
+              <AppShell />
             </TooltipProvider>
           </AuthProvider>
         </QueryClientProvider>
