@@ -147,6 +147,11 @@ const META_LABELS: Record<string, string> = {
   name: "New Name",
   billingNotes: "Billing Notes",
   accessNotes: "Access Notes",
+  viewedUserId: "Viewed User ID",
+  viewedUserEmail: "Viewed User Email",
+  viewedUserRole: "Viewed User Role",
+  viewedUserName: "Viewed User Name",
+  targetDashboard: "Target Dashboard",
 };
 
 // Old→new pairs: [oldKey, newKey, label]
