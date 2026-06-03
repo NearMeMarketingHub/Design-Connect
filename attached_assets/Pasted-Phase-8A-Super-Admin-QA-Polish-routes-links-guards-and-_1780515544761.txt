@@ -1,0 +1,143 @@
+Phase 8A: Super Admin QA / Polish — routes, links, guards, and legacy cleanup.
+
+Context:
+The main Super Admin rebuild phases are complete:
+
+* Sidebar navigation
+* Companies + Company Detail
+* Users & Approvals
+* Invites
+* Demo Requests + HubSpot
+* Pricing & Access without tiers
+* Audit Log
+* View As User
+
+Now we need a QA/polish pass to make sure the Super Admin area is clean, consistent, and does not have broken routes or legacy leftovers.
+
+Do not change BuildVision branding.
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not expand subcontractor/notary functionality.
+Do not add HubSpot sync outside demo requests.
+
+Goal:
+Clean up Super Admin navigation, broken links, route guards, old wording, and legacy references.
+
+1. Check all Super Admin sidebar routes.
+
+Verify these routes load correctly and use the Super Admin layout:
+
+* /admin/dashboard
+* /admin/companies
+* /admin/companies/:companyId
+* /admin/demo-requests
+* /admin/users
+* /admin/invites
+* /admin/projects
+* /admin/pricing-access
+* /admin/audit-log
+* /admin/view-as-user
+* /admin/tools
+* /admin/role-definitions
+
+Fix any broken or missing routes.
+
+2. Check old/deprecated admin routes.
+
+Make sure old routes do not show stale pages:
+
+* /admin/contractors should redirect to /admin/users
+* /admin/budget should redirect away from Super Admin
+* /admin/sales should redirect away from Super Admin
+* /admin/estimates should redirect away from Super Admin
+* /admin/accounting should redirect away from Super Admin
+* /admin/invoice/new should redirect away from Super Admin
+
+These tools belong to the company owner side now, not Super Admin.
+
+3. Fix broken links and actions.
+
+Review buttons/links in Super Admin pages and fix anything that points to non-existing routes.
+
+Check links/actions from:
+
+* Companies table
+* Company Detail tabs
+* Demo Requests detail drawer
+* Users detail drawer
+* Invites detail drawer
+* Projects table
+* Audit Log detail drawer
+* Dashboard quick links
+* Admin Tools cards
+
+If a feature is not built yet, link to the correct placeholder page instead of a broken route.
+
+4. Verify Super Admin route guards.
+
+Only Super Admins should access Super Admin pages and APIs.
+
+Company owners, clients, and regular users should not access:
+
+* /admin/dashboard
+* /admin/companies
+* /admin/demo-requests
+* /admin/users
+* /admin/invites
+* /admin/projects
+* /admin/pricing-access
+* /admin/audit-log
+* /admin/view-as-user
+* /admin/tools
+* /admin/role-definitions
+
+If unauthorized, redirect to the correct login/dashboard.
+
+5. Clean up visible legacy wording.
+
+Remove or update visible wording that no longer matches the product model.
+
+Replace:
+
+* “Subscription” when it means billing/access → “Billing & Access”
+* “Contractor Management” → “Users & Approvals”
+* “Subscription tiers” / “Plan tiers” → remove entirely
+* “Company self registration” wording → request demo / Super Admin-created company account
+* “Public signup” wording → invite-only access
+
+Do not rename internal database fields unless needed.
+
+6. Keep subcontractor/notary hidden.
+
+Subcontractor/notary code may remain, but normal public and company-owner UI should not encourage or expose those flows right now.
+
+If visible active UI says subcontractors/notaries can self-register or manage invites, hide or soften that wording.
+
+Do not delete the underlying subcontractor code/database structure.
+
+7. Improve empty states.
+
+Make sure these pages have clean empty states:
+
+* Companies
+* Demo Requests
+* Users
+* Invites
+* Projects
+* Audit Log
+* Role Definitions
+* Admin Tools
+
+Examples:
+
+* “No companies found.”
+* “No users match your filters.”
+* “No invites found.”
+* “No audit activity found.”
+
+8. Keep this phase focused.
+
+Do not build new major features.
+Do not redesign the whole UI.
+Do not modify company owner financial tools.
+Do not change project/client functionality except to fix broken admin links.
