@@ -1,0 +1,121 @@
+Phase 6B: Audit Log coverage and polish.
+
+Phase 6A added the audit log foundation:
+
+* audit_logs table/migration
+* logAuditEvent helper
+* /admin/audit-log page
+* audit detail drawer
+* Recent Admin Activity card
+* audit logging for major Super Admin actions
+
+For this phase, do a focused audit log polish pass.
+
+Do not redesign unrelated areas.
+Do not reintroduce subscription tiers.
+Do not reintroduce public account creation.
+Do not add HubSpot sync outside demo requests.
+
+1. Review audit coverage.
+
+Confirm these actions are logged:
+
+* company_created
+* company_access_updated
+* company_suspended
+* company_reactivated
+* user_approved
+* user_rejected
+* user_disabled
+* user_reactivated
+* password_reset_sent
+* invite_resent
+* invite_revoked
+* demo_request_status_updated
+* demo_request_converted
+* hubspot_sync_retried
+* pricing_access_updated
+
+If any of these actions are not currently logged, add audit logging for them.
+
+2. Improve metadata readability.
+
+In the Audit Log detail drawer, make metadata easier to read.
+
+Instead of showing raw JSON only, display key/value rows when possible.
+
+For example:
+
+* Old Status → New Status
+* Email
+* Company Name
+* Project Name
+* Invite Type
+* Demo Request Status
+* Billing Type
+* Monthly Price
+* Trial End
+
+It is okay to keep raw JSON in a collapsed “Advanced Details” area if useful.
+
+3. Add old value → new value where practical.
+
+For update actions, include previous and new values in metadata where practical:
+
+* company_access_updated
+* pricing_access_updated
+* demo_request_status_updated
+* user status changes
+
+Do not overcomplicate this if the old value is not easily available, but add it where the route already has access to both values.
+
+4. Improve Audit Log filters.
+
+Make sure filters work together:
+
+* Search
+* Action
+* Entity Type
+* Company
+* Date range
+
+Add a clear “Reset Filters” button if one does not exist.
+
+5. Improve empty states.
+
+If there are no audit events, show:
+“No audit activity found.”
+
+If filters return no results, show:
+“No audit events match your filters.”
+
+6. Improve Recent Admin Activity.
+
+On /admin/dashboard, make sure the Recent Admin Activity card:
+
+* shows the latest 5 audit events
+* shows action, actor, entity, and timestamp
+* has a link to /admin/audit-log
+* handles empty state cleanly
+
+7. Add audit log for View As later.
+
+Do not build View As User in this phase, but leave the audit log ready for future actions:
+
+* view_as_started
+* view_as_ended
+
+This can just be action naming support/documentation for now.
+
+8. Security.
+
+Confirm only Super Admins can access:
+
+* /admin/audit-log
+* audit log API routes
+
+Do not expose audit logs to company owners, clients, or regular users.
+
+9. Keep this phase focused.
+
+Do not redesign Companies, Users, Invites, Demo Requests, Projects, Pricing & Access, View As User, or Admin Tools except where needed for audit log coverage or links.

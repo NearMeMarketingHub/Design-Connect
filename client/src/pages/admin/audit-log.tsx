@@ -29,7 +29,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X } from "lucide-react";
+import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X, ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 interface AuditEvent {
@@ -67,6 +67,7 @@ const ACTION_LABELS: Record<string, string> = {
   company_suspended: "Company Suspended",
   company_reactivated: "Company Reactivated",
   user_approved: "User Approved",
+  user_rejected: "User Rejected",
   user_disabled: "User Disabled",
   user_reactivated: "User Reactivated",
   password_reset_sent: "Password Reset Sent",
@@ -76,6 +77,9 @@ const ACTION_LABELS: Record<string, string> = {
   demo_request_converted: "Lead Converted",
   hubspot_sync_retried: "HubSpot Sync Retried",
   pricing_access_updated: "Pricing & Access Updated",
+  // Reserved for future View As User feature
+  view_as_started: "View As Started",
+  view_as_ended: "View As Ended",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -84,6 +88,7 @@ const ACTION_COLORS: Record<string, string> = {
   company_suspended: "bg-red-100 text-red-700",
   company_reactivated: "bg-green-100 text-green-700",
   user_approved: "bg-green-100 text-green-700",
+  user_rejected: "bg-red-100 text-red-700",
   user_disabled: "bg-red-100 text-red-700",
   user_reactivated: "bg-green-100 text-green-700",
   password_reset_sent: "bg-orange-100 text-orange-700",
@@ -93,6 +98,8 @@ const ACTION_COLORS: Record<string, string> = {
   demo_request_converted: "bg-blue-100 text-blue-700",
   hubspot_sync_retried: "bg-teal-100 text-teal-700",
   pricing_access_updated: "bg-gray-100 text-gray-700",
+  view_as_started: "bg-amber-100 text-amber-700",
+  view_as_ended: "bg-amber-100 text-amber-700",
 };
 
 const ENTITY_ICONS: Record<string, typeof FileText> = {
@@ -102,6 +109,59 @@ const ENTITY_ICONS: Record<string, typeof FileText> = {
   demo_request: CalendarCheck,
   platform: Settings,
 };
+
+// Human-readable labels for known metadata keys
+const META_LABELS: Record<string, string> = {
+  email: "Email",
+  role: "Role",
+  status: "Status",
+  oldStatus: "Previous Status",
+  newStatus: "New Status",
+  previousState: "Previous State",
+  newState: "New State",
+  oldSubscriptionStatus: "Previous Subscription",
+  newSubscriptionStatus: "New Subscription",
+  subscriptionStatus: "Subscription Status",
+  oldBillingType: "Previous Billing Type",
+  newBillingType: "New Billing Type",
+  billingType: "Billing Type",
+  oldMonthlyPrice: "Previous Monthly Price",
+  newMonthlyPrice: "New Monthly Price",
+  monthlyPrice: "Monthly Price",
+  oldDefaultTrialLength: "Previous Trial Length",
+  newDefaultTrialLength: "New Trial Length",
+  oldDefaultMonthlyPrice: "Previous Default Price",
+  newDefaultMonthlyPrice: "New Default Price",
+  oldManualBillingEnabled: "Manual Billing Was",
+  newManualBillingEnabled: "Manual Billing Now",
+  oldFreeAccessEnabled: "Free Access Was",
+  newFreeAccessEnabled: "Free Access Now",
+  oldPrepaidAccessEnabled: "Prepaid Access Was",
+  newPrepaidAccessEnabled: "Prepaid Access Now",
+  projectName: "Project Name",
+  companyName: "Company Name",
+  inviteKind: "Invite Type",
+  inviteType: "Invite Type",
+  convertedCompanyId: "Converted Company ID",
+  ownerEmail: "Owner Email",
+  name: "New Name",
+  billingNotes: "Billing Notes",
+  accessNotes: "Access Notes",
+};
+
+// Old→new pairs: [oldKey, newKey, label]
+const OLD_NEW_PAIRS: Array<[string, string, string]> = [
+  ["oldStatus", "newStatus", "Status"],
+  ["previousState", "newState", "State"],
+  ["oldSubscriptionStatus", "newSubscriptionStatus", "Subscription"],
+  ["oldBillingType", "newBillingType", "Billing Type"],
+  ["oldMonthlyPrice", "newMonthlyPrice", "Monthly Price"],
+  ["oldDefaultTrialLength", "newDefaultTrialLength", "Trial Length (days)"],
+  ["oldDefaultMonthlyPrice", "newDefaultMonthlyPrice", "Default Monthly Price"],
+  ["oldManualBillingEnabled", "newManualBillingEnabled", "Manual Billing"],
+  ["oldFreeAccessEnabled", "newFreeAccessEnabled", "Free Access"],
+  ["oldPrepaidAccessEnabled", "newPrepaidAccessEnabled", "Prepaid Access"],
+];
 
 function EntityIcon({ type }: { type: string }) {
   const Icon = ENTITY_ICONS[type] ?? FileText;
@@ -126,18 +186,67 @@ function formatTimestamp(ts: string) {
   }
 }
 
+function formatMetaValue(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  return String(v);
+}
+
 function MetadataView({ metadata }: { metadata: Record<string, unknown> | null }) {
+  const [showRaw, setShowRaw] = useState(false);
+
   if (!metadata) return <p className="text-muted-foreground text-sm italic">No additional details</p>;
   const entries = Object.entries(metadata);
   if (entries.length === 0) return <p className="text-muted-foreground text-sm italic">No additional details</p>;
+
+  const pairedKeys = new Set<string>();
+  const renderedPairs: React.ReactNode[] = [];
+
+  for (const [oldKey, newKey, label] of OLD_NEW_PAIRS) {
+    if (metadata[oldKey] !== undefined && metadata[newKey] !== undefined) {
+      pairedKeys.add(oldKey);
+      pairedKeys.add(newKey);
+      renderedPairs.push(
+        <div key={oldKey} className="flex gap-2 text-sm items-center flex-wrap">
+          <span className="text-muted-foreground w-36 shrink-0">{label}</span>
+          <span className="font-medium line-through text-muted-foreground/70">{formatMetaValue(metadata[oldKey])}</span>
+          <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" />
+          <span className="font-medium">{formatMetaValue(metadata[newKey])}</span>
+        </div>
+      );
+    }
+  }
+
+  const remainingEntries = entries.filter(([k]) => !pairedKeys.has(k));
+  const knownEntries = remainingEntries.filter(([k]) => k in META_LABELS);
+  const unknownEntries = remainingEntries.filter(([k]) => !(k in META_LABELS));
+
   return (
-    <div className="space-y-1">
-      {entries.map(([k, v]) => (
+    <div className="space-y-1.5">
+      {renderedPairs}
+      {knownEntries.map(([k, v]) => (
         <div key={k} className="flex gap-2 text-sm">
-          <span className="text-muted-foreground w-36 shrink-0">{k.replace(/_/g, " ")}</span>
-          <span className="font-medium break-all">{String(v ?? "—")}</span>
+          <span className="text-muted-foreground w-36 shrink-0">{META_LABELS[k]}</span>
+          <span className="font-medium break-all">{formatMetaValue(v)}</span>
         </div>
       ))}
+      {unknownEntries.length > 0 && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowRaw(!showRaw)}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mt-1"
+            data-testid="button-toggle-raw-metadata"
+          >
+            {showRaw ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            Advanced details
+          </button>
+          {showRaw && (
+            <pre className="mt-2 text-xs bg-muted rounded-md p-3 overflow-x-auto text-muted-foreground">
+              {JSON.stringify(Object.fromEntries(unknownEntries), null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -154,6 +263,18 @@ export default function AdminAuditLog() {
   const [endDate, setEndDate] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const [page, setPage] = useState(0);
+
+  const hasActiveFilters = search !== "" || actionFilter !== "all" || entityTypeFilter !== "all" || companyFilter !== "all" || !!(startDate || endDate);
+
+  const resetFilters = () => {
+    setSearch("");
+    setActionFilter("all");
+    setEntityTypeFilter("all");
+    setCompanyFilter("all");
+    setStartDate("");
+    setEndDate("");
+    setPage(0);
+  };
 
   const params = useMemo(() => {
     const p: Record<string, string> = {
@@ -193,10 +314,7 @@ export default function AdminAuditLog() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const handleSearchChange = (v: string) => {
-    setSearch(v);
-    setPage(0);
-  };
+  const handleSearchChange = (v: string) => { setSearch(v); setPage(0); };
   const handleActionChange = (v: string) => { setActionFilter(v); setPage(0); };
   const handleEntityTypeChange = (v: string) => { setEntityTypeFilter(v); setPage(0); };
   const handleCompanyChange = (v: string) => { setCompanyFilter(v); setPage(0); };
@@ -230,7 +348,7 @@ export default function AdminAuditLog() {
         {/* Filters */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-48">
                 <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -315,6 +433,19 @@ export default function AdminAuditLog() {
                   </button>
                 )}
               </div>
+
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="h-9 text-muted-foreground hover:text-foreground gap-1.5"
+                  data-testid="button-reset-filters"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Reset Filters
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -327,11 +458,24 @@ export default function AdminAuditLog() {
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             ) : events.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center" data-testid="audit-empty-state">
                 <div className="p-3 bg-muted rounded-full">
                   <FileText className="w-6 h-6 text-muted-foreground" />
                 </div>
-                <p className="text-sm text-muted-foreground">No audit events found.</p>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {hasActiveFilters ? "No audit events match your filters." : "No audit activity found."}
+                  </p>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={resetFilters}
+                      className="text-xs text-primary hover:underline mt-1"
+                      data-testid="button-reset-filters-empty"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -362,7 +506,7 @@ export default function AdminAuditLog() {
                         <TableCell>
                           <div className="flex items-center gap-1.5 text-sm">
                             <EntityIcon type={event.entityType} />
-                            <span className="text-muted-foreground text-xs">{event.entityType}</span>
+                            <span className="text-muted-foreground text-xs">{event.entityType.replace(/_/g, " ")}</span>
                             {event.entityName && (
                               <span className="font-medium truncate max-w-40">{event.entityName}</span>
                             )}

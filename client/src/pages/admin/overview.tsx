@@ -53,6 +53,7 @@ const ACTION_LABELS: Record<string, string> = {
   company_suspended: "Company Suspended",
   company_reactivated: "Company Reactivated",
   user_approved: "User Approved",
+  user_rejected: "User Rejected",
   user_disabled: "User Disabled",
   user_reactivated: "User Reactivated",
   password_reset_sent: "Password Reset Sent",
@@ -62,6 +63,8 @@ const ACTION_LABELS: Record<string, string> = {
   demo_request_converted: "Lead Converted",
   hubspot_sync_retried: "HubSpot Sync Retried",
   pricing_access_updated: "Pricing & Access Updated",
+  view_as_started: "View As Started",
+  view_as_ended: "View As Ended",
 };
 
 export default function AdminOverview() {

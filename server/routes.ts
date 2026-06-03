@@ -899,7 +899,7 @@ export async function registerRoutes(
         entityId: target.id,
         entityName: target.name ?? target.username,
         companyId: target.companyId ?? null,
-        metadata: { email: target.email, role: target.role },
+        metadata: { email: target.email, role: target.role, previousState: target.isDisabled ? "disabled" : "active", newState: "disabled" },
       });
     } catch (error) { next(error); }
   });
@@ -916,7 +916,7 @@ export async function registerRoutes(
         entityId: target.id,
         entityName: target.name ?? target.username,
         companyId: target.companyId ?? null,
-        metadata: { email: target.email, role: target.role },
+        metadata: { email: target.email, role: target.role, previousState: target.isDisabled ? "disabled" : "active", newState: "active" },
       });
     } catch (error) { next(error); }
   });
@@ -1015,6 +1015,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid subscription data", errors: parsed.error.flatten().fieldErrors });
       }
       const { subscriptionStatus, trialStartedAt, trialEndsAt, prepaidThroughDate, billingType, monthlyPrice, billingNotes, accessNotes } = parsed.data;
+      const beforeSub = await storage.getCompany(req.params.id);
       const updateData: Partial<InsertCompany> = {};
       if (subscriptionStatus !== undefined) {
         updateData.subscriptionStatus = subscriptionStatus;
@@ -1032,13 +1033,28 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+      const subMeta: Record<string, unknown> = {};
+      if (subscriptionStatus !== undefined) {
+        subMeta.oldSubscriptionStatus = beforeSub?.subscriptionStatus ?? null;
+        subMeta.newSubscriptionStatus = subscriptionStatus;
+      }
+      if (billingType !== undefined) {
+        subMeta.oldBillingType = beforeSub?.billingType ?? null;
+        subMeta.newBillingType = billingType;
+      }
+      if (monthlyPrice !== undefined) {
+        subMeta.oldMonthlyPrice = beforeSub?.monthlyPrice ?? null;
+        subMeta.newMonthlyPrice = monthlyPrice;
+      }
+      if (billingNotes !== undefined) subMeta.billingNotes = billingNotes;
+      if (accessNotes !== undefined) subMeta.accessNotes = accessNotes;
       logAuditEvent(req, req.user as User, {
         action: "company_access_updated",
         entityType: "company",
         entityId: company.id,
         entityName: company.name,
         companyId: company.id,
-        metadata: updateData as Record<string, unknown>,
+        metadata: subMeta,
       });
     } catch (error) { next(error); }
   });
@@ -1046,6 +1062,7 @@ export async function registerRoutes(
   // ── Admin: Suspend / Reactivate company ──────────────────────────────────────
   app.patch("/api/admin/companies/:id/suspend", requireAdmin, async (req, res, next) => {
     try {
+      const beforeSuspend = await storage.getCompany(req.params.id);
       const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "suspended" });
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
@@ -1055,12 +1072,14 @@ export async function registerRoutes(
         entityId: company.id,
         entityName: company.name,
         companyId: company.id,
+        metadata: { previousState: beforeSuspend?.subscriptionStatus ?? null, newState: "suspended" },
       });
     } catch (error) { next(error); }
   });
 
   app.patch("/api/admin/companies/:id/reactivate", requireAdmin, async (req, res, next) => {
     try {
+      const beforeReactivate = await storage.getCompany(req.params.id);
       const company = await storage.updateCompany(req.params.id, { subscriptionStatus: "active" });
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
@@ -1070,6 +1089,7 @@ export async function registerRoutes(
         entityId: company.id,
         entityName: company.name,
         companyId: company.id,
+        metadata: { previousState: beforeReactivate?.subscriptionStatus ?? null, newState: "active" },
       });
     } catch (error) { next(error); }
   });
@@ -1189,6 +1209,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
       const { name, subscriptionStatus, billingType, monthlyPrice, trialStartedAt, trialEndsAt, prepaidThroughDate, billingNotes, adminNotes, accessNotes } = parsed.data;
+      const beforeCompany = await storage.getCompany(req.params.id);
       const updateData: Partial<InsertCompany> = {};
       if (name !== undefined) updateData.name = name;
       if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
@@ -1203,15 +1224,29 @@ export async function registerRoutes(
       const company = await storage.updateCompany(req.params.id, updateData);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
+      const genMeta: Record<string, unknown> = {};
+      if (name !== undefined) genMeta.name = name;
+      if (subscriptionStatus !== undefined) {
+        genMeta.oldSubscriptionStatus = beforeCompany?.subscriptionStatus ?? null;
+        genMeta.newSubscriptionStatus = subscriptionStatus;
+      }
+      if (billingType !== undefined) {
+        genMeta.oldBillingType = beforeCompany?.billingType ?? null;
+        genMeta.newBillingType = billingType;
+      }
+      if (monthlyPrice !== undefined) {
+        genMeta.oldMonthlyPrice = beforeCompany?.monthlyPrice ?? null;
+        genMeta.newMonthlyPrice = monthlyPrice;
+      }
+      if (billingNotes !== undefined) genMeta.billingNotes = billingNotes;
+      if (accessNotes !== undefined) genMeta.accessNotes = accessNotes;
       logAuditEvent(req, req.user as User, {
         action: "company_access_updated",
         entityType: "company",
         entityId: company.id,
         entityName: company.name,
         companyId: company.id,
-        metadata: Object.fromEntries(
-          Object.entries(updateData).filter(([, v]) => v !== undefined)
-        ) as Record<string, unknown>,
+        metadata: genMeta,
       });
     } catch (error) { next(error); }
   });
@@ -1238,6 +1273,7 @@ export async function registerRoutes(
       if (parsed.data.followUpDate !== undefined) {
         payload.followUpDate = parsed.data.followUpDate ? new Date(parsed.data.followUpDate) : null;
       }
+      const beforeLead = await storage.getDemoRequest(req.params.id);
       const updated = await storage.updateDemoRequest(req.params.id, payload as Parameters<typeof storage.updateDemoRequest>[1]);
       if (!updated) return res.status(404).json({ message: "Demo request not found" });
       res.json(updated);
@@ -1248,7 +1284,11 @@ export async function registerRoutes(
         entityId: updated.id,
         entityName: updated.name,
         companyId: isConversion ? (updated.convertedCompanyId ?? null) : null,
-        metadata: { status: updated.status, convertedCompanyId: updated.convertedCompanyId ?? null },
+        metadata: {
+          oldStatus: beforeLead?.status ?? null,
+          newStatus: updated.status,
+          convertedCompanyId: updated.convertedCompanyId ?? null,
+        },
       });
     } catch (error) { next(error); }
   });
@@ -1584,14 +1624,36 @@ export async function registerRoutes(
       });
       const parsed = settingsSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const beforeSettings = await storage.getPlatformSettings();
       const updated = await storage.updatePlatformSettings(parsed.data);
       res.json(updated);
+      const pricingMeta: Record<string, unknown> = {};
+      if (parsed.data.defaultTrialLength !== undefined) {
+        pricingMeta.oldDefaultTrialLength = beforeSettings?.defaultTrialLength ?? null;
+        pricingMeta.newDefaultTrialLength = parsed.data.defaultTrialLength;
+      }
+      if (parsed.data.defaultMonthlyPrice !== undefined) {
+        pricingMeta.oldDefaultMonthlyPrice = beforeSettings?.defaultMonthlyPrice ?? null;
+        pricingMeta.newDefaultMonthlyPrice = parsed.data.defaultMonthlyPrice;
+      }
+      if (parsed.data.manualBillingEnabled !== undefined) {
+        pricingMeta.oldManualBillingEnabled = beforeSettings?.manualBillingEnabled ?? null;
+        pricingMeta.newManualBillingEnabled = parsed.data.manualBillingEnabled;
+      }
+      if (parsed.data.freeAccessEnabled !== undefined) {
+        pricingMeta.oldFreeAccessEnabled = beforeSettings?.freeAccessEnabled ?? null;
+        pricingMeta.newFreeAccessEnabled = parsed.data.freeAccessEnabled;
+      }
+      if (parsed.data.prepaidAccessEnabled !== undefined) {
+        pricingMeta.oldPrepaidAccessEnabled = beforeSettings?.prepaidAccessEnabled ?? null;
+        pricingMeta.newPrepaidAccessEnabled = parsed.data.prepaidAccessEnabled;
+      }
       logAuditEvent(req, req.user as User, {
         action: "pricing_access_updated",
         entityType: "platform",
         entityId: "platform",
         entityName: "Platform Settings",
-        metadata: parsed.data as Record<string, unknown>,
+        metadata: pricingMeta,
       });
     } catch (error) { next(error); }
   });
