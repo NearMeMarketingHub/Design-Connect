@@ -236,7 +236,7 @@ export default function AdminCompanies() {
                 <Building2 className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">No companies registered yet.</p>
+                <p className="text-sm font-medium text-foreground">No companies found.</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Create the first company account to get started.</p>
               </div>
             </CardContent>

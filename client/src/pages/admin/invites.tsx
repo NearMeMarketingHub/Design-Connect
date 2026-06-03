@@ -549,9 +549,9 @@ export default function AdminInvites() {
             <CardContent className="py-14 text-center text-muted-foreground space-y-1">
               <Mail className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="font-medium">
-                {adminInvites.length === 0 ? "No invites have been sent yet." : "No invites match your filters."}
+                {hasFilters ? "No invitations match your filters." : "No invitations found."}
               </p>
-              {hasFilters && <p className="text-xs">Try clearing filters to see all invites.</p>}
+              {hasFilters && <p className="text-xs">Try clearing filters to see all invitations.</p>}
             </CardContent>
           </Card>
         ) : (
