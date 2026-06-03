@@ -1,0 +1,86 @@
+Audit Log Phase 6A is mostly implemented. Please make this small cleanup pass before we move to the next phase.
+
+1. Add an audit log database migration.
+
+The audit_logs table exists in shared/schema.ts, but there does not appear to be a migration file for it.
+
+Add a migration file to create the audit_logs table with the fields currently defined in shared/schema.ts:
+
+* id
+* actor_user_id
+* actor_name
+* actor_email
+* action
+* entity_type
+* entity_id
+* entity_name
+* company_id
+* project_id
+* metadata
+* ip_address
+* user_agent
+* created_at
+
+Use indexes where useful for:
+
+* created_at
+* action
+* entity_type
+* company_id
+* actor_user_id
+
+2. Improve companyId on invite audit events.
+
+For project/client invite audit logs, derive companyId from:
+projectId → project.contractorId → contractor user.companyId
+
+Use that companyId when logging:
+
+* invite_resent
+* invite_revoked
+
+This should apply to both Super Admin invite endpoints and project-level invite endpoints where possible.
+
+3. Log company-owner invite resend/revoke actions too.
+
+The project-level invite resend/revoke endpoints currently appear to log audit events only when the acting user is a Super Admin.
+
+Because invite access is security-relevant, log invite_resent and invite_revoked for authorized company owners/company admins too.
+
+For those events:
+
+* actor should be the logged-in company owner/company admin
+* action should be invite_resent or invite_revoked
+* entityType should be invite
+* entityId should be the invite id
+* entityName should be the invited email
+* companyId should be the project’s company id
+* projectId should be the project id
+* metadata should include email, projectName, and inviteKind
+
+4. Add audit logging for user rejection/removal.
+
+When a Super Admin rejects a pending user/access request, log an event such as:
+
+* action: user_rejected
+* entityType: user
+* entityId: user id, if available
+* entityName: user name or username
+* companyId: user.companyId if available
+* metadata: email and role if available
+
+If the current reject route deletes the user immediately, fetch the user first so the audit log has useful details before deletion.
+
+5. Improve demo request conversion audit company link.
+
+When a demo request is converted to a company and convertedCompanyId is provided, set companyId on the audit event to convertedCompanyId.
+
+Keep convertedCompanyId in metadata too.
+
+6. Keep this focused.
+
+Do not redesign the Audit Log UI.
+Do not change View As User.
+Do not change Companies, Users, Invites, Demo Requests, Pricing & Access, or Admin Tools except where needed for the audit logging fixes above.
+Do not reintroduce subscription tiers.
+Do not reintroduce public account creation.
