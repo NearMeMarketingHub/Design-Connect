@@ -1,0 +1,80 @@
+Phase 7B is partially complete. Please finish the View As session timeout and audit polish.
+
+Do not change BuildVision branding.
+Do not reintroduce public account creation.
+Do not reintroduce subscription tiers.
+Do not add HubSpot sync outside demo requests.
+
+1. Add clearer View As session timing metadata.
+
+When a View As session starts, store:
+- admin user id
+- startedAt
+- lastActivityAt
+
+If practical, update lastActivityAt on authenticated requests while a View As session is active.
+
+2. Add inactivity timeout.
+
+End View As sessions after 30 minutes of inactivity.
+
+If lastActivityAt is not practical to update everywhere, use a 30-minute session timeout for now instead of 2 hours.
+
+Optional if easy:
+- also keep a 2-hour maximum hard session length from startedAt
+
+3. Log timeout endings.
+
+When a View As session ends due to timeout, log:
+- action: view_as_ended
+- entityType: user
+- entityId: viewed user id
+- entityName: viewed user name/email
+- metadata.endReason: timeout
+- metadata.viewedUserId
+- metadata.viewedUserEmail
+- metadata.viewedUserRole
+- metadata.viewedUserName
+- metadata.startedAt
+- metadata.endedAt
+- metadata.durationMs
+
+Use the stored admin user as the audit actor.
+
+4. Improve manual exit audit metadata.
+
+When a Super Admin clicks Exit View As, log:
+- action: view_as_ended
+- metadata.endReason: manual
+- metadata.startedAt
+- metadata.endedAt
+- metadata.durationMs
+- viewed user details
+
+5. Update timeout message.
+
+If using a 30-minute inactivity timeout, update the frontend toast/message so it does not say “2-hour View As session has expired.”
+
+Use:
+“Your View As session ended due to inactivity. You’ve been restored to your admin account.”
+
+6. Keep clear Audit Log labels.
+
+Keep:
+- View As Started
+- View As Ended
+
+Make sure the Audit Log detail drawer shows:
+- Viewed User
+- Viewed Role
+- Target Dashboard
+- End Reason
+- Duration
+- Started At
+- Ended At
+
+7. Keep this focused.
+
+Do not redesign View As User.
+Do not redesign Audit Log beyond displaying the new metadata clearly.
+Do not change Companies, Users, Invites, Demo Requests, Projects, Pricing & Access, or Admin Tools.
