@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.viewAsExpired && !options?.suppressExpiredToast) {
         toast({
           title: "View As session ended",
-          description: "Your 2-hour View As session has expired. You've been restored to your admin account.",
+          description: "Your View As session ended due to inactivity. You've been restored to your admin account.",
           variant: "default",
         });
         setUser(fetchedUser);

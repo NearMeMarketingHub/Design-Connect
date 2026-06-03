@@ -25,8 +25,8 @@ import { logAuditEvent } from "./auditLog";
 
 const PgSession = connectPgSimple(session);
 
-// View-as session timeout: 2 hours
-const VIEW_AS_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;  // 30 minutes of inactivity
+const HARD_CAP_MS = 2 * 60 * 60 * 1000;         // 2-hour absolute maximum
 
 export async function registerRoutes(
   httpServer: Server,
@@ -96,31 +96,64 @@ export async function registerRoutes(
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Global View-As timeout enforcement: runs on every request after passport
-  // deserializes the session. If adminData.startedAt is older than the timeout,
-  // auto-restore the admin identity and set a one-time session flag so the next
-  // GET /api/auth/user call can surface a toast to the client.
+  // Global View-As timeout enforcement: runs on every authenticated request after
+  // passport deserializes the session. Enforces 30-min inactivity + 2-hr hard cap.
+  // IMPORTANT: expiry is checked BEFORE lastActivityAt is updated so that inactivity
+  // on a stale session is never masked by a same-request refresh.
   app.use(async (req: any, res, next) => {
     const session = req.session as any;
-    if (!req.isAuthenticated() || !session.adminData?.startedAt) return next();
-    const elapsed = Date.now() - session.adminData.startedAt;
-    if (elapsed <= VIEW_AS_TIMEOUT_MS) return next();
+    if (!req.isAuthenticated() || !session.adminData?.userId) return next();
 
-    // Session expired — restore admin
-    const adminId = session.adminData.userId;
-    try {
-      const adminUser = await storage.getUser(adminId);
-      delete session.adminData;
-      if (adminUser) {
-        await new Promise<void>((resolve) => {
-          req.logIn(adminUser, { keepSessionInfo: true }, () => resolve());
-        });
+    // Step 1: read timing data
+    const { userId: adminId, startedAt = 0, lastActivityAt } = session.adminData;
+    const now = Date.now();
+    const lastActivity = lastActivityAt ?? startedAt;
+
+    // Step 2: check expiry (inactivity OR hard cap) — before any writes
+    const inactivityExpired = (now - lastActivity) > INACTIVITY_TIMEOUT_MS;
+    const hardCapExpired = (now - startedAt) > HARD_CAP_MS;
+
+    if (inactivityExpired || hardCapExpired) {
+      // Step 3: expire — log audit event, restore admin, clear session data
+      const viewedUser = req.user as User;
+      try {
+        const adminUser = await storage.getUser(adminId);
+        if (adminUser && viewedUser) {
+          const endedAt = now;
+          const durationMs = endedAt - startedAt;
+          logAuditEvent(req, adminUser, {
+            action: "view_as_ended",
+            entityType: "user",
+            entityId: viewedUser.id,
+            entityName: viewedUser.name ?? viewedUser.username,
+            companyId: viewedUser.companyId ?? null,
+            metadata: {
+              endReason: "timeout",
+              viewedUserId: viewedUser.id,
+              viewedUserEmail: viewedUser.email,
+              viewedUserRole: viewedUser.role,
+              viewedUserName: viewedUser.name ?? viewedUser.username,
+              startedAt,
+              endedAt,
+              durationMs,
+            },
+          });
+        }
+        delete session.adminData;
+        if (adminUser) {
+          await new Promise<void>((resolve) => {
+            req.logIn(adminUser, { keepSessionInfo: true }, () => resolve());
+          });
+        }
+        session.viewAsExpired = true;
+      } catch {
+        delete session.adminData;
       }
-      // One-time flag so /api/auth/user can relay the expiry event to the client
-      session.viewAsExpired = true;
-    } catch {
-      delete session.adminData;
+      return next();
     }
+
+    // Step 4: not expired — update lastActivityAt now (after the expiry check)
+    session.adminData.lastActivityAt = now;
     next();
   });
 
@@ -1709,13 +1742,17 @@ export async function registerRoutes(
 
   // ── Admin: View As User ───────────────────────────────────────────────────────
 
-  // Custom middleware: exit requires the view-as session to be active (req.user is viewed user)
+  // Custom middleware: exit requires the view-as session to be active (req.user is viewed user).
+  // The global middleware already clears adminData on expiry, so the userId check is usually
+  // sufficient; the inactivity/hard-cap checks here are defense-in-depth.
   const requireViewAsSession = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const session = req.session as any;
     if (!session.adminData?.userId) return res.status(403).json({ message: "No active view-as session" });
-    const startedAt = session.adminData.startedAt ?? 0;
-    if (Date.now() - startedAt > VIEW_AS_TIMEOUT_MS) {
+    const { startedAt = 0, lastActivityAt } = session.adminData;
+    const now = Date.now();
+    const lastActivity = lastActivityAt ?? startedAt;
+    if ((now - lastActivity) > INACTIVITY_TIMEOUT_MS || (now - startedAt) > HARD_CAP_MS) {
       return res.status(403).json({ message: "View-as session expired" });
     }
     next();
@@ -1803,8 +1840,9 @@ export async function registerRoutes(
 
       const targetDashboard = target.role === "company_owner" ? "/company/dashboard" : "/client/dashboard";
 
-      // Store admin identity before swapping session (with timestamp for timeout)
-      (req.session as any).adminData = { userId: admin.id, startedAt: Date.now() };
+      // Store admin identity before swapping session (timestamps for inactivity + hard-cap)
+      const sessionStartedAt = Date.now();
+      (req.session as any).adminData = { userId: admin.id, startedAt: sessionStartedAt, lastActivityAt: sessionStartedAt };
 
       // Swap Passport session to viewed user, keeping existing session data (adminData)
       await new Promise<void>((resolve, reject) => {
@@ -1840,6 +1878,8 @@ export async function registerRoutes(
       if (!admin) return res.status(404).json({ message: "Admin user not found" });
 
       const viewedUser = req.user as User;
+      const exitedAt = Date.now();
+      const sessionStartedAt = session.adminData.startedAt ?? exitedAt;
 
       logAuditEvent(req, admin, {
         action: "view_as_ended",
@@ -1848,10 +1888,14 @@ export async function registerRoutes(
         entityName: viewedUser.name ?? viewedUser.username,
         companyId: viewedUser.companyId ?? null,
         metadata: {
+          endReason: "manual",
           viewedUserId: viewedUser.id,
           viewedUserEmail: viewedUser.email,
           viewedUserRole: viewedUser.role,
           viewedUserName: viewedUser.name ?? viewedUser.username,
+          startedAt: sessionStartedAt,
+          endedAt: exitedAt,
+          durationMs: exitedAt - sessionStartedAt,
         },
       });
 

@@ -152,6 +152,10 @@ const META_LABELS: Record<string, string> = {
   viewedUserRole: "Viewed User Role",
   viewedUserName: "Viewed User Name",
   targetDashboard: "Target Dashboard",
+  endReason: "End Reason",
+  startedAt: "Started At",
+  endedAt: "Ended At",
+  durationMs: "Duration",
 };
 
 // Old→new pairs: [oldKey, newKey, label]
@@ -197,6 +201,26 @@ function formatMetaValue(v: unknown): string {
   return String(v);
 }
 
+function formatDuration(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+  return parts.join(" ");
+}
+
+function formatMetaValueByKey(key: string, v: unknown): string {
+  if (key === "durationMs" && typeof v === "number") return formatDuration(v);
+  if ((key === "startedAt" || key === "endedAt") && typeof v === "number") {
+    try { return format(new Date(v), "MMM d, yyyy HH:mm:ss"); } catch { return String(v); }
+  }
+  return formatMetaValue(v);
+}
+
 function MetadataView({ metadata }: { metadata: Record<string, unknown> | null }) {
   const [showRaw, setShowRaw] = useState(false);
 
@@ -232,7 +256,7 @@ function MetadataView({ metadata }: { metadata: Record<string, unknown> | null }
       {knownEntries.map(([k, v]) => (
         <div key={k} className="flex gap-2 text-sm">
           <span className="text-muted-foreground w-36 shrink-0">{META_LABELS[k]}</span>
-          <span className="font-medium break-all">{formatMetaValue(v)}</span>
+          <span className="font-medium break-all">{formatMetaValueByKey(k, v)}</span>
         </div>
       ))}
       {unknownEntries.length > 0 && (
