@@ -139,7 +139,8 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                 const Icon = item.icon;
                 const isActive =
                   location === item.href ||
-                  (item.href !== "/admin/dashboard" && location.startsWith(item.href));
+                  (item.href !== "/admin/dashboard" && location.startsWith(item.href)) ||
+                  (item.href === "/admin/projects" && location.startsWith("/admin/project/"));
                 return (
                   <Link key={item.href} href={item.href}>
                     <div

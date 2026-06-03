@@ -819,6 +819,28 @@ export default function AdminUsers() {
               </SelectContent>
             </Select>
           )}
+
+          {(search !== "" || roleFilter !== "all" || statusFilter !== "all" || (!filterCompanyIdFromUrl && companyFilter !== "all")) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-muted-foreground hover:text-foreground gap-1.5"
+              onClick={() => {
+                setSearch("");
+                setRoleFilter("all");
+                setStatusFilter("all");
+                setCompanyFilter("all");
+                allPag.reset();
+                ownersPag.reset();
+                teamPag.reset();
+                clientsPag.reset();
+              }}
+              data-testid="button-reset-user-filters"
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset Filters
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}

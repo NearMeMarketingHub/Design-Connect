@@ -45,6 +45,7 @@ import {
   PlayCircle,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 
 interface AdminCompany {
@@ -89,6 +90,9 @@ export default function AdminCompanies() {
   useEffect(() => {
     setCompaniesPage(1);
   }, [companySearch, companyStatusFilter]);
+
+  const hasActiveFilters = companySearch !== "" || companyStatusFilter !== "all";
+  const clearFilters = () => { setCompanySearch(""); setCompanyStatusFilter("all"); };
 
   const { data: allCompaniesRaw = [] } = useQuery<AdminCompany[]>({
     queryKey: ["/api/admin/companies"],
@@ -211,12 +215,48 @@ export default function AdminCompanies() {
               </button>
             ))}
           </div>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-muted-foreground hover:text-foreground gap-1.5"
+              onClick={clearFilters}
+              data-testid="button-clear-company-filters"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Filters
+            </Button>
+          )}
         </div>
 
         {allCompaniesRaw.length === 0 ? (
           <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              No companies registered yet.
+            <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center" data-testid="companies-empty-state">
+              <div className="p-3 bg-muted rounded-full">
+                <Building2 className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">No companies registered yet.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Create the first company account to get started.</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : companies.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center" data-testid="companies-filtered-empty-state">
+              <div className="p-3 bg-muted rounded-full">
+                <Building2 className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">No companies match your filters.</p>
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-primary hover:underline mt-1"
+                  data-testid="button-clear-filters-empty"
+                >
+                  Clear filters
+                </button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -238,16 +278,6 @@ export default function AdminCompanies() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedCompanies.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={10}
-                        className="text-center text-muted-foreground py-8"
-                      >
-                        No companies match your search.
-                      </TableCell>
-                    </TableRow>
-                  )}
                   {pagedCompanies.map((company) => {
                     const trialLengthDays = platformSettings?.defaultTrialLength ?? 7;
                     const trialEnd = company.trialEndsAt
