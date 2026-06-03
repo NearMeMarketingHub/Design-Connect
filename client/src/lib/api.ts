@@ -94,7 +94,7 @@ class ApiClient {
       return { user: null as Omit<User, "password"> | null };
     }
     
-    return response.json() as Promise<{ user: Omit<User, "password"> }>;
+    return response.json() as Promise<{ user: Omit<User, "password"> | null; viewAsAdmin?: Omit<User, "password"> | null; viewAsExpired?: boolean }>;
   }
 
   // Project methods

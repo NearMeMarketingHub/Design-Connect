@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { User } from "@shared/schema";
 import { api } from "./api";
+import { toast } from "@/hooks/use-toast";
 
 export type PortalType = 'client' | 'contractor' | 'admin';
 
@@ -32,11 +33,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuth = async (options?: { suppressExpiredToast?: boolean }) => {
     try {
       const result = await api.getCurrentUser();
       const fetchedUser = result.user || null;
       const fetchedViewAsAdmin = result.viewAsAdmin || null;
+
+      // If the view-as session expired server-side, show a toast and restore admin state
+      if (result.viewAsExpired && !options?.suppressExpiredToast) {
+        toast({
+          title: "View As session ended",
+          description: "Your 2-hour View As session has expired. You've been restored to your admin account.",
+          variant: "default",
+        });
+        setUser(fetchedUser);
+        setViewAsAdmin(null);
+        return;
+      }
 
       // If user is an unapproved company_owner or contractor (and not in view-as mode), treat as not authenticated
       const isContractorPortalRole = fetchedUser?.role === 'contractor' || fetchedUser?.role === 'company_owner';

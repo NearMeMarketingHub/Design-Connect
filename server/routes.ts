@@ -25,6 +25,9 @@ import { logAuditEvent } from "./auditLog";
 
 const PgSession = connectPgSimple(session);
 
+// View-as session timeout: 2 hours
+const VIEW_AS_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -92,6 +95,34 @@ export async function registerRoutes(
   // Passport setup
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // Global View-As timeout enforcement: runs on every request after passport
+  // deserializes the session. If adminData.startedAt is older than the timeout,
+  // auto-restore the admin identity and set a one-time session flag so the next
+  // GET /api/auth/user call can surface a toast to the client.
+  app.use(async (req: any, res, next) => {
+    const session = req.session as any;
+    if (!req.isAuthenticated() || !session.adminData?.startedAt) return next();
+    const elapsed = Date.now() - session.adminData.startedAt;
+    if (elapsed <= VIEW_AS_TIMEOUT_MS) return next();
+
+    // Session expired — restore admin
+    const adminId = session.adminData.userId;
+    try {
+      const adminUser = await storage.getUser(adminId);
+      delete session.adminData;
+      if (adminUser) {
+        await new Promise<void>((resolve) => {
+          req.logIn(adminUser, { keepSessionInfo: true }, () => resolve());
+        });
+      }
+      // One-time flag so /api/auth/user can relay the expiry event to the client
+      session.viewAsExpired = true;
+    } catch {
+      delete session.adminData;
+    }
+    next();
+  });
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
@@ -336,8 +367,16 @@ export async function registerRoutes(
     if (req.isAuthenticated()) {
       const user = req.user as User;
       const { password: _, ...userWithoutPassword } = user;
-      // Include viewAsAdmin context when a view-as session is active
       const session = req.session as any;
+
+      // If the global timeout middleware just expired a view-as session, relay
+      // that to the client as a one-time flag so it can show a toast.
+      if (session.viewAsExpired) {
+        delete session.viewAsExpired;
+        return res.json({ user: userWithoutPassword, viewAsAdmin: null, viewAsExpired: true });
+      }
+
+      // Include viewAsAdmin context when a view-as session is active
       let viewAsAdmin = null;
       if (session.adminData?.userId) {
         const adminUser = await storage.getUser(session.adminData.userId);
@@ -1675,6 +1714,10 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const session = req.session as any;
     if (!session.adminData?.userId) return res.status(403).json({ message: "No active view-as session" });
+    const startedAt = session.adminData.startedAt ?? 0;
+    if (Date.now() - startedAt > VIEW_AS_TIMEOUT_MS) {
+      return res.status(403).json({ message: "View-as session expired" });
+    }
     next();
   };
 
@@ -1760,8 +1803,8 @@ export async function registerRoutes(
 
       const targetDashboard = target.role === "company_owner" ? "/company/dashboard" : "/client/dashboard";
 
-      // Store admin identity before swapping session
-      (req.session as any).adminData = { userId: admin.id };
+      // Store admin identity before swapping session (with timestamp for timeout)
+      (req.session as any).adminData = { userId: admin.id, startedAt: Date.now() };
 
       // Swap Passport session to viewed user, keeping existing session data (adminData)
       await new Promise<void>((resolve, reject) => {
