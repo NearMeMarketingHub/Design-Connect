@@ -390,7 +390,43 @@ export async function registerRoutes(
     })(req, res, next);
   });
 
-  app.post("/api/auth/logout", (req, res) => {
+  app.post("/api/auth/logout", async (req, res) => {
+    const session = req.session as any;
+
+    // If a View As session is active, write a view_as_ended audit event before
+    // logging out. Best-effort — any error is swallowed so logout always succeeds.
+    if (req.isAuthenticated() && session.adminData?.userId) {
+      const viewedUser = req.user as User;
+      const { userId: adminId, startedAt = Date.now() } = session.adminData;
+      try {
+        const adminUser = await storage.getUser(adminId);
+        if (adminUser && viewedUser) {
+          const endedAt = Date.now();
+          logAuditEvent(req, adminUser, {
+            action: "view_as_ended",
+            entityType: "user",
+            entityId: viewedUser.id,
+            entityName: viewedUser.name ?? viewedUser.username,
+            companyId: viewedUser.companyId ?? null,
+            metadata: {
+              endReason: "logout",
+              viewedUserId: viewedUser.id,
+              viewedUserEmail: viewedUser.email,
+              viewedUserRole: viewedUser.role,
+              viewedUserName: viewedUser.name ?? viewedUser.username,
+              startedAt,
+              endedAt,
+              durationMs: endedAt - startedAt,
+            },
+          });
+        }
+      } catch {
+        // best-effort — continue to logout regardless of audit failure
+      }
+      delete session.adminData;
+      delete session.viewAsExpired;
+    }
+
     req.logout(() => {
       res.json({ message: "Logged out successfully" });
     });
