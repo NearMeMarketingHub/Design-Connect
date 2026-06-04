@@ -1,0 +1,144 @@
+Phase 9B: Make the Estimator tool save and load real estimates.
+
+Context:
+Phase 9A cleaned up company-owner financial tool routing, security, real dashboard data, and company data isolation. Manual Billing & Access now controls whether company users can create financial records.
+
+Now we need the Estimator tool to work with real estimate records instead of being only a calculator/mock workflow.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not reintroduce public account creation.
+Do not build production sheets, payout schedules, Gantt, board views, or Avery formulas.
+Do not expand subcontractor/notary functionality.
+Do not add Stripe in this phase.
+
+Goal:
+Company owners and authorized company admins should be able to create, save, load, and view real estimates for their own company’s projects.
+
+1. Review existing estimate schema/routes first.
+
+Before changing the UI, inspect:
+
+* shared/schema.ts estimate and estimate line item tables
+* server/routes.ts estimate endpoints
+* server/storage.ts estimate storage methods
+* client/src/pages/estimator.tsx
+* client/src/pages/sales-dashboard.tsx
+
+Reuse the existing estimate and estimate line item tables/routes where possible.
+
+2. Company ownership/security requirements.
+
+Estimator actions must respect the Phase 9A security model:
+
+* non-admin company users must provide a valid projectId when saving an estimate
+* project must belong to the user’s company
+* users cannot save estimates to another company’s project
+* users cannot load/view estimates from another company
+* blocked companies cannot create new estimates
+* active, prepaid, and free companies can create estimates
+
+Do not weaken the existing estimate route protections.
+
+3. Update Estimator page to load real company projects.
+
+On the Estimator page:
+
+* load company-scoped projects from /api/projects
+* require selecting a project before saving an estimate
+* show a clean empty state if there are no projects
+* do not use hardcoded project/client data
+
+4. Save a real estimate.
+
+Add a Save Estimate action that creates a real estimate using the existing /api/estimates endpoint.
+
+The saved estimate should include:
+
+* projectId
+* estimate name/title if supported
+* status, default draft
+* total amount
+* line items from the estimator
+* notes/description if supported
+
+If the current schema does not support estimate title/name or notes cleanly, do not force a schema redesign in this phase. Use the existing fields and leave missing polish for a later phase.
+
+5. Save estimate line items.
+
+Estimator line items should be saved to the estimate line items table through the existing backend route behavior if available.
+
+Each line item should include where supported:
+
+* description
+* category/type
+* quantity
+* unit cost/rate
+* total amount
+
+If the current line item schema uses different field names, map the estimator data to the existing schema.
+
+6. Load existing estimates.
+
+On the Estimator page, add a way to view/load existing estimates for the company’s projects.
+
+This can be:
+
+* a list/table of recent estimates
+* a project-specific estimate dropdown
+* or a “Load Estimate” panel
+
+Show:
+
+* project
+* status
+* total amount
+* created date
+* actions:
+
+  * View / Load
+
+7. Editing behavior.
+
+For this phase, keep editing simple.
+
+Preferred:
+
+* Loading an existing estimate populates the estimator UI
+* Saving after loading either updates the existing estimate if update endpoints exist, or creates a new copy if updates are not available
+
+If update endpoints do not exist, do not build a complex edit system yet. Add a clear label like “Save as New Estimate” and leave full edit/versioning for later.
+
+8. Sales Dashboard integration.
+
+Confirm that newly saved estimates appear in the Sales Dashboard because it uses /api/estimates.
+
+If status values are needed for the dashboard metrics, use consistent statuses such as:
+
+* draft
+* sent
+* approved
+* rejected
+
+Do not build a full approval workflow unless it already exists.
+
+9. Empty/loading/error states.
+
+Add clean states for:
+
+* no projects
+* no existing estimates
+* save success
+* save error
+* loading estimates/projects
+
+10. Keep this phase focused.
+
+Do not build estimate templates yet.
+Do not build kitchen/bathroom/remodel templates yet.
+Do not build quote cloning yet.
+Do not build production sheet formulas yet.
+Do not build reports yet.
+Do not build invoice detail/edit yet.
+Do not add Stripe.
