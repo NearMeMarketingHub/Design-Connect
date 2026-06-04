@@ -1,0 +1,157 @@
+Phase 9C: Add live invoice detail and edit view for the Accounting dashboard.
+
+Context:
+Phase 9A cleaned up company-owner financial tool scoping/security.
+Phase 9B made the Estimator save and load real estimates.
+Now we need the Accounting dashboard to open real invoices and allow safe invoice viewing/editing.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not reintroduce public account creation.
+Do not add Stripe in this phase.
+Do not build production sheets, payout schedules, reports, Gantt, board views, or Avery formulas.
+Do not expand subcontractor/notary functionality.
+
+Goal:
+Company owners and authorized company-side users should be able to click an invoice from the Accounting dashboard, view the real invoice details, and edit basic invoice information using existing company-scoped invoice APIs.
+
+1. Review existing invoice schema/routes first.
+
+Before changing the UI, inspect:
+
+* shared/schema.ts invoice and invoice line item tables
+* server/routes.ts invoice endpoints
+* server/storage.ts invoice storage methods
+* client/src/pages/accounting-dashboard.tsx
+* client/src/pages/create-invoice.tsx
+
+Reuse existing invoice tables/routes where possible.
+
+2. Security requirements.
+
+Invoice detail/edit must respect the Phase 9A security model:
+
+* non-admin company users can only view invoices tied to projects owned by their company
+* non-admin company users can only edit invoices tied to projects owned by their company
+* users cannot view/edit another company’s invoices
+* blocked companies should not be able to create or edit invoices
+* active, prepaid, and free companies can create/edit invoices
+* backend must remain the source of truth for access checks
+
+Do not add unscoped invoice routes.
+
+3. Add invoice detail route/page.
+
+Add a company-side route such as:
+
+* /company/invoices/:invoiceId
+
+The page should load invoice details using the existing secured route:
+
+* GET /api/invoices/:id
+
+Show:
+
+* invoice number/custom ID
+* project
+* client/customer name
+* status
+* invoice date
+* due date, if available
+* amount
+* line items
+* notes/description if supported
+* created date
+* updated date if available
+
+If the invoice cannot be loaded because of permissions or missing data, show a clean error state using the backend error message where possible.
+
+4. Link Accounting dashboard to invoice detail.
+
+On /company/accounting:
+
+* update invoice row/card “View” actions to navigate to /company/invoices/:invoiceId
+* do not link to old admin invoice routes
+* use the invoice ID from real API data
+
+5. Add basic edit behavior.
+
+If existing backend update routes already exist, use them.
+
+Allow editing basic fields that are already supported by the current schema, such as:
+
+* status
+* invoice date
+* due date if supported
+* line items if supported
+* notes/description if supported
+
+If update endpoints do not exist yet:
+
+* add a secured PATCH /api/invoices/:id endpoint
+* require project/company ownership verification before updating
+* block editing for suspended/cancelled/expired/legacy trialing companies
+* do not allow changing invoice.projectId to another company’s project
+
+Keep editing simple. Do not build a complex versioning system.
+
+6. Invoice line items.
+
+If the invoice line item schema already supports updates:
+
+* display line items
+* allow add/edit/remove line items
+* recalculate invoice total from line items
+
+If this would be too large for this phase:
+
+* display line items read-only
+* allow editing only invoice status/basic metadata
+* leave full line-item editing for a later phase
+
+Do not add new schema fields unless absolutely required.
+
+7. Status handling.
+
+Use existing invoice statuses if already defined.
+
+If needed, use simple statuses:
+
+* draft
+* sent
+* paid
+* overdue
+* cancelled
+
+Do not build payment processing in this phase.
+Do not add Stripe in this phase.
+
+8. Error/loading/empty states.
+
+Add clean states for:
+
+* loading invoice
+* invoice not found
+* access denied
+* save success
+* save error
+* no line items
+
+Use parseErrorMessage for API errors if available.
+
+9. Accounting dashboard refresh.
+
+After editing an invoice:
+
+* invalidate /api/invoices
+* Accounting dashboard should reflect updated invoice status/amount after returning or refreshing
+
+10. Keep this phase focused.
+
+Do not build invoice payment collection.
+Do not build invoice PDF export.
+Do not build email/send invoice workflow.
+Do not build recurring billing management.
+Do not build Stripe.
+Do not build production sheet/job financial reports.
