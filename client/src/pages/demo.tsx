@@ -141,8 +141,8 @@ export default function DemoPage() {
                     <CheckCircle className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-900">7-Day Free Trial</h3>
-                    <p className="text-slate-600 text-sm">Start with a free trial to explore all features before committing to a plan.</p>
+                    <h3 className="font-semibold text-slate-900">Demo & Guided Setup</h3>
+                    <p className="text-slate-600 text-sm">Request a demo and our team will help determine the right access setup for your company.</p>
                   </div>
                 </div>
               </div>

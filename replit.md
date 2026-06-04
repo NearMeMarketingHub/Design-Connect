@@ -49,14 +49,13 @@ Key data models include:
 - E-Signature system (signing packets, participants, audit events)
 - Change orders with line items (for scope/budget/timeline changes)
 
-### Subscription Trial System
-BuildVision uses a 7-day free trial model for company accounts:
-- **Trial Start**: New company_owner registrations auto-start a 7-day trial (`subscriptionStatus: "trialing"`, `trialStartedAt: now()`)
-- **Trial Countdown Banner**: Company dashboard shows an amber warning banner with days remaining when status is "trialing"
-- **Expired Screen**: When trial expires, a red "Trial Expired" block appears with an upgrade prompt
-- **Subscription Tab**: Shows billing type, monthly price, real trial dates, and days remaining
-- **Status Values**: `trialing` → `active` (paid) → `expired` / `past_due` / `cancelled`
-- **No payment processing**: Billing is manual/admin-controlled; admins manually set company billing fields (status, billing type, monthly price, trial dates) via the Super Admin dashboard
+### Access & Billing Model
+BuildVision does not use self-serve trials. Companies request a demo; Super Admins manually set access status per company.
+- **Default status**: New companies default to `free` (not trialing)
+- **Valid statuses**: `active`, `free`, `prepaid`, `suspended`, `cancelled`, `expired`
+- **Legacy statuses**: `trialing` and `past_due` may exist in old data but are treated as blocked ("Blocked (legacy)") and cannot be set on new companies
+- **Subscription Tab**: Shows billing type, monthly price, trial date fields (reference only), and current access status
+- **No payment processing**: Billing is manual/admin-controlled; admins manually set company billing fields (status, billing type, monthly price) via the Super Admin dashboard
 
 ### Admin Subscription Management
 The Super Admin dashboard includes a "Subscriptions" section:

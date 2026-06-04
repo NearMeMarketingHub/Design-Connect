@@ -10,7 +10,7 @@ export const companies = pgTable("companies", {
   name: text("name").notNull(),
   logo: text("logo"), // Optional company logo URL
   ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
-  subscriptionStatus: text("subscription_status").default("trialing"), // trialing, active, expired, past_due, cancelled
+  subscriptionStatus: text("subscription_status").default("free"), // active, free, prepaid, suspended, cancelled, expired (legacy: trialing, past_due)
   trialStartedAt: timestamp("trial_started_at"), // When the 7-day trial began
   // Billing & access fields (admin-managed)
   billingType: text("billing_type").default("manual"), // manual | free | prepaid | future_in_app

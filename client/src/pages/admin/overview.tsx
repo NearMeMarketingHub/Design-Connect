@@ -115,7 +115,7 @@ export default function AdminOverview() {
   const recentEvents = recentAuditData?.events ?? [];
 
   const activeCompanies = allCompanies.filter(
-    (c) => c.subscriptionStatus === "active" || c.subscriptionStatus === "trialing"
+    (c) => c.subscriptionStatus === "active" || c.subscriptionStatus === "free" || c.subscriptionStatus === "prepaid"
   );
   const newDemoRequests = demoRequests.filter((d) => d.status === "new");
   const pendingInvitesCount = adminInvites.filter((i) => i.status === "pending").length;
