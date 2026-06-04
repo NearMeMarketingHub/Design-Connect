@@ -156,7 +156,7 @@ export default function InvoiceDetail() {
 
       {!companyActive && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive" data-testid="banner-company-inactive">
-          Company access is not active. Changes cannot be saved until your subscription is restored.
+          Company access is not active. Please contact support to update your Billing &amp; Access status.
         </div>
       )}
 
