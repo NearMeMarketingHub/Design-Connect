@@ -21,7 +21,6 @@ import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 interface PlatformSettings {
-  defaultTrialLength: number;
   defaultMonthlyPrice: string;
   manualBillingEnabled: boolean;
 }
@@ -44,8 +43,6 @@ const EMPTY_FORM = {
   subscriptionStatus: "free",
   billingType: "manual",
   monthlyPrice: "",
-  trialStartedAt: "",
-  trialEndsAt: "",
   prepaidThroughDate: "",
 };
 
@@ -65,8 +62,6 @@ function buildPayload(f: typeof EMPTY_FORM) {
     subscriptionStatus: f.subscriptionStatus,
     billingType: f.billingType,
     monthlyPrice: f.monthlyPrice || null,
-    trialStartedAt: dateToIso(f.trialStartedAt),
-    trialEndsAt: dateToIso(f.trialEndsAt) ?? null,
     prepaidThroughDate: dateToIso(f.prepaidThroughDate) ?? null,
   };
 }

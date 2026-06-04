@@ -11,11 +11,11 @@ export const companies = pgTable("companies", {
   logo: text("logo"), // Optional company logo URL
   ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
   subscriptionStatus: text("subscription_status").default("free"), // active, free, prepaid, suspended, cancelled, expired (legacy: trialing, past_due)
-  trialStartedAt: timestamp("trial_started_at"), // When the 7-day trial began
+  trialStartedAt: timestamp("trial_started_at"), // Legacy reference field — not used for access control
   // Billing & access fields (admin-managed)
   billingType: text("billing_type").default("manual"), // manual | free | prepaid | future_in_app
   monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }), // Company-specific monthly price
-  trialEndsAt: timestamp("trial_ends_at"), // Explicit trial end; null = computed from trialStartedAt + defaultTrialDays
+  trialEndsAt: timestamp("trial_ends_at"), // Legacy reference field — not used for access control
   prepaidThroughDate: timestamp("prepaid_through_date"), // For prepaid billing: access guaranteed through
   billingNotes: text("billing_notes"), // Admin notes on billing/access arrangement
   adminNotes: text("admin_notes"), // Internal-only notes about this company/customer
@@ -808,7 +808,7 @@ export type DemoRequest = typeof demoRequests.$inferSelect;
 // Platform-wide settings (singleton row, id always = 1)
 export const platformSettings = pgTable("platform_settings", {
   id: integer("id").primaryKey().default(1),
-  defaultTrialLength: integer("default_trial_days").notNull().default(7),
+  defaultTrialLength: integer("default_trial_days").notNull().default(7), // Legacy — no longer used for access decisions; kept for historical audit records
   manualBillingEnabled: boolean("manual_billing_enabled").notNull().default(true),
   freeAccessEnabled: boolean("free_access_enabled").notNull().default(false),
   prepaidAccessEnabled: boolean("prepaid_access_enabled").notNull().default(false),

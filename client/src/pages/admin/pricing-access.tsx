@@ -55,29 +55,7 @@ export default function AdminPricingAccess() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="space-y-1.5">
-                <Label htmlFor="setting-trial-days" className="text-xs">
-                  Default Trial Length (days)
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="setting-trial-days"
-                    type="number"
-                    min={1}
-                    max={365}
-                    defaultValue={platformSettingsData?.defaultTrialLength ?? 7}
-                    className="h-8 text-sm w-20"
-                    onBlur={(e) =>
-                      updatePlatformSettingsMutation.mutate({
-                        defaultTrialLength: parseInt(e.target.value) || 7,
-                      })
-                    }
-                    data-testid="input-setting-trial-days"
-                  />
-                  <span className="text-xs text-muted-foreground">days</span>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <div className="space-y-1.5">
                 <Label htmlFor="setting-default-price" className="text-xs">
                   Default Monthly Price ($)

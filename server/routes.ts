@@ -1715,7 +1715,6 @@ export async function registerRoutes(
   app.patch("/api/admin/platform-settings", requireAdmin, async (req, res, next) => {
     try {
       const settingsSchema = z.object({
-        defaultTrialLength: z.number().int().min(1).max(365).optional(),
         manualBillingEnabled: z.boolean().optional(),
         freeAccessEnabled: z.boolean().optional(),
         prepaidAccessEnabled: z.boolean().optional(),
@@ -1727,10 +1726,6 @@ export async function registerRoutes(
       const updated = await storage.updatePlatformSettings(parsed.data);
       res.json(updated);
       const pricingMeta: Record<string, unknown> = {};
-      if (parsed.data.defaultTrialLength !== undefined) {
-        pricingMeta.oldDefaultTrialLength = beforeSettings?.defaultTrialLength ?? null;
-        pricingMeta.newDefaultTrialLength = parsed.data.defaultTrialLength;
-      }
       if (parsed.data.defaultMonthlyPrice !== undefined) {
         pricingMeta.oldDefaultMonthlyPrice = beforeSettings?.defaultMonthlyPrice ?? null;
         pricingMeta.newDefaultMonthlyPrice = parsed.data.defaultMonthlyPrice;
