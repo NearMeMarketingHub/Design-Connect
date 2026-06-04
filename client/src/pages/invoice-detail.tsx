@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
@@ -19,9 +19,9 @@ type InvoiceWithLineItems = Invoice & { lineItems: InvoiceLineItem[] };
 
 const BLOCKED_STATUSES = new Set(["suspended", "cancelled", "expired", "trialing", "past_due"]);
 
-type EditableStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled" | "unpaid";
+type EditableStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
 
-const VALID_STATUSES: EditableStatus[] = ["draft", "sent", "unpaid", "paid", "overdue", "cancelled"];
+const VALID_STATUSES: EditableStatus[] = ["draft", "sent", "paid", "overdue", "cancelled"];
 
 function formatCurrency(value: string | number | null | undefined) {
   const num = parseFloat(String(value ?? "0"));
@@ -42,7 +42,6 @@ function capitalize(s: string) {
 
 export default function InvoiceDetail() {
   const [, params] = useRoute("/company/invoices/:invoiceId");
-  const [, setLocation] = useLocation();
   const invoiceId = params?.invoiceId ?? "";
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -54,11 +53,8 @@ export default function InvoiceDetail() {
     enabled: user?.role === "company_owner" || user?.role === "contractor",
   });
 
-  const [clientName, setClientName] = useState("");
-  const [projectName, setProjectName] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [status, setStatus] = useState<EditableStatus>("unpaid");
-  const [amount, setAmount] = useState("");
+  const [status, setStatus] = useState<EditableStatus>("draft");
   const [dirty, setDirty] = useState(false);
 
   const { data: invoice, isLoading, error } = useQuery<InvoiceWithLineItems>({
@@ -69,27 +65,21 @@ export default function InvoiceDetail() {
 
   useEffect(() => {
     if (invoice) {
-      setClientName(invoice.clientName ?? "");
-      setProjectName(invoice.projectName ?? "");
       setDueDate(invoice.dueDate ?? "");
-      setStatus((invoice.status as EditableStatus) ?? "unpaid");
-      setAmount(invoice.amount ?? "");
+      const s = invoice.status as string;
+      setStatus(VALID_STATUSES.includes(s as EditableStatus) ? (s as EditableStatus) : "draft");
       setDirty(false);
     }
   }, [invoice]);
 
   const companyActive = company ? !BLOCKED_STATUSES.has(company.subscriptionStatus ?? "") : true;
-
   const saveDisabled = !dirty || !companyActive;
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: () =>
       apiRequest("PATCH", `/api/invoices/${invoiceId}`, {
-        clientName,
-        projectName,
         dueDate: dueDate || undefined,
         status,
-        amount,
       }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/invoices/${invoiceId}`] });
@@ -101,10 +91,6 @@ export default function InvoiceDetail() {
       toast({ title: "Save failed", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
-
-  function markDirty() {
-    setDirty(true);
-  }
 
   if (isLoading) {
     return (
@@ -182,38 +168,20 @@ export default function InvoiceDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="clientName">Client Name</Label>
-                  <Input
-                    id="clientName"
-                    value={clientName}
-                    onChange={(e) => { setClientName(e.target.value); markDirty(); }}
-                    data-testid="input-client-name"
-                  />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Client</p>
+                  <p className="font-medium" data-testid="text-client-name">{invoice.clientName || "—"}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="projectName">Project Name</Label>
-                  <Input
-                    id="projectName"
-                    value={projectName}
-                    onChange={(e) => { setProjectName(e.target.value); markDirty(); }}
-                    data-testid="input-project-name"
-                  />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Project</p>
+                  <p className="font-medium" data-testid="text-project-name">{invoice.projectName || "—"}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => { setAmount(e.target.value); markDirty(); }}
-                    data-testid="input-amount"
-                  />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Amount</p>
+                  <p className="text-xl font-bold" data-testid="text-amount">{formatCurrency(invoice.amount)}</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dueDate">Due Date</Label>
@@ -221,7 +189,7 @@ export default function InvoiceDetail() {
                     id="dueDate"
                     type="date"
                     value={dueDate}
-                    onChange={(e) => { setDueDate(e.target.value); markDirty(); }}
+                    onChange={(e) => { setDueDate(e.target.value); setDirty(true); }}
                     data-testid="input-due-date"
                   />
                 </div>
@@ -282,14 +250,14 @@ export default function InvoiceDetail() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Status</CardTitle>
+              <CardTitle>Edit Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Invoice Status</Label>
                 <Select
                   value={status}
-                  onValueChange={(v) => { setStatus(v as EditableStatus); markDirty(); }}
+                  onValueChange={(v) => { setStatus(v as EditableStatus); setDirty(true); }}
                 >
                   <SelectTrigger data-testid="select-status">
                     <SelectValue />

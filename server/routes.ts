@@ -2427,12 +2427,17 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
 
-      // Reject clients and external contractor subtypes
+      // Only company_owner, isCompanyAdmin contractors, and admins may edit invoices
       if (user.role === "client") {
         return res.status(403).json({ message: "Access denied" });
       }
-      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
-        return res.status(403).json({ message: "Access denied" });
+      if (user.role === "contractor") {
+        if (user.contractorType === "subcontractor" || user.contractorType === "notary") {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!user.isCompanyAdmin) {
+          return res.status(403).json({ message: "Access denied: company admin required" });
+        }
       }
 
       const invoice = await storage.getInvoice(req.params.id);
@@ -2456,12 +2461,8 @@ export async function registerRoutes(
       }
 
       const updateSchema = z.object({
-        clientName: z.string().min(1).optional(),
-        projectName: z.string().min(1).optional(),
-        amount: z.string().optional(),
         dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate must be YYYY-MM-DD").optional(),
-        status: z.enum(["draft", "sent", "paid", "overdue", "cancelled", "unpaid"]).optional(),
-        type: z.string().optional(),
+        status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]).optional(),
       });
 
       const parsed = updateSchema.safeParse(req.body);

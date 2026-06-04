@@ -192,7 +192,7 @@ export default function AccountingDashboard() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={() => setLocation(`/company/invoices/${inv.id}`)}
-                                data-testid={`menu-item-view-invoice-${inv.id}`}
+                                data-testid={`menuitem-view-invoice-${inv.id}`}
                               >
                                 View Invoice
                               </DropdownMenuItem>
