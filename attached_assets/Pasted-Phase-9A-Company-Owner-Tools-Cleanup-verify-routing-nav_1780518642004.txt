@@ -1,0 +1,137 @@
+Phase 9A: Company Owner Tools Cleanup — verify routing, navigation, permissions, and company data isolation.
+
+Context:
+The Super Admin cleanup is complete. Budget Manager and Financial Management tools were moved out of Super Admin because they belong to the company owner side.
+
+Now we need to verify these company owner tools are safe and correctly scoped before building bigger job financial/production sheet features.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce public account creation.
+Do not expand subcontractor/notary functionality.
+Do not build the new Production Sheet, Gantt chart, board view, payout schedule, or Avery formulas in this phase.
+
+Goal:
+Make sure company owners can access their own company tools, and cannot see or manage another company’s financial/budget/estimate/invoice data.
+
+1. Review company owner navigation.
+
+Confirm the company owner side has clear navigation to:
+
+* Budget Manager
+* Financial Management
+* Sales Dashboard
+* Estimator
+* Accounting
+* Invoices / New Invoice
+
+Make sure these tools are no longer linked from Super Admin except through redirects/placeholders already handled.
+
+2. Verify company owner route guards.
+
+Company owner tools should only be accessible to:
+
+* company_owner for their own company
+* authorized company team/admin users if the app currently supports that
+
+Clients should not access company financial tools.
+Unrelated contractors should not access company financial tools.
+Super Admins should not be the normal user for these tools, except through support/View As if applicable.
+
+3. Review these routes/pages.
+
+Check company-side routes for:
+
+* /company/budget
+* /company/financials
+* /company/sales
+* /company/estimates
+* /company/accounting
+* /company/invoice/new
+* any related estimator/invoice/accounting routes
+
+Fix broken links or old /admin links if found.
+
+4. Verify data scoping for Budget Manager.
+
+Budget/price book data must be company-specific.
+
+Company A should not be able to view, create, edit, or delete Company B’s:
+
+* budget categories
+* budget items
+* price book items
+* product/service pricing
+* imported budget data
+
+If any budget/price book query is currently global, update it to filter by the logged-in user’s companyId.
+
+5. Verify data scoping for estimates.
+
+Estimates must be company/project-specific.
+
+Company A should not see or edit Company B’s:
+
+* estimates
+* estimate line items
+* saved quote data
+* estimator outputs
+* cloned/past estimates
+
+Filter by project/company ownership. If projects do not have direct companyId, derive company through the project’s contractor/company relationship used elsewhere in the app.
+
+6. Verify data scoping for invoices/accounting/sales.
+
+Company A should not see or edit Company B’s:
+
+* invoices
+* invoice line items
+* accounting data
+* sales dashboard data
+* financial summaries
+* recurring billing records, if any
+
+Update backend routes/storage queries to enforce company ownership.
+
+7. Add clear empty states.
+
+For company owner financial pages, add simple empty states where missing:
+
+* No budget items found.
+* No estimates found.
+* No invoices found.
+* No accounting activity found.
+
+Do not redesign the pages; just make empty states clean if they are currently bare/confusing.
+
+8. Add audit logging for sensitive company financial actions if the audit helper is available.
+
+If simple and appropriate, log actions such as:
+
+* budget_item_created
+* budget_item_updated
+* budget_item_deleted
+* estimate_created
+* estimate_updated
+* invoice_created
+* invoice_updated
+
+If this would expand the phase too much, skip detailed audit coverage and note it for a later pass.
+
+9. Report any complex formula/schema issues.
+
+If a tool still assumes the old single-company model and would need a larger schema redesign, do not force a messy fix.
+
+Instead:
+
+* secure access as much as possible
+* add company filtering where safe
+* note what needs a later dedicated rebuild
+
+10. Keep this phase focused.
+
+Do not build new job financial features yet.
+Do not implement payout schedules.
+Do not implement commission formulas.
+Do not implement Gantt or board view.
+Do not modify Super Admin unless fixing links/redirects related to moved tools.
