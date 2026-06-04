@@ -1,0 +1,72 @@
+Phase 9B polish patch: tighten Estimator save behavior and error handling.
+
+Context:
+The Estimator has been wired to real projects and real estimates. Before moving to invoice detail/edit, make a small polish pass.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not reintroduce public account creation.
+Do not add Stripe in this phase.
+Do not build templates, cloning, PDFs, invoice generation, production sheets, payouts, Gantt, or board views.
+
+1. Prevent saving empty estimates.
+
+On /company/estimates:
+
+* Disable Save Estimate / Save as New Estimate if there are no line items.
+* Show a helpful message like:
+  “Add at least one line item before saving.”
+* Keep project selection required too.
+
+The Save button should require:
+
+* valid selected project
+* at least one line item
+* company access not blocked
+* not currently saving
+
+2. Improve API error handling.
+
+client/src/lib/queryClient.ts apiRequest() throws on non-OK responses, so code like `if (!res.ok)` after `await apiRequest(...)` does not reliably run.
+
+Update estimator.tsx to catch thrown API errors and show the server’s message where possible.
+
+Use the existing parseErrorMessage helper if available.
+
+For save failures, show the real message from the backend when possible, such as:
+
+* “Company access is not active. Please contact support to update your Billing & Access status.”
+* “Access denied: project not in your company”
+* “Access denied: a project must be associated with this estimate”
+
+Do not replace these with only a generic “Could not save estimate” message unless no server message is available.
+
+3. Improve load-estimate error handling.
+
+When loading an estimate from:
+
+* Recent Estimates
+* /company/estimates?load=:id
+
+Use the secured GET /api/estimates/:id route as currently implemented.
+
+If loading fails, show the real backend error message where possible using parseErrorMessage.
+
+Do not add a new unscoped load route.
+
+4. Keep Billing & Access wording.
+
+Visible UI should continue using:
+
+* “Billing & Access”
+* “company access”
+
+Do not use “subscription” in user-facing estimator messages.
+
+5. Keep this patch focused.
+
+Do not change the estimate schema.
+Do not add PATCH /api/estimates/:id.
+Do not add invoice generation from estimates.
+Do not redesign the Estimator page.
