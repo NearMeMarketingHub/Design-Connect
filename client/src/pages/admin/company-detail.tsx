@@ -128,14 +128,16 @@ interface CompanyDetail {
 }
 
 function statusBadge(status: string | null | undefined) {
-  const s = status ?? "trialing";
+  const s = status ?? "free";
   const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     active: { label: "Active", variant: "default" },
-    trialing: { label: "Trialing", variant: "secondary" },
+    prepaid: { label: "Prepaid", variant: "default" },
+    free: { label: "Free", variant: "secondary" },
     expired: { label: "Expired", variant: "destructive" },
     suspended: { label: "Suspended", variant: "destructive" },
-    past_due: { label: "Past Due", variant: "destructive" },
     cancelled: { label: "Cancelled", variant: "outline" },
+    trialing: { label: "Blocked (legacy)", variant: "destructive" },
+    past_due: { label: "Blocked (legacy)", variant: "destructive" },
   };
   const info = map[s] ?? { label: s, variant: "outline" as const };
   return <Badge variant={info.variant} className="capitalize text-xs">{info.label}</Badge>;
@@ -157,7 +159,7 @@ export default function AdminCompanyDetail() {
   const [editingNotes, setEditingNotes] = useState(false);
 
   const [billingForm, setBillingForm] = useState({
-    subscriptionStatus: "trialing",
+    subscriptionStatus: "free",
     billingType: "manual",
     monthlyPrice: "",
     trialStartedAt: "",
@@ -255,7 +257,7 @@ export default function AdminCompanyDetail() {
   function openBillingEdit() {
     if (!company) return;
     setBillingForm({
-      subscriptionStatus: company.subscriptionStatus ?? "trialing",
+      subscriptionStatus: company.subscriptionStatus ?? "free",
       billingType: company.billingType ?? "manual",
       monthlyPrice: company.monthlyPrice ?? "",
       trialStartedAt: company.trialStartedAt ? company.trialStartedAt.slice(0, 10) : "",
@@ -846,8 +848,8 @@ export default function AdminCompanyDetail() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {["trialing", "active", "free", "prepaid", "suspended", "cancelled", "expired", "past_due"].map(s => (
-                              <SelectItem key={s} value={s} className="capitalize">{s.replace("_", " ")}</SelectItem>
+                            {["active", "prepaid", "free", "suspended", "cancelled", "expired"].map(s => (
+                              <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -863,9 +865,10 @@ export default function AdminCompanyDetail() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="manual">Manual</SelectItem>
-                            <SelectItem value="free">Free</SelectItem>
+                            <SelectItem value="in_app">In-App</SelectItem>
                             <SelectItem value="prepaid">Prepaid</SelectItem>
-                            <SelectItem value="future_in_app">Future In-App</SelectItem>
+                            <SelectItem value="included_with_service">Included with Service</SelectItem>
+                            <SelectItem value="free_demo">Free Demo</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -882,7 +885,10 @@ export default function AdminCompanyDetail() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Trial Start Date</Label>
+                        <Label>
+                          Legacy Trial Start{" "}
+                          <span className="text-muted-foreground text-xs font-normal">(reference only)</span>
+                        </Label>
                         <Input
                           type="date"
                           value={billingForm.trialStartedAt}
@@ -891,7 +897,10 @@ export default function AdminCompanyDetail() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Trial End Date Override</Label>
+                        <Label>
+                          Legacy Trial End{" "}
+                          <span className="text-muted-foreground text-xs font-normal">(reference only)</span>
+                        </Label>
                         <Input
                           type="date"
                           value={billingForm.trialEndsAt}
@@ -969,17 +978,15 @@ export default function AdminCompanyDetail() {
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground text-xs mb-0.5">Trial Start</dt>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Legacy Trial Start <span className="font-normal">(ref)</span></dt>
                       <dd className="font-medium" data-testid="display-trial-started-at">
                         {safeFormat(company.trialStartedAt, "MMM d, yyyy")}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground text-xs mb-0.5">Trial End Override</dt>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Legacy Trial End <span className="font-normal">(ref)</span></dt>
                       <dd className="font-medium" data-testid="display-trial-ends-at">
-                        {company.trialEndsAt
-                          ? safeFormat(company.trialEndsAt, "MMM d, yyyy")
-                          : "— (auto from start date)"}
+                        {safeFormat(company.trialEndsAt, "MMM d, yyyy")}
                       </dd>
                     </div>
                     <div>

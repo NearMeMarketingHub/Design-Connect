@@ -20,8 +20,6 @@ import {
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-
 interface PlatformSettings {
   defaultTrialLength: number;
   defaultMonthlyPrice: string;
@@ -36,8 +34,6 @@ interface CreateCompanyDialogProps {
   onCompanyCreated?: (companyId: string) => void;
 }
 
-const todayIso = () => format(new Date(), "yyyy-MM-dd");
-
 const EMPTY_FORM = {
   companyName: "",
   ownerName: "",
@@ -45,10 +41,10 @@ const EMPTY_FORM = {
   ownerUsername: "",
   password: "",
   companyType: "",
-  subscriptionStatus: "trialing",
+  subscriptionStatus: "free",
   billingType: "manual",
   monthlyPrice: "",
-  trialStartedAt: todayIso(),
+  trialStartedAt: "",
   trialEndsAt: "",
   prepaidThroughDate: "",
 };
@@ -94,9 +90,6 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
           ? platformSettings.defaultMonthlyPrice
           : ""
         : "";
-      const trialDays = platformSettings?.defaultTrialLength ?? 7;
-      const trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + trialDays);
 
       setForm({
         ...EMPTY_FORM,
@@ -104,7 +97,6 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
         ownerName: prefill?.ownerName || "",
         ownerEmail: prefill?.ownerEmail || "",
         monthlyPrice: defaultPrice,
-        trialEndsAt: format(trialEnd, "yyyy-MM-dd"),
       });
     }
   }, [open, prefill?.companyName, prefill?.ownerName, prefill?.ownerEmail, platformSettings]);
@@ -202,7 +194,6 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="trialing">Trialing</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="free">Free</SelectItem>
                     <SelectItem value="prepaid">Prepaid</SelectItem>
@@ -223,9 +214,10 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="in_app">In-App</SelectItem>
                     <SelectItem value="prepaid">Prepaid</SelectItem>
-                    <SelectItem value="future_in_app">Future In-App</SelectItem>
+                    <SelectItem value="included_with_service">Included with Service</SelectItem>
+                    <SelectItem value="free_demo">Free Demo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -246,32 +238,6 @@ export function CreateCompanyDialog({ open, onOpenChange, prefill, leadId, onCom
                 placeholder="0.00"
                 data-testid="input-create-company-monthly-price"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="cc-trial-start">Trial Start</Label>
-                <Input
-                  id="cc-trial-start"
-                  type="date"
-                  value={form.trialStartedAt}
-                  onChange={(e) => set("trialStartedAt", e.target.value)}
-                  data-testid="input-create-company-trial-start"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="cc-trial-end">
-                  Trial End Override{" "}
-                  <span className="text-muted-foreground text-xs">(optional)</span>
-                </Label>
-                <Input
-                  id="cc-trial-end"
-                  type="date"
-                  value={form.trialEndsAt}
-                  onChange={(e) => set("trialEndsAt", e.target.value)}
-                  data-testid="input-create-company-trial-end"
-                />
-              </div>
             </div>
 
             {isPrepaid && (

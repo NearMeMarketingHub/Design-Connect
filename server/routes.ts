@@ -538,7 +538,7 @@ export async function registerRoutes(
   });
 
   // Admin-only middleware
-  const TRIAL_DAYS = 7;
+  const ACTIVE_STATUSES = new Set(["active", "prepaid", "free"]);
 
   const requireActiveSubscription = async (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) return next();
@@ -552,16 +552,10 @@ export async function registerRoutes(
     if (!companyId) return next();
     const company = await storage.getCompany(companyId);
     if (!company) return next();
-    // Active paid subscription — always allowed
-    if (company.subscriptionStatus === "active") return next();
-    // Still within trial window — allowed
-    if (company.subscriptionStatus === "trialing" && company.trialStartedAt) {
-      const trialEnd = new Date(company.trialStartedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
-      if (new Date() <= trialEnd) return next();
-    }
-    // Expired or any other non-active status
+    // Only active, prepaid, or free companies may perform write operations
+    if (ACTIVE_STATUSES.has(company.subscriptionStatus ?? "")) return next();
     return res.status(402).json({
-      message: "Your trial has expired. Please upgrade your subscription to continue.",
+      message: "Your company access is not active. Please contact support to update your Billing & Access status.",
       code: "SUBSCRIPTION_REQUIRED",
     });
   };
@@ -873,17 +867,7 @@ export async function registerRoutes(
         );
       }
       if (status && status !== "all") {
-        filtered = filtered.filter(c => {
-          const trialStart = c.trialStartedAt ? new Date(c.trialStartedAt) : null;
-          const trialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
-          const now = new Date();
-          const effectiveStatus =
-            c.subscriptionStatus === "suspended" ? "suspended" :
-            (c.subscriptionStatus === "trialing" && trialEnd && now > trialEnd) ? "expired" :
-            c.subscriptionStatus === "expired" ? "expired" :
-            c.subscriptionStatus || "trialing";
-          return effectiveStatus === status;
-        });
+        filtered = filtered.filter(c => (c.subscriptionStatus ?? "free") === status);
       }
       res.json(filtered);
     } catch (error) { next(error); }
@@ -1047,8 +1031,8 @@ export async function registerRoutes(
     ownerUsername: z.string().min(3).max(100),
     password: z.string().min(6),
     companyType: z.string().optional(),
-    subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).default("trialing"),
-    billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).default("manual"),
+    subscriptionStatus: z.enum(["active", "free", "prepaid", "expired", "cancelled", "suspended"]).default("free"),
+    billingType: z.enum(["manual", "in_app", "prepaid", "included_with_service", "free_demo"]).default("manual"),
     monthlyPrice: z.string().nullable().optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
     trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
@@ -1113,14 +1097,14 @@ export async function registerRoutes(
   });
 
   // ── Admin: Update company subscription ───────────────────────────────────────
-  const VALID_SUBSCRIPTION_STATUSES = ["trialing", "active", "expired", "past_due", "cancelled", "suspended"] as const;
+  const VALID_SUBSCRIPTION_STATUSES = ["active", "free", "prepaid", "expired", "cancelled", "suspended"] as const;
 
   const adminCompanySubscriptionSchema = z.object({
-    subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).optional(),
+    subscriptionStatus: z.enum(["active", "free", "prepaid", "expired", "cancelled", "suspended"]).optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
     trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
     prepaidThroughDate: z.string().datetime({ offset: true }).nullable().optional(),
-    billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
+    billingType: z.enum(["manual", "in_app", "prepaid", "included_with_service", "free_demo"]).optional(),
     monthlyPrice: z.string().nullable().optional(),
     billingNotes: z.string().max(2000).nullable().optional(),
     accessNotes: z.string().max(2000).nullable().optional(),
@@ -1137,9 +1121,6 @@ export async function registerRoutes(
       const updateData: Partial<InsertCompany> = {};
       if (subscriptionStatus !== undefined) {
         updateData.subscriptionStatus = subscriptionStatus;
-        if (subscriptionStatus === "trialing" && trialStartedAt === undefined) {
-          updateData.trialStartedAt = new Date();
-        }
       }
       if (trialStartedAt !== undefined) updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
       if (trialEndsAt !== undefined) updateData.trialEndsAt = trialEndsAt ? new Date(trialEndsAt) : null;
@@ -2329,13 +2310,14 @@ export async function registerRoutes(
         if (!user.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
-        if (estimate.projectId) {
-          const project = await storage.getProject(estimate.projectId);
-          if (project && project.contractorId) {
-            const contractor = await storage.getUser(project.contractorId);
-            if (!contractor || contractor.companyId !== user.companyId) {
-              return res.status(403).json({ message: "Access denied" });
-            }
+        if (!estimate.projectId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const project = await storage.getProject(estimate.projectId);
+        if (project && project.contractorId) {
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
           }
         }
       }
@@ -2354,7 +2336,10 @@ export async function registerRoutes(
       }
       const { lineItems, ...estimateData } = parsedEstimate.data;
       const user = req.user as User;
-      if (user.role !== "admin" && estimateData.projectId) {
+      if (user.role !== "admin") {
+        if (!estimateData.projectId) {
+          return res.status(403).json({ message: "Access denied: a project must be associated with this estimate" });
+        }
         const project = await storage.getProject(estimateData.projectId);
         if (!project) return res.status(404).json({ message: "Project not found" });
         if (!project.contractorId) {
@@ -2412,6 +2397,9 @@ export async function registerRoutes(
         if (!user.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
+        if (!invoice.projectId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
         if (invoice.projectId) {
           const project = await storage.getProject(invoice.projectId);
           if (project && project.contractorId) {
@@ -2437,7 +2425,10 @@ export async function registerRoutes(
       }
       const { lineItems, ...invoiceData } = parsedInvoice.data;
       const user = req.user as User;
-      if (user.role !== "admin" && invoiceData.projectId) {
+      if (user.role !== "admin") {
+        if (!invoiceData.projectId) {
+          return res.status(403).json({ message: "Access denied: a project must be associated with this invoice" });
+        }
         const project = await storage.getProject(invoiceData.projectId);
         if (!project) return res.status(404).json({ message: "Project not found" });
         if (!project.contractorId) {
@@ -2489,6 +2480,22 @@ export async function registerRoutes(
       const parsedBilling = createRecurringBillingSchema.safeParse(req.body);
       if (!parsedBilling.success) {
         return res.status(400).json({ message: "Invalid recurring billing data", errors: parsedBilling.error.flatten().fieldErrors });
+      }
+      const user = req.user as User;
+      if (user.role !== "admin") {
+        const billingProjectId = parsedBilling.data.projectId;
+        if (!billingProjectId) {
+          return res.status(403).json({ message: "Access denied: a project must be associated with this billing record" });
+        }
+        const project = await storage.getProject(billingProjectId);
+        if (!project) return res.status(404).json({ message: "Project not found" });
+        if (!project.contractorId) {
+          return res.status(403).json({ message: "Access denied: cannot verify project ownership" });
+        }
+        const contractor = await storage.getUser(project.contractorId);
+        if (!contractor || contractor.companyId !== user.companyId) {
+          return res.status(403).json({ message: "Access denied: project not in your company" });
+        }
       }
       const billing = await storage.createRecurringBilling(parsedBilling.data);
       res.json(billing);
