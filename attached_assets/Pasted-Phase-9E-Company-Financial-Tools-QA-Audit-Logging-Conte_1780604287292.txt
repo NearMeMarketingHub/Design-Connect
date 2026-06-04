@@ -1,0 +1,159 @@
+Phase 9E: Company Financial Tools QA + Audit Logging.
+
+Context:
+Phase 9A secured company-owner financial tool routing and data scoping.
+Phase 9B made Estimator save/load real estimates.
+Phase 9C added invoice detail/edit.
+Phase 9D made Create Invoice save real invoices.
+
+Now that estimates and invoices create/edit real financial records, we need a focused QA/audit pass.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not add Stripe in this phase.
+Do not build PDFs, email/send invoice, payment collection, recurring billing management, production sheets, payout schedules, reports, Gantt, or board views.
+Do not expand subcontractor/notary functionality.
+
+Goal:
+Add audit logging and final consistency checks for company-owner financial actions.
+
+1. Add audit logging for estimate creation.
+
+When a company-side user successfully creates an estimate through POST /api/estimates, log:
+
+* action: estimate_created
+* entityType: estimate
+* entityId: estimate id
+* entityName: estimate customId or project name
+* companyId
+* projectId
+* metadata:
+
+  * customId
+  * projectName
+  * clientName
+  * amount
+  * status
+  * lineItemCount
+
+Only log after successful creation.
+
+2. Add audit logging for invoice creation.
+
+When a company-side user successfully creates an invoice through POST /api/invoices, log:
+
+* action: invoice_created
+* entityType: invoice
+* entityId: invoice id
+* entityName: invoice customId or project name
+* companyId
+* projectId
+* metadata:
+
+  * customId
+  * projectName
+  * clientName
+  * amount
+  * status
+  * dueDate
+  * lineItemCount
+
+Only log after successful creation.
+
+3. Add audit logging for invoice updates.
+
+When PATCH /api/invoices/:id successfully updates an invoice, log:
+
+* action: invoice_updated
+* entityType: invoice
+* entityId: invoice id
+* entityName: invoice customId
+* companyId
+* projectId
+* metadata:
+
+  * oldStatus
+  * newStatus
+  * oldDueDate
+  * newDueDate
+  * amount
+
+Only include old/new values that are available.
+Only log after successful update.
+
+4. Make sure audit events support company users.
+
+Audit Log is viewed by Super Admins, but events can be created by company owners/company admins.
+
+Make sure logAuditEvent supports company-side actors:
+
+* actorUserId
+* actorName
+* actorEmail
+
+Do not give company owners access to /admin/audit-log.
+
+5. Update Audit Log labels.
+
+In the Audit Log UI, add readable labels for:
+
+* estimate_created → Estimate Created
+* invoice_created → Invoice Created
+* invoice_updated → Invoice Updated
+
+Add metadata labels if needed:
+
+* Line Item Count
+* Due Date
+* Old Status
+* New Status
+* Old Due Date
+* New Due Date
+* Invoice Amount
+* Estimate Amount
+
+6. Financial route QA.
+
+Review these routes and confirm they still enforce company ownership and Billing & Access write protection:
+
+* GET /api/estimates
+* GET /api/estimates/:id
+* POST /api/estimates
+* GET /api/invoices
+* GET /api/invoices/:id
+* POST /api/invoices
+* PATCH /api/invoices/:id
+* GET /api/recurring-billing
+* POST /api/recurring-billing
+
+Do not weaken any ownership checks.
+Do not add new financial routes in this phase unless needed for audit logging.
+
+7. Financial UI QA.
+
+Confirm these pages still use real data and have no mock data:
+
+* /company/estimates
+* /company/sales
+* /company/accounting
+* /company/invoice/new
+* /company/invoices/:invoiceId
+
+Check for visible outdated wording:
+
+* no “subscription” in user-facing financial tool messages
+* no trial/free trial wording
+* no plan/tier wording
+
+Use “Billing & Access” or “company access” wording.
+
+8. Keep this phase focused.
+
+Do not build estimate editing.
+Do not build invoice line-item editing.
+Do not build invoice PDFs.
+Do not build invoice emailing.
+Do not build payment collection.
+Do not add Stripe.
+Do not modify Super Admin pages except Audit Log labels/metadata display.
