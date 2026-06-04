@@ -1,0 +1,111 @@
+Phase 9A follow-up patch: remove remaining trial UI and tighten estimate/invoice detail access.
+
+Context:
+The previous Phase 9A patch fixed most company financial scoping issues, but a few trial/billing leftovers remain in the UI and estimate/invoice detail routes need to fail closed harder.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce public account creation.
+Do not build estimate save/load yet.
+Do not build invoice detail/edit yet.
+Do not build production sheets, payout schedules, Gantt, board views, or Avery formulas.
+Do not expand subcontractor/notary functionality.
+
+1. Remove trialing/past_due from the admin Companies active UI.
+
+On /admin/companies:
+
+* Remove Trialing from the status filter buttons.
+* Remove Past Due from the Edit Access status dropdown.
+* Remove Trialing from the Edit Access status dropdown.
+* The active access status options should be:
+
+  * active
+  * free
+  * prepaid
+  * suspended
+  * cancelled
+  * expired
+
+If old data still has trialing, display it as “Blocked (legacy)” in badges/details, but do not allow selecting it.
+
+2. Remove Trial Ends as an active Companies table column.
+
+On /admin/companies:
+
+* Remove or rename the “Trial Ends” column.
+* Do not calculate trial end using trialStartedAt + 7 days.
+* Do not automatically display trialing as expired based on date math.
+
+If a replacement column is useful, use one of:
+
+* Prepaid Through
+* Access Reference
+* Billing Notes
+
+But do not show trial as an active workflow.
+
+3. Remove active trial display from Company Detail.
+
+On /admin/companies/:companyId:
+
+* Remove the main summary text that says “Trial ends.”
+* Do not calculate effectiveTrialEnd from trialStartedAt + 7 days.
+* Legacy Trial Start / Legacy Trial End fields may remain in Billing & Access as reference-only fields if they already exist.
+* Make sure trialing, if present from old data, displays as “Blocked (legacy)” and cannot be selected as a normal status.
+
+4. Remove trial/upgrade flow from company owner dashboard.
+
+On the company dashboard:
+
+* Remove trial countdown banner.
+* Remove “Free Trial” active messaging.
+* Remove “Trial Expired” screen.
+* Remove “Upgrade Now” / “View Plans & Upgrade” buttons.
+* Remove 7-day trial calculations and automatic expired logic.
+
+Replace with Billing & Access messaging based on manual access status:
+
+* active = Active
+* prepaid = Prepaid
+* free = Free / Demo Access
+* suspended = Suspended
+* cancelled = Cancelled
+* expired = Expired
+* trialing = Blocked (legacy)
+
+If the company is suspended/cancelled/expired/trialing, show a clear message:
+“Your company access is not active. Please contact support to update your Billing & Access status.”
+
+Do not link to plan/tier/upgrade pages.
+
+5. Tighten GET estimate detail authorization.
+
+For GET /api/estimates/:id:
+
+* non-admin users must only access estimates tied to a project owned by their company
+* if estimate.projectId is missing, deny access
+* if the project cannot be found, deny access
+* if project.contractorId is missing, deny access
+* if the contractor cannot be found, deny access
+* if contractor.companyId does not match user.companyId, deny access
+
+Financial record detail routes should fail closed when ownership cannot be verified.
+
+6. Tighten GET invoice detail authorization.
+
+For GET /api/invoices/:id:
+
+* non-admin users must only access invoices tied to a project owned by their company
+* if invoice.projectId is missing, deny access
+* if the project cannot be found, deny access
+* if project.contractorId is missing, deny access
+* if the contractor cannot be found, deny access
+* if contractor.companyId does not match user.companyId, deny access
+
+7. Keep this patch focused.
+
+Do not build new estimator features.
+Do not build invoice detail/edit views.
+Do not add Stripe yet.
+Do not modify Super Admin except where needed to remove remaining trial UI.
