@@ -106,7 +106,7 @@ export interface IStorage {
   createInvoiceLineItem(lineItem: InsertInvoiceLineItem): Promise<InvoiceLineItem>;
   
   // Recurring billing methods
-  getRecurringBilling(): Promise<RecurringBilling[]>;
+  getRecurringBilling(companyId?: string): Promise<RecurringBilling[]>;
   createRecurringBilling(billing: InsertRecurringBilling): Promise<RecurringBilling>;
   
   // Project phase methods
@@ -585,8 +585,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Recurring billing methods
-  async getRecurringBilling(): Promise<RecurringBilling[]> {
-    return await db.select().from(schema.recurringBilling);
+  async getRecurringBilling(companyId?: string): Promise<RecurringBilling[]> {
+    if (!companyId) {
+      return await db.select().from(schema.recurringBilling);
+    }
+    const rows = await db
+      .select({ billing: schema.recurringBilling })
+      .from(schema.recurringBilling)
+      .leftJoin(schema.projects, eq(schema.recurringBilling.projectId, schema.projects.id))
+      .leftJoin(schema.users, eq(schema.projects.contractorId, schema.users.id))
+      .where(eq(schema.users.companyId, companyId));
+    return rows.map((r) => r.billing);
   }
 
   async createRecurringBilling(insertBilling: InsertRecurringBilling): Promise<RecurringBilling> {

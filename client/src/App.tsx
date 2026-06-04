@@ -144,6 +144,12 @@ function Router() {
 
   // Company Portal Routes (with Layout - shares contractor portal sidebar)
   if (location.startsWith("/company")) {
+    const canAccessCompany = user?.role === "company_owner" || !!user?.isCompanyAdmin;
+    if (!authLoading && !canAccessCompany) {
+      setLocation("/auth");
+      return null;
+    }
+    if (authLoading) return null;
     return (
       <Layout>
         <Switch>

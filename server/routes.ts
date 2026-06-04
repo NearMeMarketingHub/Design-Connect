@@ -2353,6 +2353,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid estimate data", errors: parsedEstimate.error.flatten().fieldErrors });
       }
       const { lineItems, ...estimateData } = parsedEstimate.data;
+      const user = req.user as User;
+      if (user.role !== "admin" && estimateData.projectId) {
+        const project = await storage.getProject(estimateData.projectId);
+        if (!project) return res.status(404).json({ message: "Project not found" });
+        if (project.contractorId) {
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied: project not in your company" });
+          }
+        }
+      }
       const estimate = await storage.createEstimate(estimateData);
       
       if (lineItems && Array.isArray(lineItems)) {
@@ -2424,6 +2435,17 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid invoice data", errors: parsedInvoice.error.flatten().fieldErrors });
       }
       const { lineItems, ...invoiceData } = parsedInvoice.data;
+      const user = req.user as User;
+      if (user.role !== "admin" && invoiceData.projectId) {
+        const project = await storage.getProject(invoiceData.projectId);
+        if (!project) return res.status(404).json({ message: "Project not found" });
+        if (project.contractorId) {
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied: project not in your company" });
+          }
+        }
+      }
       const invoice = await storage.createInvoice(invoiceData);
       
       if (lineItems && Array.isArray(lineItems)) {
@@ -2448,7 +2470,12 @@ export async function registerRoutes(
   // Recurring billing routes
   app.get("/api/recurring-billing", requireAuth, async (req, res, next) => {
     try {
-      const billing = await storage.getRecurringBilling();
+      const user = req.user as User;
+      if (user.role !== "admin" && !user.companyId) {
+        return res.status(403).json({ message: "No company associated with your account" });
+      }
+      const companyId = user.role === "admin" ? undefined : user.companyId!;
+      const billing = await storage.getRecurringBilling(companyId);
       res.json(billing);
     } catch (error) {
       next(error);
