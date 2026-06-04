@@ -58,11 +58,23 @@ interface AdminCompany {
   subscriptionStatus?: string;
   billingType?: string | null;
   monthlyPrice?: string | null;
-  trialStartedAt?: string | null;
-  trialEndsAt?: string | null;
+  prepaidThroughDate?: string | null;
   userCount?: number;
   projectCount?: number;
 }
+
+const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+  active:    { label: "Active",           variant: "default" },
+  prepaid:   { label: "Prepaid",          variant: "default" },
+  free:      { label: "Free",             variant: "secondary" },
+  suspended: { label: "Suspended",        variant: "destructive" },
+  cancelled: { label: "Cancelled",        variant: "destructive" },
+  expired:   { label: "Expired",          variant: "destructive" },
+  trialing:  { label: "Blocked (legacy)", variant: "destructive" },
+  past_due:  { label: "Blocked (legacy)", variant: "destructive" },
+};
+
+const STATUS_FILTER_PILLS = ["all", "active", "free", "prepaid", "suspended", "cancelled", "expired"] as const;
 
 export default function AdminCompanies() {
   const { user } = useAuth();
@@ -74,17 +86,11 @@ export default function AdminCompanies() {
   const [companiesPage, setCompaniesPage] = useState(1);
   const [companiesPageSize, setCompaniesPageSize] = useState(25);
 
-  const { data: platformSettings } = useQuery<{ defaultMonthlyPrice: string; defaultTrialLength: number }>({
-    queryKey: ["/api/admin/platform-settings"],
-    queryFn: () => apiRequest("GET", "/api/admin/platform-settings").then((r) => r.json()),
-    enabled: user?.role === "admin",
-  });
-
   const [createCompanyOpen, setCreateCompanyOpen] = useState(false);
   const [companySubDialogOpen, setCompanySubDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<AdminCompany | null>(null);
   const [companySubForm, setCompanySubForm] = useState({
-    subscriptionStatus: "trialing",
+    subscriptionStatus: "free",
   });
 
   useEffect(() => {
@@ -109,6 +115,12 @@ export default function AdminCompanies() {
       const qs = params.toString();
       return apiRequest("GET", `/api/admin/companies${qs ? `?${qs}` : ""}`).then((r) => r.json());
     },
+    enabled: user?.role === "admin",
+  });
+
+  const { data: platformSettings } = useQuery<{ defaultMonthlyPrice: string }>({
+    queryKey: ["/api/admin/platform-settings"],
+    queryFn: () => apiRequest("GET", "/api/admin/platform-settings").then((r) => r.json()),
     enabled: user?.role === "admin",
   });
 
@@ -166,7 +178,7 @@ export default function AdminCompanies() {
   const openCompanySubEdit = (company: AdminCompany) => {
     setEditingCompany(company);
     setCompanySubForm({
-      subscriptionStatus: company.subscriptionStatus || "trialing",
+      subscriptionStatus: company.subscriptionStatus || "free",
     });
     setCompanySubDialogOpen(true);
   };
@@ -200,7 +212,7 @@ export default function AdminCompanies() {
             />
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            {(["all", "active", "trialing", "suspended", "expired"] as const).map((status) => (
+            {STATUS_FILTER_PILLS.map((status) => (
               <button
                 key={status}
                 onClick={() => setCompanyStatusFilter(status)}
@@ -271,7 +283,7 @@ export default function AdminCompanies() {
                     <TableHead>Access Status</TableHead>
                     <TableHead>Billing Type</TableHead>
                     <TableHead>Monthly Price</TableHead>
-                    <TableHead>Trial Ends</TableHead>
+                    <TableHead>Prepaid Through</TableHead>
                     <TableHead className="text-center">Users</TableHead>
                     <TableHead className="text-center">Projects</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -279,19 +291,9 @@ export default function AdminCompanies() {
                 </TableHeader>
                 <TableBody>
                   {pagedCompanies.map((company) => {
-                    const trialLengthDays = platformSettings?.defaultTrialLength ?? 7;
-                    const trialEnd = company.trialEndsAt
-                      ? new Date(company.trialEndsAt)
-                      : company.trialStartedAt
-                      ? new Date(new Date(company.trialStartedAt).getTime() + trialLengthDays * 24 * 60 * 60 * 1000)
-                      : null;
-                    const now = new Date();
-                    const isSuspended = company.subscriptionStatus === "suspended";
-                    const isExpired =
-                      company.subscriptionStatus === "expired" ||
-                      (company.subscriptionStatus === "trialing" &&
-                        trialEnd &&
-                        now > trialEnd);
+                    const status = company.subscriptionStatus ?? "";
+                    const badge = STATUS_BADGE[status] ?? { label: status || "—", variant: "secondary" as const };
+                    const isSuspended = status === "suspended";
                     const price = company.monthlyPrice ? parseFloat(company.monthlyPrice) : null;
                     return (
                       <TableRow key={company.id} data-testid={`company-row-${company.id}`}>
@@ -303,27 +305,12 @@ export default function AdminCompanies() {
                           {company.companyType || "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              company.subscriptionStatus === "active"
-                                ? "default"
-                                : isSuspended
-                                ? "destructive"
-                                : isExpired
-                                ? "destructive"
-                                : "secondary"
-                            }
-                            className="capitalize text-xs"
-                          >
-                            {isSuspended
-                              ? "Suspended"
-                              : isExpired && company.subscriptionStatus !== "expired"
-                              ? "Expired"
-                              : company.subscriptionStatus}
+                          <Badge variant={badge.variant} className="text-xs">
+                            {badge.label}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground capitalize">
-                          {company.billingType?.replace("_", " ") || "manual"}
+                          {company.billingType?.replace(/_/g, " ") || "manual"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {price !== null
@@ -335,7 +322,9 @@ export default function AdminCompanies() {
                               : "—"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {trialEnd ? trialEnd.toLocaleDateString() : "—"}
+                          {company.prepaidThroughDate
+                            ? new Date(company.prepaidThroughDate).toLocaleDateString()
+                            : "—"}
                         </TableCell>
                         <TableCell className="text-center text-sm">
                           {company.userCount ?? 0}
@@ -508,12 +497,12 @@ export default function AdminCompanies() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="trialing">Trialing</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                  <SelectItem value="past_due">Past Due</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="prepaid">Prepaid</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
             </div>

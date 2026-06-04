@@ -2314,11 +2314,15 @@ export async function registerRoutes(
           return res.status(403).json({ message: "Access denied" });
         }
         const project = await storage.getProject(estimate.projectId);
-        if (project && project.contractorId) {
-          const contractor = await storage.getUser(project.contractorId);
-          if (!contractor || contractor.companyId !== user.companyId) {
-            return res.status(403).json({ message: "Access denied" });
-          }
+        if (!project) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!project.contractorId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const contractor = await storage.getUser(project.contractorId);
+        if (!contractor || contractor.companyId !== user.companyId) {
+          return res.status(403).json({ message: "Access denied" });
         }
       }
       const lineItems = await storage.getEstimateLineItems(req.params.id);
@@ -2400,14 +2404,16 @@ export async function registerRoutes(
         if (!invoice.projectId) {
           return res.status(403).json({ message: "Access denied" });
         }
-        if (invoice.projectId) {
-          const project = await storage.getProject(invoice.projectId);
-          if (project && project.contractorId) {
-            const contractor = await storage.getUser(project.contractorId);
-            if (!contractor || contractor.companyId !== user.companyId) {
-              return res.status(403).json({ message: "Access denied" });
-            }
-          }
+        const project = await storage.getProject(invoice.projectId);
+        if (!project) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!project.contractorId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const contractor = await storage.getUser(project.contractorId);
+        if (!contractor || contractor.companyId !== user.companyId) {
+          return res.status(403).json({ message: "Access denied" });
         }
       }
       const lineItems = await storage.getInvoiceLineItems(req.params.id);

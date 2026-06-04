@@ -303,9 +303,6 @@ export default function AdminCompanyDetail() {
   }
 
   const isSuspended = company.subscriptionStatus === "suspended";
-  const trialStart = company.trialStartedAt ? new Date(company.trialStartedAt) : null;
-  const computedTrialEnd = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
-  const effectiveTrialEnd = company.trialEndsAt ? new Date(company.trialEndsAt) : computedTrialEnd;
 
   return (
     <SuperAdminLayout>
@@ -349,9 +346,6 @@ export default function AdminCompanyDetail() {
                     <span>Billing: <span className="capitalize font-medium text-foreground">{company.billingType ?? "manual"}</span></span>
                     {company.monthlyPrice && (
                       <span>Price: <span className="font-medium text-foreground">${parseFloat(company.monthlyPrice).toFixed(2)}/mo</span></span>
-                    )}
-                    {effectiveTrialEnd && (
-                      <span>Trial ends: <span className="font-medium text-foreground">{safeFormat(effectiveTrialEnd, "MMM d, yyyy")}</span></span>
                     )}
                     <span>Created: <span className="font-medium text-foreground">{safeFormat(company.createdAt, "MMM d, yyyy")}</span></span>
                   </div>

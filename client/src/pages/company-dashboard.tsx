@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { 
   Building2, Users, CreditCard, Settings, Plus, Mail, Trash2,
   CheckCircle, Clock, Crown, Wrench, FileText, UserPlus, ChevronRight,
-  RefreshCw, AlertCircle, ShieldCheck, AlertTriangle, Lock,
+  RefreshCw, AlertCircle, ShieldCheck, AlertTriangle,
   BookOpen, Tag, Pencil, Package, DollarSign, Upload, Calculator,
   LayoutGrid, X
 } from "lucide-react";
@@ -362,17 +362,21 @@ export default function CompanyDashboard() {
     setItemDialogOpen(true);
   };
 
-  // Trial calculation
-  const TRIAL_DAYS = 7;
-  const trialStartedAt = company?.trialStartedAt ? new Date(company.trialStartedAt) : null;
-  const trialEndsAt = trialStartedAt ? new Date(trialStartedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000) : null;
-  const now = new Date();
-  const isTrialing = company?.subscriptionStatus === "trialing";
-  const isExpired = company?.subscriptionStatus === "expired" || (isTrialing && trialEndsAt !== null && now > trialEndsAt);
-  const trialDaysRemaining = trialEndsAt && isTrialing && !isExpired
-    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)))
-    : 0;
-  const isActive = company?.subscriptionStatus === "active";
+  const ACTIVE_STATUSES = ["active", "prepaid", "free"] as const;
+  const BLOCKED_STATUSES = ["suspended", "cancelled", "expired", "trialing"] as const;
+  const STATUS_LABEL: Record<string, string> = {
+    active:    "Active",
+    prepaid:   "Prepaid",
+    free:      "Free",
+    suspended: "Suspended",
+    cancelled: "Cancelled",
+    expired:   "Expired",
+    trialing:  "Blocked (legacy)",
+    past_due:  "Blocked (legacy)",
+  };
+  const subscriptionStatus = company?.subscriptionStatus ?? "";
+  const isActive = (ACTIVE_STATUSES as readonly string[]).includes(subscriptionStatus);
+  const isBlocked = (BLOCKED_STATUSES as readonly string[]).includes(subscriptionStatus);
 
   const inviteMutation = useMutation({
     mutationFn: async (data: { email: string; contractorType: string; specialty?: string; projectId?: string }) => {
@@ -497,61 +501,16 @@ export default function CompanyDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Trial countdown banner */}
-      {isTrialing && !isExpired && trialDaysRemaining <= TRIAL_DAYS && (
+      {/* Blocked access notice */}
+      {isBlocked && (
         <div
-          className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${
-            trialDaysRemaining <= 2
-              ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800"
-              : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
-          }`}
-          data-testid="trial-banner"
+          className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 flex items-center gap-3"
+          data-testid="blocked-access-banner"
         >
-          <AlertTriangle className={`w-5 h-5 shrink-0 ${trialDaysRemaining <= 2 ? "text-red-500" : "text-amber-500"}`} />
-          <div className="flex-1">
-            <p className={`font-medium text-sm ${trialDaysRemaining <= 2 ? "text-red-700 dark:text-red-300" : "text-amber-700 dark:text-amber-300"}`}>
-              {trialDaysRemaining === 0
-                ? "Your trial expires today!"
-                : trialDaysRemaining === 1
-                ? "1 day remaining in your free trial"
-                : `${trialDaysRemaining} days remaining in your free trial`}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Upgrade to keep full access to all BuildVision features after your trial ends.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant={trialDaysRemaining <= 2 ? "destructive" : "default"}
-            onClick={() => setActiveTab("subscription")}
-            data-testid="button-upgrade-from-banner"
-          >
-            Upgrade Now
-          </Button>
-        </div>
-      )}
-
-      {/* Trial expired screen */}
-      {isExpired && (
-        <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-8 text-center space-y-4" data-testid="trial-expired-screen">
-          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
-            <Lock className="w-8 h-8 text-destructive" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Trial Expired</h2>
-            <p className="text-muted-foreground mt-1 max-w-md mx-auto">
-              Your 7-day free trial has ended. Upgrade to a paid plan to continue using BuildVision's contractor features.
-            </p>
-          </div>
-          <Button
-            onClick={() => setActiveTab("subscription")}
-            size="lg"
-            className="mt-2"
-            data-testid="button-upgrade-expired"
-          >
-            <CreditCard className="w-4 h-4 mr-2" />
-            View Plans & Upgrade
-          </Button>
+          <AlertTriangle className="w-5 h-5 shrink-0 text-destructive" />
+          <p className="text-sm font-medium text-destructive">
+            Your company access is not active. Please contact support to update your Billing &amp; Access status.
+          </p>
         </div>
       )}
 
@@ -563,22 +522,22 @@ export default function CompanyDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Badge
-            variant={isActive ? "default" : isExpired ? "destructive" : "secondary"}
+            variant={isActive ? "default" : isBlocked ? "destructive" : "secondary"}
             className="capitalize"
             data-testid="subscription-status"
           >
-            {isExpired ? "Expired" : isTrialing ? `Trial — ${trialDaysRemaining}d left` : (company?.subscriptionStatus || "active")}
+            {(STATUS_LABEL[subscriptionStatus] ?? subscriptionStatus) || "—"}
           </Badge>
         </div>
       </div>
 
-      <Tabs value={isExpired ? "subscription" : activeTab} onValueChange={isExpired ? undefined : setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList data-testid="company-tabs">
-          <TabsTrigger value="overview" disabled={isExpired} data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="team" disabled={isExpired} data-testid="tab-team">Team</TabsTrigger>
-          <TabsTrigger value="price-book" disabled={isExpired} data-testid="tab-price-book">Price Book</TabsTrigger>
+          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="team" data-testid="tab-team">Team</TabsTrigger>
+          <TabsTrigger value="price-book" data-testid="tab-price-book">Price Book</TabsTrigger>
           <TabsTrigger value="subscription" data-testid="tab-subscription">Billing & Access</TabsTrigger>
-          <TabsTrigger value="settings" disabled={isExpired} data-testid="tab-settings">Settings</TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -1501,29 +1460,24 @@ export default function CompanyDashboard() {
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Current status card */}
-              <div className={`rounded-lg border p-4 ${isExpired ? "bg-destructive/5 border-destructive/30" : isTrialing ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800" : "bg-muted/30"}`}>
+              <div className={`rounded-lg border p-4 ${isBlocked ? "bg-destructive/5 border-destructive/30" : "bg-muted/30"}`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold capitalize text-lg">
-                      {isExpired ? "Trial Expired" : isTrialing ? "Free Trial" : "Active"}
+                      {(STATUS_LABEL[subscriptionStatus] ?? subscriptionStatus) || "—"}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {isExpired
-                        ? "Your trial ended. Upgrade to restore access."
-                        : isTrialing
-                        ? trialEndsAt
-                          ? `Trial ends ${trialEndsAt.toLocaleDateString()} — ${trialDaysRemaining} day${trialDaysRemaining !== 1 ? "s" : ""} remaining`
-                          : "Trial active"
-                        : `Status: ${company?.subscriptionStatus || "active"}`
-                      }
+                      {isBlocked
+                        ? "Your company access is not active. Please contact support."
+                        : `Access status: ${STATUS_LABEL[subscriptionStatus] ?? subscriptionStatus}`}
                     </p>
                   </div>
                   <Badge
-                    variant={isActive ? "default" : isExpired ? "destructive" : "secondary"}
+                    variant={isActive ? "default" : isBlocked ? "destructive" : "secondary"}
                     className="capitalize"
                     data-testid="subscription-status-badge"
                   >
-                    {isExpired ? "Expired" : isTrialing ? "Trialing" : company?.subscriptionStatus || "active"}
+                    {(STATUS_LABEL[subscriptionStatus] ?? subscriptionStatus) || "—"}
                   </Badge>
                 </div>
               </div>
@@ -1532,7 +1486,7 @@ export default function CompanyDashboard() {
                 <div>
                   <dt className="text-muted-foreground text-xs mb-0.5">Billing Type</dt>
                   <dd className="font-medium capitalize" data-testid="display-billing-type">
-                    {company?.billingType?.replace("_", " ") || "Manual"}
+                    {company?.billingType?.replace(/_/g, " ") || "Manual"}
                   </dd>
                 </div>
                 <div>
@@ -1543,14 +1497,6 @@ export default function CompanyDashboard() {
                       : "—"}
                   </dd>
                 </div>
-                {trialEndsAt && (
-                  <div>
-                    <dt className="text-muted-foreground text-xs mb-0.5">Trial End</dt>
-                    <dd className="font-medium" data-testid="display-trial-end">
-                      {trialEndsAt.toLocaleDateString()}
-                    </dd>
-                  </div>
-                )}
                 {company?.prepaidThroughDate && (
                   <div>
                     <dt className="text-muted-foreground text-xs mb-0.5">Prepaid Through</dt>
