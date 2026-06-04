@@ -5,9 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Plus, Trash2, Save, FileText, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, FileText, AlertCircle, Loader2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,11 +16,19 @@ import { useToast } from "@/hooks/use-toast";
 
 const BLOCKED_STATUSES = new Set(["suspended", "cancelled", "expired", "trialing", "past_due"]);
 
-interface Project {
+interface ProjectListItem {
+  id: string;
+  name: string;
+}
+
+interface ProjectDetail {
   id: string;
   name: string;
   clientId: string | null;
-  clientName: string | null;
+  client: {
+    name: string | null;
+    username: string;
+  } | null;
 }
 
 interface LineItem {
@@ -50,7 +57,7 @@ export default function CreateInvoice() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [nextId, setNextId] = useState(1);
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ProjectListItem[]>({
     queryKey: ["/api/projects"],
     queryFn: () => apiRequest("GET", "/api/projects").then((r) => r.json()),
   });
@@ -61,17 +68,33 @@ export default function CreateInvoice() {
     enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
   });
 
+  const { data: projectDetail, isFetching: projectDetailLoading } = useQuery<ProjectDetail>({
+    queryKey: ["/api/projects", selectedProjectId],
+    queryFn: () => apiRequest("GET", `/api/projects/${selectedProjectId}`).then((r) => r.json()),
+    enabled: !!selectedProjectId,
+  });
+
   const isBlocked = company ? BLOCKED_STATUSES.has(company.subscriptionStatus ?? "") : false;
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
-  const clientName = selectedProject?.clientName ?? "";
-  const projectName = selectedProject?.name ?? "";
+  const clientName = projectDetail?.client
+    ? (projectDetail.client.name ?? projectDetail.client.username ?? "")
+    : "";
+  const projectName = projectDetail?.name ?? projects.find((p) => p.id === selectedProjectId)?.name ?? "";
+
+  const noClientLinked = !!selectedProjectId && !projectDetailLoading && !projectDetail?.client;
+
   const total = items.reduce((sum, item) => sum + item.amount, 0);
 
   const lineItemsValid =
     items.length > 0 && items.every((i) => i.desc.trim() && i.qty > 0 && i.rate >= 0);
   const hasInvalidItems = items.length > 0 && !lineItemsValid;
-  const canSubmit = !!selectedProjectId && !!dueDate && lineItemsValid && !isBlocked;
+  const canSubmit =
+    !!selectedProjectId &&
+    !!clientName &&
+    !!dueDate &&
+    lineItemsValid &&
+    !isBlocked &&
+    !projectDetailLoading;
 
   const addItem = () => {
     setItems((prev) => [...prev, { id: nextId, desc: "", qty: 1, rate: 0, amount: 0 }]);
@@ -197,25 +220,31 @@ export default function CreateInvoice() {
                       className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground"
                       data-testid="display-client-name"
                     >
-                      {clientName || (selectedProjectId ? "No client linked" : "—")}
+                      {!selectedProjectId ? (
+                        "—"
+                      ) : projectDetailLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        clientName || "No client linked"
+                      )}
                     </div>
+                    {noClientLinked && (
+                      <p className="text-xs text-amber-600" data-testid="hint-no-client">
+                        This project does not have a client linked. Link a client before creating an invoice.
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Invoice Date</Label>
-                    <Input type="date" data-testid="input-invoice-date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Due Date <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      data-testid="input-invoice-due-date"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Due Date <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="max-w-xs"
+                    data-testid="input-invoice-due-date"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -329,22 +358,13 @@ export default function CreateInvoice() {
               <CardHeader>
                 <CardTitle>Settings</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div className="flex items-center justify-between opacity-50">
                   <div className="space-y-0.5">
                     <Label className="cursor-not-allowed">Recurring Invoice</Label>
                     <p className="text-xs text-muted-foreground">Recurring invoices coming later.</p>
                   </div>
                   <Switch disabled data-testid="switch-recurring" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notes for Client</Label>
-                  <Textarea
-                    placeholder="Thank you for your business…"
-                    className="min-h-[100px]"
-                    data-testid="textarea-invoice-notes"
-                  />
                 </div>
               </CardContent>
               <CardFooter>
