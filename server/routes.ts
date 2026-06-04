@@ -2357,11 +2357,12 @@ export async function registerRoutes(
       if (user.role !== "admin" && estimateData.projectId) {
         const project = await storage.getProject(estimateData.projectId);
         if (!project) return res.status(404).json({ message: "Project not found" });
-        if (project.contractorId) {
-          const contractor = await storage.getUser(project.contractorId);
-          if (!contractor || contractor.companyId !== user.companyId) {
-            return res.status(403).json({ message: "Access denied: project not in your company" });
-          }
+        if (!project.contractorId) {
+          return res.status(403).json({ message: "Access denied: cannot verify project ownership" });
+        }
+        const contractor = await storage.getUser(project.contractorId);
+        if (!contractor || contractor.companyId !== user.companyId) {
+          return res.status(403).json({ message: "Access denied: project not in your company" });
         }
       }
       const estimate = await storage.createEstimate(estimateData);
@@ -2439,11 +2440,12 @@ export async function registerRoutes(
       if (user.role !== "admin" && invoiceData.projectId) {
         const project = await storage.getProject(invoiceData.projectId);
         if (!project) return res.status(404).json({ message: "Project not found" });
-        if (project.contractorId) {
-          const contractor = await storage.getUser(project.contractorId);
-          if (!contractor || contractor.companyId !== user.companyId) {
-            return res.status(403).json({ message: "Access denied: project not in your company" });
-          }
+        if (!project.contractorId) {
+          return res.status(403).json({ message: "Access denied: cannot verify project ownership" });
+        }
+        const contractor = await storage.getUser(project.contractorId);
+        if (!contractor || contractor.companyId !== user.companyId) {
+          return res.status(403).json({ message: "Access denied: project not in your company" });
         }
       }
       const invoice = await storage.createInvoice(invoiceData);

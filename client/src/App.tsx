@@ -144,9 +144,23 @@ function Router() {
 
   // Company Portal Routes (with Layout - shares contractor portal sidebar)
   if (location.startsWith("/company")) {
-    const canAccessCompany = user?.role === "company_owner" || !!user?.isCompanyAdmin;
+    const canAccessCompany =
+      user?.role === "company_owner" ||
+      (user?.role === "contractor" && !!user?.isCompanyAdmin);
     if (!authLoading && !canAccessCompany) {
-      setLocation("/auth");
+      if (!user) {
+        setLocation("/auth");
+      } else if (user.role === "admin") {
+        setLocation("/admin/dashboard");
+      } else if (user.role === "client") {
+        setLocation("/client/dashboard");
+      } else if (user.role === "contractor") {
+        if (user.contractorType === "notary") setLocation("/notary/portal");
+        else if (user.contractorType === "subcontractor") setLocation("/subcontractor/dashboard");
+        else setLocation("/contractor/dashboard");
+      } else {
+        setLocation("/auth");
+      }
       return null;
     }
     if (authLoading) return null;
