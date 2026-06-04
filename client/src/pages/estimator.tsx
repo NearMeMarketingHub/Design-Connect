@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,17 +100,22 @@ export default function Estimator() {
       setProjectClientName("");
       return;
     }
+    let cancelled = false;
     setIsFetchingClient(true);
-    apiRequest("GET", `/api/projects/${selectedProjectId}`)
-      .then(async (res) => {
-        if (!res.ok) return;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", `/api/projects/${selectedProjectId}`);
         const data = await res.json();
-        const clientName =
-          data.client?.name || data.client?.username || data.name || "";
-        setProjectClientName(clientName);
-      })
-      .catch(() => setProjectClientName(""))
-      .finally(() => setIsFetchingClient(false));
+        if (!cancelled) {
+          setProjectClientName(data.client?.name || data.client?.username || data.name || "");
+        }
+      } catch {
+        if (!cancelled) setProjectClientName("");
+      } finally {
+        if (!cancelled) setIsFetchingClient(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [selectedProjectId]);
 
   // Auto-load estimate from ?load= URL param on mount
@@ -118,17 +123,9 @@ export default function Estimator() {
     const params = new URLSearchParams(window.location.search);
     const loadId = params.get("load");
     if (!loadId) return;
-    apiRequest("GET", `/api/estimates/${loadId}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          toast({
-            title: "Could not load estimate",
-            description: (err as any).message || "Access denied or estimate not found.",
-            variant: "destructive",
-          });
-          return;
-        }
+    (async () => {
+      try {
+        const res = await apiRequest("GET", `/api/estimates/${loadId}`);
         const data: EstimateWithLineItems = await res.json();
         setSelectedProjectId(data.projectId ?? "");
         let ctr = 0;
@@ -146,14 +143,14 @@ export default function Estimator() {
         setLineItemCounter(ctr);
         setLoadedEstimateId(loadId);
         toast({ title: "Estimate loaded", description: `Loaded ${data.customId} — save to create a new copy.` });
-      })
-      .catch(() => {
+      } catch (err) {
         toast({
           title: "Could not load estimate",
-          description: "An error occurred while loading the estimate.",
+          description: parseErrorMessage(err),
           variant: "destructive",
         });
-      });
+      }
+    })();
   }, []);
 
   const subtotal = lineItems.reduce((acc, i) => acc + i.total, 0);
@@ -178,11 +175,6 @@ export default function Estimator() {
   const handleLoadEstimate = async (estimateId: string) => {
     try {
       const res = await apiRequest("GET", `/api/estimates/${estimateId}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast({ title: "Could not load estimate", description: (err as any).message || "Access denied.", variant: "destructive" });
-        return;
-      }
       const data: EstimateWithLineItems = await res.json();
       setSelectedProjectId(data.projectId ?? "");
       let ctr = 0;
@@ -202,8 +194,8 @@ export default function Estimator() {
       setShowAddForm(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
       toast({ title: "Estimate loaded", description: `Loaded ${data.customId} — save to create a new copy.` });
-    } catch {
-      toast({ title: "Error", description: "Could not load estimate.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Could not load estimate", description: parseErrorMessage(err), variant: "destructive" });
     }
   };
 
@@ -231,20 +223,15 @@ export default function Estimator() {
           total: String(li.total),
         })),
       };
-      const res = await apiRequest("POST", "/api/estimates", payload);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast({ title: "Save failed", description: (err as any).message || "Could not save estimate.", variant: "destructive" });
-        return;
-      }
+      await apiRequest("POST", "/api/estimates", payload);
       await queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
       toast({ title: "Estimate saved", description: "Saved as a draft estimate." });
       setLineItems([]);
       setSelectedProjectId("");
       setLoadedEstimateId(null);
       setShowAddForm(false);
-    } catch {
-      toast({ title: "Save failed", description: "Could not save estimate.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Save failed", description: parseErrorMessage(err), variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -295,6 +282,12 @@ export default function Estimator() {
             Company access is not active — contact support.
           </AlertDescription>
         </Alert>
+      )}
+
+      {selectedProjectId && lineItems.length === 0 && !isBlocked && (
+        <p className="text-sm text-muted-foreground" data-testid="hint-no-line-items">
+          Add at least one line item before saving.
+        </p>
       )}
 
       <Card>
