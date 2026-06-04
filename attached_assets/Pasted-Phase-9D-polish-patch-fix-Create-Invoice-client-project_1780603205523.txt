@@ -1,0 +1,65 @@
+Phase 9D polish patch: fix Create Invoice client/project details and remove unsaved fields.
+
+Context:
+Create Invoice now posts to the real backend, but the page still has a few UX/data issues:
+- clientName may be blank because /api/projects does not include clientName
+- Invoice Date is visible but not saved by the schema
+- Notes for Client is visible but not saved by the schema
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not add Stripe.
+Do not add PDFs, email/send invoice, payment collection, recurring billing, production sheets, reports, Gantt, or board views.
+Do not change invoice schema in this pass.
+
+1. Fetch selected project details to derive client name.
+
+In client/src/pages/create-invoice.tsx:
+- keep loading the project list from /api/projects
+- when selectedProjectId changes, fetch /api/projects/:id using the existing secured route
+- derive clientName from the detailed project response:
+  - data.client?.name
+  - data.client?.username
+  - fallback to empty string only if no client exists
+- derive projectName from the detailed project response or selected project name
+- show loading state while fetching project/client details
+
+2. Prevent saving if client name cannot be resolved.
+
+Because POST /api/invoices requires clientName:
+- disable Create Invoice if clientName is missing
+- show inline message:
+  “This project does not have a client linked. Link a client before creating an invoice.”
+
+Do not allow creating invoices with blank clientName.
+
+3. Remove unsaved Invoice Date field.
+
+The invoice schema does not currently support invoice date.
+Remove the visible Invoice Date input from /company/invoice/new for now.
+
+Keep Due Date as the required date field.
+
+Do not add invoiceDate to the schema in this pass.
+
+4. Remove or disable unsaved Notes for Client field.
+
+The invoice schema does not currently support notes.
+Remove the Notes for Client textarea, or disable it with a clear “Notes coming later” message.
+
+Preferred for now: remove the field entirely to avoid users entering notes that will not be saved.
+
+Do not add notes to the schema in this pass.
+
+5. Keep Create Invoice behavior otherwise unchanged.
+
+Continue to:
+- require project
+- require due date
+- require at least one valid line item
+- block save for inactive company access
+- POST to /api/invoices
+- redirect to /company/invoices/:invoiceId after success
+- use parseErrorMessage for errors
+- keep recurring invoice disabled/coming later
