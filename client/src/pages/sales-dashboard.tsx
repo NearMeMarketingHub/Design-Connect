@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, FileText, ArrowUpRight, TrendingUp, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
@@ -27,6 +27,7 @@ function statusVariant(status: string): "default" | "secondary" | "outline" | "d
 }
 
 export default function SalesDashboard() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
 
   const { data: estimates = [], isLoading } = useQuery<Estimate[]>({
@@ -168,7 +169,12 @@ export default function SalesDashboard() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" data-testid={`button-view-quote-${quote.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigate(`/company/estimates?load=${quote.id}`)}
+                        data-testid={`button-view-quote-${quote.id}`}
+                      >
                         View
                       </Button>
                     </TableCell>
