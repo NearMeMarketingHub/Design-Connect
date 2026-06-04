@@ -80,6 +80,9 @@ const ACTION_LABELS: Record<string, string> = {
   // Reserved for future View As User feature
   view_as_started: "View As Started",
   view_as_ended: "View As Ended",
+  estimate_created: "Estimate Created",
+  invoice_created: "Invoice Created",
+  invoice_updated: "Invoice Updated",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -100,6 +103,9 @@ const ACTION_COLORS: Record<string, string> = {
   pricing_access_updated: "bg-gray-100 text-gray-700",
   view_as_started: "bg-amber-100 text-amber-700",
   view_as_ended: "bg-amber-100 text-amber-700",
+  estimate_created: "bg-emerald-100 text-emerald-700",
+  invoice_created: "bg-cyan-100 text-cyan-700",
+  invoice_updated: "bg-cyan-100 text-cyan-700",
 };
 
 const ENTITY_ICONS: Record<string, typeof FileText> = {
@@ -108,6 +114,8 @@ const ENTITY_ICONS: Record<string, typeof FileText> = {
   invite: Link2,
   demo_request: CalendarCheck,
   platform: Settings,
+  estimate: FileText,
+  invoice: FileText,
 };
 
 // Human-readable labels for known metadata keys
@@ -154,6 +162,13 @@ const META_LABELS: Record<string, string> = {
   startedAt: "Started At",
   endedAt: "Ended At",
   durationMs: "Duration",
+  customId: "ID",
+  clientName: "Client",
+  amount: "Amount",
+  lineItemCount: "Line Items",
+  dueDate: "Due Date",
+  oldDueDate: "Previous Due Date",
+  newDueDate: "New Due Date",
 };
 
 // Old→new pairs: [oldKey, newKey, label]
@@ -167,6 +182,7 @@ const OLD_NEW_PAIRS: Array<[string, string, string]> = [
   ["oldManualBillingEnabled", "newManualBillingEnabled", "Manual Billing"],
   ["oldFreeAccessEnabled", "newFreeAccessEnabled", "Free Access"],
   ["oldPrepaidAccessEnabled", "newPrepaidAccessEnabled", "Prepaid Access"],
+  ["oldDueDate", "newDueDate", "Due Date"],
 ];
 
 function EntityIcon({ type }: { type: string }) {

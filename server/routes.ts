@@ -2335,6 +2335,7 @@ export async function registerRoutes(
       }
       const { lineItems, ...estimateData } = parsedEstimate.data;
       const user = req.user as User;
+      let auditCompanyId: string | null = null;
       if (user.role !== "admin") {
         if (!estimateData.projectId) {
           return res.status(403).json({ message: "Access denied: a project must be associated with this estimate" });
@@ -2348,6 +2349,7 @@ export async function registerRoutes(
         if (!contractor || contractor.companyId !== user.companyId) {
           return res.status(403).json({ message: "Access denied: project not in your company" });
         }
+        auditCompanyId = contractor.companyId ?? null;
       }
       const estimate = await storage.createEstimate(estimateData);
       
@@ -2364,6 +2366,22 @@ export async function registerRoutes(
         const estimateBroadcastCtx = await getProjectBroadcastContext(estimate.projectId, (req.user as User).companyId);
         broadcast({ type: "estimate", projectId: estimate.projectId, ...estimateBroadcastCtx });
       }
+      logAuditEvent(req, user, {
+        action: "estimate_created",
+        entityType: "estimate",
+        entityId: estimate.id,
+        entityName: estimate.customId,
+        companyId: auditCompanyId,
+        projectId: estimate.projectId,
+        metadata: {
+          customId: estimate.customId,
+          projectName: estimate.projectName,
+          clientName: estimate.clientName,
+          amount: estimate.amount,
+          status: estimate.status,
+          lineItemCount: lineItems?.length ?? 0,
+        },
+      });
       res.json(estimate);
     } catch (error) {
       next(error);
@@ -2441,6 +2459,7 @@ export async function registerRoutes(
       }
 
       // Verify ownership for non-admins
+      let auditCompanyId: string | null = null;
       if (user.role !== "admin") {
         if (!user.companyId || !invoice.projectId) {
           return res.status(403).json({ message: "Access denied" });
@@ -2453,7 +2472,11 @@ export async function registerRoutes(
         if (!contractor || contractor.companyId !== user.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
+        auditCompanyId = contractor.companyId ?? null;
       }
+
+      const oldStatus = invoice.status;
+      const oldDueDate = invoice.dueDate;
 
       const updateSchema = z.object({
         dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate must be YYYY-MM-DD").optional(),
@@ -2475,6 +2498,21 @@ export async function registerRoutes(
         broadcast({ type: "invoice", projectId: invoice.projectId, ...ctx });
       }
 
+      logAuditEvent(req, user, {
+        action: "invoice_updated",
+        entityType: "invoice",
+        entityId: updated.id,
+        entityName: updated.customId,
+        companyId: auditCompanyId,
+        projectId: updated.projectId,
+        metadata: {
+          oldStatus,
+          newStatus: updated.status,
+          oldDueDate,
+          newDueDate: updated.dueDate,
+          amount: updated.amount,
+        },
+      });
       res.json(updated);
     } catch (error) {
       next(error);
@@ -2489,6 +2527,7 @@ export async function registerRoutes(
       }
       const { lineItems, ...invoiceData } = parsedInvoice.data;
       const user = req.user as User;
+      let auditCompanyId: string | null = null;
       if (user.role !== "admin") {
         if (!invoiceData.projectId) {
           return res.status(403).json({ message: "Access denied: a project must be associated with this invoice" });
@@ -2502,6 +2541,7 @@ export async function registerRoutes(
         if (!contractor || contractor.companyId !== user.companyId) {
           return res.status(403).json({ message: "Access denied: project not in your company" });
         }
+        auditCompanyId = contractor.companyId ?? null;
       }
       const invoice = await storage.createInvoice(invoiceData);
       
@@ -2518,6 +2558,23 @@ export async function registerRoutes(
         const invoiceBroadcastCtx = await getProjectBroadcastContext(invoice.projectId, (req.user as User).companyId);
         broadcast({ type: "invoice", projectId: invoice.projectId, ...invoiceBroadcastCtx });
       }
+      logAuditEvent(req, user, {
+        action: "invoice_created",
+        entityType: "invoice",
+        entityId: invoice.id,
+        entityName: invoice.customId,
+        companyId: auditCompanyId,
+        projectId: invoice.projectId,
+        metadata: {
+          customId: invoice.customId,
+          projectName: invoice.projectName,
+          clientName: invoice.clientName,
+          amount: invoice.amount,
+          status: invoice.status,
+          dueDate: invoice.dueDate,
+          lineItemCount: lineItems?.length ?? 0,
+        },
+      });
       res.json(invoice);
     } catch (error) {
       next(error);
