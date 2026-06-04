@@ -1066,7 +1066,7 @@ export async function registerRoutes(
           subscriptionStatus,
           billingType,
           monthlyPrice: monthlyPrice || null,
-          trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
+          trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : null,
           trialEndsAt: trialEndsAt ? new Date(trialEndsAt) : null,
           prepaidThroughDate: prepaidThroughDate ? new Date(prepaidThroughDate) : null,
           accessNotes: accessNotes || null,
@@ -1290,8 +1290,8 @@ export async function registerRoutes(
   // ── Admin: Update company general fields (billing, notes, etc.) ───────────
   const adminCompanyUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
-    subscriptionStatus: z.enum(["trialing", "active", "free", "prepaid", "expired", "past_due", "cancelled", "suspended"]).optional(),
-    billingType: z.enum(["manual", "free", "prepaid", "future_in_app"]).optional(),
+    subscriptionStatus: z.enum(["active", "free", "prepaid", "expired", "cancelled", "suspended"]).optional(),
+    billingType: z.enum(["manual", "in_app", "prepaid", "included_with_service", "free_demo"]).optional(),
     monthlyPrice: z.string().nullable().optional(),
     trialStartedAt: z.string().datetime({ offset: true }).nullable().optional(),
     trialEndsAt: z.string().datetime({ offset: true }).nullable().optional(),
