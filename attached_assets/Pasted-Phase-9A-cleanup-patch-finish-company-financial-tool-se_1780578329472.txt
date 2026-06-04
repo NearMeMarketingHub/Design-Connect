@@ -1,0 +1,168 @@
+Phase 9A cleanup patch: finish company financial tool security/scoping and update Billing & Access model.
+
+Context:
+Phase 9A mostly landed, but several important financial access and mock-data issues remain.
+
+Also, the Billing & Access model has changed:
+All access models are manual for now. Super Admins manually set company access status. The app should not automatically expire, suspend, or lock accounts based on dates.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce public account creation.
+Do not build production sheets, payout schedules, Gantt, board views, or Avery formulas.
+Do not expand subcontractor/notary functionality.
+
+1. Remove active trial logic from Billing & Access checks.
+
+The app should no longer use trialing/trial periods as an active access model.
+
+Valid manually controlled access statuses:
+
+* active: company is paying through the app
+* prepaid: company paid outside the app or access is included in another service/package
+* free: temporary demo/free/manual access
+* suspended: manually locked by Super Admin
+* cancelled: no longer active
+* expired: manually marked as ended by Super Admin
+
+Allowed to create financial records:
+
+* active
+* prepaid
+* free
+
+Blocked from creating financial records:
+
+* suspended
+* cancelled
+* expired
+
+Do not allow trialing as an active access status anymore.
+
+If trialing still exists in old data, treat it as legacy and block financial writes until a Super Admin updates the company’s Billing & Access status to active, prepaid, free, suspended, cancelled, or expired.
+
+2. Keep access dates as reference-only for now.
+
+The app may keep fields like:
+
+* prepaidThroughDate
+* accessEndsAt
+* freeAccessEndsAt
+
+But for now these dates should be informational only.
+
+Do not automatically block access based on these dates.
+Do not automatically change a company from free/prepaid to expired.
+Do not automatically suspend or expire companies.
+
+Super Admins will manually set the company’s Access Status.
+
+3. Update Billing & Access UI wording.
+
+Remove visible trial wording from Super Admin Billing & Access UI and Create Company.
+
+Create Company / Edit Billing & Access should support:
+
+* Access Status:
+
+  * active
+  * prepaid
+  * free
+  * suspended
+  * cancelled
+  * expired
+* Billing Type:
+
+  * in_app
+  * prepaid
+  * included_with_service
+  * free_demo
+  * manual
+* Monthly Price
+* Prepaid Through Date, reference only
+* Access Ends At / Free Demo End Date, reference only
+* Billing Notes
+* Access Notes
+
+Do not show trial start/end fields as active workflow fields anymore.
+
+4. Update write protection error wording.
+
+Do not use old wording like “upgrade your subscription.”
+
+Use Billing & Access wording, such as:
+“Your company access is not active. Please contact support to update your Billing & Access status.”
+
+5. Require valid project ownership for non-admin estimates.
+
+For POST /api/estimates:
+
+* non-admin users must provide projectId
+* fetch the project
+* verify project.contractorId → contractor user.companyId matches logged-in user.companyId
+* return 403 if project ownership cannot be verified
+
+For GET /api/estimates/:id:
+
+* non-admin users must only access estimates tied to a project owned by their company
+* if estimate.projectId is missing, deny access for non-admin users
+
+6. Require valid project ownership for non-admin invoices.
+
+For POST /api/invoices:
+
+* non-admin users must provide projectId
+* fetch the project
+* verify project.contractorId → contractor user.companyId matches logged-in user.companyId
+* return 403 if project ownership cannot be verified
+
+For GET /api/invoices/:id:
+
+* non-admin users must only access invoices tied to a project owned by their company
+* if invoice.projectId is missing, deny access for non-admin users
+
+7. Add project ownership checks for recurring billing creation.
+
+For POST /api/recurring-billing:
+
+* non-admin users must provide projectId
+* fetch the project
+* verify project.contractorId → contractor user.companyId matches logged-in user.companyId
+* return 403 if project ownership cannot be verified
+
+GET /api/recurring-billing is already scoped by company; keep that behavior.
+
+8. Remove hardcoded mock data from Create Invoice.
+
+client/src/pages/create-invoice.tsx still contains sample clients/projects/items.
+
+Remove visible hardcoded sample data such as:
+
+* Sarah Jenkins
+* Mike Miller
+* West Lake Dev
+* Jenkins Residence
+* Miller Kitchen
+* Labor - Week 6
+* Materials - Lumber
+
+If fully wiring invoice creation is too large for this patch, replace the sample data with real company-scoped project/client options from existing APIs and a clean empty state.
+
+The page should not show fake customer/project/item data.
+
+9. Keep dashboards real-data only.
+
+Confirm Sales Dashboard and Accounting Dashboard continue using:
+
+* /api/estimates
+* /api/invoices
+* /api/recurring-billing
+
+Do not bring back hardcoded dashboard arrays.
+
+10. Keep this patch focused.
+
+Do not build estimate save/load yet.
+Do not build invoice detail/edit yet.
+Do not add new financial reports.
+Do not modify Super Admin pages except where required for Billing & Access fields or redirects.
