@@ -1,0 +1,66 @@
+Small no-trial cleanup pass before moving to the next financial feature.
+
+Context:
+The app no longer uses trials. Companies request a demo, and Super Admins manually set company access status as active, free, prepaid, suspended, cancelled, or expired.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not add Stripe in this pass.
+Do not remove trialStartedAt/trialEndsAt database columns yet.
+Do not build new financial features.
+
+1. Remove Default Trial Length from active Pricing & Access UI.
+
+On /admin/pricing-access:
+
+* Remove the visible “Default Trial Length (days)” field.
+* Do not allow admins to edit defaultTrialLength from the UI anymore.
+* Pricing & Access should focus only on:
+
+  * Default Monthly Price
+  * Manual Billing
+  * Free Access Enabled
+  * Prepaid Access Enabled
+
+2. Stop updating defaultTrialLength through active settings UI.
+
+In PATCH /api/admin/platform-settings:
+
+* Remove defaultTrialLength from the active request schema if practical.
+* Or ignore it if sent, but do not treat it as part of the active Pricing & Access workflow.
+
+Keep the database column for now if removing it would require a larger migration.
+
+3. Clean up Audit Log labels for defaultTrialLength.
+
+In the Audit Log UI:
+
+* Remove or stop displaying “Previous Trial Length”
+* Remove or stop displaying “New Trial Length”
+* Remove old/new pair label “Trial Length (days)”
+
+If old audit records contain defaultTrialLength metadata, show the raw metadata only in Advanced Details instead of presenting it as an active first-class field.
+
+4. Update schema comments.
+
+In shared/schema.ts:
+
+* Update trialStartedAt and trialEndsAt comments to say these are legacy/reference-only fields and are not used for access control.
+* Update platformSettings.defaultTrialLength comment to say legacy/unused if the column remains.
+* Do not remove the columns in this pass.
+
+5. Optional cleanup in Create Company payload.
+
+If create-company-dialog still sends trialStartedAt/trialEndsAt even though there are no visible fields, remove those fields from the create-company payload unless the backend still requires them.
+
+Do not add trial fields back to the UI.
+
+6. Keep legacy display only where useful.
+
+Company Detail may continue showing Legacy Trial Start / Legacy Trial End as reference-only fields for now, but they should be clearly marked as legacy/reference only and not used for access decisions.
+
+7. Do not remove legacy trial columns yet.
+
+Do not run the suggested task “Remove legacy trial date columns from the database” in this pass.
+
+That should be a later dedicated schema cleanup after all code references are gone.
