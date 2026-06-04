@@ -60,6 +60,8 @@ export default function Estimator() {
   const queryClient = useQueryClient();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [projectClientName, setProjectClientName] = useState<string>("");
+  const [isFetchingClient, setIsFetchingClient] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [lineItemCounter, setLineItemCounter] = useState(0);
   const [loadedEstimateId, setLoadedEstimateId] = useState<string | null>(null);
@@ -74,12 +76,12 @@ export default function Estimator() {
     rate: "0",
   });
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     queryFn: () => apiRequest("GET", "/api/projects").then((r) => r.json()),
   });
 
-  const { data: estimates = [], isLoading: estimatesLoading } = useQuery<Estimate[]>({
+  const { data: estimates = [], isLoading: estimatesLoading, isError: estimatesError } = useQuery<Estimate[]>({
     queryKey: ["/api/estimates"],
     queryFn: () => apiRequest("GET", "/api/estimates").then((r) => r.json()),
   });
@@ -92,13 +94,41 @@ export default function Estimator() {
 
   const isBlocked = company ? BLOCKED_STATUSES.has(company.subscriptionStatus ?? "") : false;
 
+  // Fetch client name whenever the selected project changes
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setProjectClientName("");
+      return;
+    }
+    setIsFetchingClient(true);
+    apiRequest("GET", `/api/projects/${selectedProjectId}`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        const clientName =
+          data.client?.name || data.client?.username || data.name || "";
+        setProjectClientName(clientName);
+      })
+      .catch(() => setProjectClientName(""))
+      .finally(() => setIsFetchingClient(false));
+  }, [selectedProjectId]);
+
+  // Auto-load estimate from ?load= URL param on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const loadId = params.get("load");
     if (!loadId) return;
     apiRequest("GET", `/api/estimates/${loadId}`)
       .then(async (res) => {
-        if (!res.ok) return;
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          toast({
+            title: "Could not load estimate",
+            description: (err as any).message || "Access denied or estimate not found.",
+            variant: "destructive",
+          });
+          return;
+        }
         const data: EstimateWithLineItems = await res.json();
         setSelectedProjectId(data.projectId ?? "");
         let ctr = 0;
@@ -117,7 +147,13 @@ export default function Estimator() {
         setLoadedEstimateId(loadId);
         toast({ title: "Estimate loaded", description: `Loaded ${data.customId} — save to create a new copy.` });
       })
-      .catch(() => {});
+      .catch(() => {
+        toast({
+          title: "Could not load estimate",
+          description: "An error occurred while loading the estimate.",
+          variant: "destructive",
+        });
+      });
   }, []);
 
   const subtotal = lineItems.reduce((acc, i) => acc + i.total, 0);
@@ -180,7 +216,7 @@ export default function Estimator() {
     try {
       const payload = {
         customId: generateCustomId(),
-        clientName: selectedProject.name,
+        clientName: projectClientName || selectedProject.name,
         projectName: selectedProject.name,
         amount: grandTotal.toFixed(2),
         status: "draft",
@@ -272,6 +308,11 @@ export default function Estimator() {
                 <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" /> Loading projects…
                 </div>
+              ) : projectsError ? (
+                <Alert variant="destructive" data-testid="alert-projects-error">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>Could not load projects. Please refresh and try again.</AlertDescription>
+                </Alert>
               ) : projects.length === 0 ? (
                 <Alert data-testid="alert-no-projects">
                   <AlertTriangle className="h-4 w-4" />
@@ -295,15 +336,27 @@ export default function Estimator() {
               )}
             </div>
             {selectedProject && (
-              <div className="text-sm text-muted-foreground pb-0.5">
-                <span className="font-medium">Status:</span>{" "}
-                <span className="capitalize">{selectedProject.status}</span>
-                {selectedProject.phase && (
-                  <>
-                    {" · "}
-                    <span className="font-medium">Phase:</span> {selectedProject.phase}
-                  </>
-                )}
+              <div className="text-sm text-muted-foreground pb-0.5 space-y-1">
+                <div>
+                  <span className="font-medium">Status:</span>{" "}
+                  <span className="capitalize">{selectedProject.status}</span>
+                  {selectedProject.phase && (
+                    <>
+                      {" · "}
+                      <span className="font-medium">Phase:</span> {selectedProject.phase}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Client:</span>{" "}
+                  {isFetchingClient ? (
+                    <Loader2 className="w-3 h-3 animate-spin inline" />
+                  ) : (
+                    <span data-testid="text-project-client">
+                      {projectClientName || "—"}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -564,6 +617,12 @@ export default function Estimator() {
           {estimatesLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : estimatesError ? (
+            <div className="text-center py-8 text-destructive" data-testid="error-estimates">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-60" />
+              <p className="font-medium text-sm">Could not load estimates</p>
+              <p className="text-xs mt-1 text-muted-foreground">Please refresh the page and try again.</p>
             </div>
           ) : estimates.length === 0 ? (
             <div
