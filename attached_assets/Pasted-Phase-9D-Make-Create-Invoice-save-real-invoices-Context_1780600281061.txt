@@ -1,0 +1,130 @@
+Phase 9D: Make Create Invoice save real invoices.
+
+Context:
+Phase 9A secured company-owner financial tools.
+Phase 9B made Estimator save/load real estimates.
+Phase 9C added invoice detail/edit.
+Now the Create Invoice page needs to actually create real invoices.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not add Stripe in this phase.
+Do not build PDF export, email/send invoice, payment collection, recurring billing management, production sheets, payout schedules, reports, Gantt, or board views.
+
+Goal:
+Company owners and authorized company-side users should be able to create a standard invoice from /company/invoice/new using real project data and the existing POST /api/invoices endpoint.
+
+1. Use real company projects.
+
+On /company/invoice/new:
+
+* continue loading projects from /api/projects
+* require selecting a project before creating an invoice
+* when a project is selected, derive clientName and projectName from that selected project
+* do not allow manually selecting a mismatched client from another project
+* if there are no projects, show a clean empty state:
+  “No projects yet — create a project first.”
+
+2. Create standard invoices only in this phase.
+
+The current page has a Recurring Invoice switch.
+
+For this phase:
+
+* either hide the recurring invoice switch
+* or disable it with a small “Recurring invoices coming later” note
+
+Do not create recurring billing records in this phase.
+Do not build recurring billing management.
+
+3. Validate invoice form before submit.
+
+Disable Create Invoice unless:
+
+* a valid project is selected
+* due date is entered
+* at least one line item exists
+* each line item has a description
+* each line item has quantity greater than 0
+* each line item has rate greater than or equal to 0
+* company access is not blocked
+* submit is not currently running
+
+Show helpful inline messages:
+
+* “Select a project before creating an invoice.”
+* “Add at least one line item before creating an invoice.”
+* “Line items need a description and valid quantity/rate.”
+
+4. Wire Create Invoice button.
+
+On Create Invoice click:
+
+* POST to /api/invoices
+* use the existing secured backend route
+* do not add a new unscoped route
+
+Payload should include existing schema fields:
+
+* customId, auto-generate as INV-{YYYYMMDD}-{4 random hex chars}
+* projectId
+* clientName from selected project
+* projectName from selected project
+* amount as string total
+* dueDate from form
+* status: draft
+* type: standard
+* lineItems mapped to existing invoice_line_items fields:
+
+  * description
+  * quantity
+  * rate
+  * amount
+
+5. Success behavior.
+
+On successful invoice creation:
+
+* show success toast
+* invalidate /api/invoices
+* redirect to /company/invoices/:invoiceId so the user can view the new invoice
+
+6. Error handling.
+
+Use parseErrorMessage for API errors.
+
+If backend rejects because company access is blocked, show the backend message:
+“Company access is not active. Please contact support to update your Billing & Access status.”
+
+If backend rejects project ownership, show the backend message.
+
+Do not use “subscription” wording in user-facing messages.
+
+7. Access rules.
+
+Frontend UX may disable the button for blocked companies, but backend remains the source of truth.
+
+Allowed company access:
+
+* active
+* prepaid
+* free
+
+Blocked:
+
+* suspended
+* cancelled
+* expired
+* legacy trialing
+* legacy past_due
+
+Do not weaken existing POST /api/invoices protections.
+
+8. Keep this focused.
+
+Do not add invoice editing beyond the existing detail page.
+Do not add line-item editing on the detail page.
+Do not add invoice PDF/email/payment/Stripe.
+Do not add recurring billing creation.
+Do not change the invoice schema unless absolutely required.
