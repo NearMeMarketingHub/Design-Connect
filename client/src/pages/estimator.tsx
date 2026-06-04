@@ -1,24 +1,16 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Save, Printer, DollarSign } from "lucide-react";
+import { Plus, Trash2, Save, Printer, FileText } from "lucide-react";
+
+type LineItem = { id: number; category: string; item: string; quantity: number; unit: string; rate: number; total: number };
 
 export default function Estimator() {
-  const [lineItems, setLineItems] = useState([
-    { id: 1, category: "01 - General Conditions", item: "Project Management", quantity: 120, unit: "Hrs", rate: 85, total: 10200 },
-    { id: 2, category: "01 - General Conditions", item: "Permits & Fees", quantity: 1, unit: "LS", rate: 2500, total: 2500 },
-    { id: 3, category: "02 - Demolition", item: "Kitchen Demolition", quantity: 1, unit: "LS", rate: 3500, total: 3500 },
-    { id: 4, category: "02 - Demolition", item: "Debris Removal", quantity: 2, unit: "Load", rate: 450, total: 900 },
-    { id: 5, category: "06 - Wood & Plastics", item: "Rough Lumber Package", quantity: 1, unit: "LS", rate: 4500, total: 4500 },
-    { id: 6, category: "06 - Wood & Plastics", item: "Framing Labor", quantity: 350, unit: "SF", rate: 12, total: 4200 },
-    { id: 7, category: "15 - Mechanical", item: "HVAC Rough-in", quantity: 1, unit: "LS", rate: 6500, total: 6500 },
-    { id: 8, category: "16 - Electrical", item: "Rough Wiring", quantity: 25, unit: "Opening", rate: 120, total: 3000 },
-  ]);
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
   const totalCost = lineItems.reduce((acc, item) => acc + item.total, 0);
   const overhead = totalCost * 0.10;
@@ -30,7 +22,7 @@ export default function Estimator() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-heading font-bold">Estimator</h1>
-          <p className="text-muted-foreground">Master Budget: Jenkins Residence</p>
+          <p className="text-muted-foreground">Build and manage project cost estimates.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline">
@@ -70,21 +62,38 @@ export default function Estimator() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lineItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium text-xs text-muted-foreground">{item.category}</TableCell>
-                      <TableCell>{item.item}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.unit}</TableCell>
-                      <TableCell>${item.rate}</TableCell>
-                      <TableCell className="text-right font-medium">${item.total.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-50 hover:opacity-100">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                  {lineItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-12">
+                        <div className="text-center text-muted-foreground" data-testid="empty-line-items">
+                          <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                          <p className="font-medium">No line items yet</p>
+                          <p className="text-sm mt-1">Click "Add Item" to start building this estimate.</p>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    lineItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium text-xs text-muted-foreground">{item.category}</TableCell>
+                        <TableCell>{item.item}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.unit}</TableCell>
+                        <TableCell>${item.rate}</TableCell>
+                        <TableCell className="text-right font-medium">${item.total.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive opacity-50 hover:opacity-100"
+                            onClick={() => setLineItems((prev) => prev.filter((i) => i.id !== item.id))}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

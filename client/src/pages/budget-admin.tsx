@@ -31,6 +31,7 @@ import {
   DollarSign,
   Edit,
   Loader2,
+  Package,
   Plus,
   Save,
   Search,
@@ -395,8 +396,12 @@ export default function BudgetAdmin() {
                           ))}
                           {(!category.items || category.items.length === 0) && (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                                No items in this category
+                              <TableCell colSpan={8} className="py-10">
+                                <div className="text-center text-muted-foreground">
+                                  <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                  <p className="text-sm font-medium">No items in this category</p>
+                                  <p className="text-xs mt-1">Click "Add Item" to add your first line item.</p>
+                                </div>
                               </TableCell>
                             </TableRow>
                           )}
