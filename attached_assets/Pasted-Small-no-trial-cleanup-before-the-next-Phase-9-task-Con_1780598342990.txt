@@ -1,0 +1,63 @@
+Small no-trial cleanup before the next Phase 9 task.
+
+Context:
+The app no longer uses trials. Companies request a demo, and Super Admins manually set access status as active, free, prepaid, suspended, cancelled, or expired.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not add Stripe in this pass.
+Do not build new financial features.
+
+1. Update public demo page wording.
+
+In client/src/pages/demo.tsx, replace the visible “7-Day Free Trial” section with wording that matches the current model.
+
+Replace:
+“7-Day Free Trial”
+“Start with a free trial to explore all features before committing to a plan.”
+
+With something like:
+“Demo & Guided Setup”
+“Request a demo and our team will help determine the right access setup for your company.”
+
+Do not mention public trials or plans.
+
+2. Update company schema default.
+
+In shared/schema.ts, update the companies.subscriptionStatus default from “trialing” to “free.”
+
+Also update the inline comments so they no longer describe trialing/past_due as the normal model.
+
+Current valid manual statuses:
+
+* active
+* free
+* prepaid
+* suspended
+* cancelled
+* expired
+
+Legacy statuses like trialing/past_due may still exist in old data but should not be created by default.
+
+3. Add migration if needed.
+
+If the database uses migrations, add a migration to change the default subscription_status from trialing to free.
+
+Do not migrate existing company rows in this pass unless explicitly safe. Existing legacy trialing companies should continue to display as “Blocked (legacy)” until manually updated.
+
+4. Update seed test account script.
+
+In server/seed-test-accounts.ts, remove trial-specific seed behavior.
+
+Do not create or update test companies to subscriptionStatus = trialing.
+
+If a test company needs access, set it to:
+
+* free
+
+5. Keep this focused.
+
+Do not remove trialStartedAt/trialEndsAt columns in this pass.
+Do not rename subscriptionStatus internally.
+Do not change Billing & Access business logic.
+Do not modify invoice detail/edit behavior.
