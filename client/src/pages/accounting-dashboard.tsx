@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Download, MoreHorizontal, RefreshCw, Receipt, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import type { Invoice, RecurringBilling } from "@shared/schema";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 function formatCurrency(value: string | number | null | undefined) {
   const num = parseFloat(String(value ?? "0"));
@@ -26,6 +27,7 @@ function invoiceStatusVariant(status: string): "default" | "secondary" | "outlin
 
 export default function AccountingDashboard() {
   const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [, setLocation] = useLocation();
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
@@ -181,9 +183,21 @@ export default function AccountingDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" data-testid={`button-invoice-actions-${inv.id}`}>
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-invoice-actions-${inv.id}`}>
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => setLocation(`/company/invoices/${inv.id}`)}
+                                data-testid={`menu-item-view-invoice-${inv.id}`}
+                              >
+                                View Invoice
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}

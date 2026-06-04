@@ -2423,6 +2423,68 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/invoices/:id", requireAuth, requireActiveSubscription, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+
+      // Reject clients and external contractor subtypes
+      if (user.role === "client") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Verify ownership for non-admins
+      if (user.role !== "admin") {
+        if (!user.companyId || !invoice.projectId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const project = await storage.getProject(invoice.projectId);
+        if (!project?.contractorId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        const contractor = await storage.getUser(project.contractorId);
+        if (!contractor || contractor.companyId !== user.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const updateSchema = z.object({
+        clientName: z.string().min(1).optional(),
+        projectName: z.string().min(1).optional(),
+        amount: z.string().optional(),
+        dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate must be YYYY-MM-DD").optional(),
+        status: z.enum(["draft", "sent", "paid", "overdue", "cancelled", "unpaid"]).optional(),
+        type: z.string().optional(),
+      });
+
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
+      }
+
+      const updated = await storage.updateInvoice(req.params.id, parsed.data);
+      if (!updated) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      if (invoice.projectId) {
+        const ctx = await getProjectBroadcastContext(invoice.projectId, user.companyId);
+        broadcast({ type: "invoice", projectId: invoice.projectId, ...ctx });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/invoices", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
       const parsedInvoice = createInvoiceSchema.safeParse(req.body);

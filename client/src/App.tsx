@@ -15,6 +15,7 @@ import ProjectDetails from "@/pages/project-details";
 import SalesDashboard from "@/pages/sales-dashboard";
 import AccountingDashboard from "@/pages/accounting-dashboard";
 import CreateInvoice from "@/pages/create-invoice";
+import InvoiceDetail from "@/pages/invoice-detail";
 import NewProject from "@/pages/new-project";
 import ClientProjects from "@/pages/client-projects";
 import SettingsPage from "@/pages/settings";
@@ -175,6 +176,7 @@ function Router() {
           <Route path="/company/estimates">{() => <Estimator />}</Route>
           <Route path="/company/accounting">{() => <AccountingDashboard />}</Route>
           <Route path="/company/invoice/new">{() => <CreateInvoice />}</Route>
+          <Route path="/company/invoices/:invoiceId" component={InvoiceDetail} />
           <Route component={NotFound} />
         </Switch>
       </Layout>
