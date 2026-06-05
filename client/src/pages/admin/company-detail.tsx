@@ -1019,71 +1019,67 @@ export default function AdminCompanyDetail() {
                   </dl>
                 )}
 
-                {/* Stripe Details — read-only; populated by webhook events */}
-                {(company.stripeCustomerId ||
-                  company.stripeSubscriptionId ||
-                  company.stripePaymentStatus) && (
-                  <div className="mt-4 pt-4 border-t space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                      <CreditCard className="w-3.5 h-3.5" /> Stripe Details
-                      <span className="font-normal normal-case text-muted-foreground/60 ml-1">(read-only · managed by webhook)</span>
-                    </p>
-                    <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                      {company.stripeCustomerId && (
-                        <div>
-                          <dt className="text-muted-foreground text-xs mb-0.5">Customer ID</dt>
-                          <dd className="font-mono text-xs" data-testid="display-stripe-customer-id">{company.stripeCustomerId}</dd>
-                        </div>
-                      )}
-                      {company.stripeSubscriptionId && (
-                        <div>
-                          <dt className="text-muted-foreground text-xs mb-0.5">Subscription ID</dt>
-                          <dd className="font-mono text-xs" data-testid="display-stripe-subscription-id">{company.stripeSubscriptionId}</dd>
-                        </div>
-                      )}
-                      {company.stripePaymentStatus && (
-                        <div>
-                          <dt className="text-muted-foreground text-xs mb-0.5">Payment Status</dt>
-                          <dd className="font-medium capitalize" data-testid="display-stripe-payment-status">
-                            {company.stripePaymentStatus.replace(/_/g, " ")}
-                          </dd>
-                        </div>
-                      )}
-                      {company.stripeCurrentPeriodEnd && (
-                        <div>
-                          <dt className="text-muted-foreground text-xs mb-0.5">Period End</dt>
-                          <dd className="font-medium" data-testid="display-stripe-period-end">
-                            {safeFormat(company.stripeCurrentPeriodEnd, "MMM d, yyyy")}
-                          </dd>
-                        </div>
-                      )}
-                      {company.stripeGraceEndsAt && (
-                        <div>
-                          <dt className="text-muted-foreground text-xs mb-0.5">Grace Period Ends</dt>
-                          <dd className="font-medium" data-testid="display-stripe-grace-ends">
-                            {safeFormat(company.stripeGraceEndsAt, "MMM d, yyyy")}
-                          </dd>
-                        </div>
-                      )}
-                      {company.lastPaymentFailureAt && (
-                        <div>
-                          <dt className="text-muted-foreground text-xs mb-0.5">Last Payment Failure</dt>
-                          <dd className="font-medium" data-testid="display-last-payment-failure">
-                            {safeFormat(company.lastPaymentFailureAt, "MMM d, yyyy HH:mm")}
-                          </dd>
-                        </div>
-                      )}
-                      {company.lastPaymentFailureReason && (
-                        <div className="sm:col-span-2">
-                          <dt className="text-muted-foreground text-xs mb-0.5">Failure Reason</dt>
-                          <dd className="text-sm" data-testid="display-payment-failure-reason">
-                            {company.lastPaymentFailureReason}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                  </div>
-                )}
+                {/* Stripe Details — always shown read-only; populated by webhook events */}
+                <div className="mt-4 pt-4 border-t space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5" /> Stripe Details
+                    <span className="font-normal normal-case text-muted-foreground/60 ml-1">(read-only · managed by webhook)</span>
+                  </p>
+                  <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Customer ID</dt>
+                      <dd className="font-mono text-xs" data-testid="display-stripe-customer-id">
+                        {company.stripeCustomerId ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Subscription ID</dt>
+                      <dd className="font-mono text-xs" data-testid="display-stripe-subscription-id">
+                        {company.stripeSubscriptionId ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Payment Status</dt>
+                      <dd className="font-medium capitalize" data-testid="display-stripe-payment-status">
+                        {company.stripePaymentStatus
+                          ? company.stripePaymentStatus.replace(/_/g, " ")
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Last Invoice ID</dt>
+                      <dd className="font-mono text-xs" data-testid="display-last-stripe-invoice-id">
+                        {company.lastStripeInvoiceId ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Period End</dt>
+                      <dd className="font-medium" data-testid="display-stripe-period-end">
+                        {safeFormat(company.stripeCurrentPeriodEnd, "MMM d, yyyy")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Grace Period Ends</dt>
+                      <dd className="font-medium" data-testid="display-stripe-grace-ends">
+                        {safeFormat(company.stripeGraceEndsAt, "MMM d, yyyy")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground text-xs mb-0.5">Last Payment Failure</dt>
+                      <dd className="font-medium" data-testid="display-last-payment-failure">
+                        {safeFormat(company.lastPaymentFailureAt, "MMM d, yyyy HH:mm")}
+                      </dd>
+                    </div>
+                    {company.lastPaymentFailureReason && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-muted-foreground text-xs mb-0.5">Failure Reason</dt>
+                        <dd className="text-sm" data-testid="display-payment-failure-reason">
+                          {company.lastPaymentFailureReason}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

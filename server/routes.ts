@@ -650,8 +650,15 @@ export async function registerRoutes(
         // TODO (Phase 10B): set stripePaymentStatus to "action_required".
         break;
 
+      case "checkout.session.completed":
+        // TODO (Phase 10B): link newly created Stripe customer/subscription IDs to the
+        // company record, set stripeCustomerId, stripeSubscriptionId, stripePriceId,
+        // and transition subscriptionStatus to "active".
+        break;
+
       default:
-        // Unhandled event type — no action required.
+        // Log unhandled event types so nothing is silently swallowed.
+        console.info(`[stripe/webhook] Unhandled event type: ${event.type} (id: ${event.id})`);
         break;
     }
 
@@ -661,15 +668,19 @@ export async function registerRoutes(
   // GET /api/stripe/config
   // Returns the Stripe publishable key for use in the frontend.
   // NEVER returns STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, or any other secret.
-  // Auth required; only company_owner or isCompanyAdmin contractors.
+  // Auth required; only company_owner or regular isCompanyAdmin contractors.
+  // Subcontractors and notaries are explicitly denied even if isCompanyAdmin is set.
   app.get("/api/stripe/config", async (req: any, res: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     const user = req.user as any;
+    // Subcontractors and notaries must never access Stripe config regardless of isCompanyAdmin
+    const isBlockedContractorSubtype =
+      user.contractorType === "subcontractor" || user.contractorType === "notary";
     const isOwnerOrAdmin =
       user.role === "company_owner" ||
-      (user.role === "contractor" && user.isCompanyAdmin);
+      (user.role === "contractor" && user.isCompanyAdmin && !isBlockedContractorSubtype);
     if (!isOwnerOrAdmin) {
       return res.status(403).json({ message: "Forbidden" });
     }

@@ -225,6 +225,48 @@ export default function CompanyDashboard() {
     enabled: !!company?.id,
   });
 
+  // Stripe config — company_owner and non-sub/notary admins only
+  const isOwnerOrCompanyAdmin =
+    user?.role === "company_owner" ||
+    (user?.role === "contractor" && user?.isCompanyAdmin &&
+      user?.contractorType !== "subcontractor" && user?.contractorType !== "notary");
+
+  const { data: stripeConfig } = useQuery({
+    queryKey: ["/api/stripe/config"],
+    queryFn: async () => {
+      const res = await fetch("/api/stripe/config", { credentials: "include" });
+      if (!res.ok) return { configured: false, publishableKey: null };
+      return res.json() as Promise<{ configured: boolean; publishableKey: string | null }>;
+    },
+    enabled: isOwnerOrCompanyAdmin,
+  });
+
+  // Local billing display-state helper (mirrors server/stripeBillingStatus.ts logic).
+  // Kept client-side only — never imports from server/.
+  const getStripeBillingDisplay = () => {
+    const paymentStatus = company?.stripePaymentStatus ?? null;
+    const graceEnd = company?.stripeGraceEndsAt ? new Date(company.stripeGraceEndsAt) : null;
+    const inGracePeriod = !!graceEnd && graceEnd > new Date();
+
+    if (paymentStatus === "past_due" && inGracePeriod) {
+      return { label: "Past Due / Grace Period", color: "text-orange-600" };
+    }
+    if (paymentStatus === "past_due") {
+      return { label: "Past Due", color: "text-destructive" };
+    }
+    if (paymentStatus === "unpaid") {
+      return { label: "Unpaid", color: "text-destructive" };
+    }
+    if (paymentStatus === "action_required") {
+      return { label: "Payment Action Required", color: "text-orange-600" };
+    }
+    if (paymentStatus === "current") {
+      return { label: "Payment Current", color: "text-green-600" };
+    }
+    return null;
+  };
+  const stripeBillingDisplay = getStripeBillingDisplay();
+
   // Price book queries
   const { data: priceCategories = [], refetch: refetchCategories } = useQuery({
     queryKey: ["/api/company/price-book/categories"],
@@ -1450,6 +1492,14 @@ export default function CompanyDashboard() {
 
         {/* Subscription Tab */}
         <TabsContent value="subscription" className="space-y-6">
+          {!isOwnerOrCompanyAdmin ? (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                <CreditCard className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                <p className="text-sm">Billing information is only available to company owners and admins.</p>
+              </CardContent>
+            </Card>
+          ) : (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1459,6 +1509,14 @@ export default function CompanyDashboard() {
               <CardDescription>Your BuildVision billing and access details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Stripe not configured — informational only */}
+              {stripeConfig && !stripeConfig.configured && company?.billingType === "in_app" && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400" data-testid="stripe-not-configured-alert">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <p>In-app billing is enabled but Stripe is not yet configured for this account. Contact BuildVision support to complete setup.</p>
+                </div>
+              )}
+
               {/* Current status card */}
               <div className={`rounded-lg border p-4 ${isBlocked ? "bg-destructive/5 border-destructive/30" : "bg-muted/30"}`}>
                 <div className="flex items-center justify-between">
@@ -1471,6 +1529,12 @@ export default function CompanyDashboard() {
                         ? "Your company access is not active. Please contact support."
                         : `Access status: ${STATUS_LABEL[subscriptionStatus] ?? subscriptionStatus}`}
                     </p>
+                    {/* Stripe payment state overlay */}
+                    {stripeBillingDisplay && (
+                      <p className={`text-sm font-medium mt-1 ${stripeBillingDisplay.color}`} data-testid="stripe-billing-state">
+                        {stripeBillingDisplay.label}
+                      </p>
+                    )}
                   </div>
                   <Badge
                     variant={isActive ? "default" : isBlocked ? "destructive" : "secondary"}
@@ -1531,11 +1595,45 @@ export default function CompanyDashboard() {
                 )}
               </dl>
 
+              {/* Placeholder billing action buttons — enabled in Phase 10B */}
+              {stripeConfig?.configured && (
+                <div className="flex flex-wrap gap-2 pt-1" data-testid="stripe-billing-actions">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    title="Coming soon — will be available in a future release"
+                    data-testid="button-start-subscription"
+                  >
+                    <CreditCard className="w-4 h-4 mr-1.5" /> Start Subscription
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    title="Coming soon — will be available in a future release"
+                    data-testid="button-manage-payment"
+                  >
+                    <CreditCard className="w-4 h-4 mr-1.5" /> Manage Payment Method
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    title="Coming soon — will be available in a future release"
+                    data-testid="button-retry-payment"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1.5" /> Retry Payment
+                  </Button>
+                </div>
+              )}
+
               <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground" data-testid="contact-support-note">
                 <p className="text-sm">To change your subscription or billing, contact BuildVision support.</p>
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
         {/* Settings Tab */}
