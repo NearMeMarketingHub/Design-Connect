@@ -29,7 +29,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X, ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
+import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X, ChevronDown, ChevronRight, ArrowRight, CreditCard } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 interface AuditEvent {
@@ -83,6 +83,14 @@ const ACTION_LABELS: Record<string, string> = {
   estimate_created: "Estimate Created",
   invoice_created: "Invoice Created",
   invoice_updated: "Invoice Updated",
+  // Stripe billing events — labels prepared for future phase (no events fired yet)
+  stripe_subscription_started: "Subscription Started",
+  stripe_payment_succeeded: "Payment Succeeded",
+  stripe_payment_failed: "Payment Failed",
+  stripe_grace_started: "Grace Period Started",
+  stripe_company_suspended: "Company Suspended (Payment)",
+  stripe_payment_recovered: "Payment Recovered",
+  stripe_billing_portal_opened: "Billing Portal Opened",
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -106,6 +114,13 @@ const ACTION_COLORS: Record<string, string> = {
   estimate_created: "bg-emerald-100 text-emerald-700",
   invoice_created: "bg-cyan-100 text-cyan-700",
   invoice_updated: "bg-cyan-100 text-cyan-700",
+  stripe_subscription_started: "bg-green-100 text-green-700",
+  stripe_payment_succeeded: "bg-green-100 text-green-700",
+  stripe_payment_failed: "bg-red-100 text-red-700",
+  stripe_grace_started: "bg-orange-100 text-orange-700",
+  stripe_company_suspended: "bg-red-100 text-red-700",
+  stripe_payment_recovered: "bg-green-100 text-green-700",
+  stripe_billing_portal_opened: "bg-indigo-100 text-indigo-700",
 };
 
 const ENTITY_ICONS: Record<string, typeof FileText> = {
@@ -116,6 +131,7 @@ const ENTITY_ICONS: Record<string, typeof FileText> = {
   platform: Settings,
   estimate: FileText,
   invoice: FileText,
+  stripe: CreditCard,
 };
 
 // Human-readable labels for known metadata keys

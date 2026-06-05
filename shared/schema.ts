@@ -21,6 +21,22 @@ export const companies = pgTable("companies", {
   adminNotes: text("admin_notes"), // Internal-only notes about this company/customer
   accessNotes: text("access_notes"), // Short public-facing access note shown to company owner
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Stripe billing fields — populated by webhook events (Phase 10B+).
+  // IMPORTANT: Stripe's API uses "canceled" (one L); our internal stripePaymentStatus
+  // uses "cancelled" (two L's) to match the rest of the app.  When mapping Stripe
+  // webhook data to this column, explicitly convert Stripe's "canceled" → "cancelled".
+  // Internal stripePaymentStatus values: current | past_due | unpaid | cancelled |
+  //   incomplete | action_required | not_configured
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripePriceId: text("stripe_price_id"),
+  stripePaymentStatus: text("stripe_payment_status"),
+  stripeCurrentPeriodEnd: timestamp("stripe_current_period_end"),
+  stripeGraceStartedAt: timestamp("stripe_grace_started_at"),
+  stripeGraceEndsAt: timestamp("stripe_grace_ends_at"),
+  lastStripeInvoiceId: text("last_stripe_invoice_id"),
+  lastPaymentFailureAt: timestamp("last_payment_failure_at"),
+  lastPaymentFailureReason: text("last_payment_failure_reason"),
 });
 
 export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true });

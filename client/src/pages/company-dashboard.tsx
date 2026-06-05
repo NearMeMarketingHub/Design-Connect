@@ -1505,6 +1505,30 @@ export default function CompanyDashboard() {
                     </dd>
                   </div>
                 )}
+                {company?.stripePaymentStatus && (
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-0.5">Payment Status</dt>
+                    <dd className="font-medium capitalize" data-testid="display-stripe-payment-status">
+                      {company.stripePaymentStatus.replace(/_/g, " ")}
+                    </dd>
+                  </div>
+                )}
+                {company?.stripeCurrentPeriodEnd && (
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-0.5">Current Period Ends</dt>
+                    <dd className="font-medium" data-testid="display-stripe-period-end">
+                      {new Date(company.stripeCurrentPeriodEnd).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
+                {company?.stripeGraceEndsAt && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted-foreground text-xs mb-0.5">Grace Period Ends</dt>
+                    <dd className="font-medium text-orange-600" data-testid="display-stripe-grace-ends">
+                      {new Date(company.stripeGraceEndsAt).toLocaleDateString()}
+                    </dd>
+                  </div>
+                )}
               </dl>
 
               <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground" data-testid="contact-support-note">

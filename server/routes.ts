@@ -22,6 +22,7 @@ import { runRoleMigration } from "./migrate-roles";
 import { seedTestAccounts } from "./seed-test-accounts";
 import { setupWebSocket, broadcast } from "./websocket";
 import { logAuditEvent } from "./auditLog";
+import { getStripe, getStripePublishableKey, isStripeConfigured, getStripeWebhookSecret } from "./stripe";
 
 const PgSession = connectPgSimple(session);
 
@@ -575,12 +576,110 @@ export async function registerRoutes(
       // Only allow public invite acceptance (not invite creation which is a paid feature)
       path.startsWith("/api/contractor-invites/accept/") ||
       path.startsWith("/api/invites/") ||
-      path.startsWith("/api/sandbox")
+      path.startsWith("/api/sandbox") ||
+      // Stripe webhook — verified by signature, must not be blocked by subscription check
+      path === "/api/stripe/webhook"
     ) {
       return next();
     }
     return requireActiveSubscription(req, res, next);
   });
+
+  // ── Stripe routes ──────────────────────────────────────────────────────────
+  //
+  // POST /api/stripe/webhook
+  // Receives Stripe webhook events. Verified via HMAC signature.
+  // Raw body is available as req.rawBody (captured in server/index.ts via verify callback).
+  // Path is in the write-middleware allowlist so subscription-blocked companies do not
+  // accidentally 400-out legitimate Stripe callbacks.
+  //
+  // Phase 10A: logs events and verifies signatures. All business handlers are TODO
+  // for Phase 10B — no company access mutations happen here yet.
+  app.post("/api/stripe/webhook", async (req: any, res: any) => {
+    const sig = req.headers["stripe-signature"] as string | undefined;
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    const webhookSecret = getStripeWebhookSecret();
+    const stripe = getStripe();
+
+    if (!webhookSecret) {
+      // Webhook secret not configured — accept gracefully and skip processing.
+      console.info("[stripe/webhook] STRIPE_WEBHOOK_SECRET not set; event ignored.");
+      return res.status(200).json({ received: true });
+    }
+
+    if (!stripe) {
+      console.error("[stripe/webhook] Stripe SDK not initialised (missing STRIPE_SECRET_KEY).");
+      return res.status(500).json({ error: "Stripe not configured" });
+    }
+
+    if (!sig || !rawBody) {
+      return res.status(400).json({ error: "Missing stripe-signature header or raw body" });
+    }
+
+    let event: any;
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } catch (err: any) {
+      console.error("[stripe/webhook] Signature verification failed:", err.message);
+      return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` });
+    }
+
+    console.info(`[stripe/webhook] Received event: ${event.type} (id: ${event.id})`);
+
+    switch (event.type) {
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted":
+        // TODO (Phase 10B): update company stripeSubscriptionId, stripePaymentStatus,
+        // stripeCurrentPeriodEnd, and subscriptionStatus based on subscription.status.
+        // IMPORTANT: map Stripe's "canceled" (one L) → internal "cancelled" (two L's).
+        break;
+
+      case "invoice.paid":
+        // TODO (Phase 10B): clear stripePaymentStatus to "current", reset grace period fields,
+        // update lastStripeInvoiceId.
+        break;
+
+      case "invoice.payment_failed":
+        // TODO (Phase 10B): set stripePaymentStatus to "past_due", record
+        // lastPaymentFailureAt / lastPaymentFailureReason, set stripeGraceStartedAt
+        // and stripeGraceEndsAt (e.g. now + 7 days).
+        break;
+
+      case "invoice.payment_action_required":
+        // TODO (Phase 10B): set stripePaymentStatus to "action_required".
+        break;
+
+      default:
+        // Unhandled event type — no action required.
+        break;
+    }
+
+    return res.status(200).json({ received: true });
+  });
+
+  // GET /api/stripe/config
+  // Returns the Stripe publishable key for use in the frontend.
+  // NEVER returns STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, or any other secret.
+  // Auth required; only company_owner or isCompanyAdmin contractors.
+  app.get("/api/stripe/config", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as any;
+    const isOwnerOrAdmin =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin);
+    if (!isOwnerOrAdmin) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    return res.json({
+      configured: isStripeConfigured(),
+      publishableKey: getStripePublishableKey() ?? null,
+    });
+  });
+
+  // ── End Stripe routes ───────────────────────────────────────────────────────
 
   const requireAdmin = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
