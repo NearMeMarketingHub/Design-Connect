@@ -1,0 +1,73 @@
+This Stripe foundation plan looks good. Please add these guardrails before building:
+
+1. Webhook route security
+
+Only POST /api/stripe/webhook should be publicly reachable without logged-in auth, and only after valid Stripe signature verification.
+
+Do not accidentally make every /api/stripe/* route public.
+
+GET /api/stripe/config must require auth and should only be available to:
+
+* company_owner
+* authorized company admins/team members
+
+Clients, unrelated contractors, subcontractors, and notaries should not access Stripe billing config.
+
+2. Include invoice.payment_action_required as a planned webhook event.
+
+Add invoice.payment_action_required to the webhook switch with a structured TODO.
+
+Do not build full handling yet, but leave it documented because this event matters when customer authentication or payment action is required.
+
+3. Be careful with Stripe status naming.
+
+Stripe uses statuses like active, past_due, unpaid, canceled, incomplete, incomplete_expired, etc.
+
+If the app uses internal spelling like cancelled, clearly map Stripe's canceled status to the app's internal cancelled/cancelled display convention later.
+
+Do not assume Stripe's exact status strings and the app's manual access status strings are identical.
+
+4. Do not mutate company access automatically in this phase.
+
+The webhook endpoint may verify events and log unhandled/TODO events, but do not automatically set company accessStatus/subscriptionStatus to active, suspended, cancelled, etc. in this phase.
+
+This phase is foundation only.
+
+5. Do not import server-only Stripe helpers into frontend.
+
+server/stripe.ts must remain server-only.
+
+If the billing display state logic is needed on both server and client, either:
+
+* duplicate a small safe client-side display helper, or
+* move only the pure, non-secret display helper into a shared file.
+
+Never expose STRIPE_SECRET_KEY or webhook secret to the frontend.
+
+6. Stripe config endpoint safety
+
+GET /api/stripe/config may return:
+
+* configured: boolean
+* publishableKey: string | null
+
+It must never return:
+
+* STRIPE_SECRET_KEY
+* STRIPE_WEBHOOK_SECRET
+* webhook endpoint secret
+* raw server env data
+
+7. Keep this phase foundation-only.
+
+Do not add:
+
+* live checkout
+* customer portal redirects
+* payment retry attempts
+* payment method updates
+* automatic suspension
+* subscription creation
+* Stripe handling for construction project invoices
+
+This Stripe work is only for BuildVision platform subscription billing.

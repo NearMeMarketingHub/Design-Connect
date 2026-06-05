@@ -1,0 +1,223 @@
+Phase 10A: Stripe Billing Foundation Planning + Schema/API Preparation.
+
+Context:
+Company financial tools now support real estimates and invoices. Next, we need to prepare for Stripe billing.
+
+Important product model:
+
+* Super Admins are the BuildVision platform owners/internal team.
+* Company Owners and Company Admins are the customer-side users who manage and pay for the app subscription.
+* Super Admins should not be the normal users making customer payments.
+* Stripe will be the only automatic access model.
+* Manual access statuses still exist for free, prepaid, suspended, cancelled, and expired.
+
+Do not change BuildVision branding.
+Do not reintroduce subscription tiers.
+Do not reintroduce trial access logic.
+Do not reintroduce public account creation.
+Do not build production sheets, payouts, reports, Gantt, board views, permitting, selections, or EOD reporting in this phase.
+
+Goal:
+Add the safe foundation for Stripe billing without turning on full payment automation yet.
+
+This phase should prepare schema, config, placeholder UI, and safe server structure for Stripe. It should not fully implement live payment collection or automatic suspension yet unless clearly separated and safe.
+
+1. Inspect current billing/access code first.
+
+Review:
+
+* company schema
+* Billing & Access fields
+* Super Admin Company Detail Billing & Access
+* Company Owner dashboard Billing & Access tab
+* requireActiveSubscription / company access middleware
+* Audit Log helper
+* existing environment variable patterns
+* current package dependencies
+
+Report or note any conflicts before implementing.
+
+2. Add Stripe environment config.
+
+Support these server-side environment variables:
+
+* STRIPE_SECRET_KEY
+* STRIPE_WEBHOOK_SECRET
+* STRIPE_PRICE_ID
+* STRIPE_PUBLISHABLE_KEY if frontend needs it later
+
+If STRIPE_SECRET_KEY is missing:
+
+* app must still run
+* Stripe UI should show “Stripe not configured”
+* no Stripe API calls should be attempted
+
+Do not expose STRIPE_SECRET_KEY to the frontend.
+
+3. Add Stripe package if missing.
+
+If Stripe package is not already installed, add the official stripe Node package.
+
+Do not add unrelated payment packages.
+
+4. Add company Stripe fields.
+
+Add company-level fields if missing:
+
+* stripeCustomerId
+* stripeSubscriptionId
+* stripePriceId
+* stripePaymentStatus
+
+  * current
+  * past_due
+  * unpaid
+  * cancelled
+  * incomplete
+  * action_required
+  * not_configured
+* stripeCurrentPeriodEnd
+* stripeGraceStartedAt
+* stripeGraceEndsAt
+* lastStripeInvoiceId
+* lastPaymentFailureAt
+* lastPaymentFailureReason
+
+Add migration/db push changes as appropriate for the project.
+
+5. Add Stripe billing status helper.
+
+Create a helper that calculates company billing display state from:
+
+* subscriptionStatus/accessStatus
+* billingType
+* stripePaymentStatus
+* stripeGraceEndsAt
+
+Important:
+Do not automatically change access status in this phase unless explicitly handling a safe webhook event later.
+
+For display:
+
+* active + current = Active
+* active + past_due + grace active = Past Due / Grace Period
+* suspended + past_due/unpaid = Suspended for Payment
+* free = Free / Demo Access
+* prepaid = Prepaid / Included Access
+* cancelled = Cancelled
+* expired = Expired
+
+6. Add placeholder Company Owner Billing & Access UI.
+
+On the company owner side, add or update Billing & Access area to show:
+
+* current access status
+* billing type
+* Stripe billing status, if configured
+* current period end, if available
+* grace period end, if applicable
+* last payment failure reason, if applicable
+* “Stripe not configured” if missing config
+
+Add disabled/placeholder buttons for:
+
+* Start Subscription
+* Manage Payment Method
+* Retry Payment
+
+Buttons can be disabled in this phase with clear “Coming soon” or “Stripe not configured” messaging unless the backend endpoints are implemented safely.
+
+Only company_owner and authorized company admins should see/manage these controls.
+Clients should not see payment controls.
+
+7. Add Super Admin Stripe visibility.
+
+In Super Admin Company Detail Billing & Access, show read-only Stripe fields:
+
+* Stripe Customer ID
+* Stripe Subscription ID
+* Stripe Payment Status
+* Current Period End
+* Grace Ends At
+* Last Invoice ID
+* Last Payment Failure
+
+Super Admin can still manually set:
+
+* free
+* prepaid
+* suspended
+* cancelled
+* expired
+
+Do not make Super Admin the normal payment actor.
+
+8. Add webhook endpoint foundation.
+
+Add a Stripe webhook endpoint such as:
+
+* POST /api/stripe/webhook
+
+Requirements:
+
+* must use raw request body for signature verification
+* must verify Stripe signature using STRIPE_WEBHOOK_SECRET
+* must return safe responses
+* must not use normal JSON body parsing before signature verification
+* must be idempotent where practical
+* should log unhandled events safely
+
+Handle events minimally in this phase:
+
+* invoice.paid
+* invoice.payment_failed
+* customer.subscription.updated
+* customer.subscription.deleted
+* checkout.session.completed, if checkout is planned
+
+If full event logic is too large, add the verified endpoint and structured TODOs for the event handlers, but do not create unsafe half-working billing automation.
+
+9. Define intended future Stripe automation but do not overbuild.
+
+Document in code comments or TODO notes:
+
+* invoice.paid should set company accessStatus to active and stripePaymentStatus to current
+* invoice.payment_failed should set stripePaymentStatus to past_due and start a 3-day grace period
+* after 3 days unpaid, company should become suspended
+* successful payment after suspension should restore active
+* Retry Payment should attempt payment on the latest open Stripe invoice
+* Update Payment Method should use Stripe Customer Portal or Checkout/Setup flow
+
+Do not build a cron/scheduler for suspension in this phase unless it is explicitly planned and safe.
+
+10. Add audit event labels for future billing events.
+
+Prepare Audit Log labels for:
+
+* stripe_subscription_started
+* stripe_payment_succeeded
+* stripe_payment_failed
+* stripe_grace_started
+* stripe_company_suspended
+* stripe_payment_recovered
+* stripe_billing_portal_opened
+
+Only log events that actually happen in this phase.
+
+11. Security requirements.
+
+* Only company_owner and authorized company admins can access company billing actions.
+* Clients cannot access billing payment endpoints.
+* Company users cannot access another company’s Stripe data.
+* Super Admin can view Stripe fields for support.
+* Stripe webhook endpoint must not require logged-in auth but must require valid Stripe signature.
+* Never trust client-submitted payment status.
+* Never mark a Stripe-paying company active from the frontend.
+
+12. Keep this phase focused.
+
+Do not fully launch Stripe payments unless the required secure endpoints, webhook verification, audit logs, and safe UI are all in place.
+Do not implement pricing tiers.
+Do not add trials.
+Do not build invoice payment collection for customer project invoices.
+This Stripe work is for BuildVision app subscription billing only, not construction project invoices.
