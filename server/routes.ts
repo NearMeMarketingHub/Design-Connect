@@ -693,6 +693,58 @@ export async function registerRoutes(
 
   // ── End Stripe routes ───────────────────────────────────────────────────────
 
+  // GET /api/company/financial-activity
+  // Company-scoped financial audit feed (estimate_created, invoice_created, invoice_updated).
+  // Allowed: company_owner, isCompanyAdmin contractors (not subcontractor/notary subtypes).
+  // Blocked: clients, subcontractors, notaries, unauthenticated users.
+  app.get("/api/company/financial-activity", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as any;
+    const isBlockedSubtype =
+      user.contractorType === "subcontractor" || user.contractorType === "notary";
+    const isAllowed =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin && !isBlockedSubtype);
+    if (!isAllowed) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    if (!user.companyId) {
+      return res.status(403).json({ message: "No company associated with this account" });
+    }
+    try {
+      const FINANCIAL_ACTIONS = ["estimate_created", "invoice_created", "invoice_updated"] as const;
+      const ACTION_LABELS: Record<string, string> = {
+        estimate_created: "Estimate Created",
+        invoice_created: "Invoice Created",
+        invoice_updated: "Invoice Updated",
+      };
+      const rows = await storage.listCompanyFinancialActivity(user.companyId, 10);
+      const items = rows.map((r) => {
+        const meta = (r.metadata ?? {}) as Record<string, unknown>;
+        return {
+          id: r.id,
+          action: r.action,
+          label: ACTION_LABELS[r.action] ?? r.action,
+          actorName: r.actorName,
+          entityType: r.entityType,
+          entityName: r.entityName ?? null,
+          projectId: r.projectId ?? null,
+          projectName: typeof meta.projectName === "string" ? meta.projectName : null,
+          amount: meta.amount !== undefined ? meta.amount : null,
+          status: typeof meta.status === "string" ? meta.status : null,
+          dueDate: typeof meta.dueDate === "string" ? meta.dueDate : null,
+          createdAt: r.createdAt,
+        };
+      });
+      return res.json(items);
+    } catch (err) {
+      console.error("[financial-activity]", err);
+      return res.status(500).json({ message: "Failed to load financial activity" });
+    }
+  });
+
   const requireAdmin = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });

@@ -388,6 +388,7 @@ export interface IStorage {
     offset?: number;
   }): Promise<{ events: (AuditLog & { companyName?: string | null })[]; total: number }>;
   getAuditLogMeta(): Promise<{ actions: string[]; entityTypes: string[]; companies: { id: string; name: string }[] }>;
+  listCompanyFinancialActivity(companyId: string, limit?: number): Promise<AuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2532,6 +2533,22 @@ export class DatabaseStorage implements IStorage {
     }));
 
     return { events, total: totalRow?.cnt ?? 0 };
+  }
+
+  async listCompanyFinancialActivity(companyId: string, limit = 10): Promise<AuditLog[]> {
+    const ALLOWED_ACTIONS = ["estimate_created", "invoice_created", "invoice_updated"];
+    const rows = await db
+      .select()
+      .from(schema.auditLogs)
+      .where(
+        and(
+          eq(schema.auditLogs.companyId, companyId),
+          inArray(schema.auditLogs.action, ALLOWED_ACTIONS)
+        )
+      )
+      .orderBy(desc(schema.auditLogs.createdAt))
+      .limit(limit);
+    return rows;
   }
 
   async getAuditLogMeta(): Promise<{ actions: string[]; entityTypes: string[]; companies: { id: string; name: string }[] }> {
