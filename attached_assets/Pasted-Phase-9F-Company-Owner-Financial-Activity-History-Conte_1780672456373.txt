@@ -1,0 +1,136 @@
+Phase 9F: Company Owner Financial Activity History.
+
+Context:
+Financial audit logging is now in place for:
+
+* estimate_created
+* invoice_created
+* invoice_updated
+
+Super Admins can see these events in the Admin Audit Log. Now company owners and authorized company admins should have a small company-scoped financial activity view.
+
+Do not change BuildVision branding.
+Do not expose the Super Admin Audit Log to company users.
+Do not add Stripe in this phase.
+Do not build production sheets, payout schedules, reports, Gantt, board views, permitting, selections, or EOD reporting.
+Do not expand subcontractor/notary functionality.
+
+Goal:
+Show company owners/company admins a limited financial activity feed for their own company only.
+
+1. Add company-scoped financial activity endpoint.
+
+Create an endpoint such as:
+GET /api/company/financial-activity
+
+It should require authentication.
+
+Allowed:
+
+* company_owner
+* authorized company admins/team members who already have access to company financial tools
+
+Blocked:
+
+* clients
+* subcontractors
+* notaries
+* unrelated contractors
+* unauthenticated users
+
+The endpoint should only return audit events for the logged-in user’s companyId.
+
+Allowed event actions:
+
+* estimate_created
+* invoice_created
+* invoice_updated
+
+Do not return other audit actions.
+
+Do not return:
+
+* Super Admin internal events
+* HubSpot events
+* View As events
+* Pricing & Access changes
+* IP address
+* user agent
+* raw internal metadata that is not needed for company users
+* other companies’ activity
+
+2. Response shape.
+
+Return a safe, simplified activity item shape like:
+
+* id
+* action
+* label
+* actorName
+* entityType
+* entityName
+* projectId
+* projectName if available in metadata
+* amount if available in metadata
+* status if available in metadata
+* dueDate if available in metadata
+* createdAt
+
+Keep metadata sanitized and company-safe.
+
+3. Add UI section.
+
+Add a “Recent Financial Activity” section in one of these places:
+
+* Company Financials page
+* Accounting dashboard
+* Sales dashboard
+* or Company Dashboard Billing/Financial area if that is the cleanest existing location
+
+Preferred:
+Add it to the Company Financials hub if that page exists, because it can summarize both estimates and invoices.
+
+Show latest 10 items.
+
+Display:
+
+* readable action label
+* actor
+* invoice/estimate ID or project name
+* amount if available
+* timestamp
+
+Examples:
+
+* “Estimate Created”
+* “Invoice Created”
+* “Invoice Updated”
+
+4. Empty/loading/error states.
+
+Add clean states:
+
+* loading activity
+* “No financial activity yet.”
+* error loading activity
+
+5. Do not duplicate Super Admin Audit Log.
+
+This is not a full audit log page.
+Do not add filters/date ranges/export/details drawer in this phase.
+Do not expose raw audit metadata.
+Do not link company users to /admin/audit-log.
+
+6. Keep permissions strict.
+
+Company users should only see activity where audit_logs.companyId matches their companyId.
+
+If a record has no companyId, do not show it to company users.
+
+7. Keep this phase focused.
+
+Do not add new audit event types.
+Do not change financial route behavior.
+Do not add estimate editing.
+Do not add invoice line-item editing.
+Do not add Stripe customer portal or payment automation.
