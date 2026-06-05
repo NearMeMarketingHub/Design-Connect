@@ -37,7 +37,10 @@ The `budget_categories` and `budget_items` tables serve a **dual-purpose model**
 - `PATCH /api/budget/items/:id` — whitelists mutable fields; `companyId` is never mutated
 - `DELETE /api/budget/items/:id` — guards against deleting company-owned items
 
-**Company price book** (`requireCompanyOwner` middleware, `server/routes.ts` ~line 4801):
+**Company price book** (`requireCompanyOwner` middleware, `server/routes.ts` ~line 758 and 4801):
+
+`requireCompanyOwner` allows: `company_owner` **OR** `isCompanyAdmin === true` **OR** `admin`. It is **not** owner-only. Any company admin can read/write the company price book, as can platform admins.
+
 - `GET /api/company/price-book/categories` — scoped to `user.companyId`
 - `POST /api/company/price-book/categories` — injects `companyId` from session
 - `PATCH /api/company/price-book/categories/:id` — verifies `existing.companyId === user.companyId`; whitelists fields; `companyId` cannot change
@@ -64,9 +67,12 @@ Two-step flow, both behind `requireCompanyOwner`:
 
 ### Floor Calculator Integration
 
-- Route: `GET /api/calculator/items` (`requireContractorOrAdmin`) — returns company price book items where `unitType` contains "SF"/"SQ" or `description` matches `/floor|tile|carpet|vinyl|hardwood|laminate/i`
-- Route: `GET /api/calculator/categories` — returns categories that have at least one floor-calculator item
-- Fully company-scoped: reads from `getCompanyPriceBookItems(companyId)` using the authenticated user's companyId
+- Route: `GET /api/calculator/items` (`requireContractorOrAdmin`) — returns **all** company price book items (`storage.getCompanyPriceBookItems(companyId)`); no floor-type filtering at the route level
+- Route: `GET /api/calculator/categories` — returns **all** company price book categories (`storage.getCompanyPriceBookCategories(companyId)`); no filtering
+- Route: `GET /api/calculator/categories/:id/items` — returns items for one category (`storage.getCompanyPriceBookItemsByCategory(id, companyId)`)
+- Route: `GET /api/calculator/items/search` — accepts a `q` query param for text search (the only route that filters)
+- Floor-type filtering is done **client-side** in `floor-calculator.tsx` (matching unitType for SF/SQ or description keywords)
+- All routes are fully company-scoped via `user.companyId`
 
 ### Budget Admin Page
 
@@ -183,11 +189,11 @@ Same pattern applies to `invoices` and `recurringBilling`.
 
 ### B8. No Estimate Status Workflow Beyond `draft`
 
-`estimate_line_items` and `estimates` have a `status` field (`draft`, `sent`, `approved`, `rejected`) but:
-- No timestamp columns (`sentAt`, `approvedAt`, `rejectedAt`)
+`estimates` has a `status` field (values used in the UI: `draft`, `sent`, `approved`, `rejected`). `estimate_line_items` has **no status field** — status exists only on the parent estimate record. Gaps:
+- No timestamp columns on `estimates` (`sentAt`, `approvedAt`, `rejectedAt`)
 - No notes/reason field for rejection
 - No version history or revision tracking
-- Client-side UI renders the badge but there is no approval workflow page for clients
+- Client-side UI renders the status badge but there is no approval workflow page for clients
 
 ### B9. Bulk Import Is Not Transactional
 
@@ -215,15 +221,13 @@ A direct `estimates.companyId` FK would allow a single-query ownership check wit
 
 **Action required:** Audit `storage.getInvoices()` implementation to confirm null-`projectId` invoices are not returned to unrelated companies.
 
-### C3. `recurringBilling` Has No Ownership Check in Storage Query
+### C3. `recurringBilling` Scoping — Confirmed Correct
 
-`GET /api/recurring-billing` (if it exists) also lacks a `companyId` column. If the query does not filter by the authenticated user's companyId via project join, it may return all recurring billing records to any authenticated user.
+`GET /api/recurring-billing` (`server/routes.ts` ~line 2747) passes `user.companyId` to `storage.getRecurringBilling(companyId)` for non-admin callers. The storage method filters by company via project join, mirroring the pattern used for estimates and invoices. **No cross-company leak risk confirmed** for recurring billing.
 
-**Action required:** Audit the recurring billing GET route and storage method.
+### C4. Budget Admin Page Permission Model Matches the API
 
-### C4. Budget Admin Page Accessible to All Company Admins (Not Owner-Only)
-
-`budget-admin.tsx` grants access to `isCompanyUser = company_owner || isCompanyAdmin`. This means any team member flagged as `isCompanyAdmin=true` can edit company price book items via the `/company/budget` route, even if `requireCompanyOwner` on the API would block them. The API itself is protected but the UI allows navigation that ends in confusing 403 errors for non-owner admins.
+`budget-admin.tsx` grants UI access to `company_owner || isCompanyAdmin`. The underlying `requireCompanyOwner` API middleware (`server/routes.ts` line 764) uses the same rule: `company_owner OR isCompanyAdmin OR admin`. The UI and API are consistent — there are no phantom 403 errors for company admins. Note: this means any company admin (not just the owner) can create, edit, or delete price book items. Whether this is intentional access control policy should be confirmed with the business owner.
 
 ---
 
