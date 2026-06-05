@@ -714,7 +714,6 @@ export async function registerRoutes(
       return res.status(403).json({ message: "No company associated with this account" });
     }
     try {
-      const FINANCIAL_ACTIONS = ["estimate_created", "invoice_created", "invoice_updated"] as const;
       const ACTION_LABELS: Record<string, string> = {
         estimate_created: "Estimate Created",
         invoice_created: "Invoice Created",

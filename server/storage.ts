@@ -1,4 +1,4 @@
-import { eq, and, or, not, isNull, like, ilike, gte, lte, desc, count, sql } from "drizzle-orm";
+import { eq, and, or, not, isNull, like, ilike, gte, lte, desc, count, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import bcrypt from "bcryptjs";
