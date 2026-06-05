@@ -1070,14 +1070,12 @@ export default function AdminCompanyDetail() {
                         {safeFormat(company.lastPaymentFailureAt, "MMM d, yyyy HH:mm")}
                       </dd>
                     </div>
-                    {company.lastPaymentFailureReason && (
-                      <div className="sm:col-span-2">
-                        <dt className="text-muted-foreground text-xs mb-0.5">Failure Reason</dt>
-                        <dd className="text-sm" data-testid="display-payment-failure-reason">
-                          {company.lastPaymentFailureReason}
-                        </dd>
-                      </div>
-                    )}
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted-foreground text-xs mb-0.5">Failure Reason</dt>
+                      <dd className="text-sm" data-testid="display-payment-failure-reason">
+                        {company.lastPaymentFailureReason ?? "—"}
+                      </dd>
+                    </div>
                   </dl>
                 </div>
               </CardContent>

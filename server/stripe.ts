@@ -46,11 +46,10 @@ export function getStripe(): Stripe | null {
   if (!key) return null;
 
   if (!_stripe) {
-    _stripe = new Stripe(key, {
-      // Pin to the API version used when this integration was written.
-      // Bump this intentionally when upgrading Stripe SDK / API behaviour.
-      apiVersion: "2025-05-28.basil",
-    });
+    // No explicit apiVersion — use the SDK's built-in default for the installed version.
+    // When upgrading the stripe npm package, run `npm run check` and review any
+    // API behaviour changes before shipping.
+    _stripe = new Stripe(key);
   }
   return _stripe;
 }

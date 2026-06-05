@@ -238,7 +238,7 @@ export default function CompanyDashboard() {
       if (!res.ok) return { configured: false, publishableKey: null };
       return res.json() as Promise<{ configured: boolean; publishableKey: string | null }>;
     },
-    enabled: isOwnerOrCompanyAdmin,
+    enabled: !!isOwnerOrCompanyAdmin,
   });
 
   // Local billing display-state helper (mirrors server/stripeBillingStatus.ts logic).
@@ -1593,40 +1593,46 @@ export default function CompanyDashboard() {
                     </dd>
                   </div>
                 )}
+                {company?.lastPaymentFailureReason && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted-foreground text-xs mb-0.5">Last Payment Issue</dt>
+                    <dd className="text-sm text-destructive" data-testid="display-payment-failure-reason">
+                      {company.lastPaymentFailureReason}
+                    </dd>
+                  </div>
+                )}
               </dl>
 
-              {/* Placeholder billing action buttons — enabled in Phase 10B */}
-              {stripeConfig?.configured && (
-                <div className="flex flex-wrap gap-2 pt-1" data-testid="stripe-billing-actions">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled
-                    title="Coming soon — will be available in a future release"
-                    data-testid="button-start-subscription"
-                  >
-                    <CreditCard className="w-4 h-4 mr-1.5" /> Start Subscription
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled
-                    title="Coming soon — will be available in a future release"
-                    data-testid="button-manage-payment"
-                  >
-                    <CreditCard className="w-4 h-4 mr-1.5" /> Manage Payment Method
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled
-                    title="Coming soon — will be available in a future release"
-                    data-testid="button-retry-payment"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-1.5" /> Retry Payment
-                  </Button>
-                </div>
-              )}
+              {/* Placeholder billing action buttons — always shown disabled for Phase 10A */}
+              <div className="flex flex-wrap gap-2 pt-1" data-testid="stripe-billing-actions">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  title="Coming soon — will be available in a future release"
+                  data-testid="button-start-subscription"
+                >
+                  <CreditCard className="w-4 h-4 mr-1.5" /> Start Subscription
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  title="Coming soon — will be available in a future release"
+                  data-testid="button-manage-payment"
+                >
+                  <CreditCard className="w-4 h-4 mr-1.5" /> Manage Payment Method
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  title="Coming soon — will be available in a future release"
+                  data-testid="button-retry-payment"
+                >
+                  <RefreshCw className="w-4 h-4 mr-1.5" /> Retry Payment
+                </Button>
+              </div>
 
               <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground" data-testid="contact-support-note">
                 <p className="text-sm">To change your subscription or billing, contact BuildVision support.</p>

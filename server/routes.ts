@@ -602,9 +602,10 @@ export async function registerRoutes(
     const stripe = getStripe();
 
     if (!webhookSecret) {
-      // Webhook secret not configured — accept gracefully and skip processing.
-      console.info("[stripe/webhook] STRIPE_WEBHOOK_SECRET not set; event ignored.");
-      return res.status(200).json({ received: true });
+      // Webhook secret not configured — reject the request rather than accepting unsigned payloads.
+      // This enforces the policy that all webhook traffic must pass signature verification.
+      console.warn("[stripe/webhook] STRIPE_WEBHOOK_SECRET not set; rejecting unsigned request.");
+      return res.status(503).json({ error: "Webhook endpoint not configured" });
     }
 
     if (!stripe) {
