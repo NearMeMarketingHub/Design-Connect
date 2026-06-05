@@ -1635,7 +1635,7 @@ export default function CompanyDashboard() {
               </div>
 
               <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground" data-testid="contact-support-note">
-                <p className="text-sm">To change your subscription or billing, contact BuildVision support.</p>
+                <p className="text-sm">To change your Billing &amp; Access settings, contact BuildVision support.</p>
               </div>
             </CardContent>
           </Card>

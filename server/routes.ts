@@ -644,7 +644,7 @@ export async function registerRoutes(
       case "invoice.payment_failed":
         // TODO (Phase 10B): set stripePaymentStatus to "past_due", record
         // lastPaymentFailureAt / lastPaymentFailureReason, set stripeGraceStartedAt
-        // and stripeGraceEndsAt (e.g. now + 7 days).
+        // and stripeGraceEndsAt (e.g. now + 3 days).
         break;
 
       case "invoice.payment_action_required":
