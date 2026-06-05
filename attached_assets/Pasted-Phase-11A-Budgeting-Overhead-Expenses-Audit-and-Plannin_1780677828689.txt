@@ -1,0 +1,172 @@
+Phase 11A: Budgeting / Overhead / Expenses Audit and Planning.
+
+Context:
+The company-owner financial foundation is now in place:
+
+* Estimator saves/loads real estimates
+* Create Invoice saves real invoices
+* Invoice detail/edit exists
+* Sales Dashboard uses real estimates
+* Accounting Dashboard uses real invoices
+* Financial actions are audit logged
+* Stripe foundation exists but live Stripe automation is paused until keys/final URL are available
+
+Now we need to review the existing Budget Manager and budget sheet import/create functionality before building production sheet/job financial features.
+
+Do not change BuildVision branding.
+Do not add Stripe automation.
+Do not build production sheets yet.
+Do not build payout schedules yet.
+Do not build Gantt/board views yet.
+Do not build permitting, selections, or EOD reporting yet.
+Do not expand subcontractor/notary functionality.
+Do not guess Avery/job-costing formulas.
+
+Goal:
+Audit the existing budget, overhead, expense, budget-sheet import, estimate, and financial code so we understand what already exists and what needs to be built next.
+
+1. Inspect existing budgeting-related code.
+
+Review:
+
+* Budget Manager page/routes
+* budget sheet upload/import logic
+* budget table/schema
+* budget categories/items
+* price book/product/service item logic, if any
+* company scoping for budget data
+* project/job association for budget data
+* estimator connections to budget or price book data
+* financial dashboard connections to budget data
+* any existing overhead/expense fields
+* any import parsing/mapping logic
+
+Relevant likely files may include:
+
+* client/src/pages/budget-admin.tsx
+* server/routes.ts
+* server/storage.ts
+* shared/schema.ts
+* any upload/import utilities
+* estimator-related files
+* financial dashboard files
+
+2. Confirm company scoping.
+
+Check whether budget data is properly company-scoped.
+
+Company A should not see or edit Company B’s:
+
+* budget categories
+* budget items
+* uploaded budget sheets
+* imported budget data
+* price book/service/product items
+* overhead/expense records
+
+If there are obvious security gaps, note them clearly.
+Do not make large schema changes yet unless it is a small safe fix.
+
+3. Identify current budget data model.
+
+Document what exists now:
+
+* tables
+* fields
+* relationships
+* companyId/projectId usage
+* import-related fields
+* category/item structure
+* whether budget items are global, company-level, or project-level
+
+4. Identify current import/create behavior.
+
+For budget sheet upload/import:
+
+* what file types are accepted
+* how rows are parsed
+* whether users can review imported data before saving
+* whether imported items can be edited afterward
+* whether imported data maps to categories/items
+* whether imported data is company-scoped
+* whether imported data is project-scoped
+
+For in-app budget creation:
+
+* whether users can create categories
+* whether users can create line items
+* whether items support cost, price, markup, overhead, or margin
+* whether items can be reused in estimates
+
+5. Audit overhead and expense support.
+
+Determine whether the current system supports:
+
+* company-level overhead
+* job/project-level overhead
+* expenses
+* labor costs
+* material costs
+* contractor/vendor costs
+* markup %
+* profit margin %
+* commission/payout-related costs
+* Near Me Marketing 1% tracking
+
+Do not implement these yet.
+Just report what exists and what is missing.
+
+6. Audit estimator/budget relationship.
+
+Check whether estimates currently:
+
+* use budget items
+* use price book items
+* use manually entered line items only
+* support overhead/profit calculations
+* store subtotal/overhead/profit separately
+* store only final total amount
+
+Note whether estimator totals can later support:
+
+* overhead
+* expenses
+* margins
+* production sheet reporting
+
+7. Recommend a clean future model.
+
+Based on the current code, propose a clean model for future build phases.
+
+The future model should support:
+
+* company-level price book / budget library
+* project-level budget
+* budget templates
+* imported budget sheets
+* overhead categories
+* expense categories
+* labor/material/contractor costs
+* estimate-to-budget connection
+* budget vs actual comparison
+* future production sheet/job financial reporting
+
+8. Output findings clearly.
+
+At the end of the task, provide a concise report with:
+
+A. What already exists and works
+B. What exists but is incomplete
+C. Security/scoping risks
+D. Recommended schema/data model changes
+E. Recommended next build phase
+F. Items that need business/formula decisions before coding
+
+9. Keep this phase audit-first.
+
+Do not build the full budgeting overhaul yet.
+Do not implement overhead formulas yet.
+Do not implement payout/commission formulas yet.
+Do not implement Near Me 1% logic yet.
+Do not implement production sheet reports yet.
+Do not alter estimator formulas unless only documenting what exists.
