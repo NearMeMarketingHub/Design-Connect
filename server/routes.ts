@@ -788,6 +788,33 @@ export async function registerRoutes(
     return res.status(403).json({ message: "Internal company member access required" });
   };
 
+  // Transport-layer guard for estimate routes (GET /api/estimates, GET /api/estimates/:id,
+  // POST /api/estimates). Blocks clients, subcontractors, notaries, and users without a
+  // companyId (except platform admin) before any DB work is performed.
+  // Allowed: admin, company_owner (with companyId), isCompanyAdmin contractors,
+  //          and regular internal contractors (companyId set, contractorType null/undefined/"").
+  const requireEstimateAccess = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as User;
+    if (user.role === "admin") return next();
+    if (user.role === "client") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    if (user.role === "company_owner" && user.companyId) return next();
+    if (user.role === "contractor" && user.companyId) {
+      if (user.isCompanyAdmin === true) return next();
+      // Block external worker types explicitly
+      if (user.contractorType === "subcontractor" || user.contractorType === "notary") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      // Regular internal contractor: contractorType is null, undefined, or empty
+      if (!user.contractorType) return next();
+    }
+    return res.status(403).json({ message: "Access denied" });
+  };
+
   // Helper: verify caller is owner/admin of the target company
   const verifyCompanyAccess = async (req: any, res: any, companyId: string): Promise<boolean> => {
     const user = req.user as User;
@@ -2462,7 +2489,7 @@ export async function registerRoutes(
   });
 
   // Estimate routes
-  app.get("/api/estimates", requireAuth, async (req, res, next) => {
+  app.get("/api/estimates", requireAuth, requireEstimateAccess, async (req, res, next) => {
     try {
       const user = req.user as User;
       if (user.role !== "admin" && !user.companyId) {
@@ -2476,7 +2503,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/estimates/:id", requireAuth, async (req, res, next) => {
+  app.get("/api/estimates/:id", requireAuth, requireEstimateAccess, async (req, res, next) => {
     try {
       const user = req.user as User;
       const estimate = await storage.getEstimate(req.params.id);
@@ -2514,7 +2541,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/estimates", requireAuth, requireActiveSubscription, async (req, res, next) => {
+  app.post("/api/estimates", requireAuth, requireEstimateAccess, requireActiveSubscription, async (req, res, next) => {
     try {
       // Strip companyId from request body — always derived server-side
       const { companyId: _stripped, ...safeBody } = req.body;
