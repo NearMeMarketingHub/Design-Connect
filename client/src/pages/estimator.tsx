@@ -23,6 +23,7 @@ type LineItem = {
   unit: string;
   rate: number;
   total: number;
+  priceBookItemId?: string | null;
 };
 
 type EstimateWithLineItems = Estimate & { lineItems: EstimateLineItem[] };
@@ -205,6 +206,7 @@ export default function Estimator() {
             unit: li.unit,
             rate: parseFloat(String(li.rate)),
             total: parseFloat(String(li.total)),
+            priceBookItemId: li.priceBookItemId ?? null,
           }))
         );
         setLineItemCounter(ctr);
