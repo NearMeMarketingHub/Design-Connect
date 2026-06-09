@@ -134,6 +134,7 @@ export const estimates = pgTable("estimates", {
   status: text("status").notNull(),
   date: text("date").notNull(),
   projectId: varchar("project_id").references(() => projects.id),
+  companyId: varchar("company_id").references(() => companies.id),
 });
 
 export const insertEstimateSchema = createInsertSchema(estimates).omit({ id: true });
@@ -165,6 +166,7 @@ export const invoices = pgTable("invoices", {
   status: text("status").notNull(),
   type: text("type").notNull(),
   projectId: varchar("project_id").references(() => projects.id),
+  companyId: varchar("company_id").references(() => companies.id),
 });
 
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true });
@@ -194,6 +196,7 @@ export const recurringBilling = pgTable("recurring_billing", {
   nextRunDate: text("next_run_date").notNull(),
   status: text("status").notNull(),
   projectId: varchar("project_id").references(() => projects.id),
+  companyId: varchar("company_id").references(() => companies.id),
 });
 
 export const insertRecurringBillingSchema = createInsertSchema(recurringBilling).omit({ id: true });

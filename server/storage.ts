@@ -525,12 +525,21 @@ export class DatabaseStorage implements IStorage {
     if (!companyId) {
       return await db.select().from(schema.estimates);
     }
+    // Single query: direct companyId match OR legacy null-companyId records owned via project chain
     const rows = await db
       .select({ estimate: schema.estimates })
       .from(schema.estimates)
       .leftJoin(schema.projects, eq(schema.estimates.projectId, schema.projects.id))
       .leftJoin(schema.users, eq(schema.projects.contractorId, schema.users.id))
-      .where(eq(schema.users.companyId, companyId));
+      .where(
+        or(
+          eq(schema.estimates.companyId, companyId),
+          and(
+            isNull(schema.estimates.companyId),
+            eq(schema.users.companyId, companyId)
+          )
+        )
+      );
     return rows.map((r) => r.estimate);
   }
 
@@ -558,12 +567,21 @@ export class DatabaseStorage implements IStorage {
     if (!companyId) {
       return await db.select().from(schema.invoices);
     }
+    // Single query: direct companyId match OR legacy null-companyId records owned via project chain
     const rows = await db
       .select({ invoice: schema.invoices })
       .from(schema.invoices)
       .leftJoin(schema.projects, eq(schema.invoices.projectId, schema.projects.id))
       .leftJoin(schema.users, eq(schema.projects.contractorId, schema.users.id))
-      .where(eq(schema.users.companyId, companyId));
+      .where(
+        or(
+          eq(schema.invoices.companyId, companyId),
+          and(
+            isNull(schema.invoices.companyId),
+            eq(schema.users.companyId, companyId)
+          )
+        )
+      );
     return rows.map((r) => r.invoice);
   }
 
@@ -596,12 +614,21 @@ export class DatabaseStorage implements IStorage {
     if (!companyId) {
       return await db.select().from(schema.recurringBilling);
     }
+    // Single query: direct companyId match OR legacy null-companyId records owned via project chain
     const rows = await db
       .select({ billing: schema.recurringBilling })
       .from(schema.recurringBilling)
       .leftJoin(schema.projects, eq(schema.recurringBilling.projectId, schema.projects.id))
       .leftJoin(schema.users, eq(schema.projects.contractorId, schema.users.id))
-      .where(eq(schema.users.companyId, companyId));
+      .where(
+        or(
+          eq(schema.recurringBilling.companyId, companyId),
+          and(
+            isNull(schema.recurringBilling.companyId),
+            eq(schema.users.companyId, companyId)
+          )
+        )
+      );
     return rows.map((r) => r.billing);
   }
 

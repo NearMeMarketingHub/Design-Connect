@@ -2467,19 +2467,24 @@ export async function registerRoutes(
         if (!user.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
-        if (!estimate.projectId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        const project = await storage.getProject(estimate.projectId);
-        if (!project) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        if (!project.contractorId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        const contractor = await storage.getUser(project.contractorId);
-        if (!contractor || contractor.companyId !== user.companyId) {
-          return res.status(403).json({ message: "Access denied" });
+        // Direct check first (populated on new records after Phase 11B)
+        if (estimate.companyId) {
+          if (estimate.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+        } else {
+          // Legacy fallback: walk project ownership chain for null-companyId records
+          if (!estimate.projectId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const project = await storage.getProject(estimate.projectId);
+          if (!project?.contractorId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
         }
       }
       const lineItems = await storage.getEstimateLineItems(req.params.id);
@@ -2491,13 +2496,15 @@ export async function registerRoutes(
 
   app.post("/api/estimates", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
-      const parsedEstimate = createEstimateSchema.safeParse(req.body);
+      // Strip companyId from request body — always derived server-side
+      const { companyId: _stripped, ...safeBody } = req.body;
+      const parsedEstimate = createEstimateSchema.safeParse(safeBody);
       if (!parsedEstimate.success) {
         return res.status(400).json({ message: "Invalid estimate data", errors: parsedEstimate.error.flatten().fieldErrors });
       }
       const { lineItems, ...estimateData } = parsedEstimate.data;
       const user = req.user as User;
-      let auditCompanyId: string | null = null;
+      let derivedCompanyId: string | null = null;
       if (user.role !== "admin") {
         if (!estimateData.projectId) {
           return res.status(403).json({ message: "Access denied: a project must be associated with this estimate" });
@@ -2511,9 +2518,23 @@ export async function registerRoutes(
         if (!contractor || contractor.companyId !== user.companyId) {
           return res.status(403).json({ message: "Access denied: project not in your company" });
         }
-        auditCompanyId = contractor.companyId ?? null;
+        derivedCompanyId = contractor.companyId ?? null;
+      } else if (estimateData.projectId) {
+        // Admin: derive companyId from project chain if possible
+        try {
+          const project = await storage.getProject(estimateData.projectId);
+          if (project?.contractorId) {
+            const contractor = await storage.getUser(project.contractorId);
+            derivedCompanyId = contractor?.companyId ?? null;
+            if (!derivedCompanyId) {
+              console.warn(`[create estimate] admin: project ${estimateData.projectId} contractor has no companyId`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[create estimate] admin: failed to derive companyId for project ${estimateData.projectId}:`, err);
+        }
       }
-      const estimate = await storage.createEstimate(estimateData);
+      const estimate = await storage.createEstimate({ ...estimateData, companyId: derivedCompanyId });
       
       if (lineItems && Array.isArray(lineItems)) {
         for (const item of lineItems) {
@@ -2533,7 +2554,7 @@ export async function registerRoutes(
         entityType: "estimate",
         entityId: estimate.id,
         entityName: estimate.customId,
-        companyId: auditCompanyId,
+        companyId: estimate.companyId,
         projectId: estimate.projectId,
         metadata: {
           customId: estimate.customId,
@@ -2576,19 +2597,24 @@ export async function registerRoutes(
         if (!user.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
-        if (!invoice.projectId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        const project = await storage.getProject(invoice.projectId);
-        if (!project) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        if (!project.contractorId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        const contractor = await storage.getUser(project.contractorId);
-        if (!contractor || contractor.companyId !== user.companyId) {
-          return res.status(403).json({ message: "Access denied" });
+        // Direct check first (populated on new records after Phase 11B)
+        if (invoice.companyId) {
+          if (invoice.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+        } else {
+          // Legacy fallback: walk project ownership chain for null-companyId records
+          if (!invoice.projectId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const project = await storage.getProject(invoice.projectId);
+          if (!project?.contractorId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
         }
       }
       const lineItems = await storage.getInvoiceLineItems(req.params.id);
@@ -2621,31 +2647,42 @@ export async function registerRoutes(
       }
 
       // Verify ownership for non-admins
-      let auditCompanyId: string | null = null;
       if (user.role !== "admin") {
-        if (!user.companyId || !invoice.projectId) {
+        if (!user.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
-        const project = await storage.getProject(invoice.projectId);
-        if (!project?.contractorId) {
-          return res.status(403).json({ message: "Access denied" });
+        // Direct check first (populated on new records after Phase 11B)
+        if (invoice.companyId) {
+          if (invoice.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+        } else {
+          // Legacy fallback: walk project ownership chain for null-companyId records
+          if (!invoice.projectId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const project = await storage.getProject(invoice.projectId);
+          if (!project?.contractorId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
         }
-        const contractor = await storage.getUser(project.contractorId);
-        if (!contractor || contractor.companyId !== user.companyId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        auditCompanyId = contractor.companyId ?? null;
       }
 
       const oldStatus = invoice.status;
       const oldDueDate = invoice.dueDate;
 
+      // Strip companyId from body — never allow client to set it
+      const { companyId: _stripped, ...safeBody } = req.body;
       const updateSchema = z.object({
         dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate must be YYYY-MM-DD").optional(),
         status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]).optional(),
       });
 
-      const parsed = updateSchema.safeParse(req.body);
+      const parsed = updateSchema.safeParse(safeBody);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.flatten().fieldErrors });
       }
@@ -2665,7 +2702,7 @@ export async function registerRoutes(
         entityType: "invoice",
         entityId: updated.id,
         entityName: updated.customId,
-        companyId: auditCompanyId,
+        companyId: updated.companyId,
         projectId: updated.projectId,
         metadata: {
           oldStatus,
@@ -2683,13 +2720,15 @@ export async function registerRoutes(
 
   app.post("/api/invoices", requireAuth, requireActiveSubscription, async (req, res, next) => {
     try {
-      const parsedInvoice = createInvoiceSchema.safeParse(req.body);
+      // Strip companyId from request body — always derived server-side
+      const { companyId: _stripped, ...safeBody } = req.body;
+      const parsedInvoice = createInvoiceSchema.safeParse(safeBody);
       if (!parsedInvoice.success) {
         return res.status(400).json({ message: "Invalid invoice data", errors: parsedInvoice.error.flatten().fieldErrors });
       }
       const { lineItems, ...invoiceData } = parsedInvoice.data;
       const user = req.user as User;
-      let auditCompanyId: string | null = null;
+      let derivedCompanyId: string | null = null;
       if (user.role !== "admin") {
         if (!invoiceData.projectId) {
           return res.status(403).json({ message: "Access denied: a project must be associated with this invoice" });
@@ -2703,9 +2742,23 @@ export async function registerRoutes(
         if (!contractor || contractor.companyId !== user.companyId) {
           return res.status(403).json({ message: "Access denied: project not in your company" });
         }
-        auditCompanyId = contractor.companyId ?? null;
+        derivedCompanyId = contractor.companyId ?? null;
+      } else if (invoiceData.projectId) {
+        // Admin: derive companyId from project chain if possible
+        try {
+          const project = await storage.getProject(invoiceData.projectId);
+          if (project?.contractorId) {
+            const contractor = await storage.getUser(project.contractorId);
+            derivedCompanyId = contractor?.companyId ?? null;
+            if (!derivedCompanyId) {
+              console.warn(`[create invoice] admin: project ${invoiceData.projectId} contractor has no companyId`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[create invoice] admin: failed to derive companyId for project ${invoiceData.projectId}:`, err);
+        }
       }
-      const invoice = await storage.createInvoice(invoiceData);
+      const invoice = await storage.createInvoice({ ...invoiceData, companyId: derivedCompanyId });
       
       if (lineItems && Array.isArray(lineItems)) {
         for (const item of lineItems) {
@@ -2725,7 +2778,7 @@ export async function registerRoutes(
         entityType: "invoice",
         entityId: invoice.id,
         entityName: invoice.customId,
-        companyId: auditCompanyId,
+        companyId: invoice.companyId,
         projectId: invoice.projectId,
         metadata: {
           customId: invoice.customId,
@@ -2760,11 +2813,14 @@ export async function registerRoutes(
 
   app.post("/api/recurring-billing", requireAuth, async (req, res, next) => {
     try {
-      const parsedBilling = createRecurringBillingSchema.safeParse(req.body);
+      // Strip companyId from request body — always derived server-side
+      const { companyId: _stripped, ...safeBody } = req.body;
+      const parsedBilling = createRecurringBillingSchema.safeParse(safeBody);
       if (!parsedBilling.success) {
         return res.status(400).json({ message: "Invalid recurring billing data", errors: parsedBilling.error.flatten().fieldErrors });
       }
       const user = req.user as User;
+      let derivedCompanyId: string | null = null;
       if (user.role !== "admin") {
         const billingProjectId = parsedBilling.data.projectId;
         if (!billingProjectId) {
@@ -2779,8 +2835,23 @@ export async function registerRoutes(
         if (!contractor || contractor.companyId !== user.companyId) {
           return res.status(403).json({ message: "Access denied: project not in your company" });
         }
+        derivedCompanyId = contractor.companyId ?? null;
+      } else if (parsedBilling.data.projectId) {
+        // Admin: derive companyId from project chain if possible
+        try {
+          const project = await storage.getProject(parsedBilling.data.projectId);
+          if (project?.contractorId) {
+            const contractor = await storage.getUser(project.contractorId);
+            derivedCompanyId = contractor?.companyId ?? null;
+            if (!derivedCompanyId) {
+              console.warn(`[create recurring-billing] admin: project ${parsedBilling.data.projectId} contractor has no companyId`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[create recurring-billing] admin: failed to derive companyId for project ${parsedBilling.data.projectId}:`, err);
+        }
       }
-      const billing = await storage.createRecurringBilling(parsedBilling.data);
+      const billing = await storage.createRecurringBilling({ ...parsedBilling.data, companyId: derivedCompanyId });
       res.json(billing);
     } catch (error) {
       next(error);
