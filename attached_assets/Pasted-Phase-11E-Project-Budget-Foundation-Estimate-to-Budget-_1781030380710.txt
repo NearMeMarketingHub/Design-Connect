@@ -1,0 +1,193 @@
+Phase 11E: Project Budget Foundation / Estimate-to-Budget Planning.
+
+Context:
+Phase 11A audited the budget/expense system.
+Phase 11B added direct companyId fields to estimates, invoices, and recurring billing.
+Phase 11C connected the company price book to the Estimator.
+Phase 11D opened Estimator/Quote access to internal company contractors while keeping Price Book management restricted.
+
+Now we need to plan the next foundation step: how estimates, price book items, and project budgets should connect.
+
+Do not change BuildVision branding.
+Do not add Stripe automation.
+Do not build overhead formulas yet.
+Do not build payout schedules.
+Do not build production sheets yet.
+Do not build reports yet.
+Do not build Gantt/board views.
+Do not build permitting, selections, or EOD reporting.
+Do not expand subcontractor/notary functionality.
+Do not guess Avery/job-costing formulas.
+
+Goal:
+Create a written implementation plan for Project Budget Foundation, based on the current codebase and BUDGET_AUDIT.md.
+
+This phase should produce a planning document only unless small, safe TODO/doc updates are needed.
+
+1. Review the current state.
+
+Review:
+
+* BUDGET_AUDIT.md
+* shared/schema.ts budget/price book/estimate/invoice/project tables
+* server/routes.ts budget, price book, estimate, invoice, project routes
+* server/storage.ts budget, price book, estimate, invoice, project storage methods
+* client/src/pages/estimator.tsx
+* client/src/pages/company-financials.tsx
+* client/src/pages/company-dashboard.tsx
+* any Budget Manager page/import code
+
+2. Define what “Project Budget” should mean.
+
+The plan should define a project budget as a company-scoped, project-level financial plan that can eventually include:
+
+* original estimate total
+* budget line items
+* materials
+* labor
+* contractor/vendor costs
+* expenses
+* overhead
+* margin/profit
+* change orders later
+* actual costs later
+* customer payments later
+* payout/commission data later
+
+Do not implement all of this yet.
+
+3. Recommend schema model.
+
+Propose clean tables/fields for a future build, such as:
+
+* project_budgets
+* project_budget_items
+* budget_item_source or sourceType/sourceId
+* projectId
+* companyId
+* estimateId if budget was generated from an estimate
+* category
+* item/description
+* quantity
+* unit
+* estimatedCost
+* estimatedPrice
+* actualCost later
+* status
+* notes
+
+If existing tables can be reused safely, explain how.
+If new tables are better, explain why.
+
+4. Estimate-to-budget flow.
+
+Define the recommended workflow for turning an estimate into a project budget.
+
+Possible flow:
+
+* user creates estimate
+* estimate is approved/selected as project baseline
+* user clicks “Create Project Budget from Estimate”
+* app copies estimate line items into project budget items
+* budget is then editable separately from the estimate
+* original estimate remains unchanged for history
+
+Document whether this should be:
+
+* one budget per project
+* multiple budget versions per project
+* active baseline budget + archived revisions
+
+Do not build it yet.
+
+5. Price book linkage.
+
+Define how price book items should connect to project budget items later.
+
+Questions to answer:
+
+* Should estimate line items store source priceBookItemId?
+* Should budget items store source priceBookItemId?
+* Should copied items remain snapshots even if the Price Book changes later?
+* Should changing Price Book prices update existing budgets or only future estimates?
+
+Recommendation:
+Prefer snapshot behavior for estimates/budgets so old quotes do not change unexpectedly.
+
+6. Budget vs actual future path.
+
+Document how this should eventually support:
+
+* estimated budget
+* actual expenses
+* invoice/customer payments
+* contractor/vendor payouts
+* overhead
+* margin/profit
+* production sheet/job financial reporting
+
+Do not implement actual expenses yet.
+
+7. Security/scoping requirements.
+
+Project budget data must be company-scoped.
+
+Rules:
+
+* company users can only access budgets for their company’s projects
+* clients should not access internal budget details unless a future client-visible summary is intentionally built
+* subcontractors/notaries should not access internal budget details unless a future assigned-scope workflow is intentionally built
+* Super Admin can support/view where appropriate
+* companyId should be stored directly on budget records
+
+8. UI placement recommendation.
+
+Recommend where the future Project Budget UI should live.
+
+Likely options:
+
+* Project Detail → Budget tab
+* Company Financials → Project Budgets section
+* Estimator → Create Budget from Estimate action
+* Budget Manager → Templates/Price Book only
+
+Recommend the cleanest structure.
+
+9. Business decisions needed before coding formulas.
+
+List what needs owner/boss decisions before overhead/profit formulas are implemented:
+
+* company overhead calculation
+* project overhead calculation
+* labor burden meaning
+* subRate meaning
+* material fee meaning
+* markup vs margin
+* commission/payout formulas
+* Near Me Marketing 1%
+* whether overhead is percentage, fixed, or line item
+* whether profit is based on estimate, contract, collected payments, or actual costs
+
+10. Output file.
+
+Create a new project-root document:
+PROJECT_BUDGET_PLAN.md
+
+It should include:
+A. Current codebase findings
+B. Recommended project budget data model
+C. Recommended estimate-to-budget workflow
+D. Recommended price book snapshot/linking behavior
+E. Security/scoping requirements
+F. UI placement recommendation
+G. Recommended next build phase
+H. Business/formula decisions needed before coding
+
+11. Keep this phase planning-only.
+
+Do not add schema migrations.
+Do not add new routes.
+Do not add new UI.
+Do not change estimator behavior.
+Do not change invoice/accounting behavior.
+Do not implement formulas.
