@@ -1,0 +1,179 @@
+Phase 11B: Add direct companyId to estimates, invoices, and recurring billing.
+
+Context:
+Phase 11A audited the budget/expense/financial system. The audit found that estimates, invoices, and recurring billing are currently company-scoped indirectly through:
+
+record → project → contractor user → companyId
+
+That works for security when routes are written carefully, but it makes reporting, filtering, audit logs, and future production-sheet/job-financial features harder.
+
+Do not change BuildVision branding.
+Do not add Stripe automation.
+Do not build overhead formulas.
+Do not build production sheets.
+Do not build payout schedules.
+Do not build reports.
+Do not build Gantt/board views.
+Do not build permitting, selections, or EOD reporting.
+Do not expand subcontractor/notary functionality.
+
+Goal:
+Add direct companyId fields to financial records while preserving existing project ownership checks.
+
+Tables/records to update:
+
+* estimates
+* invoices
+* recurring_billing, if table exists and is currently project-linked
+
+1. Add companyId fields.
+
+Add nullable companyId fields to:
+
+* estimates
+* invoices
+* recurring_billing, if applicable
+
+Use the existing company ID type/reference style used elsewhere in the schema.
+
+Do not remove projectId.
+Do not remove existing ownership checks.
+
+2. Backfill existing records.
+
+For existing records with projectId:
+
+* find the project
+* find project.contractorId
+* find contractor user.companyId
+* set record.companyId to that companyId
+
+If company ownership cannot be derived:
+
+* leave companyId null
+* document the orphaned record situation in a code comment or console warning during migration/backfill if practical
+
+Do not guess companyId.
+
+3. Update create routes.
+
+When creating a new estimate, invoice, or recurring billing record:
+
+* derive companyId from the verified project ownership chain
+* save companyId directly on the record
+
+For non-admin company users:
+
+* projectId is still required
+* project must belong to their company
+* companyId should be set to the project owner company
+
+For Super Admin/platform admin behavior:
+
+* if admin creates a financial record for a project, derive companyId from the selected project
+* do not leave companyId null if project ownership can be derived
+
+4. Update read/list routes to use companyId safely.
+
+For non-admin company users:
+
+* list routes should filter by record.companyId where available
+* keep project ownership join fallback if needed for old/null records during transition
+* never return records from another company
+
+For detail routes:
+
+* non-admin users can access only records where:
+
+  * record.companyId matches their companyId
+    OR, for older records with null companyId, project ownership verifies through project → contractor → companyId
+* if ownership cannot be verified, deny access
+
+Do not weaken current security.
+
+5. Update update routes.
+
+For PATCH /api/invoices/:id:
+
+* continue verifying ownership
+* prefer direct companyId check when present
+* keep project ownership fallback for null legacy records
+* do not allow changing companyId through request body
+* do not allow changing projectId in this phase
+
+If estimate update routes do not exist, do not add them.
+
+6. Update storage methods.
+
+Update relevant storage methods so companyId can be:
+
+* inserted
+* returned
+* filtered
+* used in future reporting
+
+Likely affected methods:
+
+* createEstimate
+* getEstimates
+* getEstimate
+* createInvoice
+* getInvoices
+* getInvoice
+* updateInvoice
+* getRecurringBilling
+* createRecurringBilling, if present
+
+7. Update schemas/types.
+
+Update shared schema and insert/select types as needed.
+
+Make sure frontend TypeScript still compiles.
+
+Do not expose companyId editing in the UI.
+
+8. Update audit logging.
+
+For estimate_created, invoice_created, and invoice_updated:
+
+* prefer record.companyId when available
+* otherwise derive companyId from project ownership
+* avoid companyId null when project ownership can be derived
+
+9. Migration / db push.
+
+If this project uses db:push, apply the schema changes accordingly.
+
+If migrations are used, add a migration for:
+
+* adding companyId columns
+* backfilling companyId where possible
+
+Do not delete old columns.
+
+10. QA expectations.
+
+After this phase:
+
+* Company A cannot see Company B’s estimates
+* Company A cannot see Company B’s invoices
+* Company A cannot see Company B’s recurring billing records
+* New estimates save companyId
+* New invoices save companyId
+* New recurring billing records save companyId, if applicable
+* Existing records with derivable project ownership are backfilled
+* Orphaned records remain inaccessible to non-admin users
+* Sales Dashboard still works
+* Accounting Dashboard still works
+* Estimator save/load still works
+* Create Invoice still works
+* Invoice detail/edit still works
+* Recent Financial Activity still works
+
+11. Keep this phase focused.
+
+Do not add new budget tables yet.
+Do not add overhead/expense logic yet.
+Do not add price-book-to-estimate linkage yet.
+Do not add project budget breakdown UI yet.
+Do not add reports yet.
