@@ -1,0 +1,133 @@
+Phase 11F: Add priceBookItemId to estimate line items.
+
+Context:
+Phase 11E created PROJECT_BUDGET_PLAN.md. The recommended next build step is to add source tracking between Price Book items and estimate line items.
+
+Right now, when a user selects a Price Book item in the Estimator, the item fills the manual line item form, but after saving the estimate there is no stored link back to the original Price Book item.
+
+Do not change BuildVision branding.
+Do not add Stripe automation.
+Do not build overhead formulas.
+Do not build production sheets.
+Do not build payout schedules.
+Do not build reports.
+Do not build Gantt/board views.
+Do not build project budget tables yet.
+Do not build expenses/actual-cost tracking yet.
+Do not expand subcontractor/notary functionality.
+Do not change estimate totals or formula behavior.
+
+Goal:
+Add a nullable `priceBookItemId` field to `estimate_line_items` so estimate line items can optionally remember the Price Book item they came from.
+
+1. Add nullable priceBookItemId to estimate line items.
+
+In shared/schema.ts:
+
+* add nullable `priceBookItemId` / `price_book_item_id` to `estimate_line_items`
+* reference `budget_items.id`
+* keep it nullable so manual line items remain supported
+
+Do not require every estimate line item to have a priceBookItemId.
+
+2. Apply database schema update.
+
+Use the project’s existing db push flow.
+
+If this project uses db:push:
+
+* run npm run db:push
+
+No existing line items need a backfill. Old/manual estimate line items should keep priceBookItemId as null.
+
+3. Update insert/select types.
+
+Update shared insert/select schemas and types so:
+
+* estimate line items can include priceBookItemId on create
+* returned estimate line items include priceBookItemId where present
+
+Do not expose priceBookItemId as an editable manual form field.
+
+4. Update storage methods.
+
+Update estimate line item storage methods so priceBookItemId can be inserted and returned.
+
+Likely methods:
+
+* createEstimateLineItem
+* getEstimateLineItems
+* any bulk/loop insert used when creating estimates with lineItems
+
+5. Update POST /api/estimates line item handling.
+
+When POST /api/estimates receives lineItems:
+
+* accept optional priceBookItemId on each line item
+* validate/verify it safely before saving
+
+For non-admin company users:
+
+* if priceBookItemId is provided, verify the referenced budget item belongs to the user’s company
+* reject or ignore priceBookItemId if it belongs to another company
+* do not let users link to another company’s price book item
+
+For admin/platform users:
+
+* if creating for a project/company context, verify the priceBookItemId belongs to the derived company
+* do not allow cross-company price book linking
+
+Manual line items:
+
+* if priceBookItemId is missing/null, save the line item normally
+
+6. Update Estimator price book picker.
+
+In client/src/pages/estimator.tsx:
+
+* when a user selects an item from the “From Price Book” picker, store that item’s id in local addForm state as priceBookItemId
+* when the user clicks Add, include priceBookItemId on the line item if present
+* if the user manually types a line item, priceBookItemId should be null/undefined
+* if the user edits the populated item text/rate/quantity before adding, still keep priceBookItemId as source tracking unless they clear/reset the form
+
+Do not display priceBookItemId to the user.
+
+7. Preserve snapshot behavior.
+
+Important:
+priceBookItemId is only traceability. It should not make estimate line items dynamically update when the Price Book changes.
+
+The estimate line item’s item/category/unit/rate/total values remain snapshots at the time the user adds the line.
+
+Do not recalculate old estimates when the price book changes.
+
+8. Update estimate load behavior.
+
+When loading an existing estimate:
+
+* include priceBookItemId in loaded line items if present
+* no UI changes are required beyond keeping the data intact
+
+9. Security requirements.
+
+Company users can only create estimate line items linked to price book items from their own company.
+
+Blocked:
+
+* clients
+* subcontractors
+* notaries
+* users from another company
+* unauthenticated users
+
+Do not weaken existing requireEstimateAccess or company ownership checks.
+
+10. Keep this phase focused.
+
+Do not build project_budgets yet.
+Do not build project_budget_items yet.
+Do not add “Create Budget from Estimate” yet.
+Do not add formulas.
+Do not add estimate editing.
+Do not add price book management changes.
+Do not add reports.
