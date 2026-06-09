@@ -2582,46 +2582,102 @@ export async function registerRoutes(
         }
       }
 
-      // Guardrail A+B: validate ALL priceBookItemIds before creating any records.
-      // A bad priceBookItemId must never produce a partial estimate in the database.
+      // Pre-validate all line items before creating any records.
+      // Combines field-shape validation (11G) with priceBookItemId ownership checks (11F).
+      // A validation failure here prevents any records from being written.
+      type SanitizedLineItem = {
+        category: string;
+        item: string;
+        quantity: string;
+        unit: string;
+        rate: string;
+        total: string;
+        priceBookItemId: string | null;
+      };
+      const sanitizedLineItems: SanitizedLineItem[] = [];
+
       if (lineItems && Array.isArray(lineItems)) {
-        for (const item of lineItems) {
-          if (item.priceBookItemId && typeof item.priceBookItemId === "string") {
+        for (let i = 0; i < lineItems.length; i++) {
+          const raw = lineItems[i];
+          const label = `Line item ${i + 1}`;
+
+          // --- Shape validation ---
+          if (!raw.category || typeof raw.category !== "string" || !raw.category.trim()) {
+            return res.status(400).json({ message: `${label}: category is required` });
+          }
+          if (!raw.item || typeof raw.item !== "string" || !raw.item.trim()) {
+            return res.status(400).json({ message: `${label}: item description is required` });
+          }
+          if (!raw.unit || typeof raw.unit !== "string" || !raw.unit.trim()) {
+            return res.status(400).json({ message: `${label}: unit is required` });
+          }
+
+          const qty = parseFloat(String(raw.quantity));
+          if (isNaN(qty) || qty <= 0) {
+            return res.status(400).json({ message: `${label}: quantity must be greater than 0` });
+          }
+
+          const rate = parseFloat(String(raw.rate));
+          if (isNaN(rate) || rate < 0) {
+            return res.status(400).json({ message: `${label}: rate must be greater than or equal to 0` });
+          }
+
+          const total = parseFloat(String(raw.total));
+          if (isNaN(total) || total < 0) {
+            return res.status(400).json({ message: `${label}: total must be greater than or equal to 0` });
+          }
+
+          // --- Total sanity check (tolerance 0.01 to allow floating-point rounding) ---
+          const computed = qty * rate;
+          if (Math.abs(total - computed) > 0.01) {
+            return res.status(400).json({ message: `${label}: total does not match quantity × rate` });
+          }
+
+          // --- priceBookItemId validation (Phase 11F) ---
+          let priceBookItemId: string | null = null;
+          if (raw.priceBookItemId && typeof raw.priceBookItemId === "string") {
             // Guardrail B: company ownership must be verifiable when linking to a price book item
             if (!derivedCompanyId) {
               return res.status(400).json({
                 message: "Cannot link to a price book item: company ownership could not be verified for this project",
               });
             }
-            const pbItem = await storage.getBudgetItem(item.priceBookItemId);
+            const pbItem = await storage.getBudgetItem(raw.priceBookItemId);
             if (!pbItem) {
               return res.status(400).json({ message: "Invalid priceBookItemId: item not found" });
             }
             if (pbItem.companyId !== derivedCompanyId) {
               return res.status(400).json({ message: "Access denied: priceBookItemId belongs to another company" });
             }
+            priceBookItemId = raw.priceBookItemId;
           }
+
+          sanitizedLineItems.push({
+            category: raw.category.trim(),
+            item: raw.item.trim(),
+            quantity: String(raw.quantity),
+            unit: raw.unit.trim(),
+            rate: String(raw.rate),
+            total: String(raw.total),
+            priceBookItemId,
+          });
         }
       }
 
       // All validations passed — safe to create records
       const estimate = await storage.createEstimate({ ...estimateData, companyId: derivedCompanyId });
 
-      if (lineItems && Array.isArray(lineItems)) {
-        for (const item of lineItems) {
-          await storage.createEstimateLineItem({
-            estimateId: estimate.id,
-            category: item.category,
-            item: item.item,
-            quantity: item.quantity,
-            unit: item.unit,
-            rate: item.rate,
-            total: item.total,
-            priceBookItemId: (item.priceBookItemId && typeof item.priceBookItemId === "string")
-              ? item.priceBookItemId
-              : null,
-          });
-        }
+      for (const item of sanitizedLineItems) {
+        await storage.createEstimateLineItem({
+          estimateId: estimate.id,
+          category: item.category,
+          item: item.item,
+          quantity: item.quantity,
+          unit: item.unit,
+          rate: item.rate,
+          total: item.total,
+          priceBookItemId: item.priceBookItemId,
+        });
       }
       
       if (estimate.projectId) {
