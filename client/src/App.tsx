@@ -145,10 +145,19 @@ function Router() {
 
   // Company Portal Routes (with Layout - shares contractor portal sidebar)
   if (location.startsWith("/company")) {
+    // Derive pathname without query params so /company/estimates?load=:id is handled correctly
+    const pathname = location.split("?")[0];
+    // Estimator is open to all internal company contractors (no subcontractor/notary contractorType)
+    const canAccessEstimator =
+      user?.role === "company_owner" ||
+      (user?.role === "contractor" && !!user?.isCompanyAdmin) ||
+      (user?.role === "contractor" && !!user?.companyId && !user?.contractorType);
+    // All other /company/* pages remain restricted to company_owner and isCompanyAdmin
     const canAccessCompany =
       user?.role === "company_owner" ||
       (user?.role === "contractor" && !!user?.isCompanyAdmin);
-    if (!authLoading && !canAccessCompany) {
+    const canAccess = pathname === "/company/estimates" ? canAccessEstimator : canAccessCompany;
+    if (!authLoading && !canAccess) {
       if (!user) {
         setLocation("/auth");
       } else if (user.role === "admin") {

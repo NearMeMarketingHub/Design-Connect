@@ -768,6 +768,26 @@ export async function registerRoutes(
     next();
   };
 
+  // Read-only access for internal company members (used for price book GET routes).
+  // Passes for: company_owner, regular internal contractors (companyId set, no
+  // subcontractor/notary contractorType), isCompanyAdmin contractors, and admin.
+  // Blocks: clients, subcontractors, notaries, unauthenticated users.
+  const requireInternalCompanyMember = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const user = req.user as User;
+    if (user.role === "admin") return next();
+    if (user.role === "company_owner") return next();
+    if (
+      user.role === "contractor" &&
+      user.companyId &&
+      user.contractorType !== "subcontractor" &&
+      user.contractorType !== "notary"
+    ) return next();
+    return res.status(403).json({ message: "Internal company member access required" });
+  };
+
   // Helper: verify caller is owner/admin of the target company
   const verifyCompanyAccess = async (req: any, res: any, companyId: string): Promise<boolean> => {
     const user = req.user as User;
@@ -4869,7 +4889,7 @@ export async function registerRoutes(
   // ── Company Price Book CRUD routes ────────────────────────────────────────────
   // Company owner/admin can manage their own price book
 
-  app.get("/api/company/price-book/categories", requireCompanyOwner, async (req, res, next) => {
+  app.get("/api/company/price-book/categories", requireInternalCompanyMember, async (req, res, next) => {
     try {
       const user = req.user as User;
       const companyId = user.companyId;
@@ -4915,7 +4935,7 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  app.get("/api/company/price-book/items", requireCompanyOwner, async (req, res, next) => {
+  app.get("/api/company/price-book/items", requireInternalCompanyMember, async (req, res, next) => {
     try {
       const user = req.user as User;
       const companyId = user.companyId;

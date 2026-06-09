@@ -99,17 +99,22 @@ export default function Estimator() {
     queryFn: () => apiRequest("GET", "/api/estimates").then((r) => r.json()),
   });
 
+  // Internal contractor: regular company team member (not a subcontractor or notary)
+  const isInternalContractor =
+    user?.role === "contractor" && !!user?.companyId && !user?.contractorType;
+
   const { data: company } = useQuery({
     queryKey: ["/api/company/mine"],
     queryFn: () => apiRequest("GET", "/api/company/mine").then((r) => r.json()),
-    enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
+    enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true || isInternalContractor,
   });
 
-  // Price book access: company_owner and authorized company admins only.
-  // Platform admins are deliberately excluded — they have no reliable companyId in the
-  // Estimator context, and the backend returns 400 when companyId is null. Enabling the
-  // query for `admin` would produce errors without providing any useful data.
-  const canAccessPriceBook = user?.role === "company_owner" || user?.isCompanyAdmin === true;
+  // Price book read access: company_owner, isCompanyAdmin contractors, and regular internal
+  // contractors with a companyId. Platform admins are deliberately excluded — they have no
+  // reliable companyId in the Estimator context and the backend returns 400 when companyId
+  // is null. Subcontractors and notaries are excluded by the isInternalContractor check.
+  const canAccessPriceBook =
+    user?.role === "company_owner" || user?.isCompanyAdmin === true || isInternalContractor;
 
   const {
     data: pbCategories = [],
