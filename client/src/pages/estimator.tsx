@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Plus, Trash2, Save, FileText, AlertTriangle, FolderOpen } from "lucide-react";
-import type { Project, Estimate, EstimateLineItem } from "@shared/schema";
+import { Loader2, Plus, Trash2, Save, FileText, AlertTriangle, FolderOpen, Search, BookOpen } from "lucide-react";
+import type { Project, Estimate, EstimateLineItem, BudgetCategory, BudgetItem } from "@shared/schema";
 
 type LineItem = {
   _id: number;
@@ -53,6 +53,13 @@ function statusVariant(status: string): "default" | "secondary" | "outline" | "d
   return "outline";
 }
 
+// Clamp a budget item's unitType to the allowed UNITS list; fall back to "EA"
+function clampUnit(unitType: string | null | undefined): string {
+  if (!unitType) return "EA";
+  const upper = unitType.toUpperCase();
+  return UNITS.includes(upper) ? upper : "EA";
+}
+
 export default function Estimator() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -68,6 +75,8 @@ export default function Estimator() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
+  // "manual" = existing entry form; "pricebook" = price book picker
+  const [addFormTab, setAddFormTab] = useState<"manual" | "pricebook">("manual");
   const [addForm, setAddForm] = useState({
     category: "Materials",
     item: "",
@@ -75,6 +84,10 @@ export default function Estimator() {
     unit: "EA",
     rate: "0",
   });
+
+  // Price book picker local state
+  const [pbSearch, setPbSearch] = useState("");
+  const [pbCategoryFilter, setPbCategoryFilter] = useState<string>("all");
 
   const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -91,6 +104,54 @@ export default function Estimator() {
     queryFn: () => apiRequest("GET", "/api/company/mine").then((r) => r.json()),
     enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
   });
+
+  // Price book access: company_owner and authorized company admins only.
+  // Platform admins are deliberately excluded — they have no reliable companyId in the
+  // Estimator context, and the backend returns 400 when companyId is null. Enabling the
+  // query for `admin` would produce errors without providing any useful data.
+  const canAccessPriceBook = user?.role === "company_owner" || user?.isCompanyAdmin === true;
+
+  const {
+    data: pbCategories = [],
+    isLoading: pbCategoriesLoading,
+    isError: pbCategoriesError,
+  } = useQuery<BudgetCategory[]>({
+    queryKey: ["/api/company/price-book/categories"],
+    queryFn: () => apiRequest("GET", "/api/company/price-book/categories").then((r) => r.json()),
+    enabled: canAccessPriceBook,
+  });
+
+  const {
+    data: pbItems = [],
+    isLoading: pbItemsLoading,
+    isError: pbItemsError,
+  } = useQuery<BudgetItem[]>({
+    queryKey: ["/api/company/price-book/items"],
+    queryFn: () => apiRequest("GET", "/api/company/price-book/items").then((r) => r.json()),
+    enabled: canAccessPriceBook,
+  });
+
+  // categoryId → category name lookup map
+  const categoryNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const cat of pbCategories) {
+      m.set(cat.id, cat.name);
+    }
+    return m;
+  }, [pbCategories]);
+
+  // Filtered price book items for the picker (only active items)
+  const filteredPbItems = useMemo(() => {
+    let items = pbItems.filter((i) => i.isActive !== false);
+    if (pbCategoryFilter && pbCategoryFilter !== "all") {
+      items = items.filter((i) => i.categoryId === pbCategoryFilter);
+    }
+    if (pbSearch.trim()) {
+      const q = pbSearch.trim().toLowerCase();
+      items = items.filter((i) => i.description.toLowerCase().includes(q));
+    }
+    return items;
+  }, [pbItems, pbSearch, pbCategoryFilter]);
 
   const isBlocked = company ? BLOCKED_STATUSES.has(company.subscriptionStatus ?? "") : false;
 
@@ -172,6 +233,40 @@ export default function Estimator() {
     setAddForm((f) => ({ ...f, item: "", quantity: "1", rate: "0" }));
   };
 
+  // Populate the manual form from a selected price book item, then switch to Manual tab.
+  //
+  // Field mapping rationale:
+  //   budget_items.description  → item        (the line item name shown to the client)
+  //   category name lookup      → category    (matched against CATEGORIES list; falls back to "Other")
+  //   budget_items.unitType     → unit        (clamped to UNITS; defaults to "EA")
+  //   budget_items.retailPrice  → rate        (customer-facing sell price — the correct field for
+  //                                            estimating. laborRate, materialFee, subRate, cost,
+  //                                            and burdens are internal cost components and are
+  //                                            intentionally not surfaced here.)
+  const handleSelectPriceBookItem = (pbItem: BudgetItem) => {
+    const categoryName = categoryNameMap.get(pbItem.categoryId) ?? "Other";
+    const mappedCategory = CATEGORIES.includes(categoryName) ? categoryName : "Other";
+    const unit = clampUnit(pbItem.unitType);
+    const rateNum = pbItem.retailPrice ? parseFloat(String(pbItem.retailPrice)) : 0;
+
+    setAddForm({
+      category: mappedCategory,
+      item: pbItem.description,
+      quantity: "1",
+      unit,
+      rate: isNaN(rateNum) ? "0" : String(rateNum),
+    });
+    setAddFormTab("manual");
+  };
+
+  // Close the add-item panel and fully reset picker state
+  const handleCloseAddForm = () => {
+    setShowAddForm(false);
+    setAddFormTab("manual");
+    setPbSearch("");
+    setPbCategoryFilter("all");
+  };
+
   const handleLoadEstimate = async (estimateId: string) => {
     try {
       const res = await apiRequest("GET", `/api/estimates/${estimateId}`);
@@ -191,7 +286,7 @@ export default function Estimator() {
       );
       setLineItemCounter(ctr);
       setLoadedEstimateId(estimateId);
-      setShowAddForm(false);
+      handleCloseAddForm();
       window.scrollTo({ top: 0, behavior: "smooth" });
       toast({ title: "Estimate loaded", description: `Loaded ${data.customId} — save to create a new copy.` });
     } catch (err) {
@@ -229,7 +324,7 @@ export default function Estimator() {
       setLineItems([]);
       setSelectedProjectId("");
       setLoadedEstimateId(null);
-      setShowAddForm(false);
+      handleCloseAddForm();
     } catch (err) {
       toast({ title: "Save failed", description: parseErrorMessage(err), variant: "destructive" });
     } finally {
@@ -241,11 +336,13 @@ export default function Estimator() {
     setLineItems([]);
     setSelectedProjectId("");
     setLoadedEstimateId(null);
-    setShowAddForm(false);
+    handleCloseAddForm();
     navigate("/company/estimates");
   };
 
   const addItemTotal = (parseFloat(addForm.quantity) || 0) * (parseFloat(addForm.rate) || 0);
+  const pbLoading = pbCategoriesLoading || pbItemsLoading;
+  const pbError = pbCategoriesError || pbItemsError;
 
   return (
     <div className="space-y-6">
@@ -365,7 +462,14 @@ export default function Estimator() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setShowAddForm((v) => !v)}
+                  onClick={() => {
+                    if (showAddForm) {
+                      handleCloseAddForm();
+                    } else {
+                      setShowAddForm(true);
+                      setAddFormTab("manual");
+                    }
+                  }}
                   data-testid="button-add-item"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -375,105 +479,247 @@ export default function Estimator() {
             </CardHeader>
             <CardContent className="p-0">
               {showAddForm && (
-                <div className="border-b p-4 bg-muted/30 space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-                    <div className="col-span-1 space-y-1">
-                      <Label className="text-xs text-muted-foreground">Category</Label>
-                      <Select
-                        value={addForm.category}
-                        onValueChange={(v) => setAddForm((f) => ({ ...f, category: v }))}
+                <div className="border-b bg-muted/30">
+                  {/* Tab switcher — only show "From Price Book" tab when user has access */}
+                  <div className="flex border-b" data-testid="add-item-tabs">
+                    <button
+                      className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                        addFormTab === "manual"
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                      onClick={() => setAddFormTab("manual")}
+                      data-testid="tab-manual"
+                    >
+                      Manual
+                    </button>
+                    {canAccessPriceBook && (
+                      <button
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
+                          addFormTab === "pricebook"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                        onClick={() => setAddFormTab("pricebook")}
+                        data-testid="tab-pricebook"
                       >
-                        <SelectTrigger className="h-8 text-sm" data-testid="input-add-category">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORIES.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2 space-y-1">
-                      <Label className="text-xs text-muted-foreground">Description</Label>
-                      <Input
-                        className="h-8 text-sm"
-                        placeholder="e.g. Framing labor"
-                        value={addForm.item}
-                        onChange={(e) => setAddForm((f) => ({ ...f, item: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === "Enter" && addForm.item.trim()) handleAddItem(); }}
-                        data-testid="input-add-item"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Qty</Label>
-                      <Input
-                        className="h-8 text-sm"
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={addForm.quantity}
-                        onChange={(e) => setAddForm((f) => ({ ...f, quantity: e.target.value }))}
-                        data-testid="input-add-quantity"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Unit</Label>
-                      <Select
-                        value={addForm.unit}
-                        onValueChange={(v) => setAddForm((f) => ({ ...f, unit: v }))}
-                      >
-                        <SelectTrigger className="h-8 text-sm" data-testid="input-add-unit">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNITS.map((u) => (
-                            <SelectItem key={u} value={u}>
-                              {u}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Rate ($)</Label>
-                      <Input
-                        className="h-8 text-sm"
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={addForm.rate}
-                        onChange={(e) => setAddForm((f) => ({ ...f, rate: e.target.value }))}
-                        data-testid="input-add-rate"
-                      />
-                    </div>
+                        <BookOpen className="w-3.5 h-3.5" />
+                        From Price Book
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">
-                      Total: <strong>{formatCurrency(addItemTotal)}</strong>
-                    </span>
-                    <div className="flex gap-2 ml-auto">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setShowAddForm(false)}
-                        data-testid="button-cancel-add-item"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleAddItem}
-                        disabled={!addForm.item.trim()}
-                        data-testid="button-confirm-add-item"
-                      >
-                        Add
-                      </Button>
+
+                  {/* ── Manual tab (existing form, unchanged) ── */}
+                  {addFormTab === "manual" && (
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                        <div className="col-span-1 space-y-1">
+                          <Label className="text-xs text-muted-foreground">Category</Label>
+                          <Select
+                            value={addForm.category}
+                            onValueChange={(v) => setAddForm((f) => ({ ...f, category: v }))}
+                          >
+                            <SelectTrigger className="h-8 text-sm" data-testid="input-add-category">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CATEGORIES.map((c) => (
+                                <SelectItem key={c} value={c}>
+                                  {c}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs text-muted-foreground">Description</Label>
+                          <Input
+                            className="h-8 text-sm"
+                            placeholder="e.g. Framing labor"
+                            value={addForm.item}
+                            onChange={(e) => setAddForm((f) => ({ ...f, item: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === "Enter" && addForm.item.trim()) handleAddItem(); }}
+                            data-testid="input-add-item"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Qty</Label>
+                          <Input
+                            className="h-8 text-sm"
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={addForm.quantity}
+                            onChange={(e) => setAddForm((f) => ({ ...f, quantity: e.target.value }))}
+                            data-testid="input-add-quantity"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Unit</Label>
+                          <Select
+                            value={addForm.unit}
+                            onValueChange={(v) => setAddForm((f) => ({ ...f, unit: v }))}
+                          >
+                            <SelectTrigger className="h-8 text-sm" data-testid="input-add-unit">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {UNITS.map((u) => (
+                                <SelectItem key={u} value={u}>
+                                  {u}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Rate ($)</Label>
+                          <Input
+                            className="h-8 text-sm"
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={addForm.rate}
+                            onChange={(e) => setAddForm((f) => ({ ...f, rate: e.target.value }))}
+                            data-testid="input-add-rate"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          Total: <strong>{formatCurrency(addItemTotal)}</strong>
+                        </span>
+                        <div className="flex gap-2 ml-auto">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleCloseAddForm}
+                            data-testid="button-cancel-add-item"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleAddItem}
+                            disabled={!addForm.item.trim()}
+                            data-testid="button-confirm-add-item"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* ── Price Book tab ── */}
+                  {addFormTab === "pricebook" && (
+                    <div className="p-4 space-y-3">
+                      {/* Search + category filter */}
+                      <div className="flex gap-2" data-testid="pb-controls">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                          <Input
+                            className="h-8 text-sm pl-8"
+                            placeholder="Search by item name…"
+                            value={pbSearch}
+                            onChange={(e) => setPbSearch(e.target.value)}
+                            data-testid="input-pb-search"
+                          />
+                        </div>
+                        {pbCategories.length > 0 && (
+                          <Select value={pbCategoryFilter} onValueChange={setPbCategoryFilter}>
+                            <SelectTrigger className="h-8 text-sm w-44 shrink-0" data-testid="select-pb-category">
+                              <SelectValue placeholder="All categories" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All categories</SelectItem>
+                              {pbCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id} data-testid={`option-pb-category-${cat.id}`}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+
+                      {/* Item list */}
+                      {pbLoading ? (
+                        <div className="flex justify-center py-8" data-testid="pb-loading">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : pbError ? (
+                        <div
+                          className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-5 text-center text-sm text-destructive"
+                          data-testid="pb-error"
+                        >
+                          <AlertTriangle className="w-4 h-4 mx-auto mb-1.5 opacity-70" />
+                          Could not load price book. Please try again.
+                        </div>
+                      ) : pbItems.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground" data-testid="pb-empty-no-items">
+                          <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-25" />
+                          <p className="font-medium">No price book items found.</p>
+                          <p className="text-xs mt-1 text-muted-foreground">
+                            Import or create price book items before using them in estimates.
+                          </p>
+                        </div>
+                      ) : filteredPbItems.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground" data-testid="pb-empty-no-matches">
+                          <Search className="w-6 h-6 mx-auto mb-2 opacity-25" />
+                          <p>No price book items match your search.</p>
+                        </div>
+                      ) : (
+                        <div
+                          className="overflow-y-auto rounded-md border divide-y max-h-56"
+                          data-testid="pb-item-list"
+                        >
+                          {filteredPbItems.map((pbItem) => {
+                            const catName = categoryNameMap.get(pbItem.categoryId) ?? "—";
+                            const unit = clampUnit(pbItem.unitType);
+                            const rate = pbItem.retailPrice ? parseFloat(String(pbItem.retailPrice)) : 0;
+                            return (
+                              <button
+                                key={pbItem.id}
+                                className="w-full text-left px-3 py-2.5 hover:bg-muted/60 transition-colors flex items-center gap-3"
+                                onClick={() => handleSelectPriceBookItem(pbItem)}
+                                data-testid={`pb-item-${pbItem.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{pbItem.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {catName}
+                                    <span className="mx-1.5 opacity-40">·</span>
+                                    {unit}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-sm font-medium tabular-nums">
+                                    {formatCurrency(isNaN(rate) ? 0 : rate)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">per {unit}</p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleCloseAddForm}
+                          data-testid="button-cancel-pb"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
               <Table>
                 <TableHeader>
                   <TableRow>
