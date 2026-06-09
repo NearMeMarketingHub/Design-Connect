@@ -1,0 +1,113 @@
+Phase 11G: Estimate line item validation hardening.
+
+Context:
+Phase 11F added `priceBookItemId` to estimate line items and now validates price book item ownership before creating an estimate. However, manual line item fields are still not fully pre-validated before `storage.createEstimate()` runs.
+
+Current risk:
+A malformed line item could theoretically fail during line item insertion after the estimate header has already been created, leaving a partial estimate record.
+
+Do not change BuildVision branding.
+Do not add schema changes.
+Do not add Stripe work.
+Do not add formulas.
+Do not add project budget tables.
+Do not add estimate editing.
+Do not change estimate totals or overhead/profit behavior.
+Do not change price book management.
+Do not expand subcontractor/notary functionality.
+
+Goal:
+Pre-validate all estimate line items before creating the estimate header so the route either fully succeeds or fails before any records are created.
+
+1. Update POST /api/estimates validation order.
+
+In server/routes.ts, inside POST /api/estimates:
+
+Current desired order should be:
+
+1. Parse request body with existing `createEstimateSchema`
+2. Verify estimate/project/company access as currently implemented
+3. Derive `companyId` as currently implemented
+4. Pre-validate every line item
+5. Validate every provided `priceBookItemId`
+6. Only after all validations pass, call `storage.createEstimate`
+7. Insert line items using explicit field whitelisting
+
+Do not call `storage.createEstimate` until all line items are validated.
+
+2. Validate line item shape before creating estimate.
+
+For each line item in `lineItems`, validate:
+
+* `category` is a non-empty string
+* `item` is a non-empty string
+* `quantity` is numeric and greater than 0
+* `unit` is a non-empty string
+* `rate` is numeric and greater than or equal to 0
+* `total` is numeric and greater than or equal to 0
+
+Accept numeric strings if the current app sends numbers as strings.
+
+Reject invalid line items with HTTP 400 and a clear message, such as:
+
+* “Line item 1: item description is required”
+* “Line item 2: quantity must be greater than 0”
+* “Line item 3: rate must be greater than or equal to 0”
+
+3. Validate calculated total consistency lightly.
+
+Do not introduce strict penny-perfect math that could break decimal/string behavior.
+
+But do a reasonable sanity check:
+
+* calculated total = quantity * rate
+* allow small rounding tolerance, such as 0.01
+* if provided total is wildly different, return 400:
+  “Line item 2: total does not match quantity × rate”
+
+If this is risky due existing decimal behavior, document and skip strict total validation, but still validate presence and numeric values.
+
+4. Keep priceBookItemId validation from Phase 11F.
+
+Preserve the existing Phase 11F validation:
+
+* if `priceBookItemId` is provided, `derivedCompanyId` must be known
+* price book item must exist
+* price book item must belong to `derivedCompanyId`
+* invalid or cross-company IDs return 400 before estimate creation
+
+5. Use sanitized line items.
+
+Create a sanitized/validated line item array before creating the estimate.
+
+Each sanitized line item should include only:
+
+* category
+* item
+* quantity
+* unit
+* rate
+* total
+* priceBookItemId
+
+Then after `storage.createEstimate`, insert only the sanitized fields plus `estimateId`.
+
+Do not spread raw client line item objects into the database.
+
+6. Preserve existing behavior.
+
+Manual line items should still work.
+Price-book-sourced line items should still work.
+Existing estimate save flow should still work.
+Estimator UI should not need changes unless TypeScript requires it.
+Loaded estimates should still work.
+Sales Dashboard should still work.
+Recent Financial Activity should still work.
+
+7. Keep this focused.
+
+Do not add transactions in this patch unless Replit determines it is simpler/safer.
+Do not add estimate editing.
+Do not add project budget tables.
+Do not add formulas.
+Do not change frontend validation unless needed for compile compatibility.
