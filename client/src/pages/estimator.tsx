@@ -488,7 +488,7 @@ export default function Estimator() {
                           ? "border-primary text-primary"
                           : "border-transparent text-muted-foreground hover:text-foreground"
                       }`}
-                      onClick={() => setAddFormTab("manual")}
+                      onClick={() => { setAddFormTab("manual"); setPbSearch(""); setPbCategoryFilter("all"); }}
                       data-testid="tab-manual"
                     >
                       Manual
@@ -500,7 +500,7 @@ export default function Estimator() {
                             ? "border-primary text-primary"
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
-                        onClick={() => setAddFormTab("pricebook")}
+                        onClick={() => { setAddFormTab("pricebook"); setPbSearch(""); setPbCategoryFilter("all"); }}
                         data-testid="tab-pricebook"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
