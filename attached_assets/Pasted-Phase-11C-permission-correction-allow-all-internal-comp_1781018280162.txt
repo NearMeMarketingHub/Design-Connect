@@ -1,0 +1,123 @@
+Phase 11C permission correction: allow all internal company contractors to use Estimator/Quotes.
+
+Context:
+The Price Book is where company owners/company admins manage company pricing and imported budget sheet items.
+The Estimator/Quote system is where internal company users use those items to create estimates/quotes.
+
+Current issue:
+Estimator and the Price Book picker may be limited to company_owner or isCompanyAdmin users only.
+
+Desired model:
+
+* All internal contractors/team members within the same company should be able to access and use the Estimator/Quote system.
+* All internal contractors/team members within the same company should be able to read price book items inside the Estimator.
+* Only company_owner and company admins should manage/edit/import Price Book items.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add schema changes.
+Do not add formulas.
+Do not change estimate save payload.
+Do not build new Price Book management UI.
+Do not expand subcontractor/notary functionality.
+
+1. Define Estimator/Quote access.
+
+Allow these users to access /company/estimates and quote/estimator functionality:
+
+* company_owner
+* contractor users with companyId
+* company admins with companyId
+
+Block:
+
+* clients
+* subcontractors
+* notaries
+* users without companyId
+* users from another company
+* unauthenticated users
+
+2. Allow read-only Price Book access for Estimator users.
+
+The Estimator’s “From Price Book” picker should be available to internal company contractors/team members.
+
+Update read-only price book GET routes if needed:
+
+* GET /api/company/price-book/categories
+* GET /api/company/price-book/items
+
+Allowed for these GET routes:
+
+* company_owner
+* contractor users with companyId
+* company admins with companyId
+
+Blocked:
+
+* clients
+* subcontractors
+* notaries
+* users without companyId
+* users from another company
+
+These routes must continue filtering strictly by req.user.companyId.
+
+3. Keep Price Book management restricted.
+
+Do not expand write/manage access.
+
+These should remain company_owner/company admin only:
+
+* create price book categories
+* edit price book categories
+* delete price book categories
+* create price book items
+* edit price book items
+* delete price book items
+* import/bulk upload price book items
+* any price book management settings
+
+Regular contractors can use price book items in estimates, but cannot manage the company price book.
+
+4. Update frontend Estimator picker permissions.
+
+In client/src/pages/estimator.tsx:
+
+* update canAccessPriceBook to allow internal company contractors/team members with companyId
+* keep clients, subcontractors, notaries, and users without companyId blocked
+* keep platform admins excluded unless they are in a true company context through View As
+
+5. Review /company route guard carefully.
+
+If App.tsx currently blocks regular internal contractors from /company/estimates:
+
+* update the route guard so regular internal contractors with companyId can access /company/estimates
+
+Do not open all /company/* pages globally.
+
+Keep restricted pages protected, such as:
+
+* Billing & Access payment controls
+* Price Book management/import tools
+* Accounting/invoice management, unless already intended
+* Company admin settings
+* Super Admin pages
+
+6. Preserve estimate security.
+
+POST /api/estimates must still:
+
+* require projectId
+* verify the project belongs to the user’s company
+* save companyId server-side
+* block inactive company access
+* block clients/subcontractors/notaries
+* prevent cross-company access
+
+7. Keep this focused.
+
+Do not add new estimator features.
+Do not add price book edit features.
+Do not add overhead/burden/margin formulas.
+Do not add production sheet/reporting features.
