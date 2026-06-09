@@ -83,6 +83,7 @@ export default function Estimator() {
     quantity: "1",
     unit: "EA",
     rate: "0",
+    priceBookItemId: undefined as string | undefined,
   });
 
   // Price book picker local state
@@ -232,10 +233,10 @@ export default function Estimator() {
     const total = qty * rate;
     setLineItems((prev) => [
       ...prev,
-      { _id: lineItemCounter, category: addForm.category || "Other", item: addForm.item, quantity: qty, unit: addForm.unit, rate, total },
+      { _id: lineItemCounter, category: addForm.category || "Other", item: addForm.item, quantity: qty, unit: addForm.unit, rate, total, priceBookItemId: addForm.priceBookItemId ?? null },
     ]);
     setLineItemCounter((c) => c + 1);
-    setAddForm((f) => ({ ...f, item: "", quantity: "1", rate: "0" }));
+    setAddForm((f) => ({ ...f, item: "", quantity: "1", rate: "0", priceBookItemId: undefined }));
   };
 
   // Populate the manual form from a selected price book item, then switch to Manual tab.
@@ -260,6 +261,7 @@ export default function Estimator() {
       quantity: "1",
       unit,
       rate: isNaN(rateNum) ? "0" : String(rateNum),
+      priceBookItemId: pbItem.id,
     });
     setAddFormTab("manual");
   };
@@ -287,6 +289,7 @@ export default function Estimator() {
           unit: li.unit,
           rate: parseFloat(String(li.rate)),
           total: parseFloat(String(li.total)),
+          priceBookItemId: li.priceBookItemId ?? null,
         }))
       );
       setLineItemCounter(ctr);
@@ -321,6 +324,7 @@ export default function Estimator() {
           unit: li.unit,
           rate: String(li.rate),
           total: String(li.total),
+          priceBookItemId: li.priceBookItemId ?? null,
         })),
       };
       await apiRequest("POST", "/api/estimates", payload);

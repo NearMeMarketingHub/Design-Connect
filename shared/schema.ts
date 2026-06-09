@@ -150,6 +150,7 @@ export const estimateLineItems = pgTable("estimate_line_items", {
   unit: text("unit").notNull(),
   rate: numeric("rate").notNull(),
   total: numeric("total").notNull(),
+  priceBookItemId: varchar("price_book_item_id").references(() => budgetItems.id),
 });
 
 export const insertEstimateLineItemSchema = createInsertSchema(estimateLineItems).omit({ id: true });

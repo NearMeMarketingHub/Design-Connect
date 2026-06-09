@@ -2581,13 +2581,45 @@ export async function registerRoutes(
           console.warn(`[create estimate] admin: failed to derive companyId for project ${estimateData.projectId}:`, err);
         }
       }
+
+      // Guardrail A+B: validate ALL priceBookItemIds before creating any records.
+      // A bad priceBookItemId must never produce a partial estimate in the database.
+      if (lineItems && Array.isArray(lineItems)) {
+        for (const item of lineItems) {
+          if (item.priceBookItemId && typeof item.priceBookItemId === "string") {
+            // Guardrail B: company ownership must be verifiable when linking to a price book item
+            if (!derivedCompanyId) {
+              return res.status(400).json({
+                message: "Cannot link to a price book item: company ownership could not be verified for this project",
+              });
+            }
+            const pbItem = await storage.getBudgetItem(item.priceBookItemId);
+            if (!pbItem) {
+              return res.status(400).json({ message: "Invalid priceBookItemId: item not found" });
+            }
+            if (pbItem.companyId !== derivedCompanyId) {
+              return res.status(400).json({ message: "Access denied: priceBookItemId belongs to another company" });
+            }
+          }
+        }
+      }
+
+      // All validations passed — safe to create records
       const estimate = await storage.createEstimate({ ...estimateData, companyId: derivedCompanyId });
-      
+
       if (lineItems && Array.isArray(lineItems)) {
         for (const item of lineItems) {
           await storage.createEstimateLineItem({
-            ...item,
             estimateId: estimate.id,
+            category: item.category,
+            item: item.item,
+            quantity: item.quantity,
+            unit: item.unit,
+            rate: item.rate,
+            total: item.total,
+            priceBookItemId: (item.priceBookItemId && typeof item.priceBookItemId === "string")
+              ? item.priceBookItemId
+              : null,
           });
         }
       }
