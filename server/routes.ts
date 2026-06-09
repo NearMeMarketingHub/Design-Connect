@@ -2585,6 +2585,16 @@ export async function registerRoutes(
       // Pre-validate all line items before creating any records.
       // Combines field-shape validation (11G) with priceBookItemId ownership checks (11F).
       // A validation failure here prevents any records from being written.
+
+      // Strict numeric parser — rejects partial matches like "1abc", "Infinity",
+      // scientific notation, and empty strings that parseFloat() would silently accept.
+      const parseStrictFloat = (raw: unknown): number | null => {
+        const s = String(raw).trim();
+        if (!/^[+-]?\d+(\.\d+)?$/.test(s)) return null;
+        const n = Number(s);
+        return Number.isFinite(n) ? n : null;
+      };
+
       type SanitizedLineItem = {
         category: string;
         item: string;
@@ -2612,19 +2622,19 @@ export async function registerRoutes(
             return res.status(400).json({ message: `${label}: unit is required` });
           }
 
-          const qty = parseFloat(String(raw.quantity));
-          if (isNaN(qty) || qty <= 0) {
-            return res.status(400).json({ message: `${label}: quantity must be greater than 0` });
+          const qty = parseStrictFloat(raw.quantity);
+          if (qty === null || qty <= 0) {
+            return res.status(400).json({ message: `${label}: quantity must be a valid number greater than 0` });
           }
 
-          const rate = parseFloat(String(raw.rate));
-          if (isNaN(rate) || rate < 0) {
-            return res.status(400).json({ message: `${label}: rate must be greater than or equal to 0` });
+          const rate = parseStrictFloat(raw.rate);
+          if (rate === null || rate < 0) {
+            return res.status(400).json({ message: `${label}: rate must be a valid number greater than or equal to 0` });
           }
 
-          const total = parseFloat(String(raw.total));
-          if (isNaN(total) || total < 0) {
-            return res.status(400).json({ message: `${label}: total must be greater than or equal to 0` });
+          const total = parseStrictFloat(raw.total);
+          if (total === null || total < 0) {
+            return res.status(400).json({ message: `${label}: total must be a valid number greater than or equal to 0` });
           }
 
           // --- Total sanity check (tolerance 0.01 to allow floating-point rounding) ---
@@ -2652,13 +2662,14 @@ export async function registerRoutes(
             priceBookItemId = raw.priceBookItemId;
           }
 
+          // Store canonical normalized values — never echo raw client strings into the DB
           sanitizedLineItems.push({
             category: raw.category.trim(),
             item: raw.item.trim(),
-            quantity: String(raw.quantity),
+            quantity: String(qty),
             unit: raw.unit.trim(),
-            rate: String(raw.rate),
-            total: String(raw.total),
+            rate: String(rate),
+            total: String(total),
             priceBookItemId,
           });
         }
