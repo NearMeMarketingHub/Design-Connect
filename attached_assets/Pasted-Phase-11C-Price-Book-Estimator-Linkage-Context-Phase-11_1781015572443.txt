@@ -1,0 +1,181 @@
+Phase 11C: Price Book → Estimator Linkage.
+
+Context:
+Phase 11A audited the budgeting/expense system.
+Phase 11B added direct companyId fields to estimates, invoices, and recurring billing.
+The company price book/budget sheet import system already exists, and the Estimator now saves/loads real estimates.
+
+Now we need to connect the company price book to the Estimator so company users can add estimate line items from imported/created price book items instead of manually typing every item.
+
+Do not change BuildVision branding.
+Do not add Stripe automation.
+Do not build overhead formulas yet.
+Do not build production sheets.
+Do not build payout schedules.
+Do not build reports.
+Do not build Gantt/board views.
+Do not build permitting, selections, or EOD reporting.
+Do not expand subcontractor/notary functionality.
+Do not guess Avery/job-costing formulas.
+
+Goal:
+Allow company owners and authorized company admins/team members to search/select items from their company price book inside the Estimator and add them as estimate line items.
+
+1. Review existing price book code first.
+
+Inspect:
+
+* budget_categories
+* budget_items
+* company price book routes
+* price book import routes
+* price book storage methods
+* estimator page
+* estimate line item schema
+
+Likely files:
+
+* shared/schema.ts
+* server/routes.ts
+* server/storage.ts
+* client/src/pages/estimator.tsx
+* client/src/pages/company-dashboard.tsx
+* client/src/pages/budget-admin.tsx, if it exists
+
+2. Use company-scoped price book data.
+
+Estimator should only show price book items belonging to the logged-in user’s company.
+
+Company A must not see Company B’s:
+
+* categories
+* items
+* imported budget sheet data
+* product/service pricing
+
+Use existing company price book APIs if possible.
+
+Do not use global/platform budget items in the company Estimator unless they are intentionally available as templates and copied into the company’s own price book.
+
+3. Add price book search/select in Estimator.
+
+On /company/estimates, add a price book item picker near the line-item form.
+
+Minimum functionality:
+
+* search by item name/description
+* filter by category if categories are available
+* show item name
+* show category
+* show unit
+* show rate/price
+* show cost/sub-rate/burden if already available and useful
+
+When user selects a price book item:
+
+* populate item/description
+* populate category
+* populate unit
+* populate rate
+* allow user to adjust quantity
+* allow user to edit the line item before adding it to the estimate
+
+4. Keep manual line items.
+
+Do not remove the existing manual Add Item flow.
+
+Estimator should support:
+
+* adding line items manually
+* adding line items from price book
+
+5. Map price book fields to estimate line item fields.
+
+Use existing estimate_line_items fields:
+
+* category
+* item
+* quantity
+* unit
+* rate
+* total
+
+If price book fields have different names, map them carefully.
+
+Do not add new estimate line item columns in this phase unless absolutely required.
+
+6. Do not implement formulas yet.
+
+Do not calculate overhead, burden, margin, profit, Near Me 1%, commissions, or payouts in this phase.
+
+If budget_items has fields like:
+
+* burdens
+* subRate
+* cost
+* markup
+
+Do not invent business logic for them yet.
+
+For now:
+
+* use the selected item’s existing sell/rate/price field as the estimate line item rate
+* if unclear which field is the correct sell price, document the ambiguity and use the safest existing display price
+
+7. Add clean empty/loading/error states.
+
+If no price book items exist:
+
+* show “No price book items found.”
+* include helper text like “Import or create price book items before using them in estimates.”
+
+If search returns no matches:
+
+* show “No price book items match your search.”
+
+If price book fails to load:
+
+* show a clean error message.
+
+8. Preserve existing estimator behavior.
+
+Estimator should still:
+
+* require project selection
+* require at least one line item
+* save real estimates
+* load recent estimates
+* load estimates from /company/estimates?load=:id
+* show blocked company access message
+* use Billing & Access wording
+* post to existing /api/estimates endpoint
+
+9. Security requirements.
+
+Company users should only access their own company price book items.
+
+Allowed:
+
+* company_owner
+* authorized company admins/team members already allowed to use company financial tools
+
+Blocked:
+
+* clients
+* unrelated contractors
+* subcontractors
+* notaries
+* unauthenticated users
+
+Do not expose platform-wide admin budget routes to company users.
+
+10. Keep this phase focused.
+
+Do not build price book management UI unless already existing.
+Do not build budget sheet import changes.
+Do not build estimate templates.
+Do not build quote cloning.
+Do not build production sheets.
+Do not build reports.
+Do not build invoice generation from estimates.
+Do not add schema migrations unless required for TypeScript compatibility.
