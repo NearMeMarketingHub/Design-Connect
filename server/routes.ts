@@ -7282,6 +7282,12 @@ export async function registerRoutes(
     return Number.isFinite(n) ? n : null;
   };
 
+  // Allowed project budget status values
+  const BUDGET_STATUSES = ["draft", "active", "locked"] as const;
+  type BudgetStatus = typeof BUDGET_STATUSES[number];
+  const isValidBudgetStatus = (s: unknown): s is BudgetStatus =>
+    typeof s === "string" && (BUDGET_STATUSES as readonly string[]).includes(s);
+
   // Helper: resolve company isolation for a project-scoped budget route.
   // Returns the companyId that owns the project, or sends an error response and returns null.
   const resolveBudgetCompanyId = async (req: any, res: any, projectId: string): Promise<string | null> => {
@@ -7317,7 +7323,13 @@ export async function registerRoutes(
       if (res.headersSent) return;
 
       const result = await storage.getProjectBudgetWithItems(req.params.projectId);
-      res.json(result ?? null);
+      if (!result) return res.json(null);
+      // Defense-in-depth: verify returned budget companyId matches resolved project company
+      const callerUser = req.user as User;
+      if (callerUser.role !== "admin" && result.budget.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      res.json(result);
     } catch (error) {
       next(error);
     }
@@ -7343,7 +7355,7 @@ export async function registerRoutes(
         return res.status(409).json({ message: "A budget already exists for this project. Use PATCH to update it." });
       }
 
-      // Validate sourceEstimateId if provided — must belong to same company
+      // Validate sourceEstimateId if provided — must belong to same company AND this project
       let sourceEstimateId: string | null = null;
       const rawSourceEstimateId = req.body.sourceEstimateId;
       if (rawSourceEstimateId && typeof rawSourceEstimateId === "string") {
@@ -7352,16 +7364,25 @@ export async function registerRoutes(
         if (sourceEstimate.companyId !== companyId) {
           return res.status(403).json({ message: "sourceEstimateId: estimate belongs to another company" });
         }
+        if (sourceEstimate.projectId !== req.params.projectId) {
+          return res.status(400).json({ message: "sourceEstimateId: estimate must be linked to this project" });
+        }
         sourceEstimateId = rawSourceEstimateId;
       }
 
       const { title, status, notes } = req.body;
+
+      // Validate status allowlist
+      if (status !== undefined && !isValidBudgetStatus(status)) {
+        return res.status(400).json({ message: `status must be one of: ${BUDGET_STATUSES.join(", ")}` });
+      }
+
       const budget = await storage.createProjectBudget({
         projectId: req.params.projectId,
         companyId,
         sourceEstimateId,
         title: (title && typeof title === "string" && title.trim()) ? title.trim() : "Project Budget",
-        status: (status && typeof status === "string") ? status : "draft",
+        status: isValidBudgetStatus(status) ? status : "draft",
         totalEstimated: "0",
         totalActual: "0",
         notes: (notes && typeof notes === "string" && notes.trim()) ? notes.trim() : null,
@@ -7408,7 +7429,12 @@ export async function registerRoutes(
       const { title, status, notes } = req.body;
       const updateData: Record<string, any> = {};
       if (title !== undefined && typeof title === "string") updateData.title = title.trim();
-      if (status !== undefined && typeof status === "string") updateData.status = status;
+      if (status !== undefined) {
+        if (!isValidBudgetStatus(status)) {
+          return res.status(400).json({ message: `status must be one of: ${BUDGET_STATUSES.join(", ")}` });
+        }
+        updateData.status = status;
+      }
       if (notes !== undefined) updateData.notes = notes === null ? null : String(notes).trim();
 
       const oldStatus = budget.status;
