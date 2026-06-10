@@ -7396,6 +7396,9 @@ export async function registerRoutes(
           if (!li.item || !li.item.trim()) {
             return res.status(400).json({ message: `Line item ${n}: item description is required` });
           }
+          if (!li.unit || typeof li.unit !== "string" || !li.unit.trim()) {
+            return res.status(400).json({ message: `Line item ${n}: unit is required` });
+          }
           const qty = parseFloat(li.quantity ?? "0");
           const rate = parseFloat(li.rate ?? "0");
           const total = parseFloat(li.total ?? "0");
@@ -7425,7 +7428,7 @@ export async function registerRoutes(
           category: li.category,
           description: li.item,
           quantity: li.quantity,
-          unit: li.unit,
+          unit: li.unit.trim(),
           unitCostEstimated: li.rate,
           unitCostActual: null,
           totalEstimated: li.total,
