@@ -401,6 +401,7 @@ export interface IStorage {
   createProjectBudget(data: InsertProjectBudget): Promise<ProjectBudget>;
   updateProjectBudget(id: string, data: Partial<InsertProjectBudget>): Promise<ProjectBudget | undefined>;
   getProjectBudgetWithItems(projectId: string): Promise<{ budget: ProjectBudget; items: ProjectBudgetItem[] } | null>;
+  createBudgetFromEstimate(budgetData: InsertProjectBudget, items: InsertProjectBudgetItem[]): Promise<ProjectBudget>;
 
   // Project budget item methods
   getProjectBudgetItems(budgetId: string): Promise<ProjectBudgetItem[]>;
@@ -2663,6 +2664,24 @@ export class DatabaseStorage implements IStorage {
     if (!budget) return null;
     const items = await this.getProjectBudgetItems(budget.id);
     return { budget, items };
+  }
+
+  async createBudgetFromEstimate(budgetData: InsertProjectBudget, items: InsertProjectBudgetItem[]): Promise<ProjectBudget> {
+    return await db.transaction(async (tx) => {
+      // 1. Insert budget header (totalEstimated already computed by route handler)
+      const [budget] = await tx.insert(schema.projectBudgets).values(budgetData).returning();
+
+      // 2. Bulk insert all item snapshots — attach the real budgetId now that it exists
+      const itemsWithBudgetId = items.map(item => ({ ...item, budgetId: budget.id }));
+      await tx.insert(schema.projectBudgetItems).values(itemsWithBudgetId);
+
+      // 3. Update projects.budget to match totalEstimated — all through tx, not outer db
+      await tx.update(schema.projects)
+        .set({ budget: budgetData.totalEstimated })
+        .where(eq(schema.projects.id, budgetData.projectId));
+
+      return budget;
+    });
   }
 
   // ── Project Budget Item Methods ─────────────────────────────────────────────

@@ -7349,13 +7349,13 @@ export async function registerRoutes(
       if (res.headersSent) return;
       if (!companyId) return res.status(400).json({ message: "Could not determine company for this project" });
 
-      // Enforce one budget per project (belt-and-suspenders: DB also has unique constraint)
+      // Enforce one budget per project (pre-flight; DB unique constraint is the final guard)
       const existing = await storage.getProjectBudget(req.params.projectId);
       if (existing) {
-        return res.status(409).json({ message: "A budget already exists for this project. Use PATCH to update it." });
+        return res.status(409).json({ message: "This project already has a budget." });
       }
 
-      // Validate sourceEstimateId if provided — must belong to same company AND this project
+      // Validate sourceEstimateId — must belong to same company AND this project
       let sourceEstimateId: string | null = null;
       const rawSourceEstimateId = req.body.sourceEstimateId;
       if (rawSourceEstimateId && typeof rawSourceEstimateId === "string") {
@@ -7370,17 +7370,121 @@ export async function registerRoutes(
         sourceEstimateId = rawSourceEstimateId;
       }
 
-      const { title, status, notes } = req.body;
+      const { title, notes } = req.body;
+      let { status } = req.body;
 
       // Validate status allowlist
       if (status !== undefined && !isValidBudgetStatus(status)) {
         return res.status(400).json({ message: `status must be one of: ${BUDGET_STATUSES.join(", ")}` });
       }
 
+      // ── Copy-from-estimate workflow ──────────────────────────────────────────
+      if (sourceEstimateId) {
+        // 1. Fetch line items
+        const lineItems = await storage.getEstimateLineItems(sourceEstimateId);
+        if (!lineItems || lineItems.length === 0) {
+          return res.status(400).json({ message: "Source estimate has no line items." });
+        }
+
+        // 2. Validate every item before any write
+        for (let i = 0; i < lineItems.length; i++) {
+          const li = lineItems[i];
+          const n = i + 1;
+          if (!li.category || !li.category.trim()) {
+            return res.status(400).json({ message: `Line item ${n}: category is required` });
+          }
+          if (!li.item || !li.item.trim()) {
+            return res.status(400).json({ message: `Line item ${n}: item description is required` });
+          }
+          const qty = parseFloat(li.quantity ?? "0");
+          const rate = parseFloat(li.rate ?? "0");
+          const total = parseFloat(li.total ?? "0");
+          if (isNaN(qty) || qty <= 0) {
+            return res.status(400).json({ message: `Line item ${n}: quantity must be greater than 0` });
+          }
+          if (isNaN(rate) || rate < 0) {
+            return res.status(400).json({ message: `Line item ${n}: rate must be 0 or greater` });
+          }
+          if (isNaN(total) || total < 0) {
+            return res.status(400).json({ message: `Line item ${n}: total must be 0 or greater` });
+          }
+        }
+
+        // 3. Compute totalEstimated from items
+        const totalEstimated = lineItems
+          .reduce((sum, li) => sum + parseFloat(li.total ?? "0"), 0)
+          .toString();
+
+        // 4. Map estimate line items → budget item snapshots (budgetId filled in by storage)
+        const itemSnapshots = lineItems.map((li, idx) => ({
+          budgetId: "", // placeholder — storage.createBudgetFromEstimate replaces this
+          companyId,
+          projectId: req.params.projectId,
+          sourceEstimateItemId: li.id,
+          priceBookItemId: li.priceBookItemId ?? null,
+          category: li.category,
+          description: li.item,
+          quantity: li.quantity,
+          unit: li.unit,
+          unitCostEstimated: li.rate,
+          unitCostActual: null,
+          totalEstimated: li.total,
+          totalActual: "0",
+          notes: null,
+          displayOrder: idx,
+        }));
+
+        // 5. Build budget header — default status to "active" for estimate-sourced budgets
+        const resolvedStatus = isValidBudgetStatus(status) ? status : "active";
+        const budgetData = {
+          projectId: req.params.projectId,
+          companyId,
+          sourceEstimateId,
+          title: (title && typeof title === "string" && title.trim()) ? title.trim() : "Project Budget",
+          status: resolvedStatus,
+          totalEstimated,
+          totalActual: "0",
+          notes: (notes && typeof notes === "string" && notes.trim()) ? notes.trim() : null,
+        };
+
+        // 6. Atomic transaction: insert header + items + update projects.budget
+        let budget;
+        try {
+          budget = await storage.createBudgetFromEstimate(budgetData, itemSnapshots);
+        } catch (txErr: any) {
+          // Secondary guard: unique constraint violation means a concurrent insert beat us
+          if (txErr?.code === "23505") {
+            return res.status(409).json({ message: "This project already has a budget." });
+          }
+          throw txErr;
+        }
+
+        // 7. Audit after transaction commits — one event, no per-item spam
+        logAuditEvent(req, user, {
+          action: "project_budget_created",
+          entityType: "project_budget",
+          entityId: budget.id,
+          entityName: budget.title,
+          companyId,
+          projectId: req.params.projectId,
+          metadata: {
+            projectId: req.params.projectId,
+            budgetId: budget.id,
+            sourceEstimateId,
+            totalEstimated: budget.totalEstimated,
+            itemCount: lineItems.length,
+            status: budget.status,
+          },
+        });
+
+        return res.status(201).json(budget);
+      }
+
+      // ── Header-only workflow (no sourceEstimateId) ───────────────────────────
       const budget = await storage.createProjectBudget({
         projectId: req.params.projectId,
         companyId,
-        sourceEstimateId,
+        sourceEstimateId: null,
         title: (title && typeof title === "string" && title.trim()) ? title.trim() : "Project Budget",
         status: isValidBudgetStatus(status) ? status : "draft",
         totalEstimated: "0",
