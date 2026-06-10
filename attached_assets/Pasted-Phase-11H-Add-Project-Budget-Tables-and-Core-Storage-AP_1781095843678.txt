@@ -1,0 +1,269 @@
+Phase 11H: Add Project Budget Tables and Core Storage/API Foundation.
+
+Context:
+Phase 11E created PROJECT_BUDGET_PLAN.md.
+Phase 11F added priceBookItemId to estimate_line_items.
+Phase 11G hardened estimate line item validation.
+
+Now we need to add the foundational project budget tables and backend methods/routes so a project can have one active budget made up of budget line items.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add overhead/profit formulas.
+Do not add expenses or actual-cost tracking yet.
+Do not add production sheets.
+Do not add payout schedules.
+Do not add reports.
+Do not add Gantt/board views.
+Do not add permitting, selections, or EOD reporting.
+Do not add client-visible budget views.
+Do not expand subcontractor/notary functionality.
+Do not change estimator totals or formula behavior.
+
+Goal:
+Add `project_budgets` and `project_budget_items` tables, storage methods, and secure backend API routes. This phase does not need a full UI yet.
+
+1. Add schema tables.
+
+In shared/schema.ts, add:
+
+project_budgets:
+
+* id
+* projectId, FK to projects.id, unique
+* companyId, FK to companies.id
+* sourceEstimateId, nullable FK to estimates.id
+* title, default “Project Budget”
+* status, default “draft”
+* totalEstimated
+* totalActual, default 0
+* notes
+* createdAt
+* updatedAt
+
+project_budget_items:
+
+* id
+* budgetId, FK to project_budgets.id, cascade delete if supported
+* companyId, FK to companies.id
+* projectId, FK to projects.id
+* sourceEstimateItemId, nullable FK to estimate_line_items.id
+* priceBookItemId, nullable FK to budget_items.id
+* category
+* description
+* quantity
+* unit
+* unitCostEstimated
+* unitCostActual, nullable
+* totalEstimated
+* totalActual, default 0
+* notes
+* displayOrder, default 0
+* createdAt
+* updatedAt if consistent with app conventions
+
+Use naming/style consistent with existing Drizzle schema.
+
+2. Apply database changes.
+
+Use the project’s existing database push flow:
+
+npm run db:push
+
+No backfill is required in this phase because no project budgets exist yet.
+
+3. Add insert/select schemas and types.
+
+Add insert/select schemas and exported types for:
+
+* ProjectBudget
+* InsertProjectBudget
+* ProjectBudgetItem
+* InsertProjectBudgetItem
+
+Use the app’s existing type/export patterns.
+
+4. Add storage methods.
+
+Add storage interface + implementation methods:
+
+Budgets:
+
+* getProjectBudget(projectId: string)
+* getProjectBudgetById(id: string)
+* createProjectBudget(data)
+* updateProjectBudget(id, data)
+
+Budget items:
+
+* getProjectBudgetItems(budgetId: string)
+* createProjectBudgetItem(data)
+* updateProjectBudgetItem(id, data)
+* deleteProjectBudgetItem(id)
+
+If useful, add helper:
+
+* getProjectBudgetWithItems(projectId: string)
+
+Storage should always return companyId on budget records.
+
+5. Add API routes.
+
+Add routes:
+
+GET /api/projects/:projectId/budget
+
+* returns budget + items if present
+* allowed for users who can read estimates/project financials for that company
+* use requireEstimateAccess or equivalent
+* verify project belongs to user’s company
+* clients/subcontractors/notaries blocked
+* if no budget exists, return null/empty cleanly
+
+POST /api/projects/:projectId/budget
+
+* creates the project budget header
+* owner/admin only for now
+* requireCompanyOwner or equivalent company owner/company admin write permission
+* verify project belongs to user’s company
+* companyId must be derived server-side from the verified project/company ownership chain
+* never accept companyId from request body
+* enforce one budget per project
+* if budget already exists, return 409 with clear message
+
+PATCH /api/projects/:projectId/budget
+
+* updates budget header fields only, such as title/status/notes
+* owner/admin only
+* verify budget.companyId matches user company
+* do not allow changing companyId, projectId, or sourceEstimateId through request body
+
+POST /api/projects/:projectId/budget/items
+
+* adds a budget item
+* owner/admin only
+* verify project and budget belong to user’s company
+* companyId and projectId derived server-side
+* validate basic item fields
+* recalculate/update budget totalEstimated after adding
+
+PATCH /api/projects/:projectId/budget/items/:itemId
+
+* updates budget item
+* owner/admin only
+* verify item belongs to the project budget/company
+* do not allow changing companyId/projectId/budgetId through request body
+* recalculate/update budget totalEstimated after update
+
+DELETE /api/projects/:projectId/budget/items/:itemId
+
+* owner/admin only
+* verify item belongs to the project budget/company
+* delete item
+* recalculate/update budget totalEstimated after delete
+
+6. Access rules.
+
+Read:
+
+* admin
+* company_owner
+* company admins
+* internal company contractors with companyId and no contractorType
+
+Write:
+
+* company_owner
+* company admins
+* admin where support/admin behavior already exists
+
+Blocked:
+
+* clients
+* subcontractors
+* notaries
+* unauthenticated users
+* users from another company
+
+7. Validation rules.
+
+For project budget items, validate:
+
+* category is required
+* description is required
+* quantity > 0
+* unit is required
+* unitCostEstimated >= 0
+* totalEstimated >= 0
+* totalEstimated should reasonably match quantity × unitCostEstimated with small rounding tolerance
+
+Accept numeric strings if that matches existing numeric column behavior.
+
+8. Keep snapshot behavior.
+
+Budget items are snapshots.
+
+If priceBookItemId is present:
+
+* verify the price book item belongs to the same company
+* store the id for traceability only
+* do not dynamically update budget items when price book prices change
+
+If sourceEstimateItemId is present:
+
+* verify the source estimate item belongs to an estimate in the same company/project context
+
+9. Do not build estimate-to-budget copy yet.
+
+This phase adds the tables and core routes.
+
+Do not yet build:
+
+* “Create Budget from Estimate”
+* copying estimate line items into budget items
+* Budget tab UI
+* budget reports
+* expenses/actual cost tracking
+
+Those come in the next phase.
+
+10. Audit logging.
+
+Add audit logs for budget actions if the audit helper is already easy to use:
+
+* project_budget_created
+* project_budget_updated
+* project_budget_item_created
+* project_budget_item_updated
+* project_budget_item_deleted
+
+Include safe metadata:
+
+* projectId
+* budgetId
+* item count or item description
+* totalEstimated
+* old/new status where applicable
+
+If audit logging makes this phase too large, add TODOs and keep the routes secure.
+
+11. TypeScript/build check.
+
+Run:
+
+npm run check
+
+Also run db push:
+
+npm run db:push
+
+Done looks like:
+
+* new tables exist
+* db push succeeds
+* npm run check passes
+* project budget routes exist and are company-scoped
+* no UI changes
+* no formulas
+* no reports
+* no estimate-to-budget copy workflow yet
