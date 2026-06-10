@@ -2545,7 +2545,9 @@ export class DatabaseStorage implements IStorage {
       .offset(offset);
 
     // Enrich with company name
-    const companyIds = [...new Set(rows.map(r => r.companyId).filter(Boolean))] as string[];
+    const companyIds = Array.from(
+      new Set(rows.map(r => r.companyId).filter((id): id is string => Boolean(id)))
+    );
     let companyNameMap: Map<string, string> = new Map();
     if (companyIds.length > 0) {
       const comps = await db.select({ id: schema.companies.id, name: schema.companies.name })

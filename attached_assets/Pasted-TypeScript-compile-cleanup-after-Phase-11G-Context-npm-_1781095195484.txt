@@ -1,0 +1,103 @@
+TypeScript compile cleanup after Phase 11G.
+
+Context:
+`npm run check` currently fails with four TypeScript errors. Fix only these compile errors. Do not change business logic, permissions, schemas, routes, formulas, Stripe, estimator behavior, or UI.
+
+Errors to fix:
+
+1. server/routes.ts:2027 — project result has no `companyId`
+
+2. server/routes.ts:2070 and 2126 — Passport `req.logIn` options missing `session`
+
+3. server/storage.ts:2548 — Set spread requires downlevelIteration / ES2015 target
+
+4. Fix admin View As user enrichment company lookup.
+
+In `server/routes.ts`, inside `GET /api/admin/view-as/users`, do not read `clientProjects[0].companyId`.
+
+Projects do not have direct `companyId` in that typed result. Company should be derived through:
+
+`project.contractorId → user.companyId`
+
+Create a lookup map from `allUsers`:
+
+```ts
+const userCompanyById = new Map(allUsers.map((u: any) => [u.id, u.companyId ?? null]));
+```
+
+Then for client project company derivation, replace:
+
+```ts
+relatedCompanyId = clientProjects[0].companyId ?? null;
+```
+
+with logic like:
+
+```ts
+const firstProjectContractorId = clientProjects[0]?.contractorId ?? null;
+relatedCompanyId = firstProjectContractorId ? (userCompanyById.get(firstProjectContractorId) ?? null) : null;
+```
+
+Also review the company-owner project count in the same block. If it uses `p.companyId`, replace that with contractor/company lookup too:
+
+```ts
+projectCount = allProjects.filter((p: any) => {
+  const projectCompanyId = p.contractorId ? userCompanyById.get(p.contractorId) : null;
+  return projectCompanyId === relatedCompanyId;
+}).length;
+```
+
+Do not add a direct `companyId` assumption to project records.
+
+2. Fix `req.logIn` TypeScript options.
+
+In `server/routes.ts`, search all calls using:
+
+```ts
+{ keepSessionInfo: true }
+```
+
+Update them to include `session: true`:
+
+```ts
+{ session: true, keepSessionInfo: true }
+```
+
+Known locations include the View As timeout restore, View As start, and View As exit areas.
+
+Do not change View As behavior. This is TypeScript-only compatibility with Passport’s `LogInOptions`.
+
+3. Fix Set spread in audit log company IDs.
+
+In `server/storage.ts`, replace:
+
+```ts
+const companyIds = [...new Set(rows.map(r => r.companyId).filter(Boolean))] as string[];
+```
+
+with an `Array.from` version that does not require Set iteration:
+
+```ts
+const companyIds = Array.from(
+  new Set(rows.map(r => r.companyId).filter((id): id is string => Boolean(id)))
+);
+```
+
+Do not change audit log filtering behavior.
+
+4. Run TypeScript check.
+
+After the patch, run:
+
+```bash
+npm run check
+```
+
+Done looks like:
+
+* `npm run check` passes
+* No schema changes
+* No db:push needed
+* No estimator logic changes
+* No route permission changes
+* No Stripe/billing changes

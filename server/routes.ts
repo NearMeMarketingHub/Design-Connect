@@ -143,7 +143,7 @@ export async function registerRoutes(
         delete session.adminData;
         if (adminUser) {
           await new Promise<void>((resolve) => {
-            req.logIn(adminUser, { keepSessionInfo: true }, () => resolve());
+            req.logIn(adminUser, { session: true, keepSessionInfo: true }, () => resolve());
           });
         }
         session.viewAsExpired = true;
@@ -2011,6 +2011,9 @@ export async function registerRoutes(
         );
       }
 
+      // Map userId → companyId for contractor-based company derivation (projects have no direct companyId)
+      const userCompanyById = new Map(allUsers.map((u: any) => [u.id, u.companyId ?? null]));
+
       // Enrich each user with company name and project count
       const enriched = filtered.map((user: any) => {
         const { password: _, ...u } = user;
@@ -2019,12 +2022,16 @@ export async function registerRoutes(
         let projectCount = 0;
 
         if (u.role === "company_owner") {
-          projectCount = allProjects.filter((p: any) => p.companyId === relatedCompanyId).length;
+          projectCount = allProjects.filter((p: any) => {
+            const projectCompanyId = p.contractorId ? userCompanyById.get(p.contractorId) : null;
+            return projectCompanyId === relatedCompanyId;
+          }).length;
         } else if (u.role === "client") {
           const clientProjects = allProjects.filter((p: any) => p.clientId === u.id);
           projectCount = clientProjects.length;
           if (!relatedCompanyId && clientProjects.length > 0) {
-            relatedCompanyId = clientProjects[0].companyId ?? null;
+            const firstProjectContractorId = clientProjects[0]?.contractorId ?? null;
+            relatedCompanyId = firstProjectContractorId ? (userCompanyById.get(firstProjectContractorId) ?? null) : null;
             relatedCompanyName = relatedCompanyId ? (companyMap.get(relatedCompanyId) ?? null) : null;
           }
         }
@@ -2067,7 +2074,7 @@ export async function registerRoutes(
 
       // Swap Passport session to viewed user, keeping existing session data (adminData)
       await new Promise<void>((resolve, reject) => {
-        req.logIn(target, { keepSessionInfo: true }, (err: any) => { if (err) reject(err); else resolve(); });
+        req.logIn(target, { session: true, keepSessionInfo: true }, (err: any) => { if (err) reject(err); else resolve(); });
       });
 
       logAuditEvent(req, admin, {
@@ -2123,7 +2130,7 @@ export async function registerRoutes(
       // Restore admin session; delete adminData first, then swap
       delete session.adminData;
       await new Promise<void>((resolve, reject) => {
-        req.logIn(admin, { keepSessionInfo: true }, (err: any) => { if (err) reject(err); else resolve(); });
+        req.logIn(admin, { session: true, keepSessionInfo: true }, (err: any) => { if (err) reject(err); else resolve(); });
       });
 
       const { password: _, ...adminWithoutPassword } = admin;
