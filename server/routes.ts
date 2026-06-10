@@ -7273,5 +7273,415 @@ export async function registerRoutes(
     }
   });
 
+  // ── Project Budget Routes ─────────────────────────────────────────────────────
+  // Strict numeric parser — rejects "1abc", "Infinity", scientific notation
+  const parseStrictBudgetFloat = (raw: unknown): number | null => {
+    const s = String(raw).trim();
+    if (!/^[+-]?\d+(\.\d+)?$/.test(s)) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Helper: resolve company isolation for a project-scoped budget route.
+  // Returns the companyId that owns the project, or sends an error response and returns null.
+  const resolveBudgetCompanyId = async (req: any, res: any, projectId: string): Promise<string | null> => {
+    const user = req.user as User;
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      res.status(404).json({ message: "Project not found" });
+      return null;
+    }
+    if (user.role === "admin") {
+      const contractor = project.contractorId ? await storage.getUser(project.contractorId) : null;
+      return contractor?.companyId ?? null;
+    }
+    if (!user.companyId) {
+      res.status(403).json({ message: "Access denied" });
+      return null;
+    }
+    const contractor = project.contractorId ? await storage.getUser(project.contractorId) : null;
+    if (!contractor || contractor.companyId !== user.companyId) {
+      res.status(403).json({ message: "Access denied" });
+      return null;
+    }
+    return user.companyId;
+  };
+
+  // GET /api/projects/:projectId/budget
+  // Returns { budget, items } or null. Allowed: admin, company_owner, company admin, internal contractor.
+  // Blocked: clients, subcontractors, notaries (enforced by requireEstimateAccess).
+  app.get("/api/projects/:projectId/budget", requireAuth, requireEstimateAccess, async (req, res, next) => {
+    try {
+      const companyId = await resolveBudgetCompanyId(req, res, req.params.projectId);
+      if (companyId === null && !res.headersSent) return res.status(403).json({ message: "Access denied" });
+      if (res.headersSent) return;
+
+      const result = await storage.getProjectBudgetWithItems(req.params.projectId);
+      res.json(result ?? null);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/projects/:projectId/budget
+  // Creates the budget header. One budget per project (enforced at DB level via unique constraint).
+  app.post("/api/projects/:projectId/budget", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const companyId = await resolveBudgetCompanyId(req, res, req.params.projectId);
+      if (companyId === null && !res.headersSent) return res.status(403).json({ message: "Access denied" });
+      if (res.headersSent) return;
+      if (!companyId) return res.status(400).json({ message: "Could not determine company for this project" });
+
+      // Enforce one budget per project (belt-and-suspenders: DB also has unique constraint)
+      const existing = await storage.getProjectBudget(req.params.projectId);
+      if (existing) {
+        return res.status(409).json({ message: "A budget already exists for this project. Use PATCH to update it." });
+      }
+
+      // Validate sourceEstimateId if provided — must belong to same company
+      let sourceEstimateId: string | null = null;
+      const rawSourceEstimateId = req.body.sourceEstimateId;
+      if (rawSourceEstimateId && typeof rawSourceEstimateId === "string") {
+        const sourceEstimate = await storage.getEstimate(rawSourceEstimateId);
+        if (!sourceEstimate) return res.status(400).json({ message: "sourceEstimateId: estimate not found" });
+        if (sourceEstimate.companyId !== companyId) {
+          return res.status(403).json({ message: "sourceEstimateId: estimate belongs to another company" });
+        }
+        sourceEstimateId = rawSourceEstimateId;
+      }
+
+      const { title, status, notes } = req.body;
+      const budget = await storage.createProjectBudget({
+        projectId: req.params.projectId,
+        companyId,
+        sourceEstimateId,
+        title: (title && typeof title === "string" && title.trim()) ? title.trim() : "Project Budget",
+        status: (status && typeof status === "string") ? status : "draft",
+        totalEstimated: "0",
+        totalActual: "0",
+        notes: (notes && typeof notes === "string" && notes.trim()) ? notes.trim() : null,
+      });
+
+      logAuditEvent(req, user, {
+        action: "project_budget_created",
+        entityType: "project_budget",
+        entityId: budget.id,
+        entityName: budget.title,
+        companyId,
+        projectId: req.params.projectId,
+        metadata: {
+          projectId: req.params.projectId,
+          budgetId: budget.id,
+          totalEstimated: budget.totalEstimated,
+          status: budget.status,
+        },
+      });
+
+      res.status(201).json(budget);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PATCH /api/projects/:projectId/budget
+  // Updates budget header fields: title, status, notes.
+  app.patch("/api/projects/:projectId/budget", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const budget = await storage.getProjectBudget(req.params.projectId);
+      if (!budget) return res.status(404).json({ message: "Budget not found for this project" });
+
+      // Verify company ownership
+      if (user.role !== "admin" && (!user.companyId || budget.companyId !== user.companyId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { title, status, notes } = req.body;
+      const updateData: Record<string, any> = {};
+      if (title !== undefined && typeof title === "string") updateData.title = title.trim();
+      if (status !== undefined && typeof status === "string") updateData.status = status;
+      if (notes !== undefined) updateData.notes = notes === null ? null : String(notes).trim();
+
+      const oldStatus = budget.status;
+      const updated = await storage.updateProjectBudget(budget.id, updateData);
+      if (!updated) return res.status(404).json({ message: "Budget not found" });
+
+      logAuditEvent(req, user, {
+        action: "project_budget_updated",
+        entityType: "project_budget",
+        entityId: budget.id,
+        entityName: updated.title,
+        companyId: budget.companyId,
+        projectId: req.params.projectId,
+        metadata: {
+          projectId: req.params.projectId,
+          budgetId: budget.id,
+          totalEstimated: updated.totalEstimated,
+          oldStatus,
+          newStatus: updated.status,
+        },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /api/projects/:projectId/budget/items
+  // Adds a budget line item with strict numeric validation.
+  app.post("/api/projects/:projectId/budget/items", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const budget = await storage.getProjectBudget(req.params.projectId);
+      if (!budget) return res.status(404).json({ message: "Budget not found for this project. Create a budget first." });
+
+      if (user.role !== "admin" && (!user.companyId || budget.companyId !== user.companyId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const body = req.body;
+
+      // String field validation
+      if (!body.category || typeof body.category !== "string" || !body.category.trim()) {
+        return res.status(400).json({ message: "category is required" });
+      }
+      if (!body.description || typeof body.description !== "string" || !body.description.trim()) {
+        return res.status(400).json({ message: "description is required" });
+      }
+      if (!body.unit || typeof body.unit !== "string" || !body.unit.trim()) {
+        return res.status(400).json({ message: "unit is required" });
+      }
+
+      // Strict numeric validation
+      const qty = parseStrictBudgetFloat(body.quantity);
+      if (qty === null || qty <= 0) {
+        return res.status(400).json({ message: "quantity must be a valid positive number" });
+      }
+      const unitCostEstimated = parseStrictBudgetFloat(body.unitCostEstimated);
+      if (unitCostEstimated === null || unitCostEstimated < 0) {
+        return res.status(400).json({ message: "unitCostEstimated must be a valid non-negative number" });
+      }
+      const totalEstimated = parseStrictBudgetFloat(body.totalEstimated);
+      if (totalEstimated === null || totalEstimated < 0) {
+        return res.status(400).json({ message: "totalEstimated must be a valid non-negative number" });
+      }
+      if (Math.abs(totalEstimated - qty * unitCostEstimated) > 0.01) {
+        return res.status(400).json({ message: "totalEstimated does not match quantity × unitCostEstimated" });
+      }
+
+      // priceBookItemId — verify ownership
+      let priceBookItemId: string | null = null;
+      if (body.priceBookItemId && typeof body.priceBookItemId === "string") {
+        const pbItem = await storage.getBudgetItem(body.priceBookItemId);
+        if (!pbItem) return res.status(400).json({ message: "priceBookItemId: item not found" });
+        if (pbItem.companyId !== budget.companyId) {
+          return res.status(403).json({ message: "priceBookItemId: item belongs to another company" });
+        }
+        priceBookItemId = body.priceBookItemId;
+      }
+
+      // sourceEstimateItemId — verify it belongs to same company and project
+      let sourceEstimateItemId: string | null = null;
+      if (body.sourceEstimateItemId && typeof body.sourceEstimateItemId === "string") {
+        const lineItem = await storage.getEstimateLineItem(body.sourceEstimateItemId);
+        if (!lineItem) return res.status(400).json({ message: "sourceEstimateItemId: estimate line item not found" });
+        const parentEstimate = await storage.getEstimate(lineItem.estimateId);
+        if (!parentEstimate || parentEstimate.companyId !== budget.companyId) {
+          return res.status(403).json({ message: "sourceEstimateItemId: estimate belongs to another company" });
+        }
+        if (parentEstimate.projectId && parentEstimate.projectId !== req.params.projectId) {
+          return res.status(403).json({ message: "sourceEstimateItemId: estimate belongs to a different project" });
+        }
+        sourceEstimateItemId = body.sourceEstimateItemId;
+      }
+
+      const item = await storage.createProjectBudgetItem({
+        budgetId: budget.id,
+        companyId: budget.companyId,
+        projectId: req.params.projectId,
+        sourceEstimateItemId,
+        priceBookItemId,
+        category: body.category.trim(),
+        description: body.description.trim(),
+        quantity: String(qty),
+        unit: body.unit.trim(),
+        unitCostEstimated: String(unitCostEstimated),
+        unitCostActual: null,
+        totalEstimated: String(totalEstimated),
+        totalActual: "0",
+        notes: (body.notes && typeof body.notes === "string") ? body.notes.trim() : null,
+        displayOrder: typeof body.displayOrder === "number" ? body.displayOrder : 0,
+      });
+
+      await storage.recalculateBudgetTotal(budget.id);
+      const updatedBudget = await storage.getProjectBudgetById(budget.id);
+
+      logAuditEvent(req, user, {
+        action: "project_budget_item_created",
+        entityType: "project_budget",
+        entityId: budget.id,
+        entityName: budget.title,
+        companyId: budget.companyId,
+        projectId: req.params.projectId,
+        metadata: {
+          projectId: req.params.projectId,
+          budgetId: budget.id,
+          itemDescription: item.description,
+          category: item.category,
+          totalEstimated: updatedBudget?.totalEstimated ?? budget.totalEstimated,
+        },
+      });
+
+      res.status(201).json(item);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PATCH /api/projects/:projectId/budget/items/:itemId
+  // Updates a budget line item with strict numeric validation.
+  app.patch("/api/projects/:projectId/budget/items/:itemId", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const budget = await storage.getProjectBudget(req.params.projectId);
+      if (!budget) return res.status(404).json({ message: "Budget not found for this project" });
+
+      if (user.role !== "admin" && (!user.companyId || budget.companyId !== user.companyId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Verify item belongs to this budget
+      const items = await storage.getProjectBudgetItems(budget.id);
+      const existingItem = items.find(i => i.id === req.params.itemId);
+      if (!existingItem) return res.status(404).json({ message: "Budget item not found" });
+
+      const body = req.body;
+      const updateData: Record<string, any> = {};
+
+      if (body.category !== undefined) {
+        if (!body.category || typeof body.category !== "string" || !body.category.trim())
+          return res.status(400).json({ message: "category must be a non-empty string" });
+        updateData.category = body.category.trim();
+      }
+      if (body.description !== undefined) {
+        if (!body.description || typeof body.description !== "string" || !body.description.trim())
+          return res.status(400).json({ message: "description must be a non-empty string" });
+        updateData.description = body.description.trim();
+      }
+      if (body.unit !== undefined) {
+        if (!body.unit || typeof body.unit !== "string" || !body.unit.trim())
+          return res.status(400).json({ message: "unit must be a non-empty string" });
+        updateData.unit = body.unit.trim();
+      }
+      if (body.notes !== undefined) {
+        updateData.notes = body.notes === null ? null : String(body.notes).trim();
+      }
+      if (body.displayOrder !== undefined && typeof body.displayOrder === "number") {
+        updateData.displayOrder = body.displayOrder;
+      }
+
+      // Validate numeric fields — use existing values as fallback for unchanged fields
+      const rawQty = body.quantity !== undefined ? body.quantity : existingItem.quantity;
+      const rawCost = body.unitCostEstimated !== undefined ? body.unitCostEstimated : existingItem.unitCostEstimated;
+      const rawTotal = body.totalEstimated !== undefined ? body.totalEstimated : existingItem.totalEstimated;
+
+      const qty = parseStrictBudgetFloat(rawQty);
+      if (qty === null || qty <= 0) return res.status(400).json({ message: "quantity must be a valid positive number" });
+      const unitCostEstimated = parseStrictBudgetFloat(rawCost);
+      if (unitCostEstimated === null || unitCostEstimated < 0) return res.status(400).json({ message: "unitCostEstimated must be a valid non-negative number" });
+      const totalEstimated = parseStrictBudgetFloat(rawTotal);
+      if (totalEstimated === null || totalEstimated < 0) return res.status(400).json({ message: "totalEstimated must be a valid non-negative number" });
+      if (Math.abs(totalEstimated - qty * unitCostEstimated) > 0.01) {
+        return res.status(400).json({ message: "totalEstimated does not match quantity × unitCostEstimated" });
+      }
+
+      if (body.quantity !== undefined) updateData.quantity = String(qty);
+      if (body.unitCostEstimated !== undefined) updateData.unitCostEstimated = String(unitCostEstimated);
+      if (body.totalEstimated !== undefined) updateData.totalEstimated = String(totalEstimated);
+
+      // unitCostActual — optional, can be null or a valid non-negative number
+      if (body.unitCostActual !== undefined) {
+        if (body.unitCostActual === null) {
+          updateData.unitCostActual = null;
+        } else {
+          const actual = parseStrictBudgetFloat(body.unitCostActual);
+          if (actual === null || actual < 0) return res.status(400).json({ message: "unitCostActual must be a valid non-negative number" });
+          updateData.unitCostActual = String(actual);
+        }
+      }
+
+      const updated = await storage.updateProjectBudgetItem(req.params.itemId, updateData);
+      if (!updated) return res.status(404).json({ message: "Budget item not found" });
+
+      await storage.recalculateBudgetTotal(budget.id);
+      const updatedBudget = await storage.getProjectBudgetById(budget.id);
+
+      logAuditEvent(req, user, {
+        action: "project_budget_item_updated",
+        entityType: "project_budget",
+        entityId: budget.id,
+        entityName: budget.title,
+        companyId: budget.companyId,
+        projectId: req.params.projectId,
+        metadata: {
+          projectId: req.params.projectId,
+          budgetId: budget.id,
+          itemDescription: updated.description,
+          category: updated.category,
+          totalEstimated: updatedBudget?.totalEstimated ?? budget.totalEstimated,
+        },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // DELETE /api/projects/:projectId/budget/items/:itemId
+  // Removes a budget line item and recalculates the budget total.
+  app.delete("/api/projects/:projectId/budget/items/:itemId", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      const budget = await storage.getProjectBudget(req.params.projectId);
+      if (!budget) return res.status(404).json({ message: "Budget not found for this project" });
+
+      if (user.role !== "admin" && (!user.companyId || budget.companyId !== user.companyId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Verify item belongs to this budget
+      const items = await storage.getProjectBudgetItems(budget.id);
+      const existingItem = items.find(i => i.id === req.params.itemId);
+      if (!existingItem) return res.status(404).json({ message: "Budget item not found" });
+
+      await storage.deleteProjectBudgetItem(req.params.itemId);
+      await storage.recalculateBudgetTotal(budget.id);
+      const updatedBudget = await storage.getProjectBudgetById(budget.id);
+
+      logAuditEvent(req, user, {
+        action: "project_budget_item_deleted",
+        entityType: "project_budget",
+        entityId: budget.id,
+        entityName: budget.title,
+        companyId: budget.companyId,
+        projectId: req.params.projectId,
+        metadata: {
+          projectId: req.params.projectId,
+          budgetId: budget.id,
+          itemDescription: existingItem.description,
+          category: existingItem.category,
+          totalEstimated: updatedBudget?.totalEstimated ?? budget.totalEstimated,
+        },
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return httpServer;
 }

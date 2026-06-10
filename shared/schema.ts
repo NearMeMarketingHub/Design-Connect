@@ -861,3 +861,48 @@ export const auditLogs = pgTable("audit_logs", {
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Project Budgets — one budget per project, made up of snapshot line items
+export const projectBudgets = pgTable("project_budgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().unique().references(() => projects.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  sourceEstimateId: varchar("source_estimate_id").references(() => estimates.id),
+  title: text("title").notNull().default("Project Budget"),
+  status: text("status").notNull().default("draft"),
+  totalEstimated: numeric("total_estimated").notNull().default("0"),
+  totalActual: numeric("total_actual").notNull().default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectBudgetSchema = createInsertSchema(projectBudgets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProjectBudget = z.infer<typeof insertProjectBudgetSchema>;
+export type ProjectBudget = typeof projectBudgets.$inferSelect;
+
+// Project Budget Items — snapshot line items belonging to a project budget
+export const projectBudgetItems = pgTable("project_budget_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar("budget_id").notNull().references(() => projectBudgets.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  sourceEstimateItemId: varchar("source_estimate_item_id").references(() => estimateLineItems.id),
+  priceBookItemId: varchar("price_book_item_id").references(() => budgetItems.id),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  quantity: numeric("quantity").notNull(),
+  unit: text("unit").notNull(),
+  unitCostEstimated: numeric("unit_cost_estimated").notNull(),
+  unitCostActual: numeric("unit_cost_actual"),
+  totalEstimated: numeric("total_estimated").notNull(),
+  totalActual: numeric("total_actual").notNull().default("0"),
+  notes: text("notes"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectBudgetItemSchema = createInsertSchema(projectBudgetItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProjectBudgetItem = z.infer<typeof insertProjectBudgetItemSchema>;
+export type ProjectBudgetItem = typeof projectBudgetItems.$inferSelect;

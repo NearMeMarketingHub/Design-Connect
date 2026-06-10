@@ -83,6 +83,12 @@ const ACTION_LABELS: Record<string, string> = {
   estimate_created: "Estimate Created",
   invoice_created: "Invoice Created",
   invoice_updated: "Invoice Updated",
+  // Project budget events
+  project_budget_created: "Budget Created",
+  project_budget_updated: "Budget Updated",
+  project_budget_item_created: "Budget Item Added",
+  project_budget_item_updated: "Budget Item Updated",
+  project_budget_item_deleted: "Budget Item Removed",
   // Stripe billing events — labels prepared for future phase (no events fired yet)
   stripe_subscription_started: "Subscription Started",
   stripe_payment_succeeded: "Payment Succeeded",
@@ -114,6 +120,11 @@ const ACTION_COLORS: Record<string, string> = {
   estimate_created: "bg-emerald-100 text-emerald-700",
   invoice_created: "bg-cyan-100 text-cyan-700",
   invoice_updated: "bg-cyan-100 text-cyan-700",
+  project_budget_created: "bg-teal-100 text-teal-700",
+  project_budget_updated: "bg-teal-100 text-teal-700",
+  project_budget_item_created: "bg-teal-100 text-teal-700",
+  project_budget_item_updated: "bg-teal-100 text-teal-700",
+  project_budget_item_deleted: "bg-teal-100 text-teal-700",
   stripe_subscription_started: "bg-green-100 text-green-700",
   stripe_payment_succeeded: "bg-green-100 text-green-700",
   stripe_payment_failed: "bg-red-100 text-red-700",
@@ -132,6 +143,7 @@ const ENTITY_ICONS: Record<string, typeof FileText> = {
   estimate: FileText,
   invoice: FileText,
   stripe: CreditCard,
+  project_budget: FileText,
 };
 
 // Human-readable labels for known metadata keys
@@ -185,6 +197,9 @@ const META_LABELS: Record<string, string> = {
   dueDate: "Due Date",
   oldDueDate: "Previous Due Date",
   newDueDate: "New Due Date",
+  budgetId: "Budget ID",
+  itemDescription: "Item Description",
+  totalEstimated: "Total Estimated",
 };
 
 // Old→new pairs: [oldKey, newKey, label]

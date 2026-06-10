@@ -65,7 +65,9 @@ import type {
   ExternalMemberPermissions,
   DemoRequest, InsertDemoRequest,
   PlatformSettings, InsertPlatformSettings,
-  AuditLog, InsertAuditLog
+  AuditLog, InsertAuditLog,
+  ProjectBudget, InsertProjectBudget,
+  ProjectBudgetItem, InsertProjectBudgetItem
 } from "@shared/schema";
 
 export interface IStorage {
@@ -389,6 +391,23 @@ export interface IStorage {
   }): Promise<{ events: (AuditLog & { companyName?: string | null })[]; total: number }>;
   getAuditLogMeta(): Promise<{ actions: string[]; entityTypes: string[]; companies: { id: string; name: string }[] }>;
   listCompanyFinancialActivity(companyId: string, limit?: number): Promise<AuditLog[]>;
+
+  // Estimate line item by id (for cross-reference validation)
+  getEstimateLineItem(id: string): Promise<EstimateLineItem | undefined>;
+
+  // Project budget methods
+  getProjectBudget(projectId: string): Promise<ProjectBudget | undefined>;
+  getProjectBudgetById(id: string): Promise<ProjectBudget | undefined>;
+  createProjectBudget(data: InsertProjectBudget): Promise<ProjectBudget>;
+  updateProjectBudget(id: string, data: Partial<InsertProjectBudget>): Promise<ProjectBudget | undefined>;
+  getProjectBudgetWithItems(projectId: string): Promise<{ budget: ProjectBudget; items: ProjectBudgetItem[] } | null>;
+
+  // Project budget item methods
+  getProjectBudgetItems(budgetId: string): Promise<ProjectBudgetItem[]>;
+  createProjectBudgetItem(data: InsertProjectBudgetItem): Promise<ProjectBudgetItem>;
+  updateProjectBudgetItem(id: string, data: Partial<InsertProjectBudgetItem>): Promise<ProjectBudgetItem | undefined>;
+  deleteProjectBudgetItem(id: string): Promise<void>;
+  recalculateBudgetTotal(budgetId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2605,6 +2624,80 @@ export class DatabaseStorage implements IStorage {
       entityTypes: entityTypesRaw.map(r => r.entityType),
       companies,
     };
+  }
+
+  // Estimate line item by id (single-record lookup for cross-reference validation)
+  async getEstimateLineItem(id: string): Promise<EstimateLineItem | undefined> {
+    const [row] = await db.select().from(schema.estimateLineItems).where(eq(schema.estimateLineItems.id, id));
+    return row;
+  }
+
+  // ── Project Budget Methods ──────────────────────────────────────────────────
+
+  async getProjectBudget(projectId: string): Promise<ProjectBudget | undefined> {
+    const [row] = await db.select().from(schema.projectBudgets).where(eq(schema.projectBudgets.projectId, projectId));
+    return row;
+  }
+
+  async getProjectBudgetById(id: string): Promise<ProjectBudget | undefined> {
+    const [row] = await db.select().from(schema.projectBudgets).where(eq(schema.projectBudgets.id, id));
+    return row;
+  }
+
+  async createProjectBudget(data: InsertProjectBudget): Promise<ProjectBudget> {
+    const [row] = await db.insert(schema.projectBudgets).values(data).returning();
+    return row;
+  }
+
+  async updateProjectBudget(id: string, data: Partial<InsertProjectBudget>): Promise<ProjectBudget | undefined> {
+    const [row] = await db
+      .update(schema.projectBudgets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.projectBudgets.id, id))
+      .returning();
+    return row;
+  }
+
+  async getProjectBudgetWithItems(projectId: string): Promise<{ budget: ProjectBudget; items: ProjectBudgetItem[] } | null> {
+    const budget = await this.getProjectBudget(projectId);
+    if (!budget) return null;
+    const items = await this.getProjectBudgetItems(budget.id);
+    return { budget, items };
+  }
+
+  // ── Project Budget Item Methods ─────────────────────────────────────────────
+
+  async getProjectBudgetItems(budgetId: string): Promise<ProjectBudgetItem[]> {
+    return db.select().from(schema.projectBudgetItems)
+      .where(eq(schema.projectBudgetItems.budgetId, budgetId))
+      .orderBy(schema.projectBudgetItems.displayOrder, schema.projectBudgetItems.createdAt);
+  }
+
+  async createProjectBudgetItem(data: InsertProjectBudgetItem): Promise<ProjectBudgetItem> {
+    const [row] = await db.insert(schema.projectBudgetItems).values(data).returning();
+    return row;
+  }
+
+  async updateProjectBudgetItem(id: string, data: Partial<InsertProjectBudgetItem>): Promise<ProjectBudgetItem | undefined> {
+    const [row] = await db
+      .update(schema.projectBudgetItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.projectBudgetItems.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteProjectBudgetItem(id: string): Promise<void> {
+    await db.delete(schema.projectBudgetItems).where(eq(schema.projectBudgetItems.id, id));
+  }
+
+  async recalculateBudgetTotal(budgetId: string): Promise<void> {
+    const items = await this.getProjectBudgetItems(budgetId);
+    const total = items.reduce((sum, item) => sum + parseFloat(item.totalEstimated ?? "0"), 0);
+    await db
+      .update(schema.projectBudgets)
+      .set({ totalEstimated: String(total), updatedAt: new Date() })
+      .where(eq(schema.projectBudgets.id, budgetId));
   }
 }
 
