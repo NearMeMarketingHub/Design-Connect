@@ -7309,8 +7309,8 @@ export async function registerRoutes(
 
   // GET /api/projects/:projectId/budget
   // Returns { budget, items } or null. Allowed: admin, company_owner, company admin, internal contractor.
-  // Blocked: clients, subcontractors, notaries (enforced by requireEstimateAccess).
-  app.get("/api/projects/:projectId/budget", requireAuth, requireEstimateAccess, async (req, res, next) => {
+  // Blocked: clients, subcontractors, notaries (requireEstimateAccess). Suspended companies blocked (requireActiveSubscription).
+  app.get("/api/projects/:projectId/budget", requireAuth, requireEstimateAccess, requireActiveSubscription, async (req, res, next) => {
     try {
       const companyId = await resolveBudgetCompanyId(req, res, req.params.projectId);
       if (companyId === null && !res.headersSent) return res.status(403).json({ message: "Access denied" });
@@ -7328,6 +7328,10 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/budget", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Subcontractors and notaries are explicitly blocked on all budget write routes
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const companyId = await resolveBudgetCompanyId(req, res, req.params.projectId);
       if (companyId === null && !res.headersSent) return res.status(403).json({ message: "Access denied" });
       if (res.headersSent) return;
@@ -7389,6 +7393,10 @@ export async function registerRoutes(
   app.patch("/api/projects/:projectId/budget", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Subcontractors and notaries are explicitly blocked on all budget write routes
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const budget = await storage.getProjectBudget(req.params.projectId);
       if (!budget) return res.status(404).json({ message: "Budget not found for this project" });
 
@@ -7434,6 +7442,10 @@ export async function registerRoutes(
   app.post("/api/projects/:projectId/budget/items", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Subcontractors and notaries are explicitly blocked on all budget write routes
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const budget = await storage.getProjectBudget(req.params.projectId);
       if (!budget) return res.status(404).json({ message: "Budget not found for this project. Create a budget first." });
 
@@ -7482,7 +7494,7 @@ export async function registerRoutes(
         priceBookItemId = body.priceBookItemId;
       }
 
-      // sourceEstimateItemId — verify it belongs to same company and project
+      // sourceEstimateItemId — verify it belongs to same company AND this exact project
       let sourceEstimateItemId: string | null = null;
       if (body.sourceEstimateItemId && typeof body.sourceEstimateItemId === "string") {
         const lineItem = await storage.getEstimateLineItem(body.sourceEstimateItemId);
@@ -7491,8 +7503,9 @@ export async function registerRoutes(
         if (!parentEstimate || parentEstimate.companyId !== budget.companyId) {
           return res.status(403).json({ message: "sourceEstimateItemId: estimate belongs to another company" });
         }
-        if (parentEstimate.projectId && parentEstimate.projectId !== req.params.projectId) {
-          return res.status(403).json({ message: "sourceEstimateItemId: estimate belongs to a different project" });
+        // projectId must match exactly — null/missing projectId is also rejected
+        if (parentEstimate.projectId !== req.params.projectId) {
+          return res.status(403).json({ message: "sourceEstimateItemId: estimate must be linked to this project" });
         }
         sourceEstimateItemId = body.sourceEstimateItemId;
       }
@@ -7545,6 +7558,10 @@ export async function registerRoutes(
   app.patch("/api/projects/:projectId/budget/items/:itemId", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Subcontractors and notaries are explicitly blocked on all budget write routes
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const budget = await storage.getProjectBudget(req.params.projectId);
       if (!budget) return res.status(404).json({ message: "Budget not found for this project" });
 
@@ -7645,6 +7662,10 @@ export async function registerRoutes(
   app.delete("/api/projects/:projectId/budget/items/:itemId", requireAuth, requireCompanyOwner, requireActiveSubscription, async (req, res, next) => {
     try {
       const user = req.user as User;
+      // Subcontractors and notaries are explicitly blocked on all budget write routes
+      if (user.role === "contractor" && (user.contractorType === "subcontractor" || user.contractorType === "notary")) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const budget = await storage.getProjectBudget(req.params.projectId);
       if (!budget) return res.status(404).json({ message: "Budget not found for this project" });
 
