@@ -1,0 +1,208 @@
+Phase 11I: Create Budget from Estimate.
+
+Context:
+Phase 11H added project_budgets and project_budget_items tables, storage methods, API routes, audit logs, and database sync.
+
+Now we need the backend workflow that creates a project budget from an existing estimate by copying estimate line items into project budget items as snapshots.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add UI yet.
+Do not add Budget tab yet.
+Do not add expenses or actual-cost tracking.
+Do not add overhead/profit formulas.
+Do not add reports, Gantt, production sheets, payout schedules, permitting, selections, or EOD reporting.
+Do not change estimator totals or formula behavior.
+Do not add client-visible budget views.
+
+Goal:
+Allow company owners/company admins to create a project budget from an estimate using the existing POST /api/projects/:projectId/budget route with sourceEstimateId.
+
+1. Extend existing budget creation route.
+
+Use the existing route:
+
+POST /api/projects/:projectId/budget
+
+When the body includes sourceEstimateId:
+
+* verify the estimate exists
+* verify estimate.companyId matches the derived project/company companyId
+* verify estimate.projectId matches req.params.projectId
+* verify the project belongs to the requesting user’s company
+* reject if a budget already exists for the project
+* create the project budget header
+* copy estimate line items into project_budget_items
+
+2. Snapshot estimate line items.
+
+For each estimate_line_item on the source estimate, create one project_budget_item.
+
+Mapping:
+
+* projectBudgetItem.budgetId = created budget id
+* projectBudgetItem.companyId = derived companyId
+* projectBudgetItem.projectId = req.params.projectId
+* projectBudgetItem.sourceEstimateItemId = estimate line item id
+* projectBudgetItem.priceBookItemId = estimate line item priceBookItemId if present
+* category = estimate line item category
+* description = estimate line item item
+* quantity = estimate line item quantity
+* unit = estimate line item unit
+* unitCostEstimated = estimate line item rate
+* totalEstimated = estimate line item total
+* totalActual = 0
+* unitCostActual = null
+* notes = null
+* displayOrder = source line item order if available, otherwise loop index
+
+Important:
+This is a snapshot. Future changes to the estimate or price book must not automatically update the budget items.
+
+3. Calculate budget totals.
+
+After copying items:
+
+* totalEstimated = sum of copied project_budget_items.totalEstimated
+* totalActual = 0
+* update project_budgets.totalEstimated
+* update projects.budget to match totalEstimated
+
+Do not apply overhead/profit formulas here.
+Use the source estimate line item totals exactly as stored.
+
+4. Budget status.
+
+Default behavior:
+
+* created budget status should be "active" when created from an estimate
+* if status is explicitly provided, it must still be one of draft/active/locked
+* do not allow invalid statuses
+
+5. Validate source estimate line items before writing.
+
+Before creating any budget records, validate:
+
+* estimate has at least one line item
+* every line item has category/item/quantity/unit/rate/total
+* quantity > 0
+* rate >= 0
+* total >= 0
+
+If validation fails:
+
+* return 400
+* do not create budget header
+* do not create partial budget items
+
+Preferred:
+Use a database transaction for budget header + item copy + project.budget update, if the current storage/db layer supports it cleanly.
+
+If transactions are not straightforward:
+
+* perform all validation before any write
+* create header
+* insert sanitized items
+* update totals
+* but document that transaction support should be added later
+
+6. Security and permissions.
+
+Allowed to create budget from estimate:
+
+* company_owner
+* company admins
+* platform admin where existing support/admin behavior allows
+
+Blocked:
+
+* clients
+* subcontractors
+* notaries
+* regular internal contractors, unless later approved for budget write access
+* unauthenticated users
+* users from another company
+
+Use the existing write protection:
+
+* requireAuth
+* requireCompanyOwner or equivalent owner/admin write guard
+* requireActiveSubscription
+* derived companyId server-side only
+
+Never accept companyId from request body.
+
+7. Prevent duplicate budgets.
+
+If a project already has a budget:
+
+* return 409 with a clear message:
+  “This project already has a budget.”
+
+Do not overwrite an existing budget in this phase.
+Do not merge into an existing budget in this phase.
+Do not create budget versions in this phase.
+
+8. Audit logging.
+
+After successful creation, log:
+
+* project_budget_created
+
+Metadata should include:
+
+* projectId
+* budgetId
+* sourceEstimateId
+* totalEstimated
+* itemCount
+* status
+
+If item audit logging already exists and is not noisy, either:
+
+* log one project_budget_created event only, preferred
+* or avoid logging individual item-created events for every copied line item
+
+Preferred:
+One budget-created audit event for the copy workflow to avoid audit spam.
+
+9. Error handling.
+
+Use clear error messages:
+
+* “sourceEstimateId is required to create a budget from estimate”
+* “sourceEstimateId: estimate not found”
+* “sourceEstimateId: estimate must be linked to this project”
+* “This project already has a budget.”
+* “Source estimate has no line items.”
+* “Line item 1: item description is required”
+
+10. No UI yet.
+
+Do not add:
+
+* Budget tab
+* Create Budget button
+* estimator UI button
+* project detail UI
+* dashboard card
+
+This phase is backend workflow only.
+
+11. TypeScript/build/db.
+
+Run:
+npm run check
+
+No db:push should be needed unless schema changes are unexpectedly required. This phase should use existing Phase 11H tables.
+
+Done looks like:
+
+* POST /api/projects/:projectId/budget with a valid sourceEstimateId creates one budget and copied budget items
+* copied items are snapshots
+* project_budgets.totalEstimated is correct
+* projects.budget is updated to match
+* invalid/wrong-project sourceEstimateId is rejected
+* duplicate budget creation returns 409
+* clients/subcontractors/notaries/internal non-admin contractors cannot create budgets
+* npm run check passes
