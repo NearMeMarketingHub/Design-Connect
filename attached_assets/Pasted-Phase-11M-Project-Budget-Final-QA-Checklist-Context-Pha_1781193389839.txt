@@ -1,0 +1,224 @@
+Phase 11M: Project Budget Final QA Checklist.
+
+Context:
+Phase 11 core budget foundation is complete:
+
+* Price Book connects to Estimator
+* Estimate line items track priceBookItemId
+* Estimate validation is hardened
+* Project budget tables/API exist
+* Create Budget from Estimate works
+* Project Detail Budget tab exists
+* Owner/admin budget editing works
+* Internal contractors can view budgets read-only
+* projects.budget stays synced after budget mutations
+* Audit Log labels are cleaned up
+
+This phase is a focused final QA pass before moving to the next roadmap area.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add expenses or actual-cost tracking.
+Do not add overhead/profit formulas.
+Do not add reports.
+Do not add Gantt/board views.
+Do not add production sheets.
+Do not add payout schedules.
+Do not add permitting, selections, or EOD reporting.
+Do not add client-visible budget views.
+Do not add schema changes unless a true bug requires it.
+Do not build new features.
+
+Goal:
+Audit the completed Project Budget feature for route safety, permissions, broken UI states, stale query behavior, and obvious bugs. Make only small polish/fix changes if something is clearly broken.
+
+1. Verify Project Detail Budget tab visibility.
+
+Confirm the Budget tab is visible for:
+
+* platform admin
+* company_owner
+* company admin
+* regular internal contractor with companyId and no contractorType
+
+Confirm the Budget tab is hidden for:
+
+* clients
+* subcontractors
+* notaries
+* unauthenticated users
+
+Do not expand permissions.
+
+2. Verify Budget tab write controls.
+
+Confirm write controls are visible only for:
+
+* platform admin
+* company_owner
+* company admin
+
+Write controls include:
+
+* Edit Budget
+* Add Budget Item
+* Edit item
+* Delete item
+
+Confirm regular internal contractors can view the Budget tab but see no write controls.
+
+3. Verify no-budget state.
+
+Confirm:
+
+* no-budget state renders cleanly
+* write users see estimate picker if project estimates exist
+* write users see “No estimates available for this project yet.” if none exist
+* read-only users see the no-budget message with no controls
+* duplicate budget creation returns a clean error if attempted
+
+4. Verify create budget from estimate.
+
+Confirm:
+
+* only estimates linked to the current project appear in the picker
+* sourceEstimateId from another project is rejected by the backend
+* creating from estimate creates budget header + budget items
+* copied budget items are snapshots
+* project_budgets.totalEstimated is correct
+* projects.budget is synced
+* success toast appears
+* budget query and project detail/list queries refresh
+
+5. Verify budget display.
+
+Confirm:
+
+* summary card shows title, status, total estimated, total actual, and variance
+* variance shows correct positive/negative sign
+* line item table displays category, description, quantity, unit, unit cost estimated, total estimated, and notes
+* empty items state says “No budget items yet.”
+* no raw internal IDs are prominently shown in the normal user UI
+
+6. Verify budget editing.
+
+Confirm owner/admin can:
+
+* edit title/status/notes
+* add manual budget item
+* edit manual budget item
+* delete budget item using in-app AlertDialog
+
+Confirm after add/edit/delete:
+
+* project_budgets.totalEstimated updates
+* projects.budget updates
+* Budget tab refreshes
+* Project detail/list budget totals refresh
+* Audit Log events are created
+
+7. Verify backend route permissions.
+
+Review budget routes:
+
+* GET /api/projects/:projectId/budget
+* POST /api/projects/:projectId/budget
+* PATCH /api/projects/:projectId/budget
+* POST /api/projects/:projectId/budget/items
+* PATCH /api/projects/:projectId/budget/items/:itemId
+* DELETE /api/projects/:projectId/budget/items/:itemId
+
+Confirm:
+
+* clients blocked
+* subcontractors blocked
+* notaries blocked
+* regular internal contractors can read only
+* owner/admin can write
+* cross-company access returns 403
+* companyId/projectId/budgetId are not trusted from request body
+
+Only patch if an actual gap is found.
+
+8. Verify Audit Log display.
+
+Confirm readable labels exist for:
+
+* project_budget_created
+* project_budget_updated
+* project_budget_item_created
+* project_budget_item_updated
+* project_budget_item_deleted
+
+Confirm metadata labels are readable:
+
+* Project ID
+* Budget ID
+* Category
+* Item Description
+* Total Estimated
+* Previous Status
+* New Status
+
+Do not redesign Audit Log.
+
+9. Verify error handling.
+
+Confirm user-facing errors use parseErrorMessage where appropriate.
+
+Check:
+
+* duplicate budget
+* invalid budget item total
+* access denied
+* inactive Billing & Access status
+* API failure
+
+Avoid “subscription” wording in new user-facing copy. Use Billing & Access language.
+
+10. Verify no scope creep.
+
+Confirm this phase does not add:
+
+* expenses
+* actual spend tracking
+* receipts
+* overhead/profit formulas
+* reports
+* Gantt
+* production sheets
+* payout schedules
+* Stripe changes
+* client-visible budget views
+* schema changes
+
+11. Output QA summary.
+
+Create or update a short project-root file:
+
+PROJECT_BUDGET_QA.md
+
+Include:
+A. What was checked
+B. Issues found
+C. Fixes made, if any
+D. Items deferred
+E. Visual audit checklist for the user
+
+If no code changes are needed, only add the QA document.
+
+12. Run checks.
+
+Run:
+
+npm run check
+
+No db:push should be needed unless a schema change is unexpectedly required, which should be avoided.
+
+Done looks like:
+
+* PROJECT_BUDGET_QA.md exists
+* npm run check passes
+* any small bugs found are fixed
+* no new features added
+* Project Budget system is ready for visual audit
