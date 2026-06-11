@@ -1,0 +1,176 @@
+Phase 11L: Project Budget QA + Polish.
+
+Context:
+Phase 11H added project budget tables, storage, API routes, and audit logs.
+Phase 11I added the backend “Create Budget from Estimate” workflow.
+Phase 11J added the Project Detail Budget tab.
+Phase 11K added owner/admin editing controls for budget header and budget items.
+
+Now we need a small QA/polish pass before moving into expenses, actual spend, reports, formulas, or production sheets.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add expenses or actual-cost tracking.
+Do not add overhead/profit formulas.
+Do not add reports.
+Do not add Gantt/board views.
+Do not add production sheets.
+Do not add payout schedules.
+Do not addfit formulas.
+Do not add reports.
+Do not add Gantt/board permitting, selections, or EOD reporting.
+Do not add client-visible budget views.
+Do not change estimator totals or formula behavior.
+Do not add schema changes unless absolutely required.
+
+Goal:
+Polish the Project Budget feature so totals, permissions, query refreshes, and audit display are consistent.
+
+1. Sync projects.budget after manual budget item changes.
+
+Current issue:
+When budget items are manually added, edited, or deleted, the backend recalculates `project_budgets.totalEstimated`, but the older summary field `projects.budget` may not be updated.
+
+Fix:
+Whenever budget item create/update/delete recalculates `project_budgets.totalEstimated`, also update:
+
+projects.budget = project_budgets.totalEstimated
+
+Routes affected:
+
+* POST /api/projects/:projectId/budget/items
+* PATCH /api/projects/:projectId/budget/items/:itemId
+* DELETE /api/projects/:projectId/budget/items/:itemId
+
+Rules:
+
+* Keep project_budgets.totalEstimated as the source of truth for the Budget tab.
+* Keep projects.budget synced for project summaries/cards/dashboards.
+* Do not change totalActual.
+* Do not add formulas.
+* Use the same company/project ownership checks already in place.
+
+2. Invalidate/refetch related project queries after budget mutations.
+
+In `client/src/components/project-budget-tab.tsx`, after these successful mutations:
+
+* create budget from estimate
+* edit budget header
+* add budget item
+* edit budget item
+* delete budget item
+
+Continue invalidating the budget query.
+
+Also invalidate/refetch any relevant project detail query or project list query that the app uses to show `projects.budget`, if identifiable.
+
+Do not over-invalidate unrelated queries.
+
+3. Confirm Budget tab permissions.
+
+Verify UI behavior:
+
+* company_owner can view/create/edit/delete budget items
+* company admin can view/create/edit/delete budget items
+* platform admin can view/create/edit/delete budget items
+* regular internal contractor can view budget read-only
+* clients do not see the Budget tab
+* subcontractors do not see the Budget tab
+* notaries do not see the Budget tab
+
+No permission expansion in this phase.
+
+4. Confirm backend budget permissions.
+
+Review backend budget routes:
+
+* GET /api/projects/:projectId/budget
+* POST /api/projects/:projectId/budget
+* PATCH /api/projects/:projectId/budget
+* POST /api/projects/:projectId/budget/items
+* PATCH /api/projects/:projectId/budget/items/:itemId
+* DELETE /api/projects/:projectId/budget/items/:itemId
+
+Confirm:
+
+* clients blocked
+* subcontractors blocked
+* notaries blocked
+* regular internal contractors can read only
+* company owner/admin can write
+* cross-company access returns 403
+* companyId/projectId/budgetId are never trusted from request body
+
+Only make code changes if an actual gap is found.
+
+5. Audit Log display QA.
+
+Confirm the following audit events display readable labels/colors/icons in Super Admin Audit Log:
+
+* project_budget_created
+* project_budget_updated
+* project_budget_item_created
+* project_budget_item_updated
+* project_budget_item_deleted
+
+Confirm metadata labels show cleanly:
+
+* Budget ID
+* Item Description
+* Total Estimated
+* Previous Status
+* New Status
+* Project ID
+
+If labels are missing, add them to audit-log.tsx.
+
+Do not redesign Audit Log.
+
+6. Budget tab empty/error states QA.
+
+Verify:
+
+* no budget state works for write users
+* no budget state works for read-only users
+* no estimates available state works
+* budget exists with zero items shows “No budget items yet.”
+* API errors show readable messages using parseErrorMessage
+* duplicate budget creation 409 shows a clean error message
+
+Make small text/UX fixes only if needed.
+
+7. Currency and numeric display QA.
+
+Verify:
+
+* Total Estimated displays as currency
+* Total Actual displays as currency or placeholder/0 consistently
+* Variance shows positive/negative sign correctly
+* budget item quantities, unit costs, and totals display cleanly
+* no raw internal IDs are shown prominently in the normal Budget tab UI
+
+8. Locked status note.
+
+For this phase, locked remains display/status metadata only.
+
+Do not add backend enforcement that blocks edits when status = locked unless explicitly requested in a future hardening phase.
+
+Do not imply in the UI that locked prevents edits.
+
+9. TypeScript/build check.
+
+Run:
+
+npm run check
+
+No db:push should be needed unless schema changes are unexpectedly introduced, which should be avoided.
+
+Done looks like:
+
+* Manual budget item add/edit/delete keeps project_budgets.totalEstimated and projects.budget in sync
+* Budget tab refreshes related visible totals after mutations
+* Permissions are verified and unchanged
+* Audit Log budget events display cleanly
+* Empty/error/currency states are polished
+* No formulas, expenses, reports, Stripe, or schema changes
+* npm run check passes
