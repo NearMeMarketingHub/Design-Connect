@@ -203,6 +203,8 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
     queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget"] });
     queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
     queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/projects", projectId] });
   };
 
   const createBudgetMutation = useMutation({
