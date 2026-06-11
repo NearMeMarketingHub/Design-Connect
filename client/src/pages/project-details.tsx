@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import ImageViewerModal from "@/components/image-viewer-modal";
 import DocumentViewerModal from "@/components/document-viewer-modal";
 import SendForSignatureDialog from "@/components/send-for-signature-dialog";
+import ProjectBudgetTab from "@/components/project-budget-tab";
 import { 
   ArrowLeft,
   Calendar,
@@ -299,6 +300,20 @@ export default function ProjectDetails() {
   const isNotaryUser = user?.role === 'contractor' && user?.contractorType === 'notary';
   const isSubOrNotary = isSubcontractor || isNotaryUser;
   const canEdit = isContractorView && !isSubOrNotary && (user?.role === 'contractor' || user?.role === 'company_owner' || user?.role === 'admin');
+
+  // Budget tab visibility — explicit check, not gated by isContractorView so platform admins
+  // are always included regardless of which portal they entered through.
+  const canViewBudget =
+    user?.role === 'admin' ||
+    user?.role === 'company_owner' ||
+    user?.isCompanyAdmin === true ||
+    (user?.role === 'contractor' && !user?.contractorType && !!user?.companyId);
+
+  // Budget write — create/edit access for owners, company admins, and platform admins only.
+  const canBudgetWrite =
+    user?.role === 'admin' ||
+    user?.role === 'company_owner' ||
+    user?.isCompanyAdmin === true;
 
   // Get portal base path
   const getPortalPath = () => {
@@ -3085,6 +3100,15 @@ export default function ProjectDetails() {
           >
             Change Orders
           </TabsTrigger>
+          {canViewBudget && (
+            <TabsTrigger
+              value="budget"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-budget"
+            >
+              Budget
+            </TabsTrigger>
+          )}
           <TabsTrigger 
             value="action-center"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 pr-6 whitespace-nowrap transition-colors relative overflow-visible"
@@ -5568,6 +5592,13 @@ export default function ProjectDetails() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* BUDGET TAB */}
+          {canViewBudget && (
+            <TabsContent value="budget" className="mt-6">
+              <ProjectBudgetTab projectId={projectId} canWrite={canBudgetWrite} />
+            </TabsContent>
+          )}
 
           {/* ACTION CENTER TAB */}
           <TabsContent value="action-center" className="space-y-6">
