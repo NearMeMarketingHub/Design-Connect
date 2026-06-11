@@ -200,6 +200,8 @@ const META_LABELS: Record<string, string> = {
   budgetId: "Budget ID",
   itemDescription: "Item Description",
   totalEstimated: "Total Estimated",
+  projectId: "Project ID",
+  category: "Category",
 };
 
 // Old→new pairs: [oldKey, newKey, label]

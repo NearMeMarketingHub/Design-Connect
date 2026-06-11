@@ -2713,10 +2713,19 @@ export class DatabaseStorage implements IStorage {
   async recalculateBudgetTotal(budgetId: string): Promise<void> {
     const items = await this.getProjectBudgetItems(budgetId);
     const total = items.reduce((sum, item) => sum + parseFloat(item.totalEstimated ?? "0"), 0);
+    const totalStr = String(total);
     await db
       .update(schema.projectBudgets)
-      .set({ totalEstimated: String(total), updatedAt: new Date() })
+      .set({ totalEstimated: totalStr, updatedAt: new Date() })
       .where(eq(schema.projectBudgets.id, budgetId));
+    // Keep projects.budget in sync so project cards/dashboards reflect the latest total
+    const budget = await this.getProjectBudgetById(budgetId);
+    if (budget) {
+      await db
+        .update(schema.projects)
+        .set({ budget: totalStr })
+        .where(eq(schema.projects.id, budget.projectId));
+    }
   }
 }
 
