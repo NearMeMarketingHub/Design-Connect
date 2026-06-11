@@ -1,0 +1,227 @@
+Phase 11K: Budget Tab Editing Controls.
+
+Context:
+Phase 11H added project budget tables, storage, and API routes.
+Phase 11I added backend create-budget-from-estimate workflow.
+Phase 11J added the Project Detail Budget tab with read-only budget display and create-from-estimate UI.
+
+Now we need to add basic owner/admin editing controls to the Budget tab.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add expenses or actual-cost tracking.
+Do not add overhead/profit formulas.
+Do not add reports.
+Do not add Gantt/board views.
+Do not add production sheets.
+Do not add payout schedules.
+Do not add permitting, selections, or EOD reporting.
+Do not add client-visible budget views.
+Do not change estimator totals or formula behavior.
+Do not add new schema changes.
+
+Goal:
+Allow company owners, company admins, and platform admins to edit the project budget header and manually add/edit/delete budget line items from the Budget tab. Regular internal contractors can view only.
+
+1. Budget header editing.
+
+In `client/src/components/project-budget-tab.tsx`, when a budget exists and `canWrite === true`, allow editing:
+
+* title
+* status: draft / active / locked
+* notes
+
+Use existing route:
+
+PATCH /api/projects/:projectId/budget
+
+Rules:
+
+* only show edit controls to canWrite users
+* regular internal contractors must not see edit controls
+* use apiRequest and parseErrorMessage
+* show success toast on save
+* invalidate/refetch budget query after save
+* do not allow editing companyId, projectId, sourceEstimateId, totalEstimated, or totalActual from the UI
+
+Keep the UI simple:
+
+* either inline edit form in the summary card
+* or an Edit Budget button that opens a small dialog
+
+2. Add manual budget item.
+
+When budget exists and `canWrite === true`, add an “Add Budget Item” button.
+
+Use existing route:
+
+POST /api/projects/:projectId/budget/items
+
+Fields:
+
+* category
+* description
+* quantity
+* unit
+* unitCostEstimated
+* totalEstimated
+* notes optional
+
+Behavior:
+
+* quantity must be greater than 0
+* unitCostEstimated must be greater than or equal to 0
+* totalEstimated should auto-calculate in the UI as quantity × unitCostEstimated
+* user can adjust fields before saving
+* send totalEstimated explicitly to match backend validation
+* do not expose companyId, projectId, budgetId, sourceEstimateItemId, or sourceEstimateId fields
+* priceBookItemId is not required for manual budget items in this phase
+* totalActual / unitCostActual remain untouched/0/null
+
+3. Edit budget item.
+
+For each budget item row, if `canWrite === true`, show an Edit action.
+
+Use existing route:
+
+PATCH /api/projects/:projectId/budget/items/:itemId
+
+Editable fields:
+
+* category
+* description
+* quantity
+* unit
+* unitCostEstimated
+* totalEstimated
+* notes
+
+Rules:
+
+* same validation as Add Budget Item
+* totalEstimated should auto-calculate as quantity × unitCostEstimated
+* do not allow editing companyId, projectId, budgetId, sourceEstimateItemId, priceBookItemId, totalActual, or unitCostActual in this phase
+* after save, invalidate/refetch budget query
+* show success/error toast
+
+4. Delete budget item.
+
+For each budget item row, if `canWrite === true`, show a Delete action.
+
+Use existing route:
+
+DELETE /api/projects/:projectId/budget/items/:itemId
+
+Rules:
+
+* confirm before deleting
+* use an in-app dialog/AlertDialog, not browser confirm
+* after delete, invalidate/refetch budget query
+* show success/error toast
+
+5. Recalculated totals.
+
+The backend already recalculates `project_budgets.totalEstimated` after item create/update/delete.
+
+Frontend should:
+
+* refetch budget after every mutation
+* display updated Total Estimated
+* display updated Variance
+
+Do not calculate or save totalActual in this phase.
+
+6. Permission behavior.
+
+Write controls visible:
+
+* platform admin
+* company_owner
+* company admin
+
+Read-only:
+
+* regular internal contractors with companyId and no contractorType
+
+Hidden/no access:
+
+* clients
+* subcontractors
+* notaries
+* unauthenticated users
+* users from other companies
+
+Important:
+Frontend controls are convenience only. Backend remains source of truth.
+
+7. Empty budget item state.
+
+If a budget exists but has zero budget items:
+
+* show “No budget items yet.”
+* if canWrite, show Add Budget Item button
+* if read-only, show read-only empty message
+
+8. Keep create-from-estimate behavior.
+
+Do not break the existing no-budget estimate picker.
+
+No-budget state should still allow owner/admin to create a budget from an estimate.
+
+After a budget is created, the editing controls should become available to owner/admin users.
+
+9. Error handling.
+
+Use `apiRequest` and `parseErrorMessage`.
+
+Common backend errors:
+
+* inactive company access
+* access denied
+* invalid budget status
+* invalid line item totals
+* budget item not found
+
+Use Billing & Access wording if access is blocked. Do not use “subscription” wording in new user-facing messages.
+
+10. Audit behavior.
+
+No new backend audit events are needed. Existing Phase 11H backend audit events should fire:
+
+* project_budget_updated
+* project_budget_item_created
+* project_budget_item_updated
+* project_budget_item_deleted
+
+11. Keep this phase focused.
+
+Do not add:
+
+* actual expense entry
+* receipt uploads
+* actual spend tracking
+* budget vs actual reports
+* overhead/profit formulas
+* price book item picker for budget items
+* estimate editing
+* budget versioning
+* client-visible budget views
+
+12. TypeScript check.
+
+Run:
+
+npm run check
+
+No db:push should be needed.
+
+Done looks like:
+
+* Owner/admin can edit budget title/status/notes
+* Owner/admin can add budget item
+* Owner/admin can edit budget item
+* Owner/admin can delete budget item with in-app confirmation
+* Regular internal contractors can view budget but see no edit controls
+* Budget totals refresh after mutations
+* No formulas/expenses/reports/schema changes
+* npm run check passes
