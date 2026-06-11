@@ -253,7 +253,7 @@ export default function AdminProjects() {
                             }}
                           >
                             <UserPlus className="w-4 h-4 mr-1" />
-                            Assign
+                            Assign Primary Contractor
                           </Button>
                         </div>
                       </TableCell>
@@ -309,9 +309,9 @@ export default function AdminProjects() {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Assign Contractor</DialogTitle>
+            <DialogTitle>Assign Primary Contractor</DialogTitle>
             <DialogDescription>
-              Assign a contractor to{" "}
+              Choose the primary contractor/company responsible for{" "}
               <span className="font-medium">{selectedProject?.name}</span>.
             </DialogDescription>
           </DialogHeader>

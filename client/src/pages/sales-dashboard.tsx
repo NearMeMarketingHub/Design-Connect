@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, FileText, ArrowUpRight, TrendingUp, Loader2 } from "lucide-react";
+import { Plus, Search, FileText, ArrowUpRight, TrendingUp, Loader2, ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -61,9 +61,17 @@ export default function SalesDashboard() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Sales Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage quotes, estimates, and pipeline.</p>
+        <div className="flex items-center gap-3">
+          <Link href="/company/financials">
+            <Button variant="ghost" size="sm" className="gap-1.5" data-testid="button-back-financials">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Financials
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-heading font-bold text-foreground">Sales Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Manage quotes, estimates, and pipeline.</p>
+          </div>
         </div>
         <Link href="/company/estimates">
           <Button className="bg-primary text-primary-foreground" data-testid="button-create-quote">

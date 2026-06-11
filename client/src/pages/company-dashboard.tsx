@@ -577,7 +577,6 @@ export default function CompanyDashboard() {
         <TabsList data-testid="company-tabs">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="team" data-testid="tab-team">Team</TabsTrigger>
-          <TabsTrigger value="price-book" data-testid="tab-price-book">Price Book</TabsTrigger>
           <TabsTrigger value="subscription" data-testid="tab-subscription">Billing & Access</TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
@@ -865,8 +864,8 @@ export default function CompanyDashboard() {
           </Card>
         </TabsContent>
 
-        {/* Price Book Tab */}
-        <TabsContent value="price-book" className="space-y-6">
+        {/* Price Book Tab — removed; use Budget Manager in sidebar */}
+        {false && <TabsContent value="price-book" className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -1488,7 +1487,7 @@ export default function CompanyDashboard() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </TabsContent>
+        </TabsContent>}
 
         {/* Subscription Tab */}
         <TabsContent value="subscription" className="space-y-6">
@@ -1612,7 +1611,7 @@ export default function CompanyDashboard() {
                   title="Coming soon — will be available in a future release"
                   data-testid="button-start-subscription"
                 >
-                  <CreditCard className="w-4 h-4 mr-1.5" /> Start Subscription
+                  <CreditCard className="w-4 h-4 mr-1.5" /> Manage Subscription
                 </Button>
                 <Button
                   variant="outline"

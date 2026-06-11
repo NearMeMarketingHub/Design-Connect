@@ -2572,7 +2572,7 @@ export class DatabaseStorage implements IStorage {
     if (companyIds.length > 0) {
       const comps = await db.select({ id: schema.companies.id, name: schema.companies.name })
         .from(schema.companies)
-        .where(sql`${schema.companies.id} = ANY(${companyIds})`);
+        .where(inArray(schema.companies.id, companyIds));
       companyNameMap = new Map(comps.map(c => [c.id, c.name]));
     }
 
@@ -2616,7 +2616,7 @@ export class DatabaseStorage implements IStorage {
     if (ids.length > 0) {
       companies = await db.select({ id: schema.companies.id, name: schema.companies.name })
         .from(schema.companies)
-        .where(sql`${schema.companies.id} = ANY(${ids})`)
+        .where(inArray(schema.companies.id, ids))
         .orderBy(schema.companies.name);
     }
 

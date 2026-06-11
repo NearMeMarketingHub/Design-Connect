@@ -190,6 +190,34 @@ Base role structure created in `shared/contractor-roles.ts`. Implementation pend
 
 ---
 
+## 🔮 Future Phase: Selections / Job Book Import & Create
+
+- [ ] Company can import or create selection categories and options (job books, selection sheets, spreadsheets, or manual creation)
+- [ ] Client can view and choose selection options from the client portal
+- [ ] Client choices flow back to the project management side for contractor visibility
+- [ ] Supports job books, selection sheets, spreadsheet import, and manual creation
+- [ ] Vendor-neutral — no Home Depot or supplier-specific integration
+- [ ] Future support for images, files, notes, and statuses on selections
+- [ ] Company-scoped and project-scoped selections
+- [ ] Clients only see client-facing selection info; internal notes and costs remain hidden
+
+---
+
+## 🛑 Deferred Visual Audit Items
+
+Items surfaced during the visual audit that are out of scope for Phase 12A:
+
+- [ ] Subcontractor multi-company access and company switcher
+- [ ] Contractor-side sandbox / demo environment
+- [ ] Estimator Calculator and Calculator consolidation (reduce duplication)
+- [ ] Selections full build (see Future Phase above)
+- [ ] 3D Floor Plan Builder overhaul and orientation audit
+- [ ] Actual spend / expenses tracking against project budgets
+- [ ] Budget reports, production sheets, and EOD reporting
+- [ ] Permitting tracker
+
+---
+
 ## 📝 Notes
 
 - Skip Sub List (Sheet 3) from Excel - only implement Labor_Budget and Floor Calculator

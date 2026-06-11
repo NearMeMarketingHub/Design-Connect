@@ -59,6 +59,8 @@ export default function BudgetAdmin() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [addCategoryDialogOpen, setAddCategoryDialogOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState({ name: "", notes: "" });
   const [newItem, setNewItem] = useState({
     itemType: "",
     description: "",
@@ -141,6 +143,20 @@ export default function BudgetAdmin() {
         description: parseErrorMessage(error),
         variant: "destructive",
       });
+    },
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: (data: { name: string; notes: string }) =>
+      apiRequest("POST", `${categoryApiBase}/categories`, { ...data, displayOrder: categories.length, isActive: true }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${categoryApiBase}/categories`] });
+      toast({ title: "Category Created", description: "New category has been added." });
+      setAddCategoryDialogOpen(false);
+      setNewCategory({ name: "", notes: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Create Failed", description: parseErrorMessage(error), variant: "destructive" });
     },
   });
 
@@ -299,11 +315,20 @@ export default function BudgetAdmin() {
               <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Link href={currentPortal === "admin" ? "/admin/dashboard" : currentPortal === "contractor" ? "/contractor/dashboard" : "/client/dashboard"}>
-                <Button variant="outline" size="sm" data-testid="button-dashboard">
-                  Back to Dashboard
+              {(isAdmin || isCompanyUser) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setNewCategory({ name: "", notes: "" });
+                    setAddCategoryDialogOpen(true);
+                  }}
+                  data-testid="button-add-category"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Category
                 </Button>
-              </Link>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -602,6 +627,47 @@ export default function BudgetAdmin() {
                 <Save className="w-4 h-4 mr-2" />
               )}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addCategoryDialogOpen} onOpenChange={setAddCategoryDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Category</DialogTitle>
+            <DialogDescription>Create a new pricing category.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newCategoryName">Category Name</Label>
+              <Input
+                id="newCategoryName"
+                value={newCategory.name}
+                onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                placeholder="e.g. Electrical, Plumbing"
+                data-testid="input-new-category-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newCategoryNotes">Notes (optional)</Label>
+              <Input
+                id="newCategoryNotes"
+                value={newCategory.notes}
+                onChange={(e) => setNewCategory({ ...newCategory, notes: e.target.value })}
+                data-testid="input-new-category-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddCategoryDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => createCategoryMutation.mutate(newCategory)}
+              disabled={createCategoryMutation.isPending || !newCategory.name.trim()}
+              data-testid="button-create-category"
+            >
+              {createCategoryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Add Category
             </Button>
           </DialogFooter>
         </DialogContent>

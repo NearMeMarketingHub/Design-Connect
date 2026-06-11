@@ -307,6 +307,11 @@ function DemoRequestDrawer({ lead, onClose, onConvert, onRefresh }: DrawerProps)
                 <span className="text-muted-foreground">Sync Status</span>
                 <HubSpotBadge status={lead.hubspotSyncStatus} />
               </div>
+              {lead.hubspotSyncStatus === "not_configured" && (
+                <p className="text-xs text-muted-foreground">
+                  HubSpot is not configured. Add the required HubSpot access token to enable demo request syncing.
+                </p>
+              )}
               {lead.hubspotLastSyncedAt && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Last Synced</span>
@@ -578,7 +583,7 @@ export default function AdminDemoRequests() {
                           }
                         >
                           <SelectTrigger
-                            className="w-[130px] h-7 text-xs"
+                            className="w-[160px] h-7 text-xs"
                             data-testid={`select-demo-status-${lead.id}`}
                           >
                             <SelectValue>

@@ -134,22 +134,6 @@ export default function CompanyFinancials() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Plus className="w-4 h-4 text-orange-600" />
-              New Invoice
-            </CardTitle>
-            <CardDescription className="text-xs">Create a new client invoice</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/company/invoice/new">
-              <Button className="w-full" variant="outline" size="sm" data-testid="button-company-new-invoice">
-                Create
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
       </div>
 
       {isOwnerOrAdmin && (

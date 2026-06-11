@@ -79,60 +79,72 @@ export default function AdminPricingAccess() {
               </div>
               <div className="flex flex-col gap-3">
                 <Label className="text-xs">Access Options</Label>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="setting-free-access"
-                    checked={platformSettingsData?.freeAccessEnabled ?? false}
-                    onCheckedChange={(v) =>
-                      updatePlatformSettingsMutation.mutate({ freeAccessEnabled: v })
-                    }
-                    data-testid="switch-setting-free-access"
-                  />
-                  <Label
-                    htmlFor="setting-free-access"
-                    className="text-xs font-normal cursor-pointer"
-                  >
-                    Free Access Enabled
-                  </Label>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="setting-free-access"
+                      checked={platformSettingsData?.freeAccessEnabled ?? false}
+                      onCheckedChange={(v) =>
+                        updatePlatformSettingsMutation.mutate({ freeAccessEnabled: v })
+                      }
+                      data-testid="switch-setting-free-access"
+                    />
+                    <Label
+                      htmlFor="setting-free-access"
+                      className="text-xs font-normal cursor-pointer"
+                    >
+                      Free Access Enabled
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-9">
+                    Allows Super Admins to use free/demo-style access for company accounts.
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="setting-prepaid-access"
-                    checked={platformSettingsData?.prepaidAccessEnabled ?? false}
-                    onCheckedChange={(v) =>
-                      updatePlatformSettingsMutation.mutate({ prepaidAccessEnabled: v })
-                    }
-                    data-testid="switch-setting-prepaid-access"
-                  />
-                  <Label
-                    htmlFor="setting-prepaid-access"
-                    className="text-xs font-normal cursor-pointer"
-                  >
-                    Prepaid Access Enabled
-                  </Label>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="setting-prepaid-access"
+                      checked={platformSettingsData?.prepaidAccessEnabled ?? false}
+                      onCheckedChange={(v) =>
+                        updatePlatformSettingsMutation.mutate({ prepaidAccessEnabled: v })
+                      }
+                      data-testid="switch-setting-prepaid-access"
+                    />
+                    <Label
+                      htmlFor="setting-prepaid-access"
+                      className="text-xs font-normal cursor-pointer"
+                    >
+                      Prepaid Access Enabled
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-9">
+                    Allows Super Admins to use prepaid/included access for companies paying outside the app.
+                  </p>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
                 <Label className="text-xs">Billing Mode</Label>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="setting-manual-billing"
-                    checked={platformSettingsData?.manualBillingEnabled ?? true}
-                    onCheckedChange={(v) =>
-                      updatePlatformSettingsMutation.mutate({ manualBillingEnabled: v })
-                    }
-                    data-testid="switch-setting-manual-billing"
-                  />
-                  <Label
-                    htmlFor="setting-manual-billing"
-                    className="text-xs font-normal cursor-pointer"
-                  >
-                    Manual Billing
-                  </Label>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="setting-manual-billing"
+                      checked={platformSettingsData?.manualBillingEnabled ?? true}
+                      onCheckedChange={(v) =>
+                        updatePlatformSettingsMutation.mutate({ manualBillingEnabled: v })
+                      }
+                      data-testid="switch-setting-manual-billing"
+                    />
+                    <Label
+                      htmlFor="setting-manual-billing"
+                      className="text-xs font-normal cursor-pointer"
+                    >
+                      Manual Billing
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-9">
+                    Billing &amp; Access is managed manually by Super Admins.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  When on, billing is managed by admins. Turn off to enable self-serve.
-                </p>
               </div>
             </div>
           </CardContent>
