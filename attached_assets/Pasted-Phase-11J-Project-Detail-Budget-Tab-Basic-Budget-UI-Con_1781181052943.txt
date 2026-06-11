@@ -1,0 +1,230 @@
+Phase 11J: Project Detail Budget Tab / Basic Budget UI.
+
+Context:
+Phase 11H added project_budgets and project_budget_items tables, storage methods, API routes, audit logs, and database sync.
+Phase 11I added the backend workflow to create a project budget from an estimate by copying estimate line items as snapshots.
+
+Now we need a basic Project Detail Budget tab so company users can view a project’s budget and company owners/admins can create one from an existing estimate.
+
+Do not change BuildVision branding.
+Do not add Stripe work.
+Do not add overhead/profit formulas.
+Do not add expenses or actual-cost tracking.
+Do not add reports.
+Do not add Gantt/board views.
+Do not add production sheets.
+Do not add payout schedules.
+Do not add permitting, selections, or EOD reporting.
+Do not add client-visible budget views.
+Do not change estimator totals or formula behavior.
+
+Goal:
+Add a Budget tab to the Project Detail page that displays a project’s budget, budget line items, and a basic “Create Budget from Estimate” workflow using the existing backend routes.
+
+1. Add Budget tab to Project Detail.
+
+In the project detail page, add a new tab:
+
+Details | Estimates | Budget | Invoices | Messages | Team | Change Orders
+
+Budget should sit after Estimates and before Invoices.
+
+The tab should use the existing project detail layout and styling patterns.
+
+2. Fetch project budget.
+
+On the Budget tab, call:
+
+GET /api/projects/:projectId/budget
+
+Handle:
+
+* loading state
+* error state
+* no budget state
+* budget exists state
+
+Do not create any new backend routes.
+
+3. No-budget state.
+
+If no budget exists, show a clean empty state:
+
+Heading:
+“No project budget yet.”
+
+Text:
+“Create a budget from an approved estimate to start tracking planned project costs.”
+
+Show a “Create Budget from Estimate” section for users who have write permission.
+
+4. Estimate picker for budget creation.
+
+When no budget exists, allow company owners/company admins to choose an estimate to seed the project budget.
+
+Use existing project estimates data if already available on the project detail page, or fetch estimates using existing APIs.
+
+Rules:
+
+* only show estimates linked to this project
+* prefer status = approved if approval status exists
+* if approval status is not fully built yet, allow draft/sent estimates but label the action clearly
+* do not include estimates from other projects
+* if no estimates exist, show:
+  “No estimates available for this project yet.”
+
+Create button:
+
+* calls POST /api/projects/:projectId/budget with { sourceEstimateId }
+* shows loading while creating
+* on success, invalidates/refetches project budget query
+* shows success toast
+* does not navigate away unless existing app patterns prefer it
+
+5. Permissions.
+
+Read Budget tab:
+Allowed:
+
+* company_owner
+* company admins
+* regular internal contractors with companyId and no contractorType
+* admin/platform support where existing project access allows
+
+Blocked:
+
+* clients
+* subcontractors
+* notaries
+* unauthenticated users
+* users from another company
+
+Write/create/edit budget:
+Allowed:
+
+* company_owner
+* company admins
+* admin/platform support where existing behavior allows
+
+Blocked:
+
+* regular internal contractors
+* clients
+* subcontractors
+* notaries
+* unauthenticated users
+
+If a regular internal contractor opens the Budget tab:
+
+* they can view the budget if it exists
+* they cannot create/edit/delete budget items
+* they should not see edit controls
+
+6. Existing budget display.
+
+If a budget exists, show:
+
+Budget summary card:
+
+* Budget title
+* Status badge: draft / active / locked
+* Total Estimated
+* Total Actual, currently placeholder/0
+* Variance = Total Estimated - Total Actual
+* Source Estimate ID or linked estimate label, if available
+
+Budget items table:
+
+* Category
+* Description
+* Quantity
+* Unit
+* Unit Cost Estimated
+* Total Estimated
+* Actual Cost, placeholder/0 if present
+* Notes, if present
+
+Format currency cleanly.
+
+Do not show internal DB IDs prominently unless useful for debugging.
+
+7. Basic edit controls for company owner/admin only.
+
+If the backend routes already support item create/update/delete from Phase 11H, add minimal controls only if it stays small:
+
+Owner/admin can:
+
+* edit budget title/status/notes
+* add a manual budget item
+* edit a budget item
+* delete a budget item
+
+If this makes the phase too large, defer manual item editing and only build:
+
+* create budget from estimate
+* read-only budget display
+
+Preferred for this phase:
+Keep editing minimal or read-only after creation. Do not build a full spreadsheet editor.
+
+8. Do not build expenses yet.
+
+Actual cost should remain display-only placeholder for now.
+
+Do not add:
+
+* expense entry
+* receipt upload
+* actual spend tracking
+* automatic totalActual updates
+* budget vs actual reports
+
+9. Do not build formulas.
+
+Do not add:
+
+* overhead calculations
+* profit/margin calculations
+* burden/subRate logic
+* Near Me 1%
+* payout/commission formulas
+
+Use the budget item values already stored by the backend.
+
+10. Error handling.
+
+Use parseErrorMessage for API errors.
+
+Common cases:
+
+* duplicate budget returns 409: “This project already has a budget.”
+* bad source estimate
+* inactive company access
+* access denied
+
+Use Billing & Access wording where access is blocked. Do not use “subscription” wording in user-facing errors.
+
+11. Audit behavior.
+
+No new audit events needed unless new write actions are used.
+
+The backend already logs budget create/update/item actions.
+
+12. TypeScript/build check.
+
+Run:
+
+npm run check
+
+No db:push should be needed unless no schema changes are added, which is expected.
+
+Done looks like:
+
+* Project Detail has a Budget tab
+* Budget tab loads existing budget + items
+* No-budget state works
+* Company owner/admin can create budget from a project estimate
+* Regular internal contractors can view but not create/edit
+* Clients/subcontractors/notaries are blocked
+* No formulas/expenses/reports/UI scope creep
+* npm run check passes
