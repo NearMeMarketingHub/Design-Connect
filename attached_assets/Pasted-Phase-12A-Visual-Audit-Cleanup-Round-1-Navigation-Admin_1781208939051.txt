@@ -1,0 +1,289 @@
+Phase 12A: Visual Audit Cleanup Round 1 — Navigation, Admin UI, and TODO cleanup.
+
+Context:
+After completing Phase 11 budget work, a visual audit found several smaller UI/UX and admin-side cleanup issues. This phase should fix the focused polish/bug items only.
+
+Do not change BuildVision branding.
+Do not add Stripe automation.
+Do not build subcontractor multi-company switching.
+Do not build contractor-side sandbox yet.
+Do not build Selections yet.
+Do not consolidate Estimator/Calculator yet.
+Do not overhaul the 3D Floor Plan Builder.
+Do not add expenses, actual-cost tracking, reports, formulas, Gantt, production sheets, or payout logic.
+Do not add schema changes unless absolutely required for a real bug fix.
+
+Goal:
+Clean up confusing navigation, redundant tabs/buttons, raw admin error handling, demo request UI clipping, and missing TODO documentation from the visual audit.
+
+1. Add Back to Home button on Request Demo page.
+
+On the public Request Demo page, add an obvious visible button/link:
+
+Label:
+“Back to Home”
+
+Behavior:
+Navigate back to the public home page.
+
+Do not rely only on the logo for navigation.
+
+2. Fix Admin/Audit Log raw database error.
+
+Admin pages are showing large raw database/code error blocks. One observed error:
+
+“op ANY/ALL (array) requires array on the right side”
+
+Investigate likely affected backend query code, especially Audit Log/company enrichment logic.
+
+Likely fix:
+Replace unsafe raw ANY/ALL array SQL usage with Drizzle-safe `inArray(...)` queries or otherwise ensure the right side is a real SQL array.
+
+Search for patterns like:
+
+* `ANY(`
+* `ALL(`
+* raw SQL using arrays
+* audit log company enrichment queries
+
+Do not change intended filtering behavior.
+
+3. Improve admin error display.
+
+Admin pages should not show giant raw database/code blocks to users.
+
+If an admin query fails:
+
+* show a clean destructive Alert/card/toast
+* use parseErrorMessage where appropriate
+* keep detailed raw error logging in console/server logs only
+
+Do not swallow errors silently.
+
+4. Fix Demo Requests / Leads status clipping.
+
+On the Admin Demo Requests / Leads page, the status dropdown/select is too narrow. Example: “Demo Scheduled” gets clipped.
+
+Fix:
+
+* widen the Status column/dropdown/select trigger
+* ensure all status labels display fully
+* keep table layout clean
+
+5. Rename Billing & Access button.
+
+On the company-side Billing & Access section:
+
+Change:
+“Start Subscription”
+
+To:
+“Manage Subscription”
+
+Do not hide the Stripe buttons in this phase.
+Do not add live Stripe behavior.
+Do not change Billing & Access logic.
+
+6. Remove duplicate Team sidebar tab.
+
+The company/contractor sidebar has a separate “Team” item, but Team is already available inside Admin Center.
+
+Remove the separate Team sidebar nav item.
+
+Team should remain accessible from:
+Admin Center → Team
+
+Do not remove the Team section inside Admin Center.
+
+7. Remove Price Book tab from Admin Center.
+
+Admin Center currently duplicates Price Book/Budget Manager functionality.
+
+Remove the “Price Book” tab/section from Admin Center.
+
+Budget Manager should remain the main place for Price Book / budget sheet management.
+
+Do not remove Budget Manager from the sidebar.
+
+8. Ensure Budget Manager has Add Category for owner/admin.
+
+Since Budget Manager becomes the main Price Book management area, confirm it includes an Add Category action.
+
+Visible/usable for:
+
+* company_owner
+* company admin
+* platform admin, if applicable
+
+Hidden/blocked for:
+
+* regular internal contractors, unless already intentionally allowed read-only
+* clients
+* subcontractors
+* notaries
+
+Do not expand permissions beyond existing intended owner/admin management access.
+
+9. Remove Budget Manager “Back to Dashboard” quick action.
+
+Budget Manager has a “Back to Dashboard” quick action that is redundant because Dashboard already exists in the sidebar.
+
+Remove that quick action/button.
+
+Do not remove the sidebar Dashboard item.
+
+10. Fix Financials subpage back buttons.
+
+Financials acts as the hub for financial tools. Financial subpages currently have “Back to Dashboard” buttons that route users back to Admin Center or the wrong place.
+
+For financial subpages such as:
+
+* Sales Dashboard
+* Accounting, if applicable
+* any other page launched from Financials
+
+Change page-level back button text/behavior to:
+
+“Back to Financials”
+
+And route it to the Financial back button text/behavior to:
+
+“Back to Financials”
+
+And route it to the Financials hub.
+
+Do not change the sidebar Dashboard behavior.
+
+11. Remove redundant Invoice button from Financials.
+
+Accounting already has the New Invoice action.
+
+Remove the redundant invoice button from the Financials hub if it duplicates Accounting’s New Invoice button.
+
+Financials should act as a hub/overview.
+Accounting should own invoice creation.
+
+12. Clarify Pricing & Access “Access Options.”
+
+On Admin Pricing & Access, add short helper text explaining:
+
+Free Access Enabled:
+Allows Super Admins to use free/demo-style access for company accounts.
+
+Prepaid Access Enabled:
+Allows Super Admins to use prepaid/included access for companies paying outside the app.
+
+Manual Billing:
+Billing & Access is managed manually by Super Admins.
+
+Do not use trial wording.
+Do not reintroduce subscription-tier wording.
+
+13. Clarify Admin Projects Assign button.
+
+On the Admin Projects page, the “Assign” button should be clearer.
+
+Change label to:
+“Assign Primary Contractor”
+
+Dialog title:
+“Assign Primary Contractor”
+
+Helper text:
+“Choose the primary contractor/company responsible for this project.”
+
+Do not change assignment logic.
+Do not add subcontractor assignment in this phase.
+
+14. Confirm HubSpot status copy.
+
+The Demo Requests / Leads page currently shows HubSpot as “Not Configured.”
+
+Do not implement new HubSpot functionality in this phase.
+
+Only ensure the UI clearly communicates that HubSpot is not configured when required secrets are missing.
+
+If helper text is needed:
+“HubSpot is not configured. Add the required HubSpot access token to enable demo request syncing.”
+
+Do not expose secret names in public/client-facing areas if inappropriate. Super Admin-only areas may mention configuration requirements.
+
+15. Add Selections / Job Book Import & Create back to TODO doc.
+
+The Home Depot-specific idea was scrapped, but the core Selections feature should remain in the roadmap as vendor-neutral.
+
+Add a TODO section:
+
+Future Phase: Selections / Job Book Import & Create
+
+Include:
+
+* Company can import or create selection categories/options
+* Client can choose selection options from the client portal
+* Choices flow back to the project management side
+* Supports job books / selection sheets / spreadsheets / manual creation
+* Vendor-neutral; no Home Depot-specific integration
+* Future support for images/files/notes/statuses
+* Company/project scoped
+* Clients only see client-facing selection info
+* Internal notes/costs remain hidden
+* Do not build this feature in Phase 12A
+
+16. Add Visual Audit Notes section to TODO doc.
+
+Add a section for deferred/later visual audit items.
+
+Include deferred items:
+
+* Subcontractor multi-company access / company switcher
+* Contractor-side sandbox
+* Estimator Calculator / Calculator consolidation
+* Selections full build
+* 3D Floor Plan Builder overhaul and orientation audit
+* Actual spend / expenses tracking
+* Budget reports / production sheets
+* EOD reporting
+* Permitting tracker
+
+17. Do not build larger deferred items.
+
+Specifically do not build:
+
+* subcontractor multi-company switching
+* contractor sandbox
+* estimator/calculator consolidation
+* selections feature
+* 3D floor plan overhaul
+* expenses/actual spend
+* reports
+
+Only document them in TODO where needed.
+
+18. Run checks.
+
+Run:
+
+npm run check
+
+No db:push should be needed unless a schema change is unexpectedly introduced, which should be avoided.
+
+Done looks like:
+
+* Request Demo page has Back to Home button
+* Admin/Audit Log raw ANY/ALL array error is fixed
+* Admin errors display cleanly
+* Demo Requests status labels fit
+* Start Subscription label changed to Manage Subscription
+* Team sidebar tab removed; Team remains inside Admin Center
+* Price Book removed from Admin Center; Budget Manager remains
+* Budget Manager has Add Category for owner/admin
+* Budget Manager redundant Back to Dashboard button removed
+* Financial subpages use Back to Financials
+* Financials redundant invoice button removed
+* Pricing & Access helper text added
+* Admin Projects Assign wording clarified
+* HubSpot Not Configured state is clearer
+* TODO doc includes Selections / Job Book Import & Create
+* TODO doc includes deferred visual audit items
+* No major new features added
+* npm run check passes
