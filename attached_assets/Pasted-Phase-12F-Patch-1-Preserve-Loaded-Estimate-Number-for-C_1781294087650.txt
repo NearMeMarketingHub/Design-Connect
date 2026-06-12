@@ -1,0 +1,65 @@
+Phase 12F Patch 1: Preserve Loaded Estimate Number for Calculator PDF Export
+
+Context:
+Phase 12F added Calculator / Estimates tabs to `/contractor/calculator`. The Estimates tab can load a saved estimate into the Calculator tab.
+
+Issue:
+When loading a saved estimate, the code currently sets `loadedFromId`, but clears `savedCustomId`. Because the Calculator tab PDF export uses `savedCustomId`, exporting a loaded estimate from the Calculator tab shows it as a draft instead of showing the loaded estimate number.
+
+Goal:
+When a saved estimate is loaded into the Calculator tab, preserve its custom ID for PDF export.
+
+Out of scope:
+
+* No schema changes
+* No db:push
+* No estimate update/edit route
+* No overwrite-existing-estimate behavior
+* No PDF redesign
+* No branded PDF work
+* No project conversion
+* No changes to `/company/estimates`
+
+Task:
+In `client/src/pages/contractor-calculator.tsx`, find the Load estimate handler.
+
+It currently does something like:
+
+```ts
+setSavedCustomId(null);
+setLoadedFromId(data.customId ?? estimateCustomId);
+```
+
+Change it so the loaded estimate custom ID is assigned to both `savedCustomId` and `loadedFromId`.
+
+Use a safe shared value:
+
+```ts
+const loadedCustomId = data.customId ?? estimateCustomId;
+setSavedCustomId(loadedCustomId);
+setLoadedFromId(loadedCustomId);
+```
+
+Expected behavior:
+
+* Loading a saved estimate still populates client name, job description, and cart items
+* Loading a saved estimate still switches to the Calculator tab
+* The UI can still show that saving will create a new estimate/copy if that behavior already exists
+* Export PDF from the Calculator tab after loading a saved estimate includes the loaded estimate number
+* Saving after loading should still create a new estimate/copy unless full update behavior is explicitly added later
+* After saving as new, the new custom ID should replace the loaded custom ID, as currently intended
+
+Run:
+
+```bash
+npm run check
+```
+
+Done looks like:
+
+* Loaded estimate PDF export from Calculator tab includes the loaded estimate custom ID
+* Estimates tab export still works independently
+* Save-as-new behavior remains unchanged
+* No schema changes
+* No db:push
+* `npm run check` passes
