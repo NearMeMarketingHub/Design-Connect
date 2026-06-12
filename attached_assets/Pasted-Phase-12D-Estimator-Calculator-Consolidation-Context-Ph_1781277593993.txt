@@ -1,0 +1,146 @@
+Phase 12D: Estimator Calculator Consolidation
+
+Context:
+Phase 12B renamed the contractor sidebar item from “Calculator” to “Estimator Calculator,” but the app may still have confusing duplicate concepts/routes/pages for “Estimator,” “Calculator,” and “Estimator Calculator.”
+
+The actual page/tool is intended to be the Estimator Calculator. This should be the single main estimate/quote-building tool.
+
+Goal:
+Consolidate Estimator and Calculator naming/navigation so users see one clear tool:
+
+“Estimator Calculator”
+
+Do not rebuild the estimating system in this phase. This is a cleanup/consolidation pass.
+
+Out of scope:
+
+* No schema changes
+* No db:push
+* No new estimate features
+* No Selections build
+* No expenses / actual spend tracking
+* No reports / production sheets
+* No Stripe changes
+* No 3D Floor Plan changes
+* No contractor sandbox
+* No subcontractor multi-company switching
+
+Tasks:
+
+1. Audit current Estimator / Calculator routes and sidebar entries
+
+Inspect:
+
+* `client/src/App.tsx`
+* `client/src/components/layout.tsx`
+* `client/src/pages/estimator.tsx`
+* `client/src/pages/contractor-calculator.tsx`
+* any references to `/estimator`, `/contractor/estimator`, `/contractor/calculator`, or labels like “Estimator,” “Calculator,” or “Estimator Calculator”
+
+Identify which route/page contains the real current estimate/quote-building functionality.
+
+2. Use “Estimator Calculator” as the single user-facing label
+
+All user-facing navigation for the estimate-building tool should say:
+
+“Estimator Calculator”
+
+Avoid showing separate generic labels like:
+
+* “Estimator”
+* “Calculator”
+
+unless they refer to a truly separate non-estimate tool.
+
+Do not rename Floor Calc. Floor Calc should remain separate if it is a flooring-specific tool.
+
+3. Consolidate duplicate route behavior
+
+There should be one primary route for the Estimator Calculator.
+
+Preferred:
+
+* keep the current working route if it is already `/contractor/calculator`
+* make any old duplicate estimator route redirect to the primary Estimator Calculator route instead of showing a separate duplicate page or 404
+
+Examples:
+
+* `/contractor/calculator` can remain the primary route if that is the current working Estimator Calculator page
+* `/estimator` or `/contractor/estimator`, if present, should redirect to `/contractor/calculator` or otherwise point to the same page
+
+Do not break existing links/book otherwise point to the same page
+
+Do not break existing links/bookmarks if avoidable.
+
+4. Remove confusing duplicate sidebar/nav entries
+
+The contractor/company sidebar should show only one estimate-building item:
+
+“Estimator Calculator”
+
+Keep:
+
+* Dashboard
+* My Projects
+* Estimator Calculator
+* Floor Calc
+* 3D Floor Plan
+* Budget Manager / Financials / Admin Center where allowed
+
+Remove/hide any duplicate sidebar item that points to the same estimating purpose.
+
+5. Update page title/copy if needed
+
+The Estimator Calculator page should have consistent copy.
+
+Preferred page title:
+“Estimator Calculator”
+
+Suggested subtitle:
+“Create project estimates and quotes using your company price book.”
+
+Do not remove existing estimate creation, saved estimates, quote line items, project association, or price book item picker functionality.
+
+6. Preserve existing functionality
+
+Do not break:
+
+* estimate/quote creation
+* saved estimates
+* project selection/association
+* price book item selection
+* estimate line items
+* budget creation from estimates, if currently available
+* regular internal contractor access added in earlier phases
+* company owner/admin access
+
+7. Search for stale labels
+
+Search for stale user-facing text:
+
+* “Calculator”
+* “Estimator”
+* “Estimate Calculator”
+* “Estimator Calculator”
+
+Only change labels where they refer to the main estimate-building tool.
+
+Do not change unrelated uses, such as Floor Calc or general calculation text inside formulas.
+
+8. Run check
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* Sidebar shows one clear “Estimator Calculator” item
+* No separate confusing “Estimator” and “Calculator” nav items remain for the same tool
+* Estimator Calculator page title/copy is consistent
+* Old estimator route redirects or safely points to the Estimator Calculator page
+* Existing estimate/quote functionality still works
+* Floor Calc remains separate
+* No schema changes
+* No db:push
+* `npm run check` passes
