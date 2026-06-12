@@ -8,7 +8,14 @@ import { z } from "zod";
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  logo: text("logo"), // Optional company logo URL
+  logo: text("logo"), // Optional company logo URL/path (object storage)
+  primaryColor: text("primary_color"), // Branding: primary color hex (default #1f2937)
+  accentColor: text("accent_color"), // Branding: accent color hex (default #d97706)
+  quoteFooterText: text("quote_footer_text"), // Branding: footer text on estimate PDFs
+  companyPhone: text("company_phone"), // Branding: company phone number
+  companyEmail: text("company_email"), // Branding: company contact email
+  companyAddress: text("company_address"), // Branding: company mailing/physical address
+  companyWebsite: text("company_website"), // Branding: company website URL
   ownerId: varchar("owner_id"), // FK to users — set after user creation (circular dep handled at app layer)
   subscriptionStatus: text("subscription_status").default("free"), // active, free, prepaid, suspended, cancelled, expired (legacy: trialing, past_due)
   trialStartedAt: timestamp("trial_started_at"), // Legacy reference field — not used for access control

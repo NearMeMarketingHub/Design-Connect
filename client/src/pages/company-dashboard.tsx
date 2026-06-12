@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { 
+import {
   Building2, Users, CreditCard, Settings, Plus, Mail, Trash2,
   CheckCircle, Clock, Crown, Wrench, FileText, UserPlus, ChevronRight,
   RefreshCw, AlertCircle, ShieldCheck, AlertTriangle,
-  DollarSign
+  DollarSign, Palette, Upload, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,6 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { parseErrorMessage, apiRequest } from "@/lib/queryClient";
+import { Textarea } from "@/components/ui/textarea";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import type { UppyFile, UploadResult } from "@uppy/core";
 
 const SUBCONTRACTOR_SPECIALTIES = [
   "Plumber", "Electrician", "HVAC Technician", "Roofer", "Carpenter",
@@ -39,6 +42,20 @@ export default function CompanyDashboard() {
     location === "/company/team" ? "team" : "overview"
   );
 
+  // Branding form state — synced from company query on load
+  const [brandingForm, setBrandingForm] = useState({
+    name: "",
+    primaryColor: "#1f2937",
+    accentColor: "#d97706",
+    quoteFooterText: "",
+    companyPhone: "",
+    companyEmail: "",
+    companyAddress: "",
+    companyWebsite: "",
+  });
+  const [logoUploadPath, setLogoUploadPath] = useState<string | null>(null);
+  const [logoVersion, setLogoVersion] = useState(0);
+
   useEffect(() => {
     if (location === "/company/team") {
       setActiveTab("team");
@@ -52,6 +69,22 @@ export default function CompanyDashboard() {
     queryFn: () => apiRequest("GET", "/api/company/mine").then(r => r.json()),
     enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
   });
+
+  // Sync branding form whenever company data loads or changes
+  useEffect(() => {
+    if (company) {
+      setBrandingForm({
+        name: company.name ?? "",
+        primaryColor: (company as any).primaryColor ?? "#1f2937",
+        accentColor: (company as any).accentColor ?? "#d97706",
+        quoteFooterText: (company as any).quoteFooterText ?? "",
+        companyPhone: (company as any).companyPhone ?? "",
+        companyEmail: (company as any).companyEmail ?? "",
+        companyAddress: (company as any).companyAddress ?? "",
+        companyWebsite: (company as any).companyWebsite ?? "",
+      });
+    }
+  }, [company]);
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["/api/company/members", company?.id],
@@ -79,6 +112,8 @@ export default function CompanyDashboard() {
     user?.role === "company_owner" ||
     (user?.role === "contractor" && user?.isCompanyAdmin &&
       user?.contractorType !== "subcontractor" && user?.contractorType !== "notary");
+  const canEditBranding =
+    user?.role === "company_owner" || user?.role === "admin" || user?.isCompanyAdmin === true;
 
   const { data: stripeConfig } = useQuery({
     queryKey: ["/api/stripe/config"],
@@ -220,6 +255,67 @@ export default function CompanyDashboard() {
       toast({ title: "Error", description: parseErrorMessage(err), variant: "destructive" });
     },
   });
+
+  // ── Branding mutations ────────────────────────────────────────────────────
+  const saveBrandingMutation = useMutation({
+    mutationFn: async (data: typeof brandingForm) => {
+      const res = await apiRequest("PATCH", "/api/company/mine", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company/mine"] });
+      toast({ title: "Branding saved", description: "Company branding has been updated." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Save failed", description: parseErrorMessage(err), variant: "destructive" });
+    },
+  });
+
+  const saveLogoMutation = useMutation({
+    mutationFn: async (objectPath: string) => {
+      const res = await apiRequest("PATCH", "/api/company/mine", { logo: objectPath });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company/branding"] });
+      setLogoVersion((v) => v + 1);
+      toast({ title: "Logo updated", description: "Company logo has been saved." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Logo save failed", description: parseErrorMessage(err), variant: "destructive" });
+    },
+  });
+
+  const getLogoUploadParameters = useCallback(
+    async (file: UppyFile<Record<string, unknown>, Record<string, unknown>>) => {
+      const res = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!res.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await res.json();
+      setLogoUploadPath(objectPath);
+      return {
+        method: "PUT" as const,
+        url: uploadURL,
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+      };
+    },
+    []
+  );
+
+  const handleLogoUploadComplete = useCallback(
+    (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+      if (result.successful && result.successful.length > 0 && logoUploadPath) {
+        saveLogoMutation.mutate(logoUploadPath);
+        setLogoUploadPath(null);
+      }
+    },
+    [logoUploadPath, saveLogoMutation]
+  );
 
   const activeProjects = projects.filter((p: any) => p.status !== "completed");
   const completedProjects = projects.filter((p: any) => p.status === "completed");
@@ -729,23 +825,198 @@ export default function CompanyDashboard() {
           )}
         </TabsContent>
 
-        {/* Settings Tab */}
+        {/* Settings / Branding Tab */}
         <TabsContent value="settings" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Company Settings
+                <Palette className="w-5 h-5" />
+                Company Branding
               </CardTitle>
+              <CardDescription>
+                {canEditBranding
+                  ? "Customize your company's logo, colors, and contact info used in estimate PDFs."
+                  : "Your company's branding settings. Contact your company owner to make changes."}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Company Name</Label>
-                <Input defaultValue={company?.name} data-testid="input-company-name" />
+            <CardContent className="space-y-6">
+              {/* Logo */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  <div className="w-28 h-16 rounded border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                    {(company as any)?.logo ? (
+                      <img
+                        src={`/api/company/branding/logo?v=${logoVersion}`}
+                        alt="Company logo"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <Building2 className="w-8 h-8 text-muted-foreground opacity-40" />
+                    )}
+                  </div>
+                  {canEditBranding && (
+                    <div className="space-y-1">
+                      <ObjectUploader
+                        maxNumberOfFiles={1}
+                        maxFileSize={5 * 1024 * 1024}
+                        onGetUploadParameters={getLogoUploadParameters}
+                        onComplete={handleLogoUploadComplete}
+                        buttonVariant="outline"
+                        testId="button-upload-logo"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {(company as any)?.logo ? "Replace Logo" : "Upload Logo"}
+                      </ObjectUploader>
+                      <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Max 5 MB.</p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="pt-2">
-                <Button data-testid="button-save-company">Save Changes</Button>
+
+              {/* Company Name */}
+              <div className="space-y-1">
+                <Label htmlFor="branding-name">Company Name</Label>
+                <Input
+                  id="branding-name"
+                  value={brandingForm.name}
+                  onChange={(e) => setBrandingForm((f) => ({ ...f, name: e.target.value }))}
+                  disabled={!canEditBranding}
+                  data-testid="input-branding-name"
+                />
               </div>
+
+              {/* Colors */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="primary-color">Primary Color</Label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={brandingForm.primaryColor}
+                      onChange={(e) => setBrandingForm((f) => ({ ...f, primaryColor: e.target.value }))}
+                      disabled={!canEditBranding}
+                      className="w-10 h-9 rounded border cursor-pointer p-0.5 bg-white"
+                      data-testid="input-primary-color-picker"
+                    />
+                    <Input
+                      id="primary-color"
+                      value={brandingForm.primaryColor}
+                      onChange={(e) => setBrandingForm((f) => ({ ...f, primaryColor: e.target.value }))}
+                      disabled={!canEditBranding}
+                      placeholder="#1f2937"
+                      className="font-mono"
+                      data-testid="input-primary-color"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Header bar &amp; table headers in PDFs.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="accent-color">Accent Color</Label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={brandingForm.accentColor}
+                      onChange={(e) => setBrandingForm((f) => ({ ...f, accentColor: e.target.value }))}
+                      disabled={!canEditBranding}
+                      className="w-10 h-9 rounded border cursor-pointer p-0.5 bg-white"
+                      data-testid="input-accent-color-picker"
+                    />
+                    <Input
+                      id="accent-color"
+                      value={brandingForm.accentColor}
+                      onChange={(e) => setBrandingForm((f) => ({ ...f, accentColor: e.target.value }))}
+                      disabled={!canEditBranding}
+                      placeholder="#d97706"
+                      className="font-mono"
+                      data-testid="input-accent-color"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total row highlight in PDFs.</p>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="branding-phone">Phone</Label>
+                  <Input
+                    id="branding-phone"
+                    value={brandingForm.companyPhone}
+                    onChange={(e) => setBrandingForm((f) => ({ ...f, companyPhone: e.target.value }))}
+                    disabled={!canEditBranding}
+                    placeholder="(555) 123-4567"
+                    data-testid="input-branding-phone"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="branding-email">Email</Label>
+                  <Input
+                    id="branding-email"
+                    value={brandingForm.companyEmail}
+                    onChange={(e) => setBrandingForm((f) => ({ ...f, companyEmail: e.target.value }))}
+                    disabled={!canEditBranding}
+                    placeholder="hello@yourcompany.com"
+                    data-testid="input-branding-email"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="branding-website">Website</Label>
+                <Input
+                  id="branding-website"
+                  value={brandingForm.companyWebsite}
+                  onChange={(e) => setBrandingForm((f) => ({ ...f, companyWebsite: e.target.value }))}
+                  disabled={!canEditBranding}
+                  placeholder="https://yourcompany.com"
+                  data-testid="input-branding-website"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="branding-address">Address</Label>
+                <Input
+                  id="branding-address"
+                  value={brandingForm.companyAddress}
+                  onChange={(e) => setBrandingForm((f) => ({ ...f, companyAddress: e.target.value }))}
+                  disabled={!canEditBranding}
+                  placeholder="123 Main St, City, FL 12345"
+                  data-testid="input-branding-address"
+                />
+              </div>
+
+              {/* Quote Footer */}
+              <div className="space-y-1">
+                <Label htmlFor="branding-footer">Quote Footer Text</Label>
+                <Textarea
+                  id="branding-footer"
+                  value={brandingForm.quoteFooterText}
+                  onChange={(e) => setBrandingForm((f) => ({ ...f, quoteFooterText: e.target.value }))}
+                  disabled={!canEditBranding}
+                  placeholder="This estimate is valid for 30 days. All prices subject to change."
+                  rows={3}
+                  data-testid="textarea-branding-footer"
+                />
+                <p className="text-xs text-muted-foreground">Appears at the bottom of all estimate PDFs.</p>
+              </div>
+
+              {canEditBranding && (
+                <div className="pt-2">
+                  <Button
+                    onClick={() => saveBrandingMutation.mutate(brandingForm)}
+                    disabled={saveBrandingMutation.isPending}
+                    data-testid="button-save-branding"
+                  >
+                    {saveBrandingMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save Branding"
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -944,7 +944,21 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
-  // Update current user's company (owner or company admin only)
+  // Branding-only allowlist — used to validate PATCH /api/company/mine from branding form
+  const companyBrandingSchema = z.object({
+    name: z.string().min(1).optional(),
+    logo: z.string().nullable().optional(),
+    primaryColor: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).nullable().optional(),
+    accentColor: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).nullable().optional(),
+    quoteFooterText: z.string().nullable().optional(),
+    companyPhone: z.string().nullable().optional(),
+    companyEmail: z.string().nullable().optional(),
+    companyAddress: z.string().nullable().optional(),
+    companyWebsite: z.string().nullable().optional(),
+  });
+
+  // Update current user's company branding (owner or company admin only)
+  // Uses strict Zod allowlist — billing/Stripe fields are stripped and cannot be written
   app.patch("/api/company/mine", requireAuth, async (req, res, next) => {
     try {
       const user = req.user as User;
@@ -952,9 +966,64 @@ export async function registerRoutes(
       if (user.role !== "company_owner" && user.role !== "admin" && user.isCompanyAdmin !== true) {
         return res.status(403).json({ message: "Only company owners and admins can update company settings" });
       }
-      const updated = await storage.updateCompany(user.companyId, req.body);
+      const parseResult = companyBrandingSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid branding data", errors: parseResult.error.issues });
+      }
+      const updated = await storage.updateCompany(user.companyId, parseResult.data);
       res.json(updated);
     } catch (error) { next(error); }
+  });
+
+  // Read-only branding endpoint for Estimator Calculator PDF export
+  // Allowed: company_owner, internal contractor (no subcontractor/notary contractorType), company admins
+  // Blocked: clients, subcontractors, notaries, anyone without companyId (including platform admins)
+  app.get("/api/company/branding", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) return res.status(404).json({ message: "No company branding found" });
+      if (user.role === "client") return res.status(403).json({ message: "Access denied" });
+      if (user.contractorType === "subcontractor" || user.contractorType === "notary") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const company = await storage.getCompany(user.companyId);
+      if (!company) return res.status(404).json({ message: "No company branding found" });
+      res.json({
+        logo: company.logo ?? null,
+        name: company.name,
+        primaryColor: company.primaryColor ?? null,
+        accentColor: company.accentColor ?? null,
+        quoteFooterText: company.quoteFooterText ?? null,
+        companyPhone: company.companyPhone ?? null,
+        companyEmail: company.companyEmail ?? null,
+        companyAddress: company.companyAddress ?? null,
+        companyWebsite: company.companyWebsite ?? null,
+      });
+    } catch (error) { next(error); }
+  });
+
+  // Proxy company logo image for PDF export — bypasses object storage ACL complexity
+  // Allowed: same rules as /api/company/branding
+  app.get("/api/company/branding/logo", requireAuth, async (req, res, next) => {
+    try {
+      const user = req.user as User;
+      if (!user.companyId) return res.status(404).end();
+      if (user.role === "client") return res.status(403).end();
+      if (user.contractorType === "subcontractor" || user.contractorType === "notary") return res.status(403).end();
+      const company = await storage.getCompany(user.companyId);
+      if (!company?.logo) return res.status(404).end();
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage");
+      const objectStorage = new ObjectStorageService();
+      const file = await objectStorage.getObjectEntityFile(company.logo);
+      const ext = company.logo.split(".").pop()?.toLowerCase();
+      const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "private, max-age=300");
+      await objectStorage.downloadObject(file, res);
+    } catch (error: any) {
+      if (error.name === "ObjectNotFoundError") return res.status(404).end();
+      next(error);
+    }
   });
 
   // Get company members (only owner, company admin, or platform admin)
