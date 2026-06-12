@@ -42,7 +42,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  AlertTriangle,
 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Project } from "@shared/schema";
 
 const PAGE_SIZE = 25;
@@ -59,7 +61,7 @@ export default function AdminProjects() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedContractorId, setSelectedContractorId] = useState<string>("");
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading, isError: projectsError } = useQuery({
     queryKey: ["/api/admin/projects"],
     queryFn: () => api.getAdminProjects(),
     enabled: user?.role === "admin",
@@ -160,7 +162,14 @@ export default function AdminProjects() {
 
         <Card>
           <CardContent className="p-0">
-            {projectsLoading ? (
+            {projectsError ? (
+              <Alert variant="destructive" className="m-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Failed to load projects. Please refresh and try again.
+                </AlertDescription>
+              </Alert>
+            ) : projectsLoading ? (
               <div className="flex items-center justify-center py-10">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>

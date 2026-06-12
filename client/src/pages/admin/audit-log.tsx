@@ -29,8 +29,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X, ChevronDown, ChevronRight, ArrowRight, CreditCard } from "lucide-react";
+import { FileText, Search, Info, Building2, User, Link2, CalendarCheck, Settings, Loader2, RefreshCw, X, ChevronDown, ChevronRight, ArrowRight, CreditCard, AlertTriangle } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { parseErrorMessage } from "@/lib/queryClient";
 
 interface AuditEvent {
   id: string;
@@ -371,7 +373,7 @@ export default function AdminAuditLog() {
 
   const queryString = useMemo(() => new URLSearchParams(params).toString(), [params]);
 
-  const { data, isLoading, isFetching, refetch } = useQuery<AuditLogResponse>({
+  const { data, isLoading, isFetching, refetch, isError, error } = useQuery<AuditLogResponse>({
     queryKey: ["/api/admin/audit-log", queryString],
     queryFn: () =>
       apiRequest("GET", `/api/admin/audit-log?${queryString}`).then((r) => r.json()),
@@ -528,7 +530,14 @@ export default function AdminAuditLog() {
         {/* Table */}
         <Card>
           <CardContent className="p-0">
-            {isLoading ? (
+            {isError ? (
+              <Alert variant="destructive" className="m-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Failed to load audit events. {parseErrorMessage(error as Error)}
+                </AlertDescription>
+              </Alert>
+            ) : isLoading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>

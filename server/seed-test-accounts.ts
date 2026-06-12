@@ -26,56 +26,62 @@ const TEST_PASSWORD = "Test123!";
 export async function seedTestAccounts(): Promise<void> {
   console.log("[seed-test-accounts] Checking test accounts...");
 
+  // ── Resolve testcontractor's company (used by testcompanyadmin and testteammember) ──
+  const [tcUser] = await db.select().from(schema.users).where(eq(schema.users.username, "testcontractor"));
+  const tcCompanyId = tcUser?.companyId ?? null;
+
   // ── testcompanyadmin ─────────────────────────────────────────────────────────
   // Same company as testcontractor; isCompanyAdmin=true gives edit access
   // but no company-owner-level privileges (e.g. cannot transfer ownership).
-  const TC_COMPANY_ID = "3d8b9dd4-0ad9-4057-82ec-37ce6cc86ef3";
-
-  const [existingCompanyAdmin] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.username, "testcompanyadmin"));
-
-  if (!existingCompanyAdmin) {
-    const hashedPassword = await bcrypt.hash(TEST_PASSWORD, 10);
-    await db.insert(schema.users).values({
-      username: "testcompanyadmin",
-      email: "testcompanyadmin@buildvision.test",
-      password: hashedPassword,
-      role: "contractor",
-      contractorType: null,
-      companyId: TC_COMPANY_ID,
-      isCompanyAdmin: true,
-      isApproved: true,
-    });
-    console.log("[seed-test-accounts] Created testcompanyadmin account.");
+  if (!tcCompanyId) {
+    console.log("[seed-test-accounts] testcontractor not found or has no company — skipping testcompanyadmin and testteammember.");
   } else {
-    console.log("[seed-test-accounts] testcompanyadmin already exists — skipping.");
-  }
+    const [existingCompanyAdmin] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "testcompanyadmin"));
 
-  // ── testteammember ───────────────────────────────────────────────────────────
-  // Same company as testcontractor; regular internal contractor with no admin flag.
-  // Can view projects, estimates, budget (read-only), messages. Cannot edit or create.
-  const [existingTeamMember] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.username, "testteammember"));
+    if (!existingCompanyAdmin) {
+      const hashedPassword = await bcrypt.hash(TEST_PASSWORD, 10);
+      await db.insert(schema.users).values({
+        username: "testcompanyadmin",
+        email: "testcompanyadmin@buildvision.test",
+        password: hashedPassword,
+        role: "contractor",
+        contractorType: null,
+        companyId: tcCompanyId,
+        isCompanyAdmin: true,
+        isApproved: true,
+      });
+      console.log("[seed-test-accounts] Created testcompanyadmin account.");
+    } else {
+      console.log("[seed-test-accounts] testcompanyadmin already exists — skipping.");
+    }
 
-  if (!existingTeamMember) {
-    const hashedPassword = await bcrypt.hash(TEST_PASSWORD, 10);
-    await db.insert(schema.users).values({
-      username: "testteammember",
-      email: "testteammember@buildvision.test",
-      password: hashedPassword,
-      role: "contractor",
-      contractorType: null,
-      companyId: TC_COMPANY_ID,
-      isCompanyAdmin: false,
-      isApproved: true,
-    });
-    console.log("[seed-test-accounts] Created testteammember account.");
-  } else {
-    console.log("[seed-test-accounts] testteammember already exists — skipping.");
+    // ── testteammember ───────────────────────────────────────────────────────────
+    // Same company as testcontractor; regular internal contractor with no admin flag.
+    // Can view projects, estimates, budget (read-only), messages. Cannot edit or create.
+    const [existingTeamMember] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "testteammember"));
+
+    if (!existingTeamMember) {
+      const hashedPassword = await bcrypt.hash(TEST_PASSWORD, 10);
+      await db.insert(schema.users).values({
+        username: "testteammember",
+        email: "testteammember@buildvision.test",
+        password: hashedPassword,
+        role: "contractor",
+        contractorType: null,
+        companyId: tcCompanyId,
+        isCompanyAdmin: false,
+        isApproved: true,
+      });
+      console.log("[seed-test-accounts] Created testteammember account.");
+    } else {
+      console.log("[seed-test-accounts] testteammember already exists — skipping.");
+    }
   }
 
   // Ensure testsubcontractor exists (the only test account not created elsewhere)
@@ -121,17 +127,11 @@ export async function seedTestAccounts(): Promise<void> {
     );
 
   if (!existingMembership) {
-    // Find testcontractor to use as the addedBy reference
-    const [addedByUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.username, "testcontractor"));
-
     await db.insert(schema.projectTeamMembers).values({
       projectId: PROJECT_ID,
       contractorId: subId,
       role: "subcontractor",
-      addedBy: addedByUser?.id ?? null,
+      addedBy: tcUser?.id ?? null,
       permissions: DEFAULT_SUBCONTRACTOR_PERMISSIONS,
       isProjectLead: false,
     });
@@ -141,7 +141,6 @@ export async function seedTestAccounts(): Promise<void> {
   }
 
   // Ensure testcontractor's company is not stuck on a legacy trialing status
-  const [tcUser] = await db.select().from(schema.users).where(eq(schema.users.username, "testcontractor"));
   if (tcUser?.companyId) {
     const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, tcUser.companyId));
     if (company && company.subscriptionStatus === "trialing") {
