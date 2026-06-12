@@ -1,0 +1,244 @@
+Phase 12D Patch 1: Estimator Calculator Pre-Project Quote Audit & Plan
+
+Context:
+The Estimator Calculator is intended to be a contractor-facing sales/quote tool used during meetings with potential clients.
+
+Important product clarification:
+The Estimator Calculator should connect to the company’s Price Book, which is set up and managed by the Company Owner or Company Admin. A contractor should be able to meet with a potential client, build an estimate/quote from that company Price Book, and save/export the result as a PDF so it can be printed or saved digitally.
+
+This estimate may be created before a project exists.
+
+Current issue:
+There are currently two different estimator-related experiences:
+
+1. `/contractor/calculator`
+
+* sidebar-accessible
+* connects to price book categories/items
+* better matches the “contractor quickly builds quote from price book” concept
+* but appears incomplete because it lacks full save/export quote workflow
+
+2. `/company/estimates`
+
+* accessible from Financials
+* has project selector, manual line items, Save Estimate, Financial Summary, Recent Estimates
+* but requires selecting an existing project, which does not fit pre-project client quoting
+
+Goal of this audit:
+Do not build the final estimator yet. First audit the current estimator/calculator data model, routes, UI, and PDF/export options so we can safely build one proper Estimator Calculator workflow next.
+
+The final Estimator Calculator should:
+
+* stay in the contractor/company sidebar for quick access
+* connect to the company Price Book
+* allow contractors to add price book items to an estimate/quote
+* allow manual line items if appropriate
+* allow prospect/client info before a project exists
+* not require an existing project
+* save the quote/estimate as a draft
+* export/save the quote as a PDF
+* support printing or digital saving
+* optionally connect to a project later if the quote becomes a real job
+* preserve existing project-based estimates where applicable
+
+Out of scope for this audit:
+
+* Do not build the final estimator yet
+* Do not delete either estimator page yet
+* Do not redirect routes yet
+* Do not change schema yet
+* Do not db:push
+* Do not add Selections, expenses, reports, contractor sandbox, subcontractor switching, Stripe changes, or 3D changes
+
+Audit tasks:
+
+1. Audit current estimate/project requirements changes, or 3D changes
+
+Audit tasks:
+
+1. Audit current estimate/project requirements
+
+Inspect:
+
+* `shared/schema.ts`
+* estimate tables
+* estimate line item tables
+* insert schemas
+* estimate API routes
+* estimate storage methods
+* frontend estimate save/load logic
+
+Determine:
+
+* Is `projectId` required for an estimate?
+* Can an estimate exist with only `companyId`?
+* Can an estimate store prospect/client info without a project?
+* Are customer/client fields available outside project records?
+* Does the save estimate API require a project ID?
+* What breaks if projectId becomes optional?
+* Would a schema change be needed for pre-project quotes?
+
+2. Audit Price Book connection
+
+Inspect:
+
+* Budget Manager / Price Book data model
+* price book category/item tables
+* price book APIs
+* `/contractor/calculator`
+* `/company/estimates`
+
+Determine:
+
+* Which page already connects to Price Book
+* Whether Price Book items can be added to estimate line items
+* Whether price book item IDs are preserved on estimate lines
+* Whether contractor users can read the company Price Book
+* Whether Company Owner/Admin Price Book management is separate and protected
+
+3. Audit PDF/export capability
+
+Search for existing PDF/export functionality:
+
+* PDF libraries
+* document export utilities
+* invoice PDF/export
+* estimate PDF/export
+* print helpers
+* existing server PDF generation
+* existing client print/export logic
+
+Determine:
+
+* Is there already an estimate PDF export?
+* Is there an invoice PDF export that can be adapted?
+* Should estimate PDFs be generated client-side or server-side?
+* What fields should be included in the PDF?
+* Are company logo/contact details available?
+* Are client/prospect fields available?
+* Are totals, line items, notes, date, and estimate number available?
+
+4. Audit both current estimator pages
+
+Inspect:
+
+* `client/src/pages/contractor-calculator.tsx`
+* `client/src/pages/estimator.tsx`
+* routes in `client/src/App.tsx`
+* sidebar link in `client/src/components/layout.tsx`
+* Financials link in `client/src/pages/company-financials.tsx`
+
+Summarize what each page currently does.
+
+Identify which parts should be preserved in the final Estimator Calculator:
+
+From `/contractor/calculator`:
+
+* price book category list
+* searchable price book item picker
+* add-to-estimate/cart workflow
+* quick meeting-friendly layout
+
+From `/company/estimates`:
+
+* saved estimate model
+* line item table
+* financial summary
+* estimate status
+* recent estimates
+* save/load behavior
+* project association, but optional only
+
+Needed additions:
+
+* prospect/client info fields
+* PDF export/save/print
+* optional project association
+* professional quote layout
+
+5. Define final desired workflow
+
+Document this intended workflow:
+
+* Company Owner/Admin sets up Price Book in Budget Manager
+* Contractor opens Estimator Calculator from sidebar
+* Contractor enters potential client/prospect details
+* Contractor optionally selects an existing project, but this is not required
+* Contractor builds quote using company Price Book items and/or manual line items
+* Contractor reviews subtotal, labor/material, overhead/profit if supported
+* Contractor saves the estimate as draft
+* Contractor exports/saves the estimate as a PDF
+* Contractor can print the PDF or send/save it digitally
+* Later, accepted estimate can be connected to a project and possibly used for project budget creation
+
+6. Recommend safest implementation approach
+
+Based on the audit, recommend one of these:
+
+Option A:
+Frontend/API consolidation only if existing data model already supports projectless estimates and PDF export is already available.
+
+Option B:
+Small backend/API update if estimates can be represented without a project, but routes currently require projectId.
+
+Option C:
+Schema update if estimates cannot currently exist without projectId or prospect/client fields.
+
+Be explicit:
+
+* whether `projectId` must become optional
+* whether new prospect/client fields are needed
+* whether PDF export requires a new route/util
+* whether `db:push` would be needed in the next build phase
+
+7. Create audit document
+
+Add:
+
+`ESTIMATOR_CALCULATOR_AUDIT.md`
+
+Include:
+
+* current route/page summary
+* current data model findings
+* Price Book connection findings
+* projectId requirement findings
+* PDF/export findings
+* final recommended workflow
+* recommended final route
+* recommended final UI structure
+* schema/API risks
+* suggested build steps for the next phase
+
+8. Do not change production behavior yet
+
+This is audit/documentation only.
+
+Do not change:
+
+* routes
+* sidebar links
+* schema
+* save estimate behavior
+* PDF behavior
+* Price Book behavior
+* project association behavior
+
+9. Run check
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* `ESTIMATOR_CALCULATOR_AUDIT.md` exists
+* It explains how to build the true pre-project Estimator Calculator
+* It confirms whether estimates can exist without a project today
+* It confirms how Price Book items connect to estimates today
+* It confirms what PDF/export support exists today
+* It recommends the safest next build plan
+* No production behavior changes
+* No schema changes
+* No db:push
+* `npm run check` passes
