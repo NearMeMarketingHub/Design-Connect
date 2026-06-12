@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useConfirm } from "@/hooks/use-confirm";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Calculator,
   Search,
@@ -45,9 +44,12 @@ import {
   Save,
   X,
   ChevronRight,
+  Loader2,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
 
 interface BudgetCategory {
   id: string;
@@ -79,15 +81,37 @@ interface EstimateLineItem {
   quantity: number;
 }
 
+function generateCustomId() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const rand = Math.random().toString(16).slice(2, 6).toUpperCase();
+  return `EST-${y}${m}${day}-${rand}`;
+}
+
+function formatCurrencyPdf(n: number) {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default function ContractorCalculator() {
   const { user, currentPortal } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [estimateItems, setEstimateItems] = useState<EstimateLineItem[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  // Persistent quote header — shared by Save and Export PDF
+  const [clientName, setClientName] = useState("");
   const [estimateName, setEstimateName] = useState("");
-  const [estimateNotes, setEstimateNotes] = useState("");
+
+  // Save state
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedCustomId, setSavedCustomId] = useState<string | null>(null);
+
   const { confirm, ConfirmDialog } = useConfirm();
 
   const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
@@ -115,19 +139,16 @@ export default function ContractorCalculator() {
 
   const filteredItems = useMemo(() => {
     let items = activeItems;
-    
     if (selectedCategory) {
       items = items.filter(i => i.categoryId === selectedCategory);
     }
-    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      items = items.filter(i => 
+      items = items.filter(i =>
         i.description.toLowerCase().includes(query) ||
         i.itemType.toLowerCase().includes(query)
       );
     }
-    
     return items.sort((a, b) => a.displayOrder - b.displayOrder);
   }, [activeItems, selectedCategory, searchQuery]);
 
@@ -143,7 +164,7 @@ export default function ContractorCalculator() {
   const addToEstimate = (item: BudgetItem) => {
     const existing = estimateItems.find(e => e.item.id === item.id);
     if (existing) {
-      setEstimateItems(prev => 
+      setEstimateItems(prev =>
         prev.map(e => e.item.id === item.id ? { ...e, quantity: e.quantity + 1 } : e)
       );
     } else {
@@ -155,7 +176,7 @@ export default function ContractorCalculator() {
     if (quantity <= 0) {
       setEstimateItems(prev => prev.filter(e => e.item.id !== itemId));
     } else {
-      setEstimateItems(prev => 
+      setEstimateItems(prev =>
         prev.map(e => e.item.id === itemId ? { ...e, quantity } : e)
       );
     }
@@ -187,7 +208,7 @@ export default function ContractorCalculator() {
       const material = parseFloat(item.materialFee || "0") * quantity;
       const retail = parseFloat(item.retailPrice || "0") * quantity;
       const cost = parseFloat(item.cost || "0") * quantity;
-      
+
       laborTotal += labor;
       materialTotal += material;
       retailTotal += retail;
@@ -218,6 +239,206 @@ export default function ContractorCalculator() {
     return isNaN(num) ? "-" : formatCurrency(num);
   };
 
+  // Real save handler — posts to /api/estimates
+  const handleSave = async () => {
+    if (!clientName.trim()) {
+      toast({ title: "Client name required", description: "Enter a client or prospect name.", variant: "destructive" });
+      return;
+    }
+    if (!estimateName.trim()) {
+      toast({ title: "Job description required", description: "Enter a job description or estimate name.", variant: "destructive" });
+      return;
+    }
+    if (estimateItems.length === 0) {
+      toast({ title: "Cart is empty", description: "Add at least one item before saving.", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const customId = generateCustomId();
+      const payload = {
+        customId,
+        clientName: clientName.trim(),
+        projectName: estimateName.trim(),
+        amount: String(totals.retail),
+        status: "draft",
+        date: new Date().toISOString().split("T")[0],
+        lineItems: estimateItems.map(({ item, quantity }) => ({
+          category: item.itemType || "Other",
+          item: item.description,
+          quantity: String(quantity),
+          unit: item.unitType || "EA",
+          rate: String(parseFloat(item.retailPrice || "0")),
+          total: String(parseFloat(item.retailPrice || "0") * quantity),
+          priceBookItemId: item.id,
+        })),
+      };
+      const res = await fetch("/api/estimates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Save failed" }));
+        throw new Error(err.message || "Save failed");
+      }
+      const saved = await res.json();
+      const resolvedId = saved.customId ?? customId;
+      setSavedCustomId(resolvedId);
+      await queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      toast({ title: "Estimate saved", description: `Saved as ${resolvedId}` });
+      setSaveDialogOpen(false);
+      // Do NOT clear clientName, estimateName, cart items, or savedCustomId —
+      // contractor may immediately export the PDF and needs all of it.
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err?.message ?? "An error occurred.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // PDF export — works before or after save
+  const handleExportPdf = () => {
+    if (estimateItems.length === 0) {
+      toast({ title: "Cart is empty", description: "Add items before exporting.", variant: "destructive" });
+      return;
+    }
+
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    // Header
+    pdf.setFontSize(22);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("ESTIMATE", margin, y);
+
+    if (savedCustomId) {
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(savedCustomId, pageWidth - margin, y, { align: "right" });
+    }
+    y += 8;
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(
+      `Date: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
+      margin,
+      y
+    );
+    y += 10;
+
+    // Divider
+    pdf.setDrawColor(180);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    // Client info
+    if (clientName) {
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Client / Prospect:", margin, y);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(clientName, margin + 36, y);
+      y += 6;
+    }
+    if (estimateName) {
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Job Description:", margin, y);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(estimateName, margin + 36, y);
+      y += 6;
+    }
+    y += 4;
+
+    // Divider
+    pdf.setDrawColor(180);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 6;
+
+    // Line items table header
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFillColor(245, 245, 245);
+    pdf.rect(margin, y - 4, contentWidth, 7, "F");
+    pdf.text("Description", margin + 2, y);
+    pdf.text("Qty", margin + contentWidth * 0.54, y);
+    pdf.text("Unit", margin + contentWidth * 0.63, y);
+    pdf.text("Rate", margin + contentWidth * 0.76, y, { align: "right" });
+    pdf.text("Total", pageWidth - margin, y, { align: "right" });
+    y += 4;
+    pdf.setDrawColor(180);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 5;
+
+    // Line items
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    estimateItems.forEach(({ item, quantity }) => {
+      const rate = parseFloat(item.retailPrice || "0");
+      const lineTotal = rate * quantity;
+      const desc = item.description.length > 42 ? item.description.slice(0, 42) + "…" : item.description;
+      pdf.text(desc, margin + 2, y);
+      pdf.text(String(quantity), margin + contentWidth * 0.54, y);
+      pdf.text(item.unitType || "EA", margin + contentWidth * 0.63, y);
+      pdf.text(formatCurrencyPdf(rate), margin + contentWidth * 0.76, y, { align: "right" });
+      pdf.text(formatCurrencyPdf(lineTotal), pageWidth - margin, y, { align: "right" });
+      y += 6;
+      if (y > 252) {
+        pdf.addPage();
+        y = 20;
+      }
+    });
+
+    y += 2;
+    pdf.setDrawColor(180);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 7;
+
+    // Totals block
+    const totalsLeft = margin + contentWidth * 0.55;
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Labor:", totalsLeft, y);
+    pdf.text(formatCurrencyPdf(totals.labor), pageWidth - margin, y, { align: "right" });
+    y += 6;
+    pdf.text("Materials:", totalsLeft, y);
+    pdf.text(formatCurrencyPdf(totals.material), pageWidth - margin, y, { align: "right" });
+    y += 2;
+    pdf.setDrawColor(180);
+    pdf.line(totalsLeft, y, pageWidth - margin, y);
+    y += 5;
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Total:", totalsLeft, y);
+    pdf.text(formatCurrencyPdf(totals.retail), pageWidth - margin, y, { align: "right" });
+    y += 6;
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(120);
+    pdf.text(`Margin: ${totals.margin.toFixed(1)}%`, totalsLeft, y);
+    y += 12;
+
+    // Footer
+    pdf.setTextColor(150);
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "italic");
+    pdf.text("This estimate is valid for 30 days from the date above.", margin, y);
+    if (!savedCustomId) {
+      y += 5;
+      pdf.text("Draft — not yet saved.", margin, y);
+    }
+
+    const safeName = (clientName || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+    const dateStr = new Date().toISOString().split("T")[0];
+    pdf.save(`estimate-${safeName}-${dateStr}.pdf`);
+  };
+
   if (categoriesLoading || itemsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -236,16 +457,18 @@ export default function ContractorCalculator() {
           <Calculator className="w-8 h-8 text-primary" />
           Estimator Calculator
         </h1>
-        <p className="text-muted-foreground mt-1">Create project estimates and quotes using your company price book.</p>
+        <p className="text-muted-foreground mt-1">Build client estimates and quotes using your company price book.</p>
       </div>
 
       <div className="flex" style={{ height: 'calc(100vh - 12rem)' }}>
         <div className="flex-1 flex flex-col md:flex-row">
+
+          {/* Category sidebar */}
           <div className="w-full md:w-80 border-r bg-muted/30 flex flex-col">
             <div className="p-4 border-b">
               <h2 className="font-semibold mb-3">Categories</h2>
-              <Button 
-                variant={selectedCategory === null ? "default" : "ghost"} 
+              <Button
+                variant={selectedCategory === null ? "default" : "ghost"}
                 className="w-full justify-start mb-2"
                 onClick={() => setSelectedCategory(null)}
                 data-testid="button-all-categories"
@@ -274,6 +497,7 @@ export default function ContractorCalculator() {
             </ScrollArea>
           </div>
 
+          {/* Item table */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="p-4 border-b bg-card">
               <div className="flex items-center gap-4">
@@ -370,12 +594,18 @@ export default function ContractorCalculator() {
             </ScrollArea>
           </div>
 
+          {/* Estimate cart */}
           <div className="w-full md:w-96 border-l bg-card flex flex-col">
+
+            {/* Cart header */}
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="w-5 h-5 text-primary" />
                   <h2 className="font-semibold">Estimate</h2>
+                  {savedCustomId && (
+                    <Badge variant="secondary" className="text-xs font-mono">{savedCustomId}</Badge>
+                  )}
                 </div>
                 {estimateItems.length > 0 && (
                   <Button variant="ghost" size="sm" onClick={clearEstimate} data-testid="button-clear-estimate">
@@ -388,6 +618,37 @@ export default function ContractorCalculator() {
               </p>
             </div>
 
+            {/* Persistent quote header fields */}
+            <div className="p-4 border-b space-y-3 bg-muted/20">
+              <div className="space-y-1">
+                <Label htmlFor="clientName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Client / Prospect Name
+                </Label>
+                <Input
+                  id="clientName"
+                  placeholder="e.g. Jane Smith"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  data-testid="input-client-name"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="estimateName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Job Description
+                </Label>
+                <Input
+                  id="estimateName"
+                  placeholder="e.g. Kitchen remodel"
+                  value={estimateName}
+                  onChange={(e) => setEstimateName(e.target.value)}
+                  data-testid="input-estimate-name"
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Cart items */}
             <ScrollArea className="flex-1">
               {estimateItems.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
@@ -453,6 +714,7 @@ export default function ContractorCalculator() {
               )}
             </ScrollArea>
 
+            {/* Totals + action buttons */}
             {estimateItems.length > 0 && (
               <div className="border-t p-4 space-y-3">
                 <div className="space-y-2 text-sm">
@@ -474,14 +736,24 @@ export default function ContractorCalculator() {
                     <span>{totals.margin.toFixed(1)}%</span>
                   </div>
                 </div>
-                
-                <Button 
-                  className="w-full" 
+
+                <Button
+                  className="w-full"
                   onClick={() => setSaveDialogOpen(true)}
                   data-testid="button-save-estimate"
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Save Estimate
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExportPdf}
+                  data-testid="button-export-pdf"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export PDF
                 </Button>
               </div>
             )}
@@ -489,65 +761,75 @@ export default function ContractorCalculator() {
         </div>
       </div>
 
+      {/* Save dialog — confirmation step */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Save Estimate</DialogTitle>
-            <DialogDescription>Save this estimate for future reference or to attach to a project.</DialogDescription>
+            <DialogDescription>
+              {clientName && estimateName
+                ? `Save "${estimateName}" for ${clientName} to your estimates.`
+                : "Save this estimate to your records."}
+            </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="estimate-name">Estimate Name</Label>
-              <Input
-                id="estimate-name"
-                placeholder="e.g., Kitchen Renovation - Phase 1"
-                value={estimateName}
-                onChange={(e) => setEstimateName(e.target.value)}
-                data-testid="input-estimate-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="estimate-notes">Notes (optional)</Label>
-              <Textarea
-                id="estimate-notes"
-                placeholder="Additional notes about this estimate..."
-                value={estimateNotes}
-                onChange={(e) => setEstimateNotes(e.target.value)}
-                rows={3}
-                data-testid="input-estimate-notes"
-              />
-            </div>
+            {/* Summary of what will be saved */}
             <Card className="bg-muted/50">
-              <CardContent className="p-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span>{estimateItems.length} items</span>
+              <CardContent className="p-4 space-y-2 text-sm">
+                {clientName ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Client</span>
+                    <span className="font-medium">{clientName}</span>
+                  </div>
+                ) : null}
+                {estimateName ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Job</span>
+                    <span className="font-medium">{estimateName}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{estimateItems.length} item{estimateItems.length !== 1 ? "s" : ""}</span>
                   <span className="font-semibold">{formatCurrency(totals.retail)}</span>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Warn if required fields are missing */}
+            {(!clientName.trim() || !estimateName.trim()) && (
+              <p className="text-sm text-destructive">
+                Please fill in{!clientName.trim() && !estimateName.trim()
+                  ? " Client Name and Job Description"
+                  : !clientName.trim()
+                    ? " Client / Prospect Name"
+                    : " Job Description"} in the estimate panel before saving.
+              </p>
+            )}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSaveDialogOpen(false)} data-testid="button-cancel-save">
+            <Button
+              variant="outline"
+              onClick={() => setSaveDialogOpen(false)}
+              data-testid="button-cancel-save"
+            >
               Cancel
             </Button>
-            <Button 
-              disabled={!estimateName.trim()}
-              onClick={() => {
-                toast({
-                  title: "Estimate Saved",
-                  description: `"${estimateName}" saved successfully. Full save functionality coming soon.`,
-                });
-                setSaveDialogOpen(false);
-                setEstimateName("");
-                setEstimateNotes("");
-              }}
+            <Button
+              disabled={isSaving || !clientName.trim() || !estimateName.trim()}
+              onClick={handleSave}
               data-testid="button-confirm-save"
             >
-              Save Estimate
+              {isSaving
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                : "Save Estimate"
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       <ConfirmDialog />
     </div>
   );

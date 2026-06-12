@@ -2603,19 +2603,42 @@ export async function registerRoutes(
       const user = req.user as User;
       let derivedCompanyId: string | null = null;
       if (user.role !== "admin") {
-        if (!estimateData.projectId) {
-          return res.status(403).json({ message: "Access denied: a project must be associated with this estimate" });
+        if (estimateData.projectId) {
+          // Project-based estimate: validate ownership, derive companyId from project chain
+          const project = await storage.getProject(estimateData.projectId);
+          if (!project) return res.status(404).json({ message: "Project not found" });
+          if (!project.contractorId) {
+            return res.status(403).json({ message: "Access denied: cannot verify project ownership" });
+          }
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied: project not in your company" });
+          }
+          derivedCompanyId = contractor.companyId ?? null;
+        } else {
+          // Projectless estimate: explicit safety checks regardless of upstream middleware
+          if (user.role === "client") {
+            return res.status(403).json({ message: "Access denied: clients cannot create estimates" });
+          }
+          if (user.contractorType === "subcontractor") {
+            return res.status(403).json({ message: "Access denied: subcontractors cannot create estimates" });
+          }
+          if (user.contractorType === "notary") {
+            return res.status(403).json({ message: "Access denied: notaries cannot create estimates" });
+          }
+          if (!user.companyId) {
+            return res.status(403).json({ message: "Access denied: no company associated with your account" });
+          }
+          // Allow: company_owner, isCompanyAdmin contractor, or regular internal contractor (no contractorType)
+          const isInternalContractor =
+            user.role === "company_owner" ||
+            user.isCompanyAdmin === true ||
+            (user.role === "contractor" && !user.contractorType);
+          if (!isInternalContractor) {
+            return res.status(403).json({ message: "Access denied: not an internal company user" });
+          }
+          derivedCompanyId = user.companyId;
         }
-        const project = await storage.getProject(estimateData.projectId);
-        if (!project) return res.status(404).json({ message: "Project not found" });
-        if (!project.contractorId) {
-          return res.status(403).json({ message: "Access denied: cannot verify project ownership" });
-        }
-        const contractor = await storage.getUser(project.contractorId);
-        if (!contractor || contractor.companyId !== user.companyId) {
-          return res.status(403).json({ message: "Access denied: project not in your company" });
-        }
-        derivedCompanyId = contractor.companyId ?? null;
       } else if (estimateData.projectId) {
         // Admin: derive companyId from project chain if possible
         try {
