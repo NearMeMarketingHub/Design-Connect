@@ -2343,13 +2343,46 @@ export class DatabaseStorage implements IStorage {
 
   // Company member methods
   async getCompanyMembers(companyId: string): Promise<(CompanyMember & { user?: User })[]> {
+    // 1. Fetch explicit join-table rows (these may include company_owner added at company creation)
     const members = await db.select().from(schema.companyMembers)
       .where(eq(schema.companyMembers.companyId, companyId));
     const result: (CompanyMember & { user?: User })[] = [];
+    const seenUserIds = new Set<string>();
     for (const member of members) {
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, member.userId));
       result.push({ ...member, user });
+      seenUserIds.add(member.userId);
     }
+
+    // 2. Also fetch internal company users stored only on the users table
+    //    Inclusion: same companyId, role contractor or company_owner
+    //    contractorType null (regular internal) or not subcontractor/notary
+    //    Exclusion: clients, platform admins, and users from other companies
+    const internalUsers = await db.select().from(schema.users).where(
+      and(
+        eq(schema.users.companyId, companyId),
+        inArray(schema.users.role, ["contractor", "company_owner"]),
+        or(
+          isNull(schema.users.contractorType),
+          not(inArray(schema.users.contractorType, ["subcontractor", "notary"]))
+        )
+      )
+    );
+
+    // 3. Merge — skip anyone already represented by a companyMembers row
+    for (const user of internalUsers) {
+      if (seenUserIds.has(user.id)) continue;
+      result.push({
+        id: `implicit-${user.id}`,
+        companyId,
+        userId: user.id,
+        status: "active",
+        roleDefinitionId: null,
+        addedAt: new Date(),
+        user,
+      });
+    }
+
     return result;
   }
 

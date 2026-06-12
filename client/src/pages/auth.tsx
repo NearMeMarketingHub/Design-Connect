@@ -173,7 +173,7 @@ export default function AuthPage() {
                     {isLogin && (
                       <div className="flex justify-end -mb-2">
                         <Link href="/forgot-password">
-                          <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground" data-testid="link-forgot-password-client">
+                          <Button type="button" variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground" data-testid="link-forgot-password-client">
                             Forgot password?
                           </Button>
                         </Link>
@@ -284,7 +284,7 @@ export default function AuthPage() {
                           <>
                             <div className="flex justify-end -mb-2">
                               <Link href="/forgot-password">
-                                <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground" data-testid="link-forgot-password-contractor">
+                                <Button type="button" variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground" data-testid="link-forgot-password-contractor">
                                   Forgot password?
                                 </Button>
                               </Link>

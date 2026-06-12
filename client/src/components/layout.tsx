@@ -77,7 +77,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       { label: "Financials", icon: <TrendingUp className="w-5 h-5" />, href: "/company/financials" },
     ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
-    { label: "Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
+    { label: "Estimator Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
     { label: "Floor Calc", icon: <Grid3X3 className="w-5 h-5" />, href: "/contractor/floor-calculator" },
     { label: "3D Floor Plan", icon: <Box className="w-5 h-5" />, href: "/contractor/floor-plan-3d" },
   ];

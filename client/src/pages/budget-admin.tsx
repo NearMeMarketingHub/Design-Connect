@@ -261,9 +261,12 @@ export default function BudgetAdmin() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <div className="flex items-center gap-2">
-              <Calculator className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-semibold">Budget Price Manager</h1>
+            <div>
+              <div className="flex items-center gap-2">
+                <Calculator className="w-6 h-6 text-primary" />
+                <h1 className="text-xl font-semibold">Budget Price Manager</h1>
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5 ml-8">Manage your company price book, categories, and budget sheet items.</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
