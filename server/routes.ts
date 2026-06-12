@@ -944,12 +944,23 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
+  // Normalizer: blank or invalid hex string → null (PDF layers apply per-field defaults)
+  const normalizeHex = z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => {
+      if (!v || !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) return null;
+      return v;
+    });
+
   // Branding-only allowlist — used to validate PATCH /api/company/mine from branding form
+  // Blank or invalid color strings are silently normalized to null rather than returning 400.
   const companyBrandingSchema = z.object({
     name: z.string().min(1).optional(),
     logo: z.string().nullable().optional(),
-    primaryColor: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).nullable().optional(),
-    accentColor: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).nullable().optional(),
+    primaryColor: normalizeHex,
+    accentColor: normalizeHex,
     quoteFooterText: z.string().nullable().optional(),
     companyPhone: z.string().nullable().optional(),
     companyEmail: z.string().nullable().optional(),
@@ -988,11 +999,12 @@ export async function registerRoutes(
       }
       const company = await storage.getCompany(user.companyId);
       if (!company) return res.status(404).json({ message: "No company branding found" });
+      // Colors always return with canonical defaults so PDF clients never receive null colors
       res.json({
         logo: company.logo ?? null,
         name: company.name,
-        primaryColor: company.primaryColor ?? null,
-        accentColor: company.accentColor ?? null,
+        primaryColor: company.primaryColor ?? "#1f2937",
+        accentColor: company.accentColor ?? "#d97706",
         quoteFooterText: company.quoteFooterText ?? null,
         companyPhone: company.companyPhone ?? null,
         companyEmail: company.companyEmail ?? null,
