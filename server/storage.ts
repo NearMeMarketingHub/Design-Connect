@@ -2343,30 +2343,34 @@ export class DatabaseStorage implements IStorage {
 
   // Company member methods
   async getCompanyMembers(companyId: string): Promise<(CompanyMember & { user?: User })[]> {
-    // 1. Fetch explicit join-table rows (these may include company_owner added at company creation)
-    const members = await db.select().from(schema.companyMembers)
-      .where(eq(schema.companyMembers.companyId, companyId));
+    // Internal-user predicate (shared by both queries)
+    const internalUserPredicate = and(
+      inArray(schema.users.role, ["contractor", "company_owner"]),
+      or(
+        isNull(schema.users.contractorType),
+        not(inArray(schema.users.contractorType, ["subcontractor", "notary"]))
+      )
+    );
+
+    // 1. Fetch join-table rows JOINED with user data — apply internal-user filter here
+    //    so subcontractors/notaries in companyMembers are excluded at the query level.
+    const joinRows = await db
+      .select({ member: schema.companyMembers, user: schema.users })
+      .from(schema.companyMembers)
+      .innerJoin(schema.users, eq(schema.users.id, schema.companyMembers.userId))
+      .where(and(eq(schema.companyMembers.companyId, companyId), internalUserPredicate));
+
     const result: (CompanyMember & { user?: User })[] = [];
     const seenUserIds = new Set<string>();
-    for (const member of members) {
-      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, member.userId));
-      result.push({ ...member, user });
-      seenUserIds.add(member.userId);
+    for (const row of joinRows) {
+      result.push({ ...row.member, user: row.user });
+      seenUserIds.add(row.member.userId);
     }
 
     // 2. Also fetch internal company users stored only on the users table
-    //    Inclusion: same companyId, role contractor or company_owner
-    //    contractorType null (regular internal) or not subcontractor/notary
-    //    Exclusion: clients, platform admins, and users from other companies
+    //    (contractors/owners whose companyId is set but who were never added to companyMembers)
     const internalUsers = await db.select().from(schema.users).where(
-      and(
-        eq(schema.users.companyId, companyId),
-        inArray(schema.users.role, ["contractor", "company_owner"]),
-        or(
-          isNull(schema.users.contractorType),
-          not(inArray(schema.users.contractorType, ["subcontractor", "notary"]))
-        )
-      )
+      and(eq(schema.users.companyId, companyId), internalUserPredicate)
     );
 
     // 3. Merge — skip anyone already represented by a companyMembers row
