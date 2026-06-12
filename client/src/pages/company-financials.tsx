@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, FileText, Receipt, Plus, Activity, AlertCircle, User } from "lucide-react";
+import { TrendingUp, Receipt, Plus, Activity, AlertCircle, User } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface FinancialActivityItem {
@@ -94,23 +94,6 @@ export default function CompanyFinancials() {
           <CardContent>
             <Link href="/company/sales">
               <Button className="w-full" variant="outline" size="sm" data-testid="button-company-sales">
-                Open
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              Estimator Calculator
-            </CardTitle>
-            <CardDescription className="text-xs">Create and manage estimates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/company/estimates">
-              <Button className="w-full" variant="outline" size="sm" data-testid="button-company-estimates">
                 Open
               </Button>
             </Link>

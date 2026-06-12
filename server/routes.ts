@@ -2591,6 +2591,42 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/estimates/:id/status", requireAuth, requireEstimateAccess, async (req, res, next) => {
+    try {
+      const VALID_STATUSES = ["draft", "sent", "approved", "declined"];
+      const { status } = req.body;
+      if (!status || !VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ message: `status must be one of: ${VALID_STATUSES.join(", ")}` });
+      }
+      const user = req.user as User;
+      const estimate = await storage.getEstimate(req.params.id);
+      if (!estimate) return res.status(404).json({ message: "Estimate not found" });
+
+      if (user.role !== "admin") {
+        if (!user.companyId) return res.status(403).json({ message: "Access denied" });
+        if (estimate.companyId) {
+          if (estimate.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied: estimate belongs to another company" });
+          }
+        } else if (estimate.projectId) {
+          const project = await storage.getProject(estimate.projectId);
+          if (!project?.contractorId) return res.status(403).json({ message: "Access denied" });
+          const contractor = await storage.getUser(project.contractorId);
+          if (!contractor || contractor.companyId !== user.companyId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+        } else {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const updated = await storage.updateEstimateStatus(req.params.id, status);
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/estimates", requireAuth, requireEstimateAccess, requireActiveSubscription, async (req, res, next) => {
     try {
       // Strip companyId from request body — always derived server-side

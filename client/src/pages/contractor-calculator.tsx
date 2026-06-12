@@ -1,8 +1,15 @@
 import { useState, useMemo } from "react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,12 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import {
   Dialog,
   DialogContent,
@@ -43,11 +44,10 @@ import {
   ShoppingCart,
   Save,
   X,
-  ChevronRight,
   Loader2,
   Download,
+  Info,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 
@@ -81,6 +81,30 @@ interface EstimateLineItem {
   quantity: number;
 }
 
+interface SavedEstimate {
+  id: string;
+  customId: string;
+  clientName: string;
+  projectName: string;
+  amount: string;
+  status: string;
+  date: string;
+  projectId?: string | null;
+  companyId?: string | null;
+}
+
+interface SavedEstimateLineItem {
+  id: string;
+  estimateId: string;
+  category: string;
+  item: string;
+  quantity: string;
+  unit: string;
+  rate: string;
+  total: string;
+  priceBookItemId: string | null;
+}
+
 function generateCustomId() {
   const d = new Date();
   const y = d.getFullYear();
@@ -94,11 +118,25 @@ function formatCurrencyPdf(n: number) {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  approved: "Approved",
+  declined: "Declined",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-700",
+  sent: "bg-blue-100 text-blue-700",
+  approved: "bg-green-100 text-green-700",
+  declined: "bg-red-100 text-red-700",
+};
+
 export default function ContractorCalculator() {
-  const { user, currentPortal } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<"calculator" | "estimates">("calculator");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [estimateItems, setEstimateItems] = useState<EstimateLineItem[]>([]);
@@ -112,9 +150,11 @@ export default function ContractorCalculator() {
   const [isSaving, setIsSaving] = useState(false);
   const [savedCustomId, setSavedCustomId] = useState<string | null>(null);
 
-  const { confirm, ConfirmDialog } = useConfirm();
+  // Track when an estimate is loaded from the Estimates tab
+  // savedCustomId stays null until user explicitly saves a new copy
+  const [loadedFromId, setLoadedFromId] = useState<string | null>(null);
 
-  const dashboardPath = currentPortal === "admin" ? "/admin/dashboard" : "/contractor/dashboard";
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<BudgetCategory[]>({
     queryKey: ["/api/calculator/categories"],
@@ -130,6 +170,15 @@ export default function ContractorCalculator() {
     queryFn: async () => {
       const res = await fetch("/api/calculator/items", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch items");
+      return res.json();
+    },
+  });
+
+  const { data: savedEstimates = [], isLoading: estimatesLoading } = useQuery<SavedEstimate[]>({
+    queryKey: ["/api/estimates"],
+    queryFn: async () => {
+      const res = await fetch("/api/estimates", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch estimates");
       return res.json();
     },
   });
@@ -194,7 +243,10 @@ export default function ContractorCalculator() {
       confirmLabel: "Clear",
       destructive: true,
     });
-    if (ok) setEstimateItems([]);
+    if (ok) {
+      setEstimateItems([]);
+      setLoadedFromId(null);
+    }
   };
 
   const totals = useMemo(() => {
@@ -239,7 +291,7 @@ export default function ContractorCalculator() {
     return isNaN(num) ? "-" : formatCurrency(num);
   };
 
-  // Real save handler — posts to /api/estimates
+  // Real save handler — always POSTs a new estimate (never PATCHes existing)
   const handleSave = async () => {
     if (!clientName.trim()) {
       toast({ title: "Client name required", description: "Enter a client or prospect name.", variant: "destructive" });
@@ -286,11 +338,11 @@ export default function ContractorCalculator() {
       const saved = await res.json();
       const resolvedId = saved.customId ?? customId;
       setSavedCustomId(resolvedId);
+      setLoadedFromId(null);  // clear "loaded from" notice after successful save
       await queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
       toast({ title: "Estimate saved", description: `Saved as ${resolvedId}` });
       setSaveDialogOpen(false);
-      // Do NOT clear clientName, estimateName, cart items, or savedCustomId —
-      // contractor may immediately export the PDF and needs all of it.
+      // Do NOT clear clientName, estimateName, or cart — contractor may immediately export PDF.
     } catch (err: any) {
       toast({ title: "Save failed", description: err?.message ?? "An error occurred.", variant: "destructive" });
     } finally {
@@ -298,7 +350,201 @@ export default function ContractorCalculator() {
     }
   };
 
-  // PDF export — works before or after save
+  // Load a saved estimate into the calculator (view/reuse only — does not update original)
+  const handleLoadEstimate = async (estimateId: string, estimateCustomId: string) => {
+    try {
+      const res = await fetch(`/api/estimates/${estimateId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load estimate");
+      const data = await res.json();
+
+      setClientName(data.clientName ?? "");
+      setEstimateName(data.projectName ?? "");
+      setSavedCustomId(null);       // no save has happened yet in this session
+      setLoadedFromId(data.customId ?? estimateCustomId);
+
+      const rebuilt: EstimateLineItem[] = (data.lineItems ?? []).map((li: SavedEstimateLineItem) => {
+        // Prefer a live price-book item for full field fidelity
+        const match = allItems.find(i => i.id === li.priceBookItemId);
+        if (match) {
+          return { item: match, quantity: parseFloat(li.quantity) || 1 };
+        }
+        // Safe synthetic item — never crashes on missing/deleted price book entries
+        const synthetic: BudgetItem = {
+          id: li.priceBookItemId ?? `synthetic-${li.id}`,
+          categoryId: "",
+          itemType: li.category ?? "Other",
+          description: li.item ?? "",
+          unitType: li.unit ?? "EA",
+          cost: "0",
+          burdens: "0",
+          materialFee: "0",
+          laborRate: "0",
+          subRate: "0",
+          retailPrice: String(li.rate ?? "0"),
+          notes: null,
+          displayOrder: 0,
+          isActive: true,
+        };
+        return { item: synthetic, quantity: parseFloat(li.quantity) || 1 };
+      });
+
+      setEstimateItems(rebuilt);
+      setActiveTab("calculator");
+      toast({
+        title: "Estimate loaded",
+        description: `${data.customId ?? estimateCustomId} loaded into the calculator. Saving will create a new estimate.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Failed to load estimate", description: err?.message ?? "An error occurred.", variant: "destructive" });
+    }
+  };
+
+  // Update estimate status from the Estimates tab
+  const handleStatusUpdate = async (estimateId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/estimates/${estimateId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Update failed" }));
+        throw new Error(err.message || "Update failed");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      toast({ title: "Status updated" });
+    } catch (err: any) {
+      toast({ title: "Update failed", description: err?.message ?? "An error occurred.", variant: "destructive" });
+    }
+  };
+
+  // Export PDF from the Estimates tab — uses saved estimate data directly, never the cart state
+  const handleExportPdfFromEstimate = async (estimateId: string) => {
+    try {
+      const res = await fetch(`/api/estimates/${estimateId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load estimate for export");
+      const data: SavedEstimate & { lineItems: SavedEstimateLineItem[] } = await res.json();
+
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+      let y = 20;
+
+      // Header
+      pdf.setFontSize(22);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("ESTIMATE", margin, y);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(data.customId, pageWidth - margin, y, { align: "right" });
+      y += 8;
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      const dateDisplay = data.date
+        ? new Date(data.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+        : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      pdf.text(`Date: ${dateDisplay}`, margin, y);
+      pdf.text(`Status: ${STATUS_LABELS[data.status] ?? data.status}`, pageWidth - margin, y, { align: "right" });
+      y += 10;
+
+      pdf.setDrawColor(180);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 8;
+
+      // Client info
+      if (data.clientName) {
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Client / Prospect:", margin, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(data.clientName, margin + 36, y);
+        y += 6;
+      }
+      if (data.projectName) {
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Job Description:", margin, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(data.projectName, margin + 36, y);
+        y += 6;
+      }
+      y += 4;
+
+      pdf.setDrawColor(180);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 6;
+
+      // Line items table header
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFillColor(245, 245, 245);
+      pdf.rect(margin, y - 4, contentWidth, 7, "F");
+      pdf.text("Description", margin + 2, y);
+      pdf.text("Qty", margin + contentWidth * 0.54, y);
+      pdf.text("Unit", margin + contentWidth * 0.63, y);
+      pdf.text("Rate", margin + contentWidth * 0.76, y, { align: "right" });
+      pdf.text("Total", pageWidth - margin, y, { align: "right" });
+      y += 4;
+      pdf.setDrawColor(180);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 5;
+
+      // Line items
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+
+      let grandTotal = 0;
+      (data.lineItems ?? []).forEach((li) => {
+        const qty = parseFloat(li.quantity) || 0;
+        const rate = parseFloat(li.rate) || 0;
+        const lineTotal = parseFloat(li.total) || rate * qty;
+        grandTotal += lineTotal;
+
+        const desc = li.item.length > 42 ? li.item.slice(0, 42) + "…" : li.item;
+        pdf.text(desc, margin + 2, y);
+        pdf.text(String(qty), margin + contentWidth * 0.54, y);
+        pdf.text(li.unit || "EA", margin + contentWidth * 0.63, y);
+        pdf.text(formatCurrencyPdf(rate), margin + contentWidth * 0.76, y, { align: "right" });
+        pdf.text(formatCurrencyPdf(lineTotal), pageWidth - margin, y, { align: "right" });
+        y += 6;
+        if (y > 252) {
+          pdf.addPage();
+          y = 20;
+        }
+      });
+
+      y += 2;
+      pdf.setDrawColor(180);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 7;
+
+      // Total
+      const totalsLeft = margin + contentWidth * 0.55;
+      const displayTotal = parseFloat(data.amount || "0") || grandTotal;
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Total:", totalsLeft, y);
+      pdf.text(formatCurrencyPdf(displayTotal), pageWidth - margin, y, { align: "right" });
+      y += 12;
+
+      // Footer
+      pdf.setTextColor(150);
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "italic");
+      pdf.text("This estimate is valid for 30 days from the date above.", margin, y);
+
+      const safeName = (data.clientName || "estimate").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      const dateStr = data.date || new Date().toISOString().split("T")[0];
+      pdf.save(`estimate-${data.customId || safeName}-${dateStr}.pdf`);
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err?.message ?? "An error occurred.", variant: "destructive" });
+    }
+  };
+
+  // Calculator-tab PDF export — uses current cart state
   const handleExportPdf = () => {
     if (estimateItems.length === 0) {
       toast({ title: "Cart is empty", description: "Add items before exporting.", variant: "destructive" });
@@ -332,12 +578,10 @@ export default function ContractorCalculator() {
     );
     y += 10;
 
-    // Divider
     pdf.setDrawColor(180);
     pdf.line(margin, y, pageWidth - margin, y);
     y += 8;
 
-    // Client info
     if (clientName) {
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
@@ -356,12 +600,10 @@ export default function ContractorCalculator() {
     }
     y += 4;
 
-    // Divider
     pdf.setDrawColor(180);
     pdf.line(margin, y, pageWidth - margin, y);
     y += 6;
 
-    // Line items table header
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "bold");
     pdf.setFillColor(245, 245, 245);
@@ -376,7 +618,6 @@ export default function ContractorCalculator() {
     pdf.line(margin, y, pageWidth - margin, y);
     y += 5;
 
-    // Line items
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9);
     estimateItems.forEach(({ item, quantity }) => {
@@ -400,7 +641,6 @@ export default function ContractorCalculator() {
     pdf.line(margin, y, pageWidth - margin, y);
     y += 7;
 
-    // Totals block
     const totalsLeft = margin + contentWidth * 0.55;
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
@@ -424,7 +664,6 @@ export default function ContractorCalculator() {
     pdf.text(`Margin: ${totals.margin.toFixed(1)}%`, totalsLeft, y);
     y += 12;
 
-    // Footer
     pdf.setTextColor(150);
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "italic");
@@ -439,16 +678,7 @@ export default function ContractorCalculator() {
     pdf.save(`estimate-${safeName}-${dateStr}.pdf`);
   };
 
-  if (categoriesLoading || itemsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Calculator className="w-12 h-12 mx-auto text-muted-foreground animate-pulse" />
-          <p className="mt-4 text-muted-foreground">Loading Estimator Calculator...</p>
-        </div>
-      </div>
-    );
-  }
+  const saveButtonLabel = loadedFromId ? "Save as New Estimate" : "Save Estimate";
 
   return (
     <div className="space-y-4">
@@ -460,321 +690,447 @@ export default function ContractorCalculator() {
         <p className="text-muted-foreground mt-1">Build client estimates and quotes using your company price book.</p>
       </div>
 
-      <div className="flex" style={{ height: 'calc(100vh - 12rem)' }}>
-        <div className="flex-1 flex flex-col md:flex-row">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calculator" | "estimates")}>
+        <TabsList data-testid="tabs-estimator">
+          <TabsTrigger value="calculator" data-testid="tab-calculator">
+            <Calculator className="w-4 h-4 mr-2" />
+            Calculator
+          </TabsTrigger>
+          <TabsTrigger value="estimates" data-testid="tab-estimates">
+            <FileText className="w-4 h-4 mr-2" />
+            Estimates
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Category sidebar */}
-          <div className="w-full md:w-80 border-r bg-muted/30 flex flex-col">
-            <div className="p-4 border-b">
-              <h2 className="font-semibold mb-3">Categories</h2>
-              <Button
-                variant={selectedCategory === null ? "default" : "ghost"}
-                className="w-full justify-start mb-2"
-                onClick={() => setSelectedCategory(null)}
-                data-testid="button-all-categories"
-              >
-                <Package className="w-4 h-4 mr-2" />
-                All Items ({activeItems.length})
-              </Button>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2">
-                {activeCategories.map(category => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "secondary" : "ghost"}
-                    className="w-full justify-between text-left mb-1"
-                    onClick={() => setSelectedCategory(category.id)}
-                    data-testid={`button-category-${category.id}`}
-                  >
-                    <span className="truncate">{category.name}</span>
-                    <Badge variant="outline" className="ml-2">
-                      {categoryItems[category.id]?.length || 0}
-                    </Badge>
-                  </Button>
-                ))}
+        {/* ── Calculator tab ─────────────────────────────────── */}
+        <TabsContent value="calculator">
+          {categoriesLoading || itemsLoading ? (
+            <div className="flex items-center justify-center" style={{ height: "calc(100vh - 16rem)" }}>
+              <div className="text-center">
+                <Calculator className="w-12 h-12 mx-auto text-muted-foreground animate-pulse" />
+                <p className="mt-4 text-muted-foreground">Loading Estimator Calculator...</p>
               </div>
-            </ScrollArea>
-          </div>
+            </div>
+          ) : (
+            <div className="flex" style={{ height: "calc(100vh - 16rem)" }}>
+              <div className="flex-1 flex flex-col md:flex-row">
 
-          {/* Item table */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-4 border-b bg-card">
-              <div className="flex items-center gap-4">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search items..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                    data-testid="input-search-items"
-                  />
+                {/* Category sidebar */}
+                <div className="w-full md:w-80 border-r bg-muted/30 flex flex-col">
+                  <div className="p-4 border-b">
+                    <h2 className="font-semibold mb-3">Categories</h2>
+                    <Button
+                      variant={selectedCategory === null ? "default" : "ghost"}
+                      className="w-full justify-start mb-2"
+                      onClick={() => setSelectedCategory(null)}
+                      data-testid="button-all-categories"
+                    >
+                      <Package className="w-4 h-4 mr-2" />
+                      All Items ({activeItems.length})
+                    </Button>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="p-2">
+                      {activeCategories.map(category => (
+                        <Button
+                          key={category.id}
+                          variant={selectedCategory === category.id ? "secondary" : "ghost"}
+                          className="w-full justify-between text-left mb-1"
+                          onClick={() => setSelectedCategory(category.id)}
+                          data-testid={`button-category-${category.id}`}
+                        >
+                          <span className="truncate">{category.name}</span>
+                          <Badge variant="outline" className="ml-2">
+                            {categoryItems[category.id]?.length || 0}
+                          </Badge>
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
-                <Badge variant="secondary">
-                  {filteredItems.length} items
-                </Badge>
-              </div>
-            </div>
 
-            <ScrollArea className="flex-1">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40%]">Description</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead className="text-right">Labor</TableHead>
-                    <TableHead className="text-right">Material</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        {searchQuery ? "No items match your search" : "No items in this category"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredItems.map(item => {
-                      const inEstimate = estimateItems.find(e => e.item.id === item.id);
-                      return (
-                        <TableRow key={item.id} className={inEstimate ? "bg-primary/5" : ""}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{item.description}</p>
-                              <p className="text-xs text-muted-foreground">{item.itemType}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{item.unitType}</TableCell>
-                          <TableCell className="text-right">{formatPrice(item.laborRate)}</TableCell>
-                          <TableCell className="text-right">{formatPrice(item.materialFee)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatPrice(item.retailPrice)}</TableCell>
-                          <TableCell>
-                            {inEstimate ? (
-                              <div className="flex items-center gap-1">
+                {/* Item table */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="p-4 border-b bg-card">
+                    <div className="flex items-center gap-4">
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search items..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-search-items"
+                        />
+                      </div>
+                      <Badge variant="secondary">
+                        {filteredItems.length} items
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <ScrollArea className="flex-1">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[40%]">Description</TableHead>
+                          <TableHead>Unit</TableHead>
+                          <TableHead className="text-right">Labor</TableHead>
+                          <TableHead className="text-right">Material</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead className="w-[80px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredItems.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              {searchQuery ? "No items match your search" : "No items in this category"}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredItems.map(item => {
+                            const inEstimate = estimateItems.find(e => e.item.id === item.id);
+                            return (
+                              <TableRow key={item.id} className={inEstimate ? "bg-primary/5" : ""}>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{item.description}</p>
+                                    <p className="text-xs text-muted-foreground">{item.itemType}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{item.unitType}</TableCell>
+                                <TableCell className="text-right">{formatPrice(item.laborRate)}</TableCell>
+                                <TableCell className="text-right">{formatPrice(item.materialFee)}</TableCell>
+                                <TableCell className="text-right font-medium">{formatPrice(item.retailPrice)}</TableCell>
+                                <TableCell>
+                                  {inEstimate ? (
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateQuantity(item.id, inEstimate.quantity - 1)}
+                                        data-testid={`button-decrease-${item.id}`}
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </Button>
+                                      <span className="w-6 text-center text-sm font-medium">{inEstimate.quantity}</span>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateQuantity(item.id, inEstimate.quantity + 1)}
+                                        data-testid={`button-increase-${item.id}`}
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => addToEstimate(item)}
+                                      data-testid={`button-add-${item.id}`}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </div>
+
+                {/* Estimate cart */}
+                <div className="w-full md:w-96 border-l bg-card flex flex-col">
+
+                  {/* Cart header */}
+                  <div className="p-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShoppingCart className="w-5 h-5 text-primary" />
+                        <h2 className="font-semibold">Estimate</h2>
+                        {savedCustomId && (
+                          <Badge variant="secondary" className="text-xs font-mono">{savedCustomId}</Badge>
+                        )}
+                      </div>
+                      {estimateItems.length > 0 && (
+                        <Button variant="ghost" size="sm" onClick={clearEstimate} data-testid="button-clear-estimate">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {estimateItems.length} item{estimateItems.length !== 1 ? "s" : ""} in estimate
+                    </p>
+                  </div>
+
+                  {/* Loaded-from notice */}
+                  {loadedFromId && (
+                    <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                      <Info className="w-3 h-3 flex-shrink-0" />
+                      Loaded from {loadedFromId} — saving will create a new estimate
+                    </div>
+                  )}
+
+                  {/* Persistent quote header fields */}
+                  <div className="p-4 border-b space-y-3 bg-muted/20">
+                    <div className="space-y-1">
+                      <Label htmlFor="clientName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Client / Prospect Name
+                      </Label>
+                      <Input
+                        id="clientName"
+                        placeholder="e.g. Jane Smith"
+                        value={clientName}
+                        onChange={(e) => setClientName(e.target.value)}
+                        data-testid="input-client-name"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="estimateName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Job Description
+                      </Label>
+                      <Input
+                        id="estimateName"
+                        placeholder="e.g. Kitchen remodel"
+                        value={estimateName}
+                        onChange={(e) => setEstimateName(e.target.value)}
+                        data-testid="input-estimate-name"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cart items */}
+                  <ScrollArea className="flex-1">
+                    {estimateItems.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">
+                        <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No items added yet</p>
+                        <p className="text-sm mt-1">Click + to add items to your estimate</p>
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        {estimateItems.map(({ item, quantity }) => (
+                          <Card key={item.id} className="mb-2">
+                            <CardContent className="p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">{item.description}</p>
+                                  <p className="text-xs text-muted-foreground">{item.unitType}</p>
+                                </div>
                                 <Button
-                                  variant="outline"
+                                  variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => updateQuantity(item.id, inEstimate.quantity - 1)}
-                                  data-testid={`button-decrease-${item.id}`}
+                                  className="h-6 w-6 -mt-1 -mr-1"
+                                  onClick={() => removeFromEstimate(item.id)}
+                                  data-testid={`button-remove-${item.id}`}
                                 >
-                                  <Minus className="w-3 h-3" />
-                                </Button>
-                                <span className="w-6 text-center text-sm font-medium">{inEstimate.quantity}</span>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => updateQuantity(item.id, inEstimate.quantity + 1)}
-                                  data-testid={`button-increase-${item.id}`}
-                                >
-                                  <Plus className="w-3 h-3" />
+                                  <X className="w-3 h-3" />
                                 </Button>
                               </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => addToEstimate(item)}
-                                data-testid={`button-add-${item.id}`}
-                              >
-                                <Plus className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </div>
+                              <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => updateQuantity(item.id, quantity - 1)}
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    value={quantity}
+                                    onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 0)}
+                                    className="w-14 h-6 text-center text-sm"
+                                    min={1}
+                                    data-testid={`input-quantity-${item.id}`}
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => updateQuantity(item.id, quantity + 1)}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                                <p className="font-medium text-sm">
+                                  {formatCurrency(parseFloat(item.retailPrice || "0") * quantity)}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
 
-          {/* Estimate cart */}
-          <div className="w-full md:w-96 border-l bg-card flex flex-col">
+                  {/* Totals + action buttons */}
+                  {estimateItems.length > 0 && (
+                    <div className="border-t p-4 space-y-3">
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Labor</span>
+                          <span>{formatCurrency(totals.labor)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Materials</span>
+                          <span>{formatCurrency(totals.material)}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex justify-between font-semibold text-lg">
+                          <span>Total</span>
+                          <span className="text-primary">{formatCurrency(totals.retail)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Profit margin</span>
+                          <span>{totals.margin.toFixed(1)}%</span>
+                        </div>
+                      </div>
 
-            {/* Cart header */}
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5 text-primary" />
-                  <h2 className="font-semibold">Estimate</h2>
-                  {savedCustomId && (
-                    <Badge variant="secondary" className="text-xs font-mono">{savedCustomId}</Badge>
+                      <Button
+                        className="w-full"
+                        onClick={() => setSaveDialogOpen(true)}
+                        data-testid="button-save-estimate"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {saveButtonLabel}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleExportPdf}
+                        data-testid="button-export-pdf"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export PDF
+                      </Button>
+                    </div>
                   )}
                 </div>
-                {estimateItems.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearEstimate} data-testid="button-clear-estimate">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {estimateItems.length} item{estimateItems.length !== 1 ? "s" : ""} in estimate
-              </p>
-            </div>
 
-            {/* Persistent quote header fields */}
-            <div className="p-4 border-b space-y-3 bg-muted/20">
-              <div className="space-y-1">
-                <Label htmlFor="clientName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Client / Prospect Name
-                </Label>
-                <Input
-                  id="clientName"
-                  placeholder="e.g. Jane Smith"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  data-testid="input-client-name"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="estimateName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Job Description
-                </Label>
-                <Input
-                  id="estimateName"
-                  placeholder="e.g. Kitchen remodel"
-                  value={estimateName}
-                  onChange={(e) => setEstimateName(e.target.value)}
-                  data-testid="input-estimate-name"
-                  className="h-8 text-sm"
-                />
               </div>
             </div>
+          )}
+        </TabsContent>
 
-            {/* Cart items */}
-            <ScrollArea className="flex-1">
-              {estimateItems.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">
-                  <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No items added yet</p>
-                  <p className="text-sm mt-1">Click + to add items to your estimate</p>
-                </div>
-              ) : (
-                <div className="p-2">
-                  {estimateItems.map(({ item, quantity }) => (
-                    <Card key={item.id} className="mb-2">
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{item.description}</p>
-                            <p className="text-xs text-muted-foreground">{item.unitType}</p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 -mt-1 -mr-1"
-                            onClick={() => removeFromEstimate(item.id)}
-                            data-testid={`button-remove-${item.id}`}
+        {/* ── Estimates tab ──────────────────────────────────── */}
+        <TabsContent value="estimates">
+          <div className="space-y-4">
+            {estimatesLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : savedEstimates.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+                <FileText className="w-12 h-12 mb-4 opacity-40" />
+                <p className="font-medium">No estimates yet.</p>
+                <p className="text-sm mt-1">Use the Calculator tab to build and save your first estimate.</p>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-semibold">Estimate #</TableHead>
+                      <TableHead className="font-semibold">Client / Prospect</TableHead>
+                      <TableHead className="font-semibold">Job Description</TableHead>
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold text-right">Amount</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {savedEstimates.map((est) => (
+                      <TableRow key={est.id} data-testid={`row-estimate-${est.id}`}>
+                        <TableCell className="font-mono text-sm font-medium">{est.customId}</TableCell>
+                        <TableCell>{est.clientName}</TableCell>
+                        <TableCell className="text-muted-foreground">{est.projectName}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {est.date
+                            ? new Date(est.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(parseFloat(est.amount || "0"))}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={est.status}
+                            onValueChange={(val) => handleStatusUpdate(est.id, val)}
                           >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateQuantity(item.id, quantity - 1)}
+                            <SelectTrigger
+                              className="h-7 w-32 text-xs"
+                              data-testid={`select-status-${est.id}`}
                             >
-                              <Minus className="w-3 h-3" />
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="draft">Draft</SelectItem>
+                              <SelectItem value="sent">Sent</SelectItem>
+                              <SelectItem value="approved">Approved</SelectItem>
+                              <SelectItem value="declined">Declined</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleLoadEstimate(est.id, est.customId)}
+                              data-testid={`button-load-estimate-${est.id}`}
+                            >
+                              Load
                             </Button>
-                            <Input
-                              type="number"
-                              value={quantity}
-                              onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 0)}
-                              className="w-14 h-6 text-center text-sm"
-                              min={1}
-                              data-testid={`input-quantity-${item.id}`}
-                            />
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6"
-                              onClick={() => updateQuantity(item.id, quantity + 1)}
+                              className="h-8 w-8"
+                              onClick={() => handleExportPdfFromEstimate(est.id)}
+                              data-testid={`button-export-estimate-${est.id}`}
+                              title="Export PDF"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Download className="w-4 h-4" />
                             </Button>
                           </div>
-                          <p className="font-medium text-sm">
-                            {formatCurrency(parseFloat(item.retailPrice || "0") * quantity)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-
-            {/* Totals + action buttons */}
-            {estimateItems.length > 0 && (
-              <div className="border-t p-4 space-y-3">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Labor</span>
-                    <span>{formatCurrency(totals.labor)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Materials</span>
-                    <span>{formatCurrency(totals.material)}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-semibold text-lg">
-                    <span>Total</span>
-                    <span className="text-primary">{formatCurrency(totals.retail)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Profit margin</span>
-                    <span>{totals.margin.toFixed(1)}%</span>
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full"
-                  onClick={() => setSaveDialogOpen(true)}
-                  data-testid="button-save-estimate"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Estimate
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleExportPdf}
-                  data-testid="button-export-pdf"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export PDF
-                </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Save dialog — confirmation step */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Save Estimate</DialogTitle>
+            <DialogTitle>{saveButtonLabel}</DialogTitle>
             <DialogDescription>
-              {clientName && estimateName
-                ? `Save "${estimateName}" for ${clientName} to your estimates.`
-                : "Save this estimate to your records."}
+              {loadedFromId
+                ? `This will save a new estimate (a copy of ${loadedFromId}). The original will not be changed.`
+                : clientName && estimateName
+                  ? `Save "${estimateName}" for ${clientName} to your estimates.`
+                  : "Save this estimate to your records."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Summary of what will be saved */}
             <Card className="bg-muted/50">
               <CardContent className="p-4 space-y-2 text-sm">
                 {clientName ? (
@@ -796,7 +1152,6 @@ export default function ContractorCalculator() {
               </CardContent>
             </Card>
 
-            {/* Warn if required fields are missing */}
             {(!clientName.trim() || !estimateName.trim()) && (
               <p className="text-sm text-destructive">
                 Please fill in{!clientName.trim() && !estimateName.trim()
@@ -823,7 +1178,7 @@ export default function ContractorCalculator() {
             >
               {isSaving
                 ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                : "Save Estimate"
+                : saveButtonLabel
               }
             </Button>
           </DialogFooter>
