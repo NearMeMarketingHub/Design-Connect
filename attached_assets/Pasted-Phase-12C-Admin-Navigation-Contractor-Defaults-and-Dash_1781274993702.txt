@@ -1,0 +1,179 @@
+Phase 12C: Admin Navigation, Contractor Defaults, and Dashboard Report Scope
+
+Context:
+Phase 12A/12B cleaned up the first company-side visual audit issues. This phase handles the remaining smaller navigation/reporting cleanup items from the visual audit.
+
+Do not build major new features in this phase.
+
+Out of scope:
+
+* No contractor-side sandbox build yet
+* No subcontractor multi-company switching
+* No Selections feature build
+* No 3D Floor Plan Builder overhaul
+* No expenses / actual spend tracking
+* No budget reports / production sheets
+* No Stripe automation
+* No schema changes unless absolutely unavoidable
+* No db:push unless a schema change is truly required, which should be avoided
+
+Goal:
+Clean up Super Admin navigation, company/contractor sidebar ordering/default landing, and contractor dashboard report export scope.
+
+1. Replace Super Admin “Admin Tools” with direct “Sandbox” nav item
+
+Issue:
+The Super Admin side currently has an “Admin Tools” tab that only contains Sandbox and a Role Definitions link. Role Definitions already has its own nav item, so Admin Tools is redundant.
+
+Expected behavior:
+
+* Remove the “Admin Tools” sidebar/nav item from Super Admin.
+* Add a direct “Sandbox” nav item in the Super Admin sidebar/nav.
+* Keep Role Definitions as its own existing nav item.
+* Do not remove the Sandbox page/route itself.
+* Do not build contractor-side sandbox in this phase.
+
+Suggested label:
+“Sandbox”
+
+Done looks like:
+
+* Super Admin sidebar has a direct Sandbox item.
+* Admin Tools is gone.
+* Role Definitions still exists separately.
+* Existing Sandbox page still opens.
+
+2. Move Admin Center lower in company/contractor sidebar
+
+Issue:
+For company/contractor users, Admin Center is too prominent in the sidebar. It should be lower/bottom because daily users should land in operational pages first.
+
+Expected behavior:
+
+* Move Admin Center near the bottom of the company/contractor sidebar list.
+* Keep it accessible for Company Owner and Company Admin users.
+* Do not remove Admin Center.
+* Do not change permissions.
+
+Done looks like:
+
+* Admin Center appears near the bottom of the company/contractor sidebar.
+* Dashboard and operational tools remain higher.
+
+3. Default Company Owner/Admin login landing to Dashboard
+
+Issue:
+Company Owner/Admin users should land on Dashboard after signing in, not Admin Center or another settings/admin area.
+
+Expected behavior:
+After login:
+
+* Company Owner lands on company/contractor Dashboard.
+* Company Admin lands on company/contractor Dashboard.
+* Regular internal contractors should continue landing on their intended dashboard/home route.
+* Do not change Super Admin landing behavior unless it is clearly sharing the same bug.
+* Do not change client landing behavior unless needed to avoid regression.
+
+Tasks:
+
+* Inspect auth redirect logic in likely files:
+
+  * `client/src/pages/auth.tsx`
+  * `client/src/lib/auth-context.tsx`
+  * `client/src/App.tsx`
+  * any route guard/default redirect logic
+* Ensure company-side elevated users default to Dashboard.
+* Admin Center should only open when clicked intentionally.
+
+Done looks like:
+
+* Company Owner sign-in goes to Dashboard.
+* Company Admin sign-in goes to Dashboard.
+* Admin Center remains accessible from sidebar.
+
+4. Contractor Dashboard report/export scope
+
+Issue:
+The Contractor Dashboard export/report currently appears to export only projects where `project.contractorId === current user id`. That may be okay for a regular internal contractor/team member, but Company Owners and Company Admins likely expect company-wide project export.
+
+Expected behavior:
+Define export/report scope by role:
+
+* Company Owner:
+
+  * export all projects for their company
+
+* Company Admin:
+
+  * export all projects for their company
+
+* Regular internal contractor/team member:
+
+  * export projects assigned to them / allowed for their access, matching current behavior if that is the intended access model
+
+* Client:
+
+  * no internal contractor report access
+
+* Subcontractor / Notary:
+
+  * no internal company-wide report access unless a future assigned-scope workflow is built
+
+* Platform/Super Admin:
+
+  * keep existing admin behavior if already separate; do not broaden unless needed
+
+Tasks:
+
+* Inspect Contractor Dashboard export/report logic.
+* Likely file:
+
+  * `client/src/pages/contractor-dashboard.tsx`
+  * backend routes/storage if the export is server-side
+* Update the filter so Company Owner/Admin users export company-wide projects.
+* Keep regular contractor/team member export scoped to their assigned/allowed projects.
+* Preserve company scoping.
+* Do not expose projects from other companies.
+
+Also clarify naming if needed:
+If the export is currently just a CSV list of projects, keep it simple. Do not build full reporting in this phase.
+
+Done looks like:
+
+* Company Owner/Admin export includes all company projects.
+* Regular internal contractor export remains scoped appropriately.
+* No cross-company project leakage.
+* No new full reporting system is added.
+
+5. Verify Estimator Calculator navigation after Phase 12B
+
+Phase 12B renamed the sidebar item to “Estimator Calculator.”
+
+In this phase, just verify:
+
+* There is not still a confusing duplicate “Calculator” sidebar label.
+* Floor Calc remains separate.
+* The Estimator Calculator route still opens.
+* No route 404s were introduced.
+
+Do not rebuild or merge the estimator/calculator functionality in this phase unless there is a small obvious duplicate sidebar label still present.
+
+6. Run check
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* Super Admin has direct Sandbox nav item
+* Admin Tools nav item removed
+* Role Definitions remains separate
+* Company/contractor Admin Center moved lower in sidebar
+* Company Owner/Admin land on Dashboard after login
+* Contractor Dashboard export scope is company-wide for owners/admins and scoped for regular contractors
+* Estimator Calculator sidebar naming remains clear
+* No contractor sandbox built
+* No schema changes
+* No db:push
+* `npm run check` passes
