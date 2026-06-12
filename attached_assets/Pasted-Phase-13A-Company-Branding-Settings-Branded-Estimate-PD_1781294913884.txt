@@ -1,0 +1,269 @@
+Phase 13A: Company Branding Settings + Branded Estimate PDF
+
+Context:
+The Estimator Calculator can now build, save, view, load, update status, and export estimates as PDFs. The current PDF export is functional but plain. Since contractors may give these PDFs to potential clients, the estimate PDF needs to look more professional and use the company’s branding.
+
+Goal:
+Allow Company Owners and Company Admins to configure basic company branding, then use that branding in the Estimator Calculator PDF export.
+
+This should be built as reusable company branding, not just a one-off estimate PDF tweak, so it can later support invoices, reports, proposals, and client-facing documents.
+
+Out of scope:
+
+* No Stripe changes
+* No Selections build
+* No contractor sandbox
+* No subcontractor multi-company switching
+* No 3D Floor Plan overhaul
+* No estimate approval signatures
+* No create-project-from-estimate workflow
+* No invoice PDF redesign yet
+* No reports/production sheets
+* No complex theme builder
+* No client-facing branding editor
+
+1. Audit existing company fields first
+
+Before adding new fields, inspect the current schema and UI.
+
+Check:
+
+* `shared/schema.ts`
+* company table/model
+* company profile/admin center settings
+* object upload helpers/components
+* existing company logo/contact fields, if any
+* existing file upload/object storage usage
+
+Determine whether the app already has fields for:
+
+* company logo
+* company phone
+* company email
+* company website
+* company address
+* company colors
+* quote/estimate footer text
+
+Use existing fields where they already exist.
+
+Only add new schema fields if needed.
+
+2. Add company branding fields if missing
+
+If the schema does not already support these, add minimal company-level branding fields.
+
+Recommended fields:
+
+* `logoUrl` or `brandLogoUrl`
+* `primaryColor`
+* `accentColor`
+* `quoteFooterText`
+* `companyPhone`, only if not already present
+* `companyEmail`, only if not already present
+* `companyWebsite`, only if not already present
+* `companyAddress`, only if not already present
+
+Use nullable fields where appropriate.
+
+Default colors if none are set:
+
+* primary: `#1f2937`
+* accent: `#d97706`
+
+If schema changes are required:
+
+* update `shared/schema.ts`
+* update any insert/update schemas if needed
+* run `npm run db:push`
+* then run `npm run check`
+
+If existing fields are sufficient:
+
+* do not add schema changes
+* do not run db:push
+
+3. Add Branding settings UI in Admin Center
+
+Add a company branding settings section for Company Owner and Company Admin users.
+
+Preferred location:
+`Admin Center → Company Profile` or `Admin Center → Branding`
+
+If Admin Center already has a profile/settings tab, add branding there instead of creating duplicate navigation.
+
+Fields:
+
+* Company Logo upload
+* Primary Color
+* Accent Color
+* Quote Footer Text
+* Phone
+* Email
+* Website
+* Address
+
+Permissions:
+Can edit:
+
+* company_owner
+* company admins
+* platform admin, if applicable
+
+Read-only or hidden:
+
+* regular internal contractors
+* clients
+* subcontractors
+* notaries
+
+Do not allow clients/subcontractors/notaries to edit company branding.
+
+4. Logo upload
+
+Use the app’s existing upload/object storage pattern.
+
+Requirements:
+
+* Owner/Admin can upload a logo image
+* Store the logo URL/path on the company branding/company record
+* Show a preview after upload
+* Allow replacing the logo
+* Do not expose unrestricted file access
+* Keep uploads company-scoped where the app’s storage pattern supports it
+
+Supported formats:
+
+* PNG
+* JPG/JPEG
+* WebP if already supported
+
+Keep file validation simple and safe.
+
+5. Save branding settings
+
+Add or reuse an API route to update company branding.
+
+Requirements:
+
+* strict company scoping
+* only owner/admin/platform admin can update
+* users cannot update branding for another company
+* clients/subcontractors/notaries blocked
+* return updated company/branding data
+* invalidate/refetch relevant company query on success
+
+If a company update route already exists, extend it carefully instead of adding a duplicate route.
+
+6. Update Estimator Calculator PDF export
+
+File likely:
+`client/src/pages/contractor-calculator.tsx`
+
+Update both PDF export flows:
+
+* Export current calculator/cart PDF
+* Export saved estimate PDF from the Estimates tab
+
+The PDF should use company branding when available.
+
+Include:
+
+* company logo in header if set
+* company name
+* company phone/email/website/address if set
+* primary color for header/accent bar
+* accent color for section headings or totals box
+* estimate title
+* estimate number/customId, or Draft Estimate if unsaved
+* date
+* client/prospect name
+* job description
+* line items
+* subtotal/total
+* estimate status where appropriate
+* quote footer text if set
+* fallback footer if no custom footer is set
+
+Keep layout clean and printable.
+
+7. PDF fallback behavior
+
+If no branding is configured:
+
+* PDF still exports successfully
+* use clean default colors
+* show company name if available
+* omit logo area if no logo exists
+* keep the document professional
+
+Do not break PDF export if:
+
+* logo is missing
+* logo fails to load
+* colors are blank
+* company contact fields are blank
+
+8. Logo loading in jsPDF
+
+If using logo images in jsPDF:
+
+* handle async image loading safely
+* support cross-origin/object storage URLs according to the app’s existing storage setup
+* if the image cannot be loaded, continue generating the PDF without the logo
+* do not block the PDF export entirely because of logo failure
+
+9. UI polish for the branded PDF
+
+The estimate PDF should look more professional than the current plain export.
+
+Suggested structure:
+
+* Header with logo/company info
+* Branded color bar
+* Estimate info block
+* Client/prospect block
+* Line item table with styled header
+* Totals box
+* Footer/disclaimer
+
+Do not overcomplicate the design. Make it clean and client-facing.
+
+10. Keep Estimator Calculator behavior intact
+
+Do not break:
+
+* Calculator tab
+* Estimates tab
+* save estimate
+* load estimate
+* status update
+* export current PDF
+* export saved estimate PDF
+* price book item picker
+* cart totals
+* projectless estimate saving
+
+11. Run checks
+
+Run:
+
+`npm run check`
+
+If schema changed, also run:
+
+`npm run db:push`
+
+Done looks like:
+
+* Company Owner/Admin can edit branding settings
+* Company logo can be uploaded/replaced
+* Company colors/footer/contact info can be saved
+* Regular contractors can use branding in PDFs but cannot edit it
+* Clients/subcontractors/notaries cannot edit branding
+* Estimator Calculator current-cart PDF uses branding
+* Estimates tab saved-estimate PDF uses branding
+* PDF still works with no branding configured
+* No unrelated features changed
+* `npm run check` passes
+* `npm run db:push` only if schema changed
