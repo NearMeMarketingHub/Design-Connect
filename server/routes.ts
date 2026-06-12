@@ -985,12 +985,44 @@ export async function registerRoutes(
     } catch (error) { next(error); }
   });
 
+  // Helper: validate that userId is an internal company user of companyId.
+  // Returns the user record if valid. Returns null if the user is not an internal member.
+  // "Internal" means: role contractor or company_owner, contractorType null/empty (not subcontractor/notary),
+  // and the user is linked to companyId either via users.companyId or via a company_members row.
+  async function resolveInternalMember(companyId: string, userId: string): Promise<User | null> {
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) return null;
+    // Must be contractor or company_owner — never clients, platform admins, subcontractors, or notaries
+    if (targetUser.role !== "contractor" && targetUser.role !== "company_owner") return null;
+    if (targetUser.contractorType === "subcontractor" || targetUser.contractorType === "notary") return null;
+    // Accept if directly linked by companyId
+    if (targetUser.companyId === companyId) return targetUser;
+    // Also accept if they have an explicit company_members row (e.g. legacy join-table-only record)
+    const membership = await storage.getCompanyMember(companyId, userId);
+    if (membership) return targetUser;
+    return null;
+  }
+
   // Remove company member (owner or company admin of that company only)
   app.delete("/api/company/:companyId/members/:userId", requireAuth, async (req, res, next) => {
     try {
       const ok = await verifyCompanyAccess(req, res, req.params.companyId);
       if (!ok) return;
-      await storage.removeCompanyMember(req.params.companyId, req.params.userId);
+      const { companyId, userId } = req.params;
+      const targetUser = await resolveInternalMember(companyId, userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User is not an internal member of this company" });
+      }
+      // Company owners cannot be removed via the Team management flow
+      if (targetUser.role === "company_owner") {
+        return res.status(403).json({ message: "Company owners cannot be removed from the team" });
+      }
+      // Remove the join-table row if it exists
+      await storage.removeCompanyMember(companyId, userId);
+      // Also clear the direct companyId link on the user record if still pointing at this company
+      if (targetUser.companyId === companyId) {
+        await storage.updateUser(userId, { companyId: null, isCompanyAdmin: false });
+      }
       res.json({ message: "Member removed" });
     } catch (error) { next(error); }
   });
@@ -1000,13 +1032,22 @@ export async function registerRoutes(
     try {
       const ok = await verifyCompanyAccess(req, res, req.params.companyId);
       if (!ok) return;
+      const { companyId, userId } = req.params;
       const { roleDefinitionId } = req.body;
       // Allow null to clear assignment; validate if a value is provided
       if (roleDefinitionId) {
         const roleDef = await storage.getContractorRoleDefinition(roleDefinitionId);
         if (!roleDef) return res.status(404).json({ message: "Role definition not found" });
       }
-      const updated = await storage.updateCompanyMember(req.params.companyId, req.params.userId, {
+      // Ensure a company_members row exists so updateCompanyMember has a row to update.
+      // For direct users.companyId members, upsert a row first.
+      let existingRow = await storage.getCompanyMember(companyId, userId);
+      if (!existingRow) {
+        const targetUser = await resolveInternalMember(companyId, userId);
+        if (!targetUser) return res.status(404).json({ message: "Member not found" });
+        existingRow = await storage.addCompanyMember({ companyId, userId, status: "active", roleDefinitionId: null });
+      }
+      const updated = await storage.updateCompanyMember(companyId, userId, {
         roleDefinitionId: roleDefinitionId || null,
       });
       if (!updated) return res.status(404).json({ message: "Member not found" });
@@ -1020,19 +1061,21 @@ export async function registerRoutes(
       const ok = await verifyCompanyAccess(req, res, req.params.companyId);
       if (!ok) return;
       const caller = req.user as User;
-      if (caller.id === req.params.userId) {
+      const { companyId, userId } = req.params;
+      if (caller.id === userId) {
         return res.status(400).json({ message: "Cannot change your own admin status" });
       }
-      // Validate target user is actually a member of this company (prevent privilege escalation)
-      const targetMembership = await storage.getCompanyMember(req.params.companyId, req.params.userId);
-      if (!targetMembership) {
+      // Validate target user is actually an internal member of this company (prevent privilege escalation).
+      // Accepts both company_members join-table members and direct users.companyId members.
+      const targetUser = await resolveInternalMember(companyId, userId);
+      if (!targetUser) {
         return res.status(404).json({ message: "User is not a member of this company" });
       }
       const { isCompanyAdmin } = req.body;
       if (typeof isCompanyAdmin !== "boolean") {
         return res.status(400).json({ message: "isCompanyAdmin must be a boolean" });
       }
-      await storage.updateUser(req.params.userId, { isCompanyAdmin });
+      await storage.updateUser(userId, { isCompanyAdmin });
       res.json({ message: "Admin status updated" });
     } catch (error) { next(error); }
   });
