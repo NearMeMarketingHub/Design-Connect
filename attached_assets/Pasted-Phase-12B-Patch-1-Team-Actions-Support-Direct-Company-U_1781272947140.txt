@@ -1,0 +1,137 @@
+Phase 12B Patch 1: Team Actions Support Direct Company Users
+
+Context:
+Phase 12B fixed Admin Center → Team visibility by merging users from:
+
+1. `company_members`
+2. direct `users.companyId = companyId` internal users
+
+That fixed the display issue, but direct `users.companyId` users may not have a `company_members` row. The Team UI actions may still fail for those users because some backend actions only operate on `company_members`.
+
+Goal:
+Make Team management actions work correctly for both:
+
+* users who have a `company_members` row
+* internal company users who are linked only by `users.companyId`
+
+Do not add new schema.
+Do not run db:push.
+Do not change permissions beyond making the existing Team actions work for the users now shown in the Team list.
+
+Out of scope:
+
+* No Selections build
+* No subcontractor multi-company switching
+* No contractor sandbox
+* No 3D floor plan changes
+* No reports/expenses/formulas
+* No Stripe changes
+* No schema changes
+* No db:push
+
+Tasks:
+
+1. Audit Team action routes and storage methods
+
+Inspect the routes/actions used by Admin Center → Team in `client/src/pages/company-dashboard.tsx`.
+
+Find the backend routes/storage methods used for:
+
+* assigning/changing team role
+* toggling company admin access
+* removing a team member
+* any invite/member update actions tied to the Team tab
+
+Likely files:
+
+* `client/src/pages/company-dashboard.tsx`
+* `server/routes.ts`
+* `server/storage.ts`
+* `shared/schema.ts` only for existing field names/reference, no schema edits
+
+2. Support direct users.companyId members in role/admin actions
+
+If a user appears in the Team list because of `users.companyId = companyId` but does not have a `company_members` row, the existing role/admin actions should not fail with errors like:
+
+* “Member not found”
+* “User is not a member of this company”
+
+Preferred backend behavior:
+
+* Detect whether the target is a `company_members` row or a direct company user.
+* If the action requires a `company_members` row, create or upsert a safe `company_members` row for that user/company before applying the existing update.
+* Preserve strict company scoping.
+* Do not create memberships for clients, subcontractors, notaries, platform admins, or users from other companies.
+* Only allow this for internal company users:
+
+  * `users.companyId = companyId`
+  * role is internal/company-side, such as `contractor` or `company_owner`
+  * `contractorType` is null/empty or not `subcontractor`/`notary`
+
+Company admins are existing internal users where:
+
+* `role = "contractor"`
+* `isCompanyAdmin = true`
+
+Do not exclude null `contractorType`.
+
+3. Make remove member work for direct users safely
+
+If the removed user has a `company_members` row:
+
+* keep the existing removal behavior
+
+If the removed user is a direct `users.companyId` member with no `company_members` row:
+
+* remove the company association safely
+* do not delete the user account
+* set `users.companyId` to null, if that matches existing app patterns
+* clear company-admin access if appropriate, such as setting `isCompanyAdmin = false`
+* do not remove company owners unless existing permissions already allow it and protections are in place
+* do not affect clients, subcontractors, notaries, platform admins, or users from other companies
+
+Add clear server-side error messages for invalid attempts.
+
+4. Preserve existing frontend shape
+
+Do not require a major frontend rewrite.
+
+The merged members returned by `/api/company/:companyId/members` should remain shaped in the way `company-dashboard.tsx` expects.
+
+If needed, add a small internal marker like `membershipSource` or equivalent, but do not expose confusing UI copy.
+
+Team UI should keep working for:
+
+* company_members-based users
+* direct users.companyId users
+
+5. Keep permissions strict
+
+Only authorized company owner/company admin/platform admin users should be able to perform Team management actions, according to existing permission checks.
+
+Never allow:
+
+* cross-company updates
+* client membership changes through this internal Team flow
+* subcontractor/notary management through this internal Team flow
+* platform admin users accidentally appearing as company team members
+
+6. Run check
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* Admin Center → Team still shows owner, company admins, and regular internal contractors
+* Team actions work for users returned from `company_members`
+* Team actions also work for direct `users.companyId` internal users
+* Assign/change role no longer fails for direct company users
+* Make Admin / remove Admin no longer fails for direct company users
+* Remove member safely removes direct company users from the company without deleting the user account
+* No clients/subcontractors/notaries/platform admins leak into Team
+* No cross-company users are affected
+* No schema changes
+* No db:push
+* `npm run check` passes
