@@ -42,13 +42,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const getDashboardPath = () => {
     if (currentPortal === "admin") return "/admin/dashboard";
     if (currentPortal === "contractor") {
-      if (user?.role === "company_owner") return "/company/dashboard";
       if (isSubOrNotary) return "/subcontractor/dashboard";
       return "/contractor/dashboard";
     }
     if (currentPortal === "client") return "/client/dashboard";
     if (user?.role === "admin") return "/admin/dashboard";
-    if (user?.role === "company_owner") return "/company/dashboard";
+    if (user?.role === "company_owner") return "/contractor/dashboard";
     if (user?.role === "contractor") return "/contractor/dashboard";
     return "/client/dashboard";
   };
@@ -69,17 +68,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const contractorSidebarItems: SidebarItem[] = [
     { label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5" />, href: "/contractor/dashboard" },
-    ...(canAccessAdminCenter ? [
-      { label: "Admin Center", icon: <Shield className="w-5 h-5" />, href: "/company/dashboard" },
-    ] : []),
-    ...(canAccessAdminCenter ? [
-      { label: "Budget Manager", icon: <BookOpen className="w-5 h-5" />, href: "/company/budget" },
-      { label: "Financials", icon: <TrendingUp className="w-5 h-5" />, href: "/company/financials" },
-    ] : []),
     { label: "My Projects", icon: <FolderOpen className="w-5 h-5" />, href: "/contractor/projects" },
     { label: "Estimator Calculator", icon: <Calculator className="w-5 h-5" />, href: "/contractor/calculator" },
     { label: "Floor Calc", icon: <Grid3X3 className="w-5 h-5" />, href: "/contractor/floor-calculator" },
     { label: "3D Floor Plan", icon: <Box className="w-5 h-5" />, href: "/contractor/floor-plan-3d" },
+    ...(canAccessAdminCenter ? [
+      { label: "Budget Manager", icon: <BookOpen className="w-5 h-5" />, href: "/company/budget" },
+      { label: "Financials", icon: <TrendingUp className="w-5 h-5" />, href: "/company/financials" },
+      { label: "Admin Center", icon: <Shield className="w-5 h-5" />, href: "/company/dashboard" },
+    ] : []),
   ];
 
   // Simplified sidebar for sub-contractors and notaries

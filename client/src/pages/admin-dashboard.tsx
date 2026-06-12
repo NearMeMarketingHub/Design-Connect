@@ -45,8 +45,12 @@ export default function AdminDashboard() {
     },
   });
 
-  // Filter to only show projects assigned to current contractor
-  const myProjects = projects.filter(p => p.contractorId === user?.id);
+  // Company owners and company admins see all company projects (API already scopes to their company).
+  // Regular internal contractors see only projects where they are the assigned contractor.
+  const isCompanyWide = user?.role === "company_owner" || user?.isCompanyAdmin === true;
+  const myProjects = isCompanyWide
+    ? projects
+    : projects.filter(p => p.contractorId === user?.id);
 
   const filteredProjects = myProjects.filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

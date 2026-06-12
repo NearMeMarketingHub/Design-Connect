@@ -98,7 +98,7 @@ export default function AuthPage() {
         if (loggedInUser.role === "admin") {
           setLocation("/admin/dashboard");
         } else if (loggedInUser.role === "company_owner") {
-          setLocation("/company/dashboard");
+          setLocation("/contractor/dashboard");
         } else if (loggedInUser.role === "contractor" && loggedInUser.contractorType === "notary") {
           setLocation("/notary/portal");
         } else if (loggedInUser.role === "contractor" && loggedInUser.contractorType === "subcontractor") {
