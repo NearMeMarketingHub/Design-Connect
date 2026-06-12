@@ -1,0 +1,226 @@
+Phase 12F: Estimator Calculator Tabs + Saved Estimates
+
+Context:
+Phase 12E made `/contractor/calculator` the working sidebar Estimator Calculator for pre-project quotes using the company Price Book. It can now save estimates and export PDFs.
+
+However, saved estimates are currently only visible through the Financials area / `/company/estimates`, which is confusing. The Estimator Calculator should be the main home for both creating estimates and viewing saved estimates.
+
+Goal:
+Update the sidebar Estimator Calculator page so it has two tabs:
+
+1. Calculator
+2. Estimates
+
+The Calculator tab should keep the current Estimator Calculator workflow.
+
+The Estimates tab should show saved estimates and allow basic estimate status management.
+
+After this is done, remove the Estimator/Estimates access card from Financials so Financials is not the main place users go to manage estimates.
+
+Out of scope:
+
+* No schema changes unless absolutely unavoidable
+* No db:push unless a schema change is unavoidable
+* No company branding / logo / color customization yet
+* No branded PDF redesign yet
+* No project conversion workflow
+* No create-project-from-estimate workflow
+* No estimate approval signatures
+* No Selections build
+* No contractor sandbox
+* No subcontractor multi-company switching
+* No Stripe changes
+* No 3D Floor Plan changes
+* No expenses / reports / production sheets
+
+1. Add tabs to `/contractor/calculator`
+
+File:
+`client/src/pages/contractor-calculator.tsx`
+
+Add a tab layout near the top of the page, similar to the Admin Center tab style.
+
+Tabs:
+
+* `Calculator`
+* `Estimates`
+
+The default tab should be:
+`Calculator`
+
+The Calculator tab should contain the current estimator calculator UI:
+
+* Price Book categories
+* searchable item table
+* quote/cart panel
+* Client / Prospect Name
+* Job Description
+* Save Estimate
+* Export PDF
+
+Do not remove or break the existing calculator/save/PDF flow.
+
+2. Add Estimates tab
+
+Inside the new `Estimates` tab, show saved estimates for the current company/user.
+
+Use the existing estimates API/query if available:
+`GET /api/estimates`
+
+The list should show:
+
+* estimate custom ID
+* client/prospect name
+* job description / projectName
+* date
+* amount
+* status
+* actions
+
+Suggested columns/cards:
+
+* Estimate #
+* Client / Prospect
+* Job Description
+* Date
+* Amount
+* Status
+* Actions
+
+Keep the layout clean and easy to scan.
+
+3. Add basic status management
+
+The Estimates tab should allow authorized internal company users to update an estimate status.
+
+Supported statuses:
+
+* `draft`
+* `sent`
+* `approved`
+* `declined`
+
+User-facing labels:
+
+* Draft
+* Sent
+* Approved
+* Declined
+
+If an update estimate status API already exists, use it.
+
+If not, add a small backend route for updating estimate status only.
+
+Requirements:
+
+* Status update must be company-scoped
+* User must be an internal company user
+* Do not allow clients, subcontractors, notaries, or cross-company users to update internal estimate statuses
+* Do not allow users to update estimates from another company
+* Do not change other estimate fields in this route
+* Do not add project conversion logic yet
+
+Suggested route if needed:
+`PATCH /api/estimates/:id/status`
+
+Payload:
+`{ status: "draft" | "sent" | "approved" | "declined" }`
+
+Validate status server-side.
+
+4. Add useful estimate actions
+
+In the Estimates tab, include basic actions where practical:
+
+Required:
+
+* View / Load estimate
+* Export PDF if feasible using existing PDF export helper
+
+For View / Load:
+
+* Loading an estimate should populate the Calculator tab with that estimate’s client/job info and line items if the current data shape supports it safely.
+* If full load/edit is too large for this phase, provide a simple View action/modal showing estimate details and line items instead.
+
+Preferred:
+
+* If easy and safe, Load should switch to the Calculator tab and populate the calculator/cart with the saved estimate.
+
+Do not overbuild this. The must-have is that saved estimates are visible and status can be changed.
+
+5. Keep `/company/estimates` intact for now
+
+Do not delete `/company/estimates` in this phase.
+
+Reason:
+It may still be linked internally, bookmarked, or useful as the project-based estimate manager.
+
+However, the sidebar Estimator Calculator should now be the main user-facing place for estimates.
+
+6. Remove Estimator/Estimates card from Financials
+
+File likely:
+`client/src/pages/company-financials.tsx`
+
+Remove the Estimator / Estimator Calculator quick-access card from the Financials hub.
+
+Financials should no longer be the main access path for saved estimates.
+
+Do not remove unrelated Financials cards.
+
+Financials should remain focused on accounting/financial overview tools.
+
+7. Update copy if needed
+
+On the Estimator Calculator page, keep the page title:
+
+`Estimator Calculator`
+
+Suggested subtitle:
+`Build client estimates and quotes using your company price book.`
+
+For the Estimates tab, use clear empty state copy:
+
+`No estimates yet. Use the Calculator tab to build and save your first estimate.`
+
+8. Permissions
+
+Estimator Calculator and Estimates tab should be available to the same internal company users currently allowed to use the Estimator Calculator.
+
+Allowed:
+
+* company_owner
+* company admin
+* regular internal contractor/team member if current access allows estimator use
+* platform admin if applicable
+
+Not allowed:
+
+* client
+* subcontractor
+* notary
+* users from another company
+
+Preserve existing estimate access rules.
+
+9. Run checks
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* Sidebar Estimator Calculator opens `/contractor/calculator`
+* Page has tabs: Calculator and Estimates
+* Calculator tab keeps current quote-building, save, and PDF export behavior
+* Estimates tab shows saved estimates
+* Estimates tab shows status badges/dropdowns for Draft, Sent, Approved, Declined
+* Internal company users can update estimate status safely
+* Clients/subcontractors/notaries cannot update internal estimate status
+* No cross-company estimates are exposed
+* Financials no longer has the Estimator/Estimates card
+* `/company/estimates` is not deleted
+* No branding/PDF redesign included yet
+* No schema changes unless absolutely necessary
+* `npm run check` passes
