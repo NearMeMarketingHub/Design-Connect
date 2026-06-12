@@ -1,0 +1,92 @@
+Phase 12C Patch 1: Convert Admin Tools Page into Sandbox Page
+
+Context:
+Phase 12C renamed the Super Admin sidebar item from “Admin Tools” to “Sandbox,” but the actual page still says “Admin Tools” and still includes the Role Definitions link. That is not the intended final state.
+
+Goal:
+The former Admin Tools page should now be a dedicated Sandbox section/page.
+
+Do not build contractor-side sandbox in this patch.
+Do not change the sandbox system logic unless needed for wording/layout cleanup.
+Do not remove Role Definitions from the app; only remove it from this page because Role Definitions already has its own sidebar/nav item.
+
+Tasks:
+
+1. Update `/admin/tools` page heading and copy
+
+Find the page/component for the Super Admin Admin Tools route, likely one of:
+
+* `client/src/pages/admin-tools.tsx`
+* `client/src/pages/super-admin-dashboard.tsx`
+* `client/src/components/super-admin-layout.tsx`
+* or wherever `/admin/tools` renders its page content
+
+Change page title:
+
+From:
+“Admin Tools”
+
+To:
+“Sandbox”
+
+Update subtitle/description so it only describes sandbox testing.
+
+Suggested copy:
+“Use the sandbox area to test client-side workflows, documents, messages, photos, and project interactions without affecting live company data.”
+
+2. Remove Role Definitions card/link from the Sandbox page
+
+The Sandbox page should not include a Role Definitions card/link anymore.
+
+Role Definitions already exists as its own Super Admin sidebar/nav item, so leave that nav item alone.
+
+Do not delete the Role Definitions page or route.
+
+3. Keep only Sandbox-related cards/actions
+
+The `/admin/tools` page should only show sandbox-related actions.
+
+Keep links/cards for existing sandbox areas, such as:
+
+* Sandbox Dashboard
+* Sandbox Project
+* Sandbox Documents
+* Sandbox Messages
+* Sandbox Photos
+
+Exact labels can follow the existing app wording, but the page should clearly be about Sandbox only.
+
+4. Update any Super Admin overview card if needed
+
+If the Super Admin dashboard/overview has a card labeled “Admin Tools” that points to `/admin/tools`, rename that card to “Sandbox.”
+
+Update its description to sandbox-specific wording.
+
+Do not remove unrelated overview cards.
+
+5. Keep route stable
+
+Keep the route `/admin/tools` for now unless the app already has a dedicated sandbox route.
+
+Reason:
+Changing routes may cause unnecessary routing work. This patch is about making the existing page content match the new Sandbox label.
+
+6. Run check
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* Super Admin sidebar still says “Sandbox”
+* Clicking Sandbox opens the existing `/admin/tools` route
+* The page heading says “Sandbox,” not “Admin Tools”
+* The page content is sandbox-only
+* Role Definitions link/card is removed from this page
+* Role Definitions still exists as its own nav/sidebar item
+* Any overview card pointing to `/admin/tools` says “Sandbox,” not “Admin Tools”
+* No contractor-side sandbox is built
+* No schema changes
+* No db:push
+* `npm run check` passes
