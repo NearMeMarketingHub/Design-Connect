@@ -14,12 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import {
-  Wrench,
   TestTube,
-  Layers,
   LayoutDashboard,
   RefreshCw,
-  ArrowRight,
   Loader2,
 } from "lucide-react";
 
@@ -64,114 +61,94 @@ export default function AdminTools() {
 
   return (
     <SuperAdminLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-gray-500" />
-          <h1 className="text-2xl font-bold text-foreground">Admin Tools</h1>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <div className="flex items-center gap-2">
+            <TestTube className="w-5 h-5 text-purple-600" />
+            <h1 className="text-2xl font-bold text-foreground">Sandbox</h1>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1 ml-7">
+            Use the sandbox area to test client-side workflows, documents, messages, photos, and project interactions without affecting live company data.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <TestTube className="w-4 h-4 text-purple-600" />
-                Sandbox Testing
-              </CardTitle>
-              <CardDescription>Test features in an isolated environment</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {sandboxLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : !sandboxData?.project ? (
-                <div className="text-center py-4">
-                  <p className="text-muted-foreground text-sm mb-4">
-                    No sandbox data. Initialize to create test accounts.
-                  </p>
-                  <Button
-                    onClick={() => initSandboxMutation.mutate()}
-                    disabled={initSandboxMutation.isPending}
-                    className="w-full"
-                    data-testid="button-init-sandbox"
-                  >
-                    {initSandboxMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Initializing…
-                      </>
-                    ) : (
-                      <>
-                        <TestTube className="w-4 h-4 mr-2" />
-                        Initialize Sandbox
-                      </>
-                    )}
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-3">
-                    <p className="text-xs text-purple-700 dark:text-purple-300">
-                      <strong>Test Client:</strong> {sandboxData.client?.name}
-                      <br />
-                      <strong>Test Contractor:</strong> {sandboxData.contractor?.name}
-                      <br />
-                      <strong>Test Project:</strong> {sandboxData.project.name}
-                    </p>
-                  </div>
-                  <Link href="/sandbox/dashboard">
-                    <Button
-                      className="w-full justify-start"
-                      variant="outline"
-                      data-testid="button-sandbox-dashboard"
-                    >
-                      <LayoutDashboard className="w-4 h-4 mr-2" />
-                      Client Dashboard
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-amber-600 border-amber-300 hover:bg-amber-50"
-                    onClick={() => resetSandboxMutation.mutate()}
-                    disabled={resetSandboxMutation.isPending}
-                    data-testid="button-reset-sandbox"
-                  >
-                    {resetSandboxMutation.isPending ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TestTube className="w-4 h-4 text-purple-600" />
+              Sandbox Testing
+            </CardTitle>
+            <CardDescription>Test features in an isolated environment</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {sandboxLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : !sandboxData?.project ? (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground text-sm mb-4">
+                  No sandbox data. Initialize to create test accounts.
+                </p>
+                <Button
+                  onClick={() => initSandboxMutation.mutate()}
+                  disabled={initSandboxMutation.isPending}
+                  className="w-full"
+                  data-testid="button-init-sandbox"
+                >
+                  {initSandboxMutation.isPending ? (
+                    <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Reset Sandbox Data
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-600" />
-                Role Definitions
-              </CardTitle>
-              <CardDescription>Team member role templates and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Define reusable role templates for contractors and subcontractors.
-                Assign permission sets that control what team members can see and do.
-              </p>
-              <Link href="/admin/role-definitions">
-                <Button className="w-full" variant="outline" data-testid="button-manage-roles">
-                  <Layers className="w-4 h-4 mr-2" />
-                  Manage Roles
-                  <ArrowRight className="w-4 h-4 ml-auto" />
+                      Initializing…
+                    </>
+                  ) : (
+                    <>
+                      <TestTube className="w-4 h-4 mr-2" />
+                      Initialize Sandbox
+                    </>
+                  )}
                 </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+              </div>
+            ) : (
+              <>
+                <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-3">
+                  <p className="text-xs text-purple-700 dark:text-purple-300">
+                    <strong>Test Client:</strong> {sandboxData.client?.name}
+                    <br />
+                    <strong>Test Contractor:</strong> {sandboxData.contractor?.name}
+                    <br />
+                    <strong>Test Project:</strong> {sandboxData.project.name}
+                  </p>
+                </div>
+                <Link href="/sandbox/dashboard">
+                  <Button
+                    className="w-full justify-start"
+                    variant="outline"
+                    data-testid="button-sandbox-dashboard"
+                  >
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
+                    Client Dashboard
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-amber-600 border-amber-300 hover:bg-amber-50"
+                  onClick={() => resetSandboxMutation.mutate()}
+                  disabled={resetSandboxMutation.isPending}
+                  data-testid="button-reset-sandbox"
+                >
+                  {resetSandboxMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Reset Sandbox Data
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </SuperAdminLayout>
   );

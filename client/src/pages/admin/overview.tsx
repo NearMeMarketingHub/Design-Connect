@@ -207,8 +207,8 @@ export default function AdminOverview() {
       color: "text-emerald-600",
     },
     {
-      label: "Admin Tools",
-      description: "Sandbox testing, role definitions, and platform utilities.",
+      label: "Sandbox",
+      description: "Initialize and manage the sandbox testing environment.",
       icon: Wrench,
       href: "/admin/tools",
       color: "text-gray-600",
