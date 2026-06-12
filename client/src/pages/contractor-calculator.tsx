@@ -359,8 +359,9 @@ export default function ContractorCalculator() {
 
       setClientName(data.clientName ?? "");
       setEstimateName(data.projectName ?? "");
-      setSavedCustomId(null);       // no save has happened yet in this session
-      setLoadedFromId(data.customId ?? estimateCustomId);
+      const loadedCustomId = data.customId ?? estimateCustomId;
+      setSavedCustomId(loadedCustomId);  // show estimate number in Calculator PDF
+      setLoadedFromId(loadedCustomId);   // drive the "loaded from" notice + save-as-new label
 
       const rebuilt: EstimateLineItem[] = (data.lineItems ?? []).map((li: SavedEstimateLineItem) => {
         // Prefer a live price-book item for full field fidelity
