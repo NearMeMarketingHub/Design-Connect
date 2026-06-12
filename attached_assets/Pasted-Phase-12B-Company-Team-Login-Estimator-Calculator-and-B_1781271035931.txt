@@ -1,0 +1,194 @@
+Phase 12B: Company Team, Login, Estimator Calculator, and Budget Manager Cleanup
+
+Context:
+Phase 12A and Patch 1 cleaned up the first visual audit items. This next phase should handle the remaining company-side usability issues found during visual testing:
+
+* login form Enter key opens Forgot Password
+* Admin Center Team tab only shows the company owner
+* Estimator and Calculator are confusing/duplicative
+* Budget Manager should fully act as the Price Book / Budget Manager area
+
+Do not build major new features in this phase.
+
+Out of scope:
+
+* No Selections feature build
+* No subcontractor multi-company switching
+* No contractor-side sandbox
+* No 3D Floor Plan Builder overhaul
+* No expenses / actual spend tracking
+* No reports / production sheets
+* No Stripe automation
+* No schema changes unless absolutely required to fix an existing query/access issue
+* No db:push unless a schema change is truly unavoidable
+
+Goal:
+Clean up company-side login, team visibility, estimator/calculator navigation, and Budget Manager/Price Book consistency.
+
+1. Fix login Enter key opening Forgot Password
+
+Issue:
+When typing a password and pressing Enter, the app opens the Forgot Password section instead of submitting the login form.
+
+Expected behavior:
+Pressing Enter in the password field should submit the login form.
+
+Tasks:
+
+* Inspect the login/auth form, likely in `client/src/pages/auth.tsx`, `client/src/pages/admin-login.tsx`, `client/src/pages/forgot-password.tsx`, and any shared auth components.
+* Ensure the main login form has the correct `onSubmit` behavior.
+* Ensure the Login button is `type="submit"`.
+* Ensure Forgot Password buttons/links are not accidentally acting as submit buttons.
+* Any Forgot Password trigger inside the form should be `type="button"` or a proper link.
+* Make sure this works for company/contractor login and admin login if they share logic.
+
+Done looks like:
+
+* Typing email/password and pressing Enter logs in or attempts login.
+* Pressing Enter does not open Forgot Password.
+* Forgot Password still works when clicked intentionally.
+
+2. Fix Admin Center Team tab only showing company owner
+
+Issue:
+Inside company-side Admin Center → Team, only the company owner appears. Other company users are not visible, regardless of viewing role.
+
+Expected behavior:
+Company Owner and Company Admin should see the company’s internal users/team members.
+
+Team list should include:
+
+* company owner
+* company admins
+* regular internal company contractors/team members tied to the same company
+* pending invited users if the app already supports showing them
+
+Do not show:
+
+* users from other companies
+* unrelated platform admins
+* clients unless the Team section intentionally includes clients already
+* subcontractors/notaries unless they are already intentionally part of this team list
+
+Tasks:
+
+* Inspect the Team section inside `client/src/pages/company-dashboard.tsx`.
+* Inspect the API/query it uses for team users.
+* Inspect relevant backend routes/storage methods in `server/routes.ts` and `server/storage.ts`.
+* Fix the query/filtering so it returns all users scoped to the current company, not just the owner.
+* Maintain strict company scoping.
+* Company Owner and Company Admin should have access to view/manage team according to existing permissions.
+* Regular internal team members should not gain management access unless already allowed.
+
+Done looks like:
+
+* Company Owner sees all company users in Admin Center → Team.
+* Company Admin sees all company users in Admin Center → Team if that is intended by current permissions.
+* No cross-company users appear.
+* Existing invite/manage functionality still works.
+
+3. Consolidate Estimator and Calculator into one clear “Estimator Calculator” flow
+
+Issue:
+The app currently has both Estimator and Calculator concepts, but the actual page label says “Estimator Calculator.” This is confusing and duplicative.
+
+Direction:
+Use one main tool called:
+
+“Estimator Calculator”
+
+This should be the official estimate/quote-building tool.
+
+Tasks:
+
+* Inspect routes/sidebar items for Estimator, Calculator, and Estimator Calculator.
+* Relevant likely files:
+
+  * `client/src/pages/estimator.tsx`
+  * `client/src/pages/contractor-calculator.tsx`
+  * `client/src/components/layout.tsx`
+  * `client/src/App.tsx`
+* Determine which page currently contains the real estimate/quote functionality.
+* Keep the real estimate-building functionality intact.
+* Sidebar/navigation should expose one clear item: “Estimator Calculator”.
+* Remove or redirect the duplicate/old Estimator or Calculator navigation entry.
+* If both routes exist, either:
+
+  * make one route redirect to the main Estimator Calculator page, or
+  * keep the route for backwards compatibility but do not show duplicate sidebar entries.
+* Do not remove Floor Calc if it is a separate flooring-specific calculator.
+* Do not break saved estimates, quote creation, project association, price book item selection, or budget creation from estimates.
+
+Suggested final navigation:
+
+* Estimator Calculator = main estimate/quote tool
+* Floor Calc = only if it is a separate flooring calculator
+* No separate generic Calculator/Estimator duplicate if it points to the same purpose
+
+Done looks like:
+
+* Users see one clear Estimator Calculator tool in the sidebar.
+* There is no confusing duplicate Estimator vs Calculator navigation.
+* Existing estimate/quote functionality still works.
+* Old routes do not 404 if they were previously used.
+
+4. Make Budget Manager fully represent Price Book / Budget Manager
+
+Issue:
+Admin Center Price Book was removed in Phase 12A, so Budget Manager is now the main place for price book / budget sheet management. Confirm the page works that way and has the needed controls.
+
+Tasks:
+
+* Inspect `client/src/pages/budget-admin.tsx`.
+* Confirm Budget Manager includes:
+
+  * Add Category
+  * Add Item
+  * Edit Category
+  * Edit Item
+  * Import budget/price sheet if already supported
+* Confirm “Add Category” is visible and functional for:
+
+  * company_owner
+  * company admin
+  * platform admin, if applicable
+* Confirm management controls are hidden/blocked for:
+
+  * clients
+  * subcontractors
+  * notaries
+  * regular internal contractors if they are intended to be read-only
+* Update page copy if needed so it is clear this is the Price Book / Budget Manager area.
+* Do not re-add the old Admin Center Price Book tab.
+
+Suggested label/copy:
+
+* Page title can remain “Budget Manager” if already preferred.
+* Add helper copy such as:
+  “Manage your company price book, categories, and budget sheet items.”
+
+Done looks like:
+
+* Budget Manager is the only price book/budget sheet management area.
+* Add Category works for company owners/admins.
+* No duplicate Price Book tab exists in Admin Center.
+* Permissions remain correct.
+
+5. Run checks
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* Login Enter key submits login, not Forgot Password
+* Admin Center Team shows all company users, not just owner
+* Estimator/Calculator navigation is consolidated into “Estimator Calculator”
+* Existing estimate/quote flow still works
+* Floor Calc remains separate if applicable
+* Budget Manager clearly acts as Price Book / Budget Manager
+* Add Category works for company owner/admin
+* No Admin Center Price Book tab returns
+* No schema changes unless explicitly necessary
+* `npm run check` passes
