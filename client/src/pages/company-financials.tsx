@@ -104,7 +104,7 @@ export default function CompanyFinancials() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" />
-              Estimator
+              Estimator Calculator
             </CardTitle>
             <CardDescription className="text-xs">Create and manage estimates</CardDescription>
           </CardHeader>

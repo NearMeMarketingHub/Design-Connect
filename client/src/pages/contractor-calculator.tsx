@@ -223,7 +223,7 @@ export default function ContractorCalculator() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Calculator className="w-12 h-12 mx-auto text-muted-foreground animate-pulse" />
-          <p className="mt-4 text-muted-foreground">Loading calculator...</p>
+          <p className="mt-4 text-muted-foreground">Loading Estimator Calculator...</p>
         </div>
       </div>
     );
@@ -234,9 +234,9 @@ export default function ContractorCalculator() {
       <div>
         <h1 className="text-3xl font-heading font-bold text-foreground flex items-center gap-3">
           <Calculator className="w-8 h-8 text-primary" />
-          Estimate Calculator
+          Estimator Calculator
         </h1>
-        <p className="text-muted-foreground mt-1">Build estimates using your price book</p>
+        <p className="text-muted-foreground mt-1">Create project estimates and quotes using your company price book.</p>
       </div>
 
       <div className="flex" style={{ height: 'calc(100vh - 12rem)' }}>
