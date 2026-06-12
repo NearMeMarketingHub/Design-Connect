@@ -1,0 +1,262 @@
+Phase 12E: Estimator Calculator Pre-Project Save + PDF Export
+
+Context:
+The Estimator Calculator is the contractor-facing sales/quote tool used while meeting with a potential client. It should connect to the company Price Book, allow the contractor to build an estimate/quote before a project exists, save that estimate, and export it as a PDF for printing or digital saving.
+
+Previous audit:
+`ESTIMATOR_CALCULATOR_AUDIT.md` confirmed:
+
+* `/contractor/calculator` is the sidebar-accessible Price Book/cart-style estimator page
+* `/company/estimates` is the project-based estimate manager
+* `projectId` is already nullable in the DB
+* `createEstimateSchema` already allows optional/null `projectId`
+* the current blocker is the POST `/api/estimates` route rejecting non-admin saves without a projectId
+* `jspdf` is already installed
+* there is no current estimate PDF export
+
+Goal:
+Make `/contractor/calculator` a working pre-project Estimator Calculator:
+
+* uses company Price Book
+* allows client/prospect info before a project exists
+* saves estimate to the real estimates API
+* exports estimate/quote as a PDF
+* does not require a project
+
+Keep `/contractor/calculator` in the sidebar as “Estimator Calculator.”
+
+Keep `/company/estimates` as the project-based estimate manager.
+
+Out of scope:
+
+* No schema changes
+* No db:push
+* No notes column
+* No new estimating formulas
+* No Stripe changes
+* No Selections build
+* No contractor sandbox
+* No subcontractor multi-company switching
+* No 3D Floor Plan changes
+* No expenses/reports/production sheets
+* Do not remove `/company/estimates`
+* Do not redirect `/contractor/calculator`
+
+1. Update POST `/api/estimates` to allow projectless estimates for internal company users
+
+File:
+`server/routes.ts`
+
+Current issue:
+For non-admin users, POST `/api/estimates` rejects requests without `projectId`.
+
+Change behavior:
+If `projectId` is provided:
+
+* keep existing project validation and company scoping behavior
+
+If `projectId` is not provided:
+
+* allow projectless estimate creation only for internal company users who have `user.companyId`
+* derive `companyId` from `req.user.companyId`
+* reject users without companyId
+* reject clients, subcontractors, notaries, and unrelated users
+* preserve strict company scoping
+
+Allowed for projectless estimates:
+
+* company_owner
+* company admin
+* regular internal contractor/team member tied to the company
+
+Not allowed:
+
+* client
+* subcontractor
+* notary
+* user without companyId
+* users from another company
+
+Do not require a schema change.
+
+2. Wire `/contractor/calculator` save to the real estimates API
+
+File:
+`client/src/pages/contractor-calculator.tsx`
+
+Current issue:
+Save Estimate currently shows a toast but does not call the API.
+
+Update the save workflow so it posts to:
+
+`POST /api/estimates`
+
+The save dialog/form should collect the required estimate fields:
+
+Required:
+
+* client/prospect name → `clientName`
+* job description / estimate name → `projectName`
+
+Optional:
+
+* existing project selection, if easy and already supported; project is not required
+* if project selector is not already simple to add, do not add it in this phase
+
+Do not persist notes unless the current schema supports it. The audit says no notes column exists, so do not send notes to the API unless already supported.
+
+3. Map cart items to estimate line items
+
+When saving from `/contractor/calculator`, map cart items to the line item payload expected by POST `/api/estimates`.
+
+Each cart item should become an estimate line item with:
+
+* `category`
+* `item`
+* `quantity`
+* `unit`
+* `rate`
+* `total`
+* `priceBookItemId`
+
+Use the item’s retail/sell price as the quote rate unless the page already has a clearer customer-facing price field.
+
+Preserve `priceBookItemId` so the saved estimate remains linked to the company Price Book item.
+
+The estimate `amount` should equal the customer-facing total of the quote.
+
+4. Add validation before save
+
+Do not allow Save Estimate if:
+
+* cart is empty
+* client/prospect name is missing
+* job description / estimate name is missing
+
+Show clean validation messages/toasts.
+
+Do not crash or silently fail.
+
+5. Add loading/success/error states
+
+When saving:
+
+* disable Save button while request is pending
+* show success toast when saved
+* show clean error toast/message if API fails
+* invalidate/refetch estimate queries if the app already has an estimates query cache pattern
+
+After successful save:
+
+* keep cart contents unless there is already a clear reset pattern
+* optionally show saved estimate ID/custom ID if returned by the API
+
+Do not remove user-entered data unexpectedly.
+
+6. Add PDF export to `/contractor/calculator`
+
+Use existing `jspdf` dependency.
+
+Add an “Export PDF” or “Save PDF” button to the Estimator Calculator page.
+
+PDF should be generated client-side.
+
+The PDF should include:
+
+* company name if available
+* title: “Estimate”
+* date
+* client/prospect name
+* job description / estimate name
+* line items table
+* quantity
+* unit
+* rate
+* line total
+* subtotal/total
+* optional estimate number if available after save
+* simple footer/disclaimer if appropriate
+
+Keep the PDF layout clean and printable.
+
+Do not require server-side PDF generation.
+
+7. PDF export should work before and after save
+
+The contractor should be able to export/print a quote PDF after building the cart.
+
+If the estimate has been saved and an estimate ID/custom ID is available, include it.
+
+If not saved yet, PDF can still export with “Draft Estimate” or no estimate number.
+
+Do not require a project to export the PDF.
+
+8. Keep Price Book behavior intact
+
+Do not break:
+
+* category list
+* searchable item table
+* add-to-cart
+* quantity adjustment
+* totals
+* margin display
+* existing Price Book reads
+
+The Estimator Calculator must continue to use the company Price Book set up by Company Owner/Admin.
+
+9. Keep permissions intact
+
+Contractors/internal company users should be able to read Price Book and create estimates according to current intended access.
+
+Do not allow:
+
+* clients
+* subcontractors
+* notaries
+* cross-company users
+
+Company Owner/Admin can still manage the Price Book through Budget Manager, not from this page unless already supported.
+
+10. Keep `/company/estimates` intact
+
+Do not remove or break the existing project-based estimate manager.
+
+It can continue to require a project if that is its current flow.
+
+This phase is focused on making `/contractor/calculator` the working pre-project Estimator Calculator.
+
+11. Update user-facing copy
+
+On `/contractor/calculator`, make sure the page title is:
+
+“Estimator Calculator”
+
+Suggested subtitle:
+“Build client estimates and quotes using your company price book.”
+
+Avoid “Quick Quote Builder” as user-facing copy. This is the real estimator tool, not a lightweight side utility.
+
+12. Run checks
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* `/contractor/calculator` remains sidebar-accessible as “Estimator Calculator”
+* contractor can build estimate from company Price Book
+* contractor can enter client/prospect name and job description
+* contractor can save estimate without selecting a project
+* saved estimate posts to real `/api/estimates`
+* saved line items include `priceBookItemId`
+* projectId is optional
+* companyId is safely derived from logged-in internal company user when no project exists
+* clients/subcontractors/notaries cannot create internal projectless estimates
+* PDF export works from `/contractor/calculator`
+* PDF can be saved/printed digitally
+* `/company/estimates` still works as the project-based estimate manager
+* no schema changes
+* no db:push
+* `npm run check` passes

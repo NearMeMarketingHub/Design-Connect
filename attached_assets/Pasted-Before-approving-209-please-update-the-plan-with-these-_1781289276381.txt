@@ -1,0 +1,69 @@
+Before approving #209, please update the plan with these corrections:
+
+1. Move client/prospect and job description fields out of only the Save dialog.
+
+The Estimator Calculator needs persistent quote header fields on the main page, preferably near the cart/estimate panel:
+
+* Client / Prospect Name
+* Job Description / Estimate Name
+
+Both Save Estimate and Export PDF should use these same state fields.
+
+Reason:
+PDF export must work before and after save. If these fields only live inside the Save dialog, exporting before save may generate a PDF without client/job information.
+
+The Save dialog can still exist as a confirmation step if desired, but it should not be the only place where client/job information is entered.
+
+2. Do not clear client/job info after saving.
+
+After successful save:
+
+* keep clientName
+* keep estimateName / job description
+* keep savedCustomId
+* keep cart/estimate items
+* close the save dialog
+* show success toast
+
+Remove these lines from the proposed save handler:
+
+setClientName("");
+setEstimateName("");
+
+Also update the Key correctness notes.
+
+Replace:
+“Reset only clientName, estimateName, and savedCustomId tracking, not estimateItems.”
+
+With:
+“After save, keep clientName, estimateName/job description, savedCustomId, and cart contents so the contractor can immediately export a complete PDF or continue editing. Only clear these fields with a future explicit New Estimate/Clear Estimate action, which is out of scope for this phase.”
+
+3. Add explicit backend checks for projectless estimates.
+
+Inside the projectless branch of POST /api/estimates, do not rely only on requireEstimateAccess.
+
+Only allow projectless estimate creation when:
+
+* user.companyId exists
+* user is an internal company user, company owner, or company admin
+* user.role is not client
+* user.contractorType is not subcontractor
+* user.contractorType is not notary
+
+Reject:
+
+* clients
+* subcontractors
+* notaries
+* users without companyId
+* unrelated/cross-company users
+
+Keep everything else the same:
+
+* no schema changes
+* no db:push
+* no project selector in this phase
+* do not change /company/estimates
+* do not redirect routes
+* keep /contractor/calculator as the sidebar Estimator Calculator
+* run npm run check
