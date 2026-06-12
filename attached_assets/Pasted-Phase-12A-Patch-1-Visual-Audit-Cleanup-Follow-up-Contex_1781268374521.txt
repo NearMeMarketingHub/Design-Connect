@@ -1,0 +1,91 @@
+Phase 12A Patch 1: Visual Audit Cleanup Follow-up
+
+Context:
+Phase 12A mostly landed and `npm run check` passed. This is a small cleanup patch only. Do not add new features and do not change schema.
+
+Goal:
+Clean up a few leftover implementation details from Phase 12A:
+
+1. Remove dead Admin Center Price Book code instead of leaving it hidden behind `{false && ...}`
+2. Add explicit clean admin query error Alerts where missing
+3. Review the new test account seed changes and either make them safe/dynamic or revert them if they were not intentional
+
+Out of scope:
+
+* No schema changes
+* No db:push
+* No Stripe behavior changes
+* No Selections build
+* No Estimator/Calculator consolidation
+* No contractor sandbox
+* No subcontractor multi-company switching
+* No 3D floor plan changes
+* No expenses/reports/formulas/production sheets
+
+Tasks:
+
+1. Fully remove dead Price Book panel code from Admin Center
+
+In `client/src/pages/company-dashboard.tsx`, Phase 12A removed the visible Price Book tab, but the old Price Book panel still exists behind a condition like:
+
+`{false && <TabsContent value="price-book" ...>}`
+
+Remove that dead Price Book `TabsContent` block entirely.
+
+Budget Manager remains the main Price Book / budget sheet management area.
+
+Do not remove Budget Manager from the sidebar.
+
+2. Add clean admin query error display where missing
+
+Review these files:
+
+* `client/src/pages/admin/audit-log.tsx`
+* `client/src/pages/admin/demo-requests.tsx`
+* `client/src/pages/admin/projects.tsx`
+* `client/src/pages/admin/pricing-access.tsx`
+
+Make sure each page has a clean destructive `<Alert>` or equivalent clean UI state when a main query fails.
+
+Use `parseErrorMessage` where appropriate.
+
+Do not render raw thrown objects, raw database/code blocks, or giant raw error strings to the user.
+
+Keep detailed error logging in console/server logs only.
+
+Focus especially on `audit-log.tsx`, because Phase 12A fixed the backend SQL issue but may not have added an explicit clean UI error state there.
+
+3. Review test account seed changes
+
+Phase 12A appears to have added test accounts like:
+
+* `testcompanyadmin`
+* `testteammember`
+
+And updated:
+
+* `TESTACCOUNTS.md`
+
+If those test accounts were intentional and useful, keep them, but make the seed script safe:
+
+* Do not hardcode a specific company ID like `3d8b9dd4-0ad9-4057-82ec-37ce6cc86ef3`
+* Instead, derive the company ID dynamically from the existing test contractor/company record
+* If the expected test company cannot be found, log a clear message and skip creating those dependent users safely
+
+If those test accounts were accidental or not needed for Phase 12A, revert the seed script and `TESTACCOUNTS.md` changes.
+
+Do not touch production user data.
+
+4. Run check
+
+Run:
+
+`npm run check`
+
+Done looks like:
+
+* No `{false && <TabsContent value="price-book"...>` dead Price Book panel remains
+* Admin query errors show clean Alerts instead of raw error/code blocks
+* Test account seed changes are either safely dynamic or reverted
+* No schema changes
+* `npm run check` passes
