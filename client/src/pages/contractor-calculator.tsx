@@ -201,6 +201,207 @@ const STATUS_COLORS: Record<string, string> = {
   declined: "bg-red-100 text-red-700",
 };
 
+// ── Shared PDF estimate renderer ──────────────────────────────────────────────
+// Both export paths call this with a normalized options object so the layout
+// is pixel-identical between the Calculator-tab and Estimates-tab exports.
+
+interface PdfEstimateOptions {
+  customId: string | null;      // null → show "DRAFT"
+  date: string | null;          // ISO date string or null (uses today)
+  status?: string;              // shown only for saved estimates
+  clientName: string;
+  projectName: string;
+  lineItems: Array<{ description: string; qty: number; unit: string; rate: number; total: number }>;
+  total: number;
+  laborTotal?: number;          // working estimate export only
+  materialTotal?: number;       // working estimate export only
+}
+
+function renderEstimatePdf(
+  pdf: jsPDF,
+  options: PdfEstimateOptions,
+  branding: CompanyBranding | null | undefined,
+  logo: { dataUrl: string; format: string; w: number; h: number } | null
+): void {
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const margin = 18;
+  const contentWidth = pageWidth - margin * 2;
+  const [pr, pg, pb] = hexToRgb(branding?.primaryColor);
+  const [ar, ag, ab] = hexToRgb(branding?.accentColor, [217, 119, 6]);
+
+  // ── Header bar (36 mm) ─────────────────────────────────────────
+  const headerH = 36;
+  pdf.setFillColor(pr, pg, pb);
+  pdf.rect(0, 0, pageWidth, headerH, "F");
+
+  let textX = margin + 3;
+  if (logo) {
+    try {
+      pdf.addImage(logo.dataUrl, logo.format, margin + 2, (headerH - logo.h) / 2, logo.w, logo.h);
+      textX = margin + 2 + logo.w + 6;
+    } catch { /* skip logo on addImage failure */ }
+  }
+
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(15);
+  pdf.setFont("helvetica", "bold");
+  pdf.text(branding?.name ?? "", textX, 16);
+  const c1 = [branding?.companyPhone, branding?.companyEmail].filter(Boolean).join("  •  ");
+  const c2 = [branding?.companyWebsite, branding?.companyAddress].filter(Boolean).join("  •  ");
+  pdf.setFontSize(7.5);
+  pdf.setFont("helvetica", "normal");
+  if (c1) pdf.text(c1, textX, 23);
+  if (c2) pdf.text(pdf.splitTextToSize(c2, pageWidth - textX - margin), textX, 29);
+
+  // ── Metadata block ─────────────────────────────────────────────
+  let y = headerH + 9;
+  pdf.setFontSize(20);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(pr, pg, pb);
+  pdf.text("ESTIMATE", margin, y);
+
+  const hasId = !!options.customId;
+  pdf.setFontSize(9);
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(hasId ? 60 : 160, hasId ? 60 : 160, hasId ? 60 : 160);
+  pdf.text(options.customId ?? "DRAFT", pageWidth - margin, y, { align: "right" });
+
+  const dateDisplay = options.date
+    ? new Date(options.date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "normal");
+  pdf.setTextColor(100, 100, 100);
+  pdf.text(dateDisplay, pageWidth - margin, y + 5, { align: "right" });
+  if (options.status) {
+    const statusLabel = STATUS_LABELS[options.status] ?? options.status;
+    pdf.text(statusLabel, pageWidth - margin, y + 10, { align: "right" });
+  }
+
+  y += 15;
+  pdf.setDrawColor(220, 220, 220);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, y, pageWidth - margin, y);
+  y += 7;
+
+  // ── Client / Job info block ────────────────────────────────────
+  if (options.clientName) {
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(pr, pg, pb);
+    pdf.text("Prepared for:", margin, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(30, 30, 30);
+    pdf.text(options.clientName, margin + 31, y);
+    y += 6;
+  }
+  if (options.projectName) {
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(pr, pg, pb);
+    pdf.text("Project:", margin, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(30, 30, 30);
+    pdf.text(options.projectName, margin + 31, y);
+    y += 6;
+  }
+  y += 4;
+  pdf.setDrawColor(220, 220, 220);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, y, pageWidth - margin, y);
+  y += 7;
+
+  // ── Line items table ───────────────────────────────────────────
+  const tableHeaderH = 10;
+  const itemRowH = 7;
+  pdf.setFillColor(pr, pg, pb);
+  pdf.rect(margin, y, contentWidth, tableHeaderH, "F");
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(8.5);
+  pdf.setFont("helvetica", "bold");
+  const hY = y + 6.5;
+  pdf.text("Description", margin + 2, hY);
+  pdf.text("Qty", margin + contentWidth * 0.54, hY);
+  pdf.text("Unit", margin + contentWidth * 0.63, hY);
+  pdf.text("Rate", margin + contentWidth * 0.76, hY, { align: "right" });
+  pdf.text("Total", pageWidth - margin, hY, { align: "right" });
+  y += tableHeaderH;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  options.lineItems.forEach((li, idx) => {
+    if (idx % 2 === 1) {
+      pdf.setFillColor(247, 248, 250);
+      pdf.rect(margin, y, contentWidth, itemRowH, "F");
+    }
+    const tY = y + 5;
+    const desc = li.description.length > 50 ? li.description.slice(0, 50) + "…" : li.description;
+    pdf.setTextColor(30, 30, 30);
+    pdf.text(desc, margin + 2, tY);
+    pdf.text(String(li.qty), margin + contentWidth * 0.54, tY);
+    pdf.text(li.unit, margin + contentWidth * 0.63, tY);
+    pdf.text(formatCurrencyPdf(li.rate), margin + contentWidth * 0.76, tY, { align: "right" });
+    pdf.text(formatCurrencyPdf(li.total), pageWidth - margin, tY, { align: "right" });
+    y += itemRowH;
+    if (y > 250) { pdf.addPage(); y = 20; }
+  });
+
+  // ── Totals block ───────────────────────────────────────────────
+  y += 3;
+  pdf.setDrawColor(220, 220, 220);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, y, pageWidth - margin, y);
+  y += 6;
+
+  const totalsLeft = margin + contentWidth * 0.52;
+  if (options.laborTotal !== undefined && options.materialTotal !== undefined) {
+    pdf.setFontSize(8.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(80, 80, 80);
+    pdf.text("Labor:", totalsLeft, y);
+    pdf.text(formatCurrencyPdf(options.laborTotal), pageWidth - margin, y, { align: "right" });
+    y += 5.5;
+    pdf.text("Materials:", totalsLeft, y);
+    pdf.text(formatCurrencyPdf(options.materialTotal), pageWidth - margin, y, { align: "right" });
+    y += 4;
+    pdf.setDrawColor(220, 220, 220);
+    pdf.line(totalsLeft, y, pageWidth - margin, y);
+    y += 5;
+  }
+
+  // Total row — full content width, accent color
+  const totalRowH = 11;
+  pdf.setFillColor(ar, ag, ab);
+  pdf.rect(margin, y, contentWidth, totalRowH, "F");
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("TOTAL", margin + 3, y + 7);
+  pdf.setFontSize(12);
+  pdf.text(formatCurrencyPdf(options.total), pageWidth - margin, y + 7, { align: "right" });
+  y += totalRowH + 12;
+
+  // ── Footer ─────────────────────────────────────────────────────
+  pdf.setDrawColor(210, 210, 210);
+  pdf.setLineWidth(0.3);
+  pdf.line(margin, y, pageWidth - margin, y);
+  y += 5;
+
+  const footerText = branding?.quoteFooterText?.trim() || "This estimate is valid for 30 days from the date above.";
+  pdf.setTextColor(130, 130, 130);
+  pdf.setFontSize(8);
+  pdf.setFont("helvetica", "italic");
+  const footerLines = pdf.splitTextToSize(footerText, contentWidth);
+  pdf.text(footerLines, margin, y);
+
+  if (!options.customId) {
+    y += footerLines.length * 4 + 3;
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.text("DRAFT — not yet saved.", margin, y);
+  }
+}
+
 export default function ContractorCalculator() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -505,147 +706,27 @@ export default function ContractorCalculator() {
       const res = await fetch(`/api/estimates/${estimateId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load estimate for export");
       const data: SavedEstimate & { lineItems: SavedEstimateLineItem[] } = await res.json();
-
       const logo = await loadLogoForPdf(branding);
-
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const margin = 18;
-      const contentWidth = pageWidth - margin * 2;
 
-      // ── Branded header bar ────────────────────────────────────
-      const [pr, pg, pb] = hexToRgb(branding?.primaryColor);
-      const headerH = 30;
-      pdf.setFillColor(pr, pg, pb);
-      pdf.rect(0, 0, pageWidth, headerH, "F");
-
-      let textX = margin + 3;
-      if (logo) {
-        try {
-          pdf.addImage(logo.dataUrl, logo.format, margin + 2, (headerH - logo.h) / 2, logo.w, logo.h);
-          textX = margin + 2 + logo.w + 5;
-        } catch { /* skip logo on addImage failure */ }
-      }
-
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(13);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(branding?.name ?? "", textX, 13);
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "normal");
-      const c1 = [branding?.companyPhone, branding?.companyEmail].filter(Boolean).join("  •  ");
-      const c2 = [branding?.companyWebsite, branding?.companyAddress].filter(Boolean).join("  •  ");
-      if (c1) pdf.text(c1, textX, 20);
-      if (c2) pdf.text(pdf.splitTextToSize(c2, pageWidth - textX - margin), textX, 25.5);
-
-      let y = headerH + 8;
-      pdf.setTextColor(30, 30, 30);
-
-      // ── Estimate title + ID ───────────────────────────────────
-      pdf.setFontSize(18);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(pr, pg, pb);
-      pdf.text("ESTIMATE", margin, y);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(60, 60, 60);
-      pdf.text(data.customId, pageWidth - margin, y, { align: "right" });
-      y += 7;
-
-      const dateDisplay = data.date
-        ? new Date(data.date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-        : new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      pdf.setFontSize(9);
-      pdf.setTextColor(60, 60, 60);
-      pdf.text(`Date: ${dateDisplay}`, margin, y);
-      pdf.text(`Status: ${STATUS_LABELS[data.status] ?? data.status}`, pageWidth - margin, y, { align: "right" });
-      y += 8;
-
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // ── Client / job info ─────────────────────────────────────
-      if (data.clientName) {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(30, 30, 30);
-        pdf.text("Client / Prospect:", margin, y);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(data.clientName, margin + 36, y);
-        y += 5.5;
-      }
-      if (data.projectName) {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Job Description:", margin, y);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(data.projectName, margin + 36, y);
-        y += 5.5;
-      }
-      y += 3;
-
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // ── Line items table header ───────────────────────────────
-      pdf.setFillColor(pr, pg, pb);
-      pdf.rect(margin, y - 4, contentWidth, 8, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(8.5);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Description", margin + 2, y);
-      pdf.text("Qty", margin + contentWidth * 0.54, y);
-      pdf.text("Unit", margin + contentWidth * 0.63, y);
-      pdf.text("Rate", margin + contentWidth * 0.76, y, { align: "right" });
-      pdf.text("Total", pageWidth - margin, y, { align: "right" });
-      y += 5;
-      pdf.setTextColor(30, 30, 30);
-
-      // ── Line items ────────────────────────────────────────────
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
       let grandTotal = 0;
-      (data.lineItems ?? []).forEach((li) => {
+      const lineItems = (data.lineItems ?? []).map((li) => {
         const qty = parseFloat(li.quantity) || 0;
         const rate = parseFloat(li.rate) || 0;
-        const lineTotal = parseFloat(li.total) || rate * qty;
-        grandTotal += lineTotal;
-        const desc = li.item.length > 44 ? li.item.slice(0, 44) + "…" : li.item;
-        pdf.text(desc, margin + 2, y);
-        pdf.text(String(qty), margin + contentWidth * 0.54, y);
-        pdf.text(li.unit || "EA", margin + contentWidth * 0.63, y);
-        pdf.text(formatCurrencyPdf(rate), margin + contentWidth * 0.76, y, { align: "right" });
-        pdf.text(formatCurrencyPdf(lineTotal), pageWidth - margin, y, { align: "right" });
-        y += 6;
-        if (y > 255) { pdf.addPage(); y = 20; }
+        const total = parseFloat(li.total) || rate * qty;
+        grandTotal += total;
+        return { description: li.item, qty, unit: li.unit || "EA", rate, total };
       });
 
-      y += 2;
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // ── Total row ─────────────────────────────────────────────
-      const totalsLeft = margin + contentWidth * 0.52;
-      const displayTotal = parseFloat(data.amount || "0") || grandTotal;
-      const [ar, ag, ab] = hexToRgb(branding?.accentColor, [217, 119, 6]); // #d97706
-      pdf.setFillColor(ar, ag, ab);
-      pdf.rect(totalsLeft - 3, y - 4, pageWidth - margin - totalsLeft + 3, 9, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Total:", totalsLeft, y);
-      pdf.text(formatCurrencyPdf(displayTotal), pageWidth - margin, y, { align: "right" });
-      y += 12;
-
-      // ── Footer ────────────────────────────────────────────────
-      pdf.setTextColor(120, 120, 120);
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "italic");
-      const footerText = branding?.quoteFooterText?.trim() || "This estimate is valid for 30 days from the date above.";
-      pdf.text(pdf.splitTextToSize(footerText, contentWidth), margin, y);
+      renderEstimatePdf(pdf, {
+        customId: data.customId ?? null,
+        date: data.date ?? null,
+        status: data.status,
+        clientName: data.clientName ?? "",
+        projectName: data.projectName ?? "",
+        lineItems,
+        total: parseFloat(data.amount || "0") || grandTotal,
+      }, branding, logo);
 
       const safeName = (data.clientName || "estimate").replace(/[^a-z0-9]/gi, "-").toLowerCase();
       const dateStr = data.date || new Date().toISOString().split("T")[0];
@@ -655,179 +736,32 @@ export default function ContractorCalculator() {
     }
   };
 
-  // Calculator-tab PDF export — uses current cart state
+  // Calculator-tab PDF export — uses current working estimate state
   const handleExportPdf = async () => {
     if (estimateItems.length === 0) {
       toast({ title: "Cart is empty", description: "Add items before exporting.", variant: "destructive" });
       return;
     }
-
     try {
       const logo = await loadLogoForPdf(branding);
-
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const margin = 18;
-      const contentWidth = pageWidth - margin * 2;
 
-      // ── Branded header bar ──────────────────────────────────────
-      const [pr, pg, pb] = hexToRgb(branding?.primaryColor);
-      const headerH = 30;
-      pdf.setFillColor(pr, pg, pb);
-      pdf.rect(0, 0, pageWidth, headerH, "F");
-
-      let textX = margin + 3;
-      if (logo) {
-        try {
-          pdf.addImage(logo.dataUrl, logo.format, margin + 2, (headerH - logo.h) / 2, logo.w, logo.h);
-          textX = margin + 2 + logo.w + 5;
-        } catch { /* skip logo on addImage failure */ }
-      }
-
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(13);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(branding?.name ?? "", textX, 13);
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "normal");
-      const c1 = [branding?.companyPhone, branding?.companyEmail].filter(Boolean).join("  •  ");
-      const c2 = [branding?.companyWebsite, branding?.companyAddress].filter(Boolean).join("  •  ");
-      if (c1) pdf.text(c1, textX, 20);
-      if (c2) pdf.text(pdf.splitTextToSize(c2, pageWidth - textX - margin), textX, 25.5);
-
-      let y = headerH + 8;
-      pdf.setTextColor(30, 30, 30);
-
-      // ── Estimate title + ID ────────────────────────────────────
-      pdf.setFontSize(18);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(pr, pg, pb);
-      pdf.text("ESTIMATE", margin, y);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      if (savedCustomId) {
-        pdf.setTextColor(60, 60, 60);
-        pdf.text(savedCustomId, pageWidth - margin, y, { align: "right" });
-      } else {
-        pdf.setTextColor(150, 150, 150);
-        pdf.text("DRAFT", pageWidth - margin, y, { align: "right" });
-      }
-      y += 7;
-
-      pdf.setTextColor(60, 60, 60);
-      pdf.setFontSize(9);
-      pdf.text(
-        `Date: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
-        margin,
-        y
-      );
-      y += 8;
-
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // ── Client / job info ──────────────────────────────────────
-      if (clientName) {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(30, 30, 30);
-        pdf.text("Client / Prospect:", margin, y);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(clientName, margin + 36, y);
-        y += 5.5;
-      }
-      if (estimateName) {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Job Description:", margin, y);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(estimateName, margin + 36, y);
-        y += 5.5;
-      }
-      y += 3;
-
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // ── Line items table header ────────────────────────────────
-      pdf.setFillColor(pr, pg, pb);
-      pdf.rect(margin, y - 4, contentWidth, 8, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(8.5);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Description", margin + 2, y);
-      pdf.text("Qty", margin + contentWidth * 0.54, y);
-      pdf.text("Unit", margin + contentWidth * 0.63, y);
-      pdf.text("Rate", margin + contentWidth * 0.76, y, { align: "right" });
-      pdf.text("Total", pageWidth - margin, y, { align: "right" });
-      y += 5;
-      pdf.setTextColor(30, 30, 30);
-
-      // ── Line items ─────────────────────────────────────────────
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      estimateItems.forEach(({ item, quantity }) => {
+      const lineItems = estimateItems.map(({ item, quantity }) => {
         const rate = parseFloat(item.retailPrice || "0");
-        const lineTotal = rate * quantity;
-        const desc = item.description.length > 44 ? item.description.slice(0, 44) + "…" : item.description;
-        pdf.text(desc, margin + 2, y);
-        pdf.text(String(quantity), margin + contentWidth * 0.54, y);
-        pdf.text(item.unitType || "EA", margin + contentWidth * 0.63, y);
-        pdf.text(formatCurrencyPdf(rate), margin + contentWidth * 0.76, y, { align: "right" });
-        pdf.text(formatCurrencyPdf(lineTotal), pageWidth - margin, y, { align: "right" });
-        y += 6;
-        if (y > 255) { pdf.addPage(); y = 20; }
+        const total = rate * quantity;
+        return { description: item.description, qty: quantity, unit: item.unitType || "EA", rate, total };
       });
 
-      y += 2;
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 6;
-
-      // ── Totals ─────────────────────────────────────────────────
-      const totalsLeft = margin + contentWidth * 0.52;
-      pdf.setFontSize(8.5);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(60, 60, 60);
-      pdf.text("Labor:", totalsLeft, y);
-      pdf.text(formatCurrencyPdf(totals.labor), pageWidth - margin, y, { align: "right" });
-      y += 5.5;
-      pdf.text("Materials:", totalsLeft, y);
-      pdf.text(formatCurrencyPdf(totals.material), pageWidth - margin, y, { align: "right" });
-      y += 3;
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(totalsLeft, y, pageWidth - margin, y);
-      y += 5;
-
-      const [ar, ag, ab] = hexToRgb(branding?.accentColor, [217, 119, 6]); // #d97706
-      pdf.setFillColor(ar, ag, ab);
-      pdf.rect(totalsLeft - 3, y - 4, pageWidth - margin - totalsLeft + 3, 9, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Total:", totalsLeft, y);
-      pdf.text(formatCurrencyPdf(totals.retail), pageWidth - margin, y, { align: "right" });
-      y += 6;
-
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(120, 120, 120);
-      pdf.text(`Margin: ${totals.margin.toFixed(1)}%`, totalsLeft, y);
-      y += 12;
-
-      // ── Footer ─────────────────────────────────────────────────
-      pdf.setTextColor(120, 120, 120);
-      pdf.setFontSize(7.5);
-      pdf.setFont("helvetica", "italic");
-      const footerText = branding?.quoteFooterText?.trim() || "This estimate is valid for 30 days from the date above.";
-      const footerLines = pdf.splitTextToSize(footerText, contentWidth);
-      pdf.text(footerLines, margin, y);
-      if (!savedCustomId) {
-        y += footerLines.length * 4 + 2;
-        pdf.text("Draft — not yet saved.", margin, y);
-      }
+      renderEstimatePdf(pdf, {
+        customId: savedCustomId ?? null,
+        date: null,
+        clientName,
+        projectName: estimateName,
+        lineItems,
+        total: totals.retail,
+        laborTotal: totals.labor,
+        materialTotal: totals.material,
+      }, branding, logo);
 
       const safeName = (clientName || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase();
       const dateStr = new Date().toISOString().split("T")[0];
