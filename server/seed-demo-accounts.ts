@@ -30,6 +30,25 @@ export async function seedDemoAccounts() {
       .where(inArray(users.username, DEMO_USERNAMES));
     const existingSet = new Set(existingRows.map((r) => r.username));
 
+    // Super admin test account
+    const [existingSuperAdmin] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "superadmin"));
+
+    const superAdminHash = await bcrypt.hash("Demo.123!", 12);
+    if (!existingSuperAdmin) {
+      await db.insert(users).values({
+        username: "superadmin",
+        email: "superadmin@buildvision.test",
+        password: superAdminHash,
+        role: "admin",
+        name: "Super Admin",
+        isApproved: true,
+      });
+      log("seedDemoAccounts: created superadmin", "seed");
+    }
+
     // Cameron — update password if account exists, create if not
     const [cameron] = await db
       .select({ id: users.id })
