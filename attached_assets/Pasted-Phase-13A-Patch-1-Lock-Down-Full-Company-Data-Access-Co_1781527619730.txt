@@ -1,0 +1,141 @@
+Phase 13A Patch 1: Lock Down Full Company Data Access
+
+Context:
+Phase 13A added company branding settings and a safe read-only branding endpoint:
+
+`GET /api/company/branding`
+
+That endpoint is intended for Estimator Calculator PDF export and only returns safe branding fields.
+
+However, the existing route:
+
+`GET /api/company/mine`
+
+still allows any authenticated user with `companyId` to fetch the full company record. That full company record may include billing, Stripe, manual access, admin, or other internal company fields. Regular internal contractors only need safe branding/contact data for PDFs, not the full company record.
+
+Goal:
+Restrict `/api/company/mine` to users who are allowed to manage/view full company settings, while keeping `/api/company/branding` available for regular internal contractors who need branding for estimate PDFs.
+
+Out of scope:
+
+* No schema changes
+* No db:push
+* No branding UI redesign
+* No PDF redesign
+* No Stripe behavior changes
+* No estimate changes
+* No Selections, sandbox, subcontractor multi-company, or 3D changes
+
+1. Restrict GET `/api/company/mine`
+
+File:
+`server/routes.ts`
+
+Update `GET /api/company/mine` so it only returns the full company record to:
+
+* `company_owner`
+* users with `isCompanyAdmin === true`
+* platform/admin users, if the route already supports them safely and they are scoped to a company
+
+Do not allow regular internal contractors/team members to receive the full company record from this route.
+
+Block:
+
+* regular internal contractors/team members
+* clients
+* subcontractors
+* notaries
+* users without `companyId`
+* cross-company users
+
+Return a clean `403` message for unauthorized users.
+
+Suggested message:
+`Access denied: company settings are restricted to company owners and admins`
+
+2. Keep PATCH `/api/company/mine` owner/admin-only
+
+Do not loosen PATCH access.
+
+Confirm PATCH remains limited to:
+
+* company_owner
+* company admin
+* platform/admin if currently intended
+
+Regular internal contractors should not be able to edit company branding or company settings.
+
+3. Keep GET `/api/company/branding` available for PDF branding
+
+Do not remove or restrict `/api/company/branding` beyond the rules from Phase 13A.
+
+It should remain available to:
+
+* company_owner
+* company admin
+* regular internal contractors/team members with `users.companyId`
+* excluding subcontractors and notaries
+
+It should return only safe branding fields:
+
+* company name
+* logo
+* primaryColor
+* accentColor
+* quoteFooterText
+* companyPhone
+* companyEmail
+* companyAddress
+* companyWebsite
+
+Do not include billing, Stripe, subscription/manual access, or admin-only fields.
+
+4. Audit frontend callers of `/api/company/mine`
+
+Search for:
+
+`/api/company/mine`
+
+Known likely files:
+
+* `client/src/pages/company-dashboard.tsx`
+* `client/src/pages/create-invoice.tsx`
+* `client/src/pages/invoice-detail.tsx`
+* `client/src/pages/estimator.tsx`
+* any other current references
+
+For each caller, decide whether it truly needs full company settings:
+
+* Company/Admin Center settings pages can keep `/api/company/mine` because only owner/admin users should reach them.
+* If a regular internal contractor-accessible page only needs branding/contact info, switch that query to `/api/company/branding`.
+* If a page needs company branding for display/PDF only, use `/api/company/branding`.
+* Do not break invoice or estimate pages that are owner/admin-only, but be careful if regular contractors can access them.
+
+5. Preserve Estimator Calculator branding
+
+Confirm `client/src/pages/contractor-calculator.tsx` already uses:
+
+`GET /api/company/branding`
+
+Keep it that way.
+
+Regular internal contractors should still be able to export branded estimate PDFs after this patch.
+
+6. Run checks
+
+Run:
+
+`npm run check`
+
+No `db:push` should be needed.
+
+Done looks like:
+
+* Regular internal contractors can no longer fetch full company data from `/api/company/mine`
+* Company Owner/Admin can still access Admin Center → Settings and save branding
+* PATCH `/api/company/mine` remains owner/admin-only
+* Estimator Calculator PDF branding still works for regular internal contractors through `/api/company/branding`
+* `/api/company/branding` returns only safe branding fields
+* No schema changes
+* No db:push
+* `npm run check` passes
