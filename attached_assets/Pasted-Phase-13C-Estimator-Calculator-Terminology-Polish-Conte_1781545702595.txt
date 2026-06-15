@@ -1,0 +1,64 @@
+Phase 13C — Estimator Calculator Terminology Polish
+
+Context:
+
+* Phase 12 completed Estimator Calculator consolidation.
+* Phase 13A added company branding and branded estimate PDFs.
+* Patch #220 locked down GET /api/company/mine.
+* Patch #221 fixed branding cache invalidation for PDFs.
+* Phase 13B polished the branded estimate PDF layout.
+* The current “cart” in contractor-calculator.tsx means the contractor-side working estimate inside the Estimator Calculator. It is not client-side cart functionality.
+
+Goal:
+Clean up visible Estimator Calculator wording so the UI uses “working estimate” / “estimate” language instead of “cart” language where users might see it.
+
+Important:
+This is a wording/UX polish pass only. Do not change estimator functionality.
+
+Scope:
+
+* Review contractor Estimator Calculator UI text.
+* Replace visible user-facing “cart” language with clearer estimate terminology.
+* Keep internal variable names like estimateItems if they already make sense.
+* Do not rename large internal state variables unless absolutely necessary.
+* Do not touch client-side project/progress/chat functionality.
+
+Suggested wording changes:
+
+* “Cart is empty” → “Estimate is empty”
+* “Estimate cart” → “Working Estimate”
+* “Add to cart” → “Add to Estimate”
+* “Cart” → “Estimate” or “Working Estimate” when visible in the UI
+* Keep “Calculator” and “Estimates” tab names unchanged.
+
+Guardrails:
+
+* Do not change schema.
+* Do not run db:push.
+* Do not change access control.
+* Do not touch /api/company/mine.
+* Do not change /api/company/branding.
+* Do not change PDF rendering logic unless the wording appears inside the PDF and needs the same terminology cleanup.
+* Do not change estimate save/load behavior.
+* Do not change savedCustomId or loadedFromId behavior.
+* Do not add client-side cart/estimate-building features.
+* Do not add email, signatures, invoices, project creation, reports, or billing.
+* Keep this focused on visible wording only.
+
+Expected files:
+
+* Most likely client/src/pages/contractor-calculator.tsx
+* Only touch other files if visible “cart” wording appears elsewhere in the contractor-side estimator UI.
+
+Before making edits:
+
+* List the visible “cart” wording found.
+* List the exact replacements planned.
+* List the files that will be touched.
+
+Done looks like:
+
+* Contractor Estimator Calculator no longer shows confusing “cart” wording to users.
+* The tool reads as a contractor-side estimate builder.
+* Client-side functionality is unchanged.
+* npm run check passes.
