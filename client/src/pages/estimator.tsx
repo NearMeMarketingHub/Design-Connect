@@ -30,7 +30,6 @@ type EstimateWithLineItems = Estimate & { lineItems: EstimateLineItem[] };
 
 const UNITS = ["EA", "SF", "LF", "HR", "LS", "CY", "SY", "LB", "GAL", "TON"];
 const CATEGORIES = ["Labor", "Materials", "Equipment", "Subcontractor", "Permits", "Overhead", "Other"];
-const BLOCKED_STATUSES = new Set(["suspended", "cancelled", "expired", "trialing", "past_due"]);
 
 function generateCustomId() {
   const d = new Date();
@@ -106,8 +105,8 @@ export default function Estimator() {
     user?.role === "contractor" && !!user?.companyId && !user?.contractorType;
 
   const { data: company } = useQuery({
-    queryKey: ["/api/company/mine"],
-    queryFn: () => apiRequest("GET", "/api/company/mine").then((r) => r.json()),
+    queryKey: ["/api/company/branding"],
+    queryFn: () => apiRequest("GET", "/api/company/branding").then((r) => r.json()),
     enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true || isInternalContractor,
   });
 
@@ -160,7 +159,6 @@ export default function Estimator() {
     return items;
   }, [pbItems, pbSearch, pbCategoryFilter]);
 
-  const isBlocked = company ? BLOCKED_STATUSES.has(company.subscriptionStatus ?? "") : false;
 
   // Fetch client name whenever the selected project changes
   useEffect(() => {
@@ -370,7 +368,7 @@ export default function Estimator() {
           )}
           <Button
             onClick={handleSave}
-            disabled={isSaving || isBlocked || !selectedProjectId || lineItems.length === 0}
+            disabled={isSaving || !selectedProjectId || lineItems.length === 0}
             data-testid="button-save-estimate"
           >
             {isSaving ? (
@@ -383,16 +381,7 @@ export default function Estimator() {
         </div>
       </div>
 
-      {isBlocked && (
-        <Alert variant="destructive" data-testid="alert-access-blocked">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Company access is not active — contact support.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {selectedProjectId && lineItems.length === 0 && !isBlocked && (
+      {selectedProjectId && lineItems.length === 0 && (
         <p className="text-sm text-muted-foreground" data-testid="hint-no-line-items">
           Add at least one line item before saving.
         </p>

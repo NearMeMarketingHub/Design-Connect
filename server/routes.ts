@@ -938,6 +938,18 @@ export async function registerRoutes(
     try {
       const user = req.user as User;
       if (!user.companyId) return res.status(404).json({ message: "No company found" });
+      // Full company record is restricted to company owners, company admins, and platform admins.
+      // Regular internal contractors, clients, subcontractors, and notaries must use
+      // GET /api/company/branding which returns only safe branding/contact fields.
+      const canViewFullRecord =
+        user.role === "company_owner" ||
+        user.isCompanyAdmin === true ||
+        user.role === "admin";
+      if (!canViewFullRecord) {
+        return res.status(403).json({
+          message: "Access denied: company settings are restricted to company owners and admins",
+        });
+      }
       const company = await storage.getCompany(user.companyId);
       if (!company) return res.status(404).json({ message: "No company found" });
       res.json(company);

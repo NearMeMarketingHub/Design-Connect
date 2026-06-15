@@ -50,7 +50,7 @@ export default function InvoiceDetail() {
   const { data: company } = useQuery<Company>({
     queryKey: ["/api/company/mine"],
     queryFn: () => apiRequest("GET", "/api/company/mine").then((r) => r.json()),
-    enabled: user?.role === "company_owner" || user?.role === "contractor",
+    enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true,
   });
 
   const [dueDate, setDueDate] = useState("");
