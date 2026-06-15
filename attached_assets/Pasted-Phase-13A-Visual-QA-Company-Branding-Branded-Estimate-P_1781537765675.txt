@@ -1,0 +1,86 @@
+Phase 13A Visual QA — Company Branding + Branded Estimate PDF
+
+Please inspect the current BuildVision / Design Connect codebase and perform a visual/functional QA pass for Phase 13A only.
+
+Context:
+
+* The current codebase is the latest GitHub ZIP checkpoint I uploaded/downloaded and personally labeled as v64 for tracking. This is not a Replit-generated version number.
+* Phase 13A added company branding fields and branded estimate PDFs.
+* Patch #220 locked down GET /api/company/mine.
+* Regular internal contractors should not access full company data.
+* Regular internal contractors should still be able to use /api/company/branding for branded estimate PDFs.
+* /contractor/calculator and /company/estimates must remain intact.
+
+Important guardrails:
+
+* Do not begin Phase 13B PDF polish yet.
+* Do not make broad refactors.
+* Do not add schema changes.
+* Do not run db push.
+* Do not change estimate save/load behavior.
+* Do not loosen the Patch #220 access restrictions.
+* Do not expose billing, Stripe, subscription, access-control, or private company settings through /api/company/branding.
+* Before making edits, summarize what you found and list the exact files you plan to touch.
+
+QA checklist:
+
+1. Admin Center → Settings branding UI
+
+* Confirm Company Owner can view and edit branding.
+* Confirm Company Admin can view and edit branding.
+* Confirm regular internal contractors cannot access/edit the branding settings UI.
+* Confirm clients, subcontractors, and notaries cannot access/edit branding settings.
+
+2. Branding fields
+   Confirm these can be viewed/saved correctly:
+
+* Logo
+* Primary color
+* Accent color
+* Quote footer text
+* Company phone
+* Company email
+* Company address
+* Company website
+
+3. Logo handling
+
+* Confirm logo upload/preview works.
+* Confirm missing logo fallback works.
+* Confirm bad/missing logo does not block PDF generation.
+
+4. Estimate PDF branding
+   Check both PDF export paths:
+
+* Current-cart PDF export from Calculator tab.
+* Saved-estimate-row PDF export from Estimates tab.
+
+Confirm PDFs use:
+
+* Company logo when available.
+* Primary/accent colors.
+* Company name/contact info.
+* Quote footer text.
+* Correct estimate/custom ID.
+* Correct line items and totals.
+
+5. Access-control verification
+
+* Confirm GET /api/company/mine is owner/admin only.
+* Confirm regular internal contractors receive 403 from /api/company/mine.
+* Confirm PATCH /api/company/mine remains owner/admin only.
+* Confirm GET /api/company/branding works for regular internal contractors.
+* Confirm /api/company/branding only returns safe branding/contact fields.
+
+6. Existing behavior to preserve
+
+* /contractor/calculator still loads.
+* Calculator and Estimates tabs still work.
+* Saved estimates still load into Calculator tab.
+* savedCustomId and loadedFromId behavior remains intact.
+* Saving after loading still creates a new copy.
+* /company/estimates remains intact.
+* Estimate status updates still work.
+* create-invoice.tsx and company-dashboard behavior remain unchanged unless there is a direct Phase 13A QA bug.
+
+If you find issues, propose a small scoped patch only for Phase 13A QA fixes. Do not start Phase 13B PDF design polish yet.
