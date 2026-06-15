@@ -264,6 +264,7 @@ export default function CompanyDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/company/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company/branding"] });
       toast({ title: "Branding saved", description: "Company branding has been updated." });
     },
     onError: (err: Error) => {
