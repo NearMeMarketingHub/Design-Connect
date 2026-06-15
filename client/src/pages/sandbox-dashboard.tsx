@@ -72,7 +72,7 @@ export default function SandboxDashboard() {
             <TestTube className="w-6 h-6" />
           </div>
           <div className="hidden sm:block">
-            <h1 className="font-heading font-bold text-xl tracking-tight">BuildVision</h1>
+            <h1 className="font-heading font-bold text-xl tracking-tight">Near Me Construct</h1>
             <p className="text-xs text-muted-foreground">Sandbox Mode</p>
           </div>
           <Badge variant="outline" className="border-purple-600 text-purple-600 ml-2">

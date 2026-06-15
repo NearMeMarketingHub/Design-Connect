@@ -201,7 +201,7 @@ export default function NotaryPortal() {
       <header className="bg-card border-b border-border p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-foreground">BuildVision Notary Portal</h1>
+            <h1 className="text-xl font-bold text-foreground">Near Me Construct Notary Portal</h1>
             <p className="text-sm text-muted-foreground">Document notarization management</p>
           </div>
           <div className="flex items-center gap-4">

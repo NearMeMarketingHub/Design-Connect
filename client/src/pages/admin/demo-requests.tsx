@@ -634,7 +634,7 @@ export default function AdminDemoRequests() {
                             </Button>
                           )}
                           <a
-                            href={`mailto:${lead.email}?subject=Re: BuildVision Demo Request`}
+                            href={`mailto:${lead.email}?subject=Re: Near Me Construct Demo Request`}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <Button size="sm" variant="ghost" title="Reply by email" data-testid={`button-email-lead-${lead.id}`}>

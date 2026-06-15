@@ -11,7 +11,7 @@ async function seed() {
       username: "contractor",
       password: hashedPassword,
       role: "contractor",
-      name: "BuildVision Contractors",
+      name: "Near Me Construct Contractors",
     });
     console.log("✓ Created contractor user");
 

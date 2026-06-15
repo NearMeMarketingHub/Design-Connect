@@ -205,7 +205,7 @@ export default function SignAuthenticatedPage() {
           <CardHeader className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-t-lg">
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              <span className="text-sm font-medium">BuildVision Secure Signing</span>
+              <span className="text-sm font-medium">Near Me Construct Secure Signing</span>
             </div>
             <CardTitle className="text-2xl">{data?.packet.title}</CardTitle>
             <CardDescription className="text-slate-300">
@@ -343,7 +343,7 @@ export default function SignAuthenticatedPage() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          This document is being signed securely through BuildVision.
+          This document is being signed securely through Near Me Construct.
           Your signature is legally binding and will be recorded with a timestamp.
         </p>
       </div>

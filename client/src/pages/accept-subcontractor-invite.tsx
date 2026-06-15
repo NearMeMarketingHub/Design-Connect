@@ -129,7 +129,7 @@ export default function AcceptSubcontractorInvite() {
           <CardTitle>You're Invited!</CardTitle>
           <CardDescription>
             You've been invited to join{" "}
-            <strong>{invite.companyName || "a company"}</strong> on BuildVision
+            <strong>{invite.companyName || "a company"}</strong> on Near Me Construct
             {invite.subcontractorSpecialty && ` as a ${invite.subcontractorSpecialty}`}.
           </CardDescription>
         </CardHeader>

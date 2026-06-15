@@ -7542,7 +7542,7 @@ export default function ProjectDetails() {
               Invite Sub-Contractor / Notary
             </DialogTitle>
             <DialogDescription>
-              Invite an external sub-contractor or notary to this project. If they already have a BuildVision account they'll be added immediately; otherwise an invitation email will be sent.
+              Invite an external sub-contractor or notary to this project. If they already have a Near Me Construct account they'll be added immediately; otherwise an invitation email will be sent.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

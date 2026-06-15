@@ -160,7 +160,7 @@ export default function SignDocumentPage() {
             </div>
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Shield className="h-4 w-4" />
-              <span>Secured by BuildVision</span>
+              <span>Secured by Near Me Construct</span>
             </div>
           </CardContent>
         </Card>
@@ -177,7 +177,7 @@ export default function SignDocumentPage() {
               <FileText className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">BuildVision</h1>
+              <h1 className="text-xl font-semibold">Near Me Construct</h1>
               <p className="text-sm text-muted-foreground">Document Signing</p>
             </div>
           </div>

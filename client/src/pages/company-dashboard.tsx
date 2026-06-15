@@ -690,14 +690,14 @@ export default function CompanyDashboard() {
                 <CreditCard className="w-5 h-5" />
                 Billing & Access
               </CardTitle>
-              <CardDescription>Your BuildVision billing and access details</CardDescription>
+              <CardDescription>Your Near Me Construct billing and access details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Stripe not configured — informational only */}
               {stripeConfig && !stripeConfig.configured && company?.billingType === "in_app" && (
                 <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400" data-testid="stripe-not-configured-alert">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                  <p>In-app billing is enabled but Stripe is not yet configured for this account. Contact BuildVision support to complete setup.</p>
+                  <p>In-app billing is enabled but Stripe is not yet configured for this account. Contact Near Me Construct support to complete setup.</p>
                 </div>
               )}
 
@@ -819,7 +819,7 @@ export default function CompanyDashboard() {
               </div>
 
               <div className="rounded-lg border border-dashed p-4 text-center text-muted-foreground" data-testid="contact-support-note">
-                <p className="text-sm">To change your Billing &amp; Access settings, contact BuildVision support.</p>
+                <p className="text-sm">To change your Billing &amp; Access settings, contact Near Me Construct support.</p>
               </div>
             </CardContent>
           </Card>
