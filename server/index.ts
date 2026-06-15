@@ -16,6 +16,7 @@ process.on('uncaughtException', (error) => {
 });
 
 const app = express();
+app.set("trust proxy", 1); // Required for secure cookies behind Replit's reverse proxy
 const httpServer = createServer(app);
 
 declare module "http" {
