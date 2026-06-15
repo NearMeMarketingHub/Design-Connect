@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { backfillFinancialCompanyIds } from "./backfill-financial-company-id";
+import { seedDemoAccounts } from "./seed-demo-accounts";
 
 // Global handlers to prevent server crashes from unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
@@ -97,6 +98,9 @@ async function runPasswordResetTokenCleanup() {
 
   // Backfill companyId on financial records created before Phase 11B
   await backfillFinancialCompanyIds();
+
+  // Seed demo + admin accounts (idempotent — skips any that already exist)
+  await seedDemoAccounts();
 
   // Run once at startup, then every hour
   await runPasswordResetTokenCleanup();
