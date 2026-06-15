@@ -1,0 +1,81 @@
+Phase 13B — Branded Estimate PDF Polish
+
+We are moving from Phase 13A QA into Phase 13B.
+
+Context:
+
+* Phase 13A added company branding fields and branded estimate PDFs.
+* Patch #220 locked down GET /api/company/mine and moved estimator PDF branding to /api/company/branding.
+* Patch #221 fixed the branding cache invalidation issue so PDFs use newly saved branding immediately.
+* The Estimator Calculator is at /contractor/calculator.
+* It has Calculator and Estimates tabs.
+* Current-cart PDF export and saved-estimate-row PDF export both already work and use branding.
+
+Goal:
+Polish the visual layout of branded estimate PDFs so they look more professional and customer-facing.
+
+Scope:
+Update the estimate PDF layout/design only.
+
+Improve:
+
+* Header layout
+* Logo placement and sizing
+* Company contact block
+* Estimate/prospect/job information block
+* Line item table styling
+* Totals section
+* Footer/quote terms area
+* Spacing, alignment, and visual hierarchy
+* Consistency between current-cart PDF export and saved-estimate-row PDF export
+
+Requirements:
+
+* Both PDF export paths must use the same polished layout style:
+
+  1. Current estimate/cart export from Calculator tab
+  2. Saved estimate export from Estimates tab row
+* Use the company primary/accent colors from /api/company/branding.
+* Use the company logo if available.
+* Missing logo must gracefully fall back to text branding.
+* Logo load failure must not block PDF generation.
+* Quote footer text should appear when configured.
+* PDF should still include estimate/custom ID correctly.
+* PDF should still include client/prospect name, job description, line items, quantities, prices, and totals.
+* Keep Draft labeling when exporting an unsaved current cart estimate.
+
+Guardrails:
+
+* Do not change schema.
+* Do not run db:push.
+* Do not change access control.
+* Do not touch /api/company/mine.
+* Do not change /api/company/branding response shape unless absolutely necessary.
+* Do not change estimate save/load behavior.
+* Do not change savedCustomId or loadedFromId behavior.
+* Do not change estimate statuses.
+* Do not add email sending.
+* Do not add signatures.
+* Do not add create-project-from-estimate.
+* Do not add invoice/report branding in this phase.
+* Do not refactor unrelated calculator logic.
+
+Before making edits:
+
+* Identify where the current-cart PDF export function is.
+* Identify where the saved-estimate-row PDF export function is.
+* Summarize the exact layout changes you plan to make.
+* List the exact files you plan to touch.
+
+Expected files:
+
+* Most likely client/src/pages/contractor-calculator.tsx
+* Only touch other files if there is a direct, necessary reason.
+
+Done looks like:
+
+* Exporting a current cart estimate creates a cleaner, branded, professional PDF.
+* Exporting a saved estimate row creates the same polished PDF style.
+* Branding colors/logo/contact/footer are reflected correctly.
+* Missing logo still works.
+* npm run check passes.
