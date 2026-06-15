@@ -28,6 +28,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-2">
               <img src="/logo-light.png" alt="Near Me Construct" className="h-8 dark:hidden" />
               <img src="/logo-dark.png" alt="Near Me Construct" className="h-8 hidden dark:block" />
+              <span className="font-heading font-bold text-lg tracking-tight hidden sm:inline">Near Me Construct</span>
             </div>
             <div className="flex items-center gap-4">
               <ThemeToggle />
@@ -381,6 +382,7 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
               <img src="/logo-dark.png" alt="Near Me Construct" className="h-8" />
+              <span className="font-bold text-slate-200">Near Me Construct</span>
             </div>
             <div className="text-sm">
               <span>Florida-based Construction Management Platform</span>
