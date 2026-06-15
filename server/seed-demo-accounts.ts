@@ -12,6 +12,15 @@ const DEMO_USERNAMES = [
   "demo_client",
 ];
 
+// Test accounts that should be disabled on the live app
+const TEST_USERNAMES_TO_DISABLE = [
+  "testadmin",
+  "testcontractor",
+  "testclient",
+  "testnotary",
+  "testsubcontractor",
+];
+
 export async function seedDemoAccounts() {
   try {
     // Check which demo usernames already exist
@@ -46,8 +55,15 @@ export async function seedDemoAccounts() {
       log("seedDemoAccounts: created cameron_admin", "seed");
     }
 
+    // Disable test accounts on the live app (idempotent)
+    await db
+      .update(users)
+      .set({ isDisabled: true })
+      .where(inArray(users.username, TEST_USERNAMES_TO_DISABLE));
+    log("seedDemoAccounts: disabled test accounts", "seed");
+
     if (existingSet.size === DEMO_USERNAMES.length) {
-      // All demo accounts already present — nothing to do
+      // All demo accounts already present — nothing else to do
       return;
     }
 
