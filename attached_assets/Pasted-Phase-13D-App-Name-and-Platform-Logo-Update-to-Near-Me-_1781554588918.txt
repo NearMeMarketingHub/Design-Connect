@@ -1,0 +1,98 @@
+Phase 13D — App Name and Platform Logo Update to Near Me Construct
+
+We are officially renaming the app to:
+
+Near Me Construct
+
+I am also providing two new platform logo assets:
+
+* One logo file labeled for light mode / light backgrounds
+* One logo file labeled for dark mode / dark backgrounds
+
+Use the provided file labels to determine which logo belongs to which theme. Do not guess or reinterpret the logo files.
+
+Important distinction:
+This is platform/app branding only. Do not change individual company/customer branding, company uploaded logos, or /api/company/branding behavior.
+
+Goal:
+Replace visible product/app branding text and platform logo usage so the app consistently presents as Near Me Construct, with the correct logo variant for light mode and dark mode.
+
+Update visible app name text from:
+
+* BuildVision
+* Build Vision
+* Design Connect
+* Design-Connect
+* DesignConnect
+
+To:
+
+* Near Me Construct
+
+Update visible text in:
+
+* Landing page
+* Request Demo page
+* Auth/login page
+* Admin login page
+* Super Admin dashboard/header/sidebar text
+* Contractor/company dashboard/sidebar/header text
+* Client dashboard/header/sidebar text
+* Footer text
+* Page titles / document title
+* Toasts or empty states that mention the old app name
+* Emails/templates that mention the old app name
+* Public invite/signing/reset-password pages
+* Metadata/app title if currently set to BuildVision or Design Connect
+
+Logo asset usage:
+
+* Add the provided logo files into the appropriate client/public asset location.
+* Use the light-mode logo asset for light mode and light-background app branding.
+* Use the dark-mode logo asset for dark mode and dark-background app branding.
+* Use the app’s existing light/dark mode/theme behavior to choose the correct logo where possible.
+* If a component already has dark-mode styling, make sure it displays the dark-mode logo asset when dark mode is active.
+* If the app has a favicon/app tile/icon setup, update it to use the appropriate provided icon asset if suitable.
+* If the provided files are PNGs, use them as provided for now.
+* If SVG/vector files are provided, use the SVG/vector files where possible.
+* Do not attempt to auto-redraw, regenerate, or reinterpret the logo.
+
+Do not change company branding:
+
+* Do not modify company-uploaded logos.
+* Do not replace company branding logos in estimate PDFs.
+* Do not change the customer company logo upload system.
+* Do not change /api/company/branding.
+* Estimate PDFs should still use the customer company’s branding, not the Near Me Construct platform logo.
+
+Guardrails:
+
+* Do not rename database tables.
+* Do not rename API routes.
+* Do not rename internal roles.
+* Do not rename package/repo/project folders unless absolutely necessary.
+* Do not change schema.
+* Do not run db:push.
+* Do not touch access control.
+* Do not change login behavior.
+* Do not change estimate save/load behavior.
+* Do not change PDF company branding behavior except if a static old app name appears somewhere outside company branding.
+* Leave individual company logos/branding fully separate from the platform app name/logo.
+
+Before making edits:
+
+* List every file where old app naming appears.
+* Separate user-facing replacements from internal/code-only references.
+* List where the new platform logo assets will be used.
+* Confirm which uploaded asset is being used for light mode and which is being used for dark mode based on the file labels.
+* List the exact files that will be touched.
+
+Done looks like:
+
+* The app consistently shows “Near Me Construct” to users.
+* No visible “BuildVision” or “Design Connect” remains in public/login/dashboard/email/invite/reset pages.
+* The light-mode logo appears in light mode/light-background branding areas.
+* The dark-mode logo appears in dark mode/dark-background branding areas.
+* Company/customer branding still works independently.
+* Estimate PDFs still use the customer company’s branding, not the platform logo.
+* npm run check passes.
