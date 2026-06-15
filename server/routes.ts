@@ -381,7 +381,7 @@ export async function registerRoutes(
         });
       }
       
-      req.login(user, { keepSessionInfo: true }, (err) => {
+      req.login(user, { keepSessionInfo: true } as any, (err) => {
         if (err) {
           return next(err);
         }
@@ -2000,7 +2000,7 @@ export async function registerRoutes(
         const { sendProjectInviteEmail } = await import("./email");
         await sendProjectInviteEmail(projectInvite.email, {
           projectName: project?.name ?? "Your Project",
-          contractorName: "BuildVision",
+          contractorName: "Near Me Construct",
           inviteToken: newToken,
           clientName: projectInvite.clientName ?? undefined,
           isExistingUser: !!existingUser,
@@ -2019,7 +2019,7 @@ export async function registerRoutes(
         const isNewUser = !contractorInvite.acceptedUserId;
         const { sendExternalInviteEmail } = await import("./email");
         await sendExternalInviteEmail(contractorInvite.email, {
-          inviterName: "BuildVision Admin",
+          inviterName: "Near Me Construct",
           projectName: project?.name ?? "Your Project",
           role,
           loginUrl: `${baseUrl}/auth`,
@@ -5726,7 +5726,7 @@ export async function registerRoutes(
       });
 
       const contractorUser = project.contractorId ? await storage.getUser(project.contractorId) : null;
-      const contractorName = (user.name || user.username) ?? (contractorUser?.name || contractorUser?.username) ?? "BuildVision";
+      const contractorName = (user.name || user.username) ?? (contractorUser?.name || contractorUser?.username) ?? "Near Me Construct";
       const existingUser = await storage.getUserByEmail(invite.email);
 
       try {

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { HardHat, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 
@@ -40,11 +40,10 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-              <HardHat className="w-7 h-7" />
-            </div>
+            <img src="/logo-light.png" alt="Near Me Construct" className="h-12 w-12 rounded-lg dark:hidden" />
+            <img src="/logo-dark.png" alt="Near Me Construct" className="h-12 w-12 rounded-lg hidden dark:block" />
             <div>
-              <h1 className="font-heading font-bold text-2xl tracking-tight">BuildVision</h1>
+              <h1 className="font-heading font-bold text-2xl tracking-tight">Near Me Construct</h1>
               <p className="text-sm text-muted-foreground">Construction Management Portal</p>
             </div>
           </div>

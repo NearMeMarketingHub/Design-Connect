@@ -3,7 +3,6 @@ import { useState } from "react";
 import { 
   Settings,
   LogOut,
-  HardHat,
   Home,
   ArrowLeft,
   FolderOpen,
@@ -115,11 +114,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Sidebar Header */}
             <div className="h-16 border-b border-border px-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                  <HardHat className="w-6 h-6" />
-                </div>
+                <img src="/logo-light.png" alt="Near Me Construct" className="h-9 w-9 rounded dark:hidden" />
+                <img src="/logo-dark.png" alt="Near Me Construct" className="h-9 w-9 rounded hidden dark:block" />
                 <div>
-                  <h1 className="font-heading font-bold text-lg tracking-tight">BuildVision</h1>
+                  <h1 className="font-heading font-bold text-lg tracking-tight">Near Me Construct</h1>
                   <p className="text-xs text-muted-foreground">
                     {isSubOrNotary ? (user?.contractorType === "notary" ? "Notary Portal" : "Sub-Contractor Portal") : canAccessAdminCenter ? "Company Portal" : "Contractor Portal"}
                   </p>
@@ -249,11 +247,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3">
           {isDashboard ? (
             <>
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                {user?.role === "admin" ? <Shield className="w-6 h-6" /> : <HardHat className="w-6 h-6" />}
-              </div>
+              <img src="/logo-light.png" alt="Near Me Construct" className="h-9 w-9 rounded dark:hidden" />
+              <img src="/logo-dark.png" alt="Near Me Construct" className="h-9 w-9 rounded hidden dark:block" />
               <div className="hidden sm:block">
-                <h1 className="font-heading font-bold text-xl tracking-tight">BuildVision</h1>
+                <h1 className="font-heading font-bold text-xl tracking-tight">Near Me Construct</h1>
               </div>
             </>
           ) : showBackButton ? (
@@ -265,9 +262,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             </Button>
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-              <HardHat className="w-6 h-6" />
-            </div>
+            <>
+              <img src="/logo-light.png" alt="Near Me Construct" className="h-9 w-9 rounded dark:hidden" />
+              <img src="/logo-dark.png" alt="Near Me Construct" className="h-9 w-9 rounded hidden dark:block" />
+            </>
           )}
         </div>
         

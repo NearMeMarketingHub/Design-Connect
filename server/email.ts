@@ -1,4 +1,4 @@
-// Resend email integration for BuildVision
+// Resend email integration for Near Me Construct
 import { Resend } from 'resend';
 
 let connectionSettings: any;
@@ -76,13 +76,13 @@ export async function sendProjectInviteEmail(
 
   const ctaText = inviteData.isExistingUser ? 'Log In & Accept Invitation' : 'Accept Invitation & Create Account';
   const bodyText = inviteData.isExistingUser
-    ? 'Click below to log in with your existing BuildVision account and accept this invitation.'
+    ? 'Click below to log in with your existing Near Me Construct account and accept this invitation.'
     : 'Click below to create your account and access your project dashboard.';
 
   const { data, error } = await client.emails.send({
-    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    from: fromEmail || 'Near Me Construct <onboarding@resend.dev>',
     to: toEmail,
-    subject: `You've been invited to ${inviteData.projectName} on BuildVision`,
+    subject: `You've been invited to ${inviteData.projectName} on Near Me Construct`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -92,7 +92,7 @@ export async function sendProjectInviteEmail(
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">Near Me Construct</h1>
           <p style="color: #94a3b8; margin: 5px 0 0;">Construction Project Management</p>
         </div>
         
@@ -118,7 +118,7 @@ export async function sendProjectInviteEmail(
         
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
           <p>This invitation will expire in 7 days.</p>
-          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
         </div>
       </body>
       </html>
@@ -167,7 +167,7 @@ export async function sendSignatureRequestEmail(
     : '';
 
   const { data, error } = await client.emails.send({
-    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    from: fromEmail || 'Near Me Construct <onboarding@resend.dev>',
     to: toEmail,
     subject: `Action Required: Please sign "${signingData.documentTitle}"`,
     html: `
@@ -179,7 +179,7 @@ export async function sendSignatureRequestEmail(
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">Near Me Construct</h1>
           <p style="color: #94a3b8; margin: 5px 0 0;">Electronic Document Signing</p>
         </div>
         
@@ -215,7 +215,7 @@ export async function sendSignatureRequestEmail(
         </div>
         
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
-          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
           <p>If you did not expect this request, please ignore this email.</p>
         </div>
       </body>
@@ -267,7 +267,7 @@ export async function sendSignatureCompletedEmail(
       </div>`;
 
   const { data, error } = await client.emails.send({
-    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    from: fromEmail || 'Near Me Construct <onboarding@resend.dev>',
     to: toEmail,
     subject,
     html: `
@@ -279,7 +279,7 @@ export async function sendSignatureCompletedEmail(
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">Near Me Construct</h1>
           <p style="color: #94a3b8; margin: 5px 0 0;">Document Signing Update</p>
         </div>
         
@@ -294,12 +294,12 @@ export async function sendSignatureCompletedEmail(
           ${statusMessage}
           
           <a href="${baseUrl}" style="display: inline-block; background: #3b82f6; color: #fff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 10px 0;">
-            View in BuildVision
+            View in Near Me Construct
           </a>
         </div>
         
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
-          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
         </div>
       </body>
       </html>
@@ -314,7 +314,7 @@ export async function sendSignatureCompletedEmail(
   return data;
 }
 
-// Send demo request notification to the BuildVision team
+// Send demo request notification to the Near Me Construct team
 export async function sendDemoRequestEmail(formData: {
   name: string;
   company: string;
@@ -331,7 +331,7 @@ export async function sendDemoRequestEmail(formData: {
   const safePhone = escapeHtml(formData.phone);
   const safeMessage = escapeHtml(formData.message).replace(/\n/g, '<br>');
   const { data, error } = await client.emails.send({
-    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    from: fromEmail || 'Near Me Construct <onboarding@resend.dev>',
     to: teamEmail,
     replyTo: formData.email,
     subject: `Demo Request from ${formData.name}${formData.company ? ` — ${formData.company}` : ''}`,
@@ -344,13 +344,13 @@ export async function sendDemoRequestEmail(formData: {
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">Near Me Construct</h1>
           <p style="color: #94a3b8; margin: 5px 0 0;">New Demo Request</p>
         </div>
 
         <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
           <div style="background: #eff6ff; padding: 16px 20px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 24px;">
-            <p style="margin: 0; font-size: 15px; color: #1e40af; font-weight: 600;">A prospect has requested a demo through the BuildVision website.</p>
+            <p style="margin: 0; font-size: 15px; color: #1e40af; font-weight: 600;">A prospect has requested a demo through the Near Me Construct website.</p>
           </div>
 
           <table style="width: 100%; border-collapse: collapse;">
@@ -380,15 +380,15 @@ export async function sendDemoRequestEmail(formData: {
           </table>
 
           <div style="margin-top: 24px;">
-            <a href="mailto:${safeEmail}?subject=Re: BuildVision Demo Request" style="display: inline-block; background: #3b82f6; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">
+            <a href="mailto:${safeEmail}?subject=Re: Near Me Construct Demo Request" style="display: inline-block; background: #3b82f6; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600;">
               Reply to ${safeName}
             </a>
           </div>
         </div>
 
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
-          <p>Submitted via BuildVision demo request form &bull; ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'full', timeStyle: 'short' })} ET</p>
-          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>Submitted via Near Me Construct demo request form &bull; ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'full', timeStyle: 'short' })} ET</p>
+          <p>&copy; ${new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
         </div>
       </body>
       </html>
@@ -423,9 +423,9 @@ export async function sendPasswordResetEmail(
   const greeting = resetData.userName ? `Hi ${escapeHtml(resetData.userName)},` : 'Hi there,';
 
   const { data, error } = await client.emails.send({
-    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    from: fromEmail || 'Near Me Construct <onboarding@resend.dev>',
     to: toEmail,
-    subject: 'Reset your BuildVision password',
+    subject: 'Reset your Near Me Construct password',
     html: `
       <!DOCTYPE html>
       <html>
@@ -435,14 +435,14 @@ export async function sendPasswordResetEmail(
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">Near Me Construct</h1>
           <p style="color: #94a3b8; margin: 5px 0 0;">Password Reset Request</p>
         </div>
 
         <div style="background: #fff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
           <p style="font-size: 16px; margin-top: 0;">${greeting}</p>
 
-          <p>We received a request to reset the password for your BuildVision account. Click the button below to choose a new password.</p>
+          <p>We received a request to reset the password for your Near Me Construct account. Click the button below to choose a new password.</p>
 
           <div style="background: #fef9c3; padding: 15px; border-radius: 8px; border-left: 4px solid #eab308; margin: 20px 0;">
             <p style="margin: 0; font-size: 13px; color: #854d0e;">
@@ -461,7 +461,7 @@ export async function sendPasswordResetEmail(
         </div>
 
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
-          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
         </div>
       </body>
       </html>
@@ -496,13 +496,13 @@ export async function sendExternalInviteEmail(
   const actionLabel = inviteData.isNewUser ? 'Create Account & Get Started' : 'Log In to View Project';
   const greeting = inviteData.inviteeName ? `Hi ${inviteData.inviteeName},` : 'Hi there,';
   const newUserNote = inviteData.isNewUser
-    ? `<p style="color: #64748b; font-size: 14px; margin-top: 20px;">You don't have a BuildVision account yet. Click the button above to create a free account and access the project.</p>`
+    ? `<p style="color: #64748b; font-size: 14px; margin-top: 20px;">You don't have a Near Me Construct account yet. Click the button above to create a free account and access the project.</p>`
     : '';
 
   const { data, error } = await client.emails.send({
-    from: fromEmail || 'BuildVision <onboarding@resend.dev>',
+    from: fromEmail || 'Near Me Construct <onboarding@resend.dev>',
     to: toEmail,
-    subject: `You've been invited to a project on BuildVision as a ${roleLabel}`,
+    subject: `You've been invited to a project on Near Me Construct as a ${roleLabel}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -512,7 +512,7 @@ export async function sendExternalInviteEmail(
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-          <h1 style="color: #fff; margin: 0; font-size: 24px;">BuildVision</h1>
+          <h1 style="color: #fff; margin: 0; font-size: 24px;">Near Me Construct</h1>
           <p style="color: #94a3b8; margin: 5px 0 0;">Construction Management Platform</p>
         </div>
 
@@ -545,7 +545,7 @@ export async function sendExternalInviteEmail(
         </div>
 
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
-          <p>&copy; ${new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
         </div>
       </body>
       </html>

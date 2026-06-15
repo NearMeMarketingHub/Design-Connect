@@ -60,7 +60,7 @@ export default function AdminLogin() {
             <Shield className="w-9 h-9" />
           </div>
           <h1 className="font-heading font-bold text-2xl text-foreground tracking-tight">Admin Portal</h1>
-          <p className="text-sm text-muted-foreground mt-1">BuildVision System Administration</p>
+          <p className="text-sm text-muted-foreground mt-1">Near Me Construct System Administration</p>
         </div>
 
         <Card>
@@ -78,7 +78,7 @@ export default function AdminLogin() {
                   id="admin-email" 
                   name="admin-email"
                   type="text"
-                  placeholder="admin@buildvision.com" 
+                  placeholder="admin@nearmeconstructapp.com" 
                   required 
                   data-testid="input-admin-email"
                 />
@@ -132,7 +132,7 @@ export default function AdminLogin() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          Protected by BuildVision Security
+          Protected by Near Me Construct Security
         </p>
       </div>
     </div>

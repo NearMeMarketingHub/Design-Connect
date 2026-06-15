@@ -1,8 +1,8 @@
-# BuildVision - Client & Contractor Portal
+# Near Me Construct - Client & Contractor Portal
 
 ## Overview
 
-BuildVision is a collaborative construction management platform that connects contractors with clients. It provides project tracking, inspiration boards, estimating tools, invoicing, and real-time communication for construction and renovation projects.
+Near Me Construct is a collaborative construction management platform that connects contractors with clients. It provides project tracking, inspiration boards, estimating tools, invoicing, and real-time communication for construction and renovation projects.
 
 The application follows a full-stack TypeScript architecture with a React frontend and Express backend, using PostgreSQL for data persistence.
 

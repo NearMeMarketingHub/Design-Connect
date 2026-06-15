@@ -69,7 +69,7 @@ export default function AcceptInvite() {
     },
     onSuccess: async () => {
       toast({
-        title: "Welcome to BuildVision!",
+        title: "Welcome to Near Me Construct!",
         description: "Your account has been created and you're now logged in.",
       });
       setPortal("client");
@@ -178,7 +178,7 @@ export default function AcceptInvite() {
               <Building2 className="w-12 h-12 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Welcome to BuildVision</CardTitle>
+          <CardTitle className="text-2xl">Welcome to Near Me Construct</CardTitle>
           <CardDescription>
             {inviteData?.companyName && (
               <span className="block"><strong>{inviteData.companyName}</strong> has invited you to collaborate on:</span>

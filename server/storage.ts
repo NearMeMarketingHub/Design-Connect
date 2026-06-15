@@ -2101,7 +2101,7 @@ export class DatabaseStorage implements IStorage {
         lastMessageAt: new Date(),
         lastMessagePreview: `Welcome to the team chat for ${project.name}! This is where everyone involved in the project can communicate together.`,
         lastMessageSenderId: null,
-        lastMessageSenderName: 'BuildVision'
+        lastMessageSenderName: 'Near Me Construct'
       });
       
       // Add all participants
@@ -2115,7 +2115,7 @@ export class DatabaseStorage implements IStorage {
         chatId: chat.id,
         projectId,
         senderId: clientId, // Use client as sender for now
-        senderName: 'BuildVision',
+        senderName: 'Near Me Construct',
         senderAvatar: null,
         content: `Welcome to the team chat for ${project.name}! This is where everyone involved in the project can communicate together.`
       });

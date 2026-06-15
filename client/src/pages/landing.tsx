@@ -26,8 +26,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
-              <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-foreground">BuildVision</span>
+              <img src="/logo-light.png" alt="Near Me Construct" className="h-8 dark:hidden" />
+              <img src="/logo-dark.png" alt="Near Me Construct" className="h-8 hidden dark:block" />
             </div>
             <div className="flex items-center gap-4">
               <ThemeToggle />
@@ -47,7 +47,7 @@ export default function LandingPage() {
               <span className="text-blue-600">Built for Teams</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
-              BuildVision gives contractors a company dashboard to manage projects, build their team, 
+              Near Me Construct gives contractors a company dashboard to manage projects, build their team, 
               and keep clients informed — all in one place.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
@@ -80,7 +80,7 @@ export default function LandingPage() {
         <section className="py-16 bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-center text-foreground mb-12">
-              How BuildVision Works
+              How Near Me Construct Works
             </h2>
             <div className="grid md:grid-cols-4 gap-8">
               <div className="text-center">
@@ -244,7 +244,7 @@ export default function LandingPage() {
               Ready to Transform Your Construction Business?
             </h2>
             <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
-              Join contractors and companies across Florida who are building smarter with BuildVision.
+              Join contractors and companies across Florida who are building smarter with Near Me Construct.
               Schedule a demo to see the platform in action and get your company set up.
             </p>
             <Link href="/demo">
@@ -380,15 +380,14 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <Building2 className="h-6 w-6 text-blue-400" />
-              <span className="text-xl font-bold text-white">BuildVision</span>
+              <img src="/logo-light.png" alt="Near Me Construct" className="h-8" />
             </div>
             <div className="text-sm">
               <span>Florida-based Construction Management Platform</span>
             </div>
           </div>
           <div className="border-t border-slate-800 mt-8 pt-8 text-center text-sm">
-            <p>&copy; {new Date().getFullYear()} BuildVision. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
           </div>
         </div>
       </footer>

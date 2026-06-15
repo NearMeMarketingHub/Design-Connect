@@ -4,7 +4,6 @@ import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
-  Shield,
   LayoutDashboard,
   Building2,
   CalendarCheck,
@@ -120,11 +119,10 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
         data-testid="admin-sidebar"
       >
         <div className="h-16 flex items-center gap-3 px-4 border-b shrink-0">
-          <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shrink-0">
-            <Shield className="w-5 h-5" />
-          </div>
+          <img src="/logo-light.png" alt="Near Me Construct" className="h-8 w-8 rounded shrink-0 dark:hidden" />
+          <img src="/logo-dark.png" alt="Near Me Construct" className="h-8 w-8 rounded shrink-0 hidden dark:block" />
           <div className="min-w-0">
-            <p className="font-bold text-sm leading-tight text-foreground">BuildVision</p>
+            <p className="font-bold text-sm leading-tight text-foreground">Near Me Construct</p>
             <p className="text-[11px] text-muted-foreground">Admin Console</p>
           </div>
         </div>

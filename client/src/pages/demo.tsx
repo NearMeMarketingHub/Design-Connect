@@ -65,8 +65,8 @@ export default function DemoPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/">
               <div className="flex items-center gap-2 cursor-pointer" data-testid="link-home">
-                <Building2 className="h-8 w-8 text-blue-600" />
-                <span className="text-2xl font-bold text-slate-900">BuildVision</span>
+                <img src="/logo-light.png" alt="Near Me Construct" className="h-8 dark:hidden" />
+                <img src="/logo-dark.png" alt="Near Me Construct" className="h-8 hidden dark:block" />
               </div>
             </Link>
             <div className="flex items-center gap-4">
@@ -109,7 +109,7 @@ export default function DemoPage() {
                   Schedule a Demo
                 </div>
                 <h1 className="text-4xl font-bold text-slate-900 mb-4">
-                  See BuildVision in Action
+                  See Near Me Construct in Action
                 </h1>
                 <p className="text-lg text-slate-600">
                   Fill out the form and our team will reach out within one business day to schedule 
@@ -256,7 +256,7 @@ export default function DemoPage() {
 
       <footer className="bg-slate-900 text-slate-400 py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} BuildVision. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Near Me Construct. All rights reserved.</p>
         </div>
       </footer>
     </div>

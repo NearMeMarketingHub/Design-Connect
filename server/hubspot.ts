@@ -2,7 +2,7 @@
  * SCOPE CONSTRAINT — this module must ONLY be imported by demo-request routes.
  *
  * HubSpot sync is intentionally scoped to demo requests submitted via the /demo
- * page. It must never be used to sync BuildVision users, companies, clients,
+ * page. It must never be used to sync Near Me Construct users, companies, clients,
  * contractors, projects, invites, or any other platform entity.
  *
  * Allowed callers:
@@ -112,7 +112,7 @@ async function upsertCompany(client: Client, req: DemoRequest): Promise<string |
 async function createDeal(client: Client, req: DemoRequest): Promise<string> {
   const created = await client.crm.deals.basicApi.create({
     properties: {
-      dealname: `BuildVision Demo — ${req.name}`,
+      dealname: `Near Me Construct Demo — ${req.name}`,
       pipeline: "default",
       dealstage: "appointmentscheduled",
       description: `Demo request submitted on ${new Date(req.createdAt).toLocaleDateString()}. Source: buildvision_demo_request. Request ID: ${req.id}.`,
@@ -129,8 +129,8 @@ async function createNote(
   if (!req.message || req.message.trim() === "") return;
 
   const noteBody =
-    `BuildVision Demo Request\n` +
-    `Source: buildvision_demo_request\n` +
+    `Near Me Construct Demo Request\n` +
+    `Source: nearmeconstructapp_demo_request\n` +
     `Request ID: ${req.id}\n` +
     `Submitted: ${new Date(req.createdAt).toLocaleString()}\n` +
     `Company: ${req.company || "(not provided)"}\n` +
