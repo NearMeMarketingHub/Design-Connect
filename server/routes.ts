@@ -381,7 +381,7 @@ export async function registerRoutes(
         });
       }
       
-      req.login(user, { keepSessionInfo: true } as any, (err) => {
+      req.login(user, { session: true, keepSessionInfo: true } as any, (err) => {
         if (err) {
           return next(err);
         }

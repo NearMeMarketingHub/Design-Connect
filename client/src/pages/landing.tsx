@@ -380,7 +380,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <img src="/logo-light.png" alt="Near Me Construct" className="h-8" />
+              <img src="/logo-dark.png" alt="Near Me Construct" className="h-8" />
             </div>
             <div className="text-sm">
               <span>Florida-based Construction Management Platform</span>
