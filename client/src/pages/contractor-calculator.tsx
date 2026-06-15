@@ -41,7 +41,6 @@ import {
   FileText,
   DollarSign,
   Package,
-  ShoppingCart,
   Save,
   X,
   Loader2,
@@ -582,7 +581,7 @@ export default function ContractorCalculator() {
       return;
     }
     if (estimateItems.length === 0) {
-      toast({ title: "Cart is empty", description: "Add at least one item before saving.", variant: "destructive" });
+      toast({ title: "Estimate is empty", description: "Add at least one item before saving.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
@@ -739,7 +738,7 @@ export default function ContractorCalculator() {
   // Calculator-tab PDF export — uses current working estimate state
   const handleExportPdf = async () => {
     if (estimateItems.length === 0) {
-      toast({ title: "Cart is empty", description: "Add items before exporting.", variant: "destructive" });
+      toast({ title: "Estimate is empty", description: "Add items before exporting.", variant: "destructive" });
       return;
     }
     try {
@@ -946,7 +945,7 @@ export default function ContractorCalculator() {
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <ShoppingCart className="w-5 h-5 text-primary" />
+                        <FileText className="w-5 h-5 text-primary" />
                         <h2 className="font-semibold">Estimate</h2>
                         {savedCustomId && (
                           <Badge variant="secondary" className="text-xs font-mono">{savedCustomId}</Badge>
@@ -1005,7 +1004,7 @@ export default function ContractorCalculator() {
                   <ScrollArea className="flex-1">
                     {estimateItems.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
-                        <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
                         <p>No items added yet</p>
                         <p className="text-sm mt-1">Click + to add items to your estimate</p>
                       </div>
