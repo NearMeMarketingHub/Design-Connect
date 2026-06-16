@@ -1,0 +1,97 @@
+Phase 15C — Expense-to-Budget Actual Cost Linkage
+
+Phase 15B is complete. The Expenses feature exists, npm run check passed, and expenses can now be created, viewed, edited, deleted, filtered, and optionally linked to projects.
+
+Now we need a plan for the next step: safely connecting expenses to project budget actual costs.
+
+Important:
+This is Plan Mode first. Do not make code changes yet. Return a detailed implementation plan only.
+
+Goal:
+Allow company-side users to associate expense records with project budget line items so real expenses can begin populating the “Actual” side of the existing Project Budget Manager.
+
+Current context:
+
+* Expenses are company-scoped and optionally project-scoped.
+* Project budgets already exist through `project_budgets`.
+* Project budget line items already exist through `project_budget_items`.
+* `project_budget_items` already has fields like `unitCostActual` and `totalActual`, but actual cost tracking is incomplete.
+* Phase 15B intentionally did not connect expenses to `project_budget_items.unitCostActual`.
+
+What we need planned:
+Design the safest way to connect expenses to budget line items without breaking existing financial behavior.
+
+Please inspect and plan around:
+
+* `expenses`
+* `project_budgets`
+* `project_budget_items`
+* Project Budget Manager UI
+* Expense Dashboard UI
+* Existing project budget routes
+* Existing expense routes
+* Existing company/project access-control helpers
+
+Questions the plan must answer:
+
+1. Should an expense link directly to one `project_budget_item`, or should there be a separate linking/allocation table?
+2. If a single expense needs to be split across multiple budget items later, what data model best supports that?
+3. For this phase, should we support one expense → one budget item only, or build an allocation structure now?
+4. How should `project_budget_items.totalActual` be calculated from linked expenses?
+5. Should `unitCostActual` be manually editable, auto-calculated, or left alone for now?
+6. Should expense linkage happen from the Expense page, the Project Budget tab, or both?
+7. How do we prevent expenses from being linked to a project budget item from another company or another project?
+8. How do we avoid double-counting actual costs?
+9. What happens if an expense is edited, deleted, or moved to a different budget item?
+10. What should regular internal contractors be allowed to do, if anything, with budget linkage?
+
+Preferred behavior unless there is a better reason:
+
+* Company Owner and Company Admin can link/unlink expenses to budget line items.
+* Regular internal contractors can view expense/budget actuals only if they already have access to that area, but should not modify budget actuals.
+* Clients, subcontractors, notaries, and unrelated users must not access internal actual cost data.
+* Expenses should only link to budget items within the same company.
+* If the expense has a projectId, it should only link to budget items for that same project.
+* Do not allow cross-company or cross-project linkage.
+
+Guardrails:
+
+* Do not change estimator calculations.
+* Do not change invoice calculations.
+* Do not change estimate PDF behavior.
+* Do not change company branding.
+* Do not add overhead formulas.
+* Do not add commission or payout logic.
+* Do not add Stripe or billing logic.
+* Do not add production sheet or daily log features.
+* Do not add receipt upload.
+* Do not change approved estimate behavior.
+* Do not change project budget estimated totals.
+* Do not silently recalculate historical estimates or invoices.
+* Do not guess business formulas.
+
+Plan should include:
+
+* Recommended data model.
+* Whether schema changes are required.
+* Exact schema additions or changes proposed.
+* Exact routes to add or modify.
+* Access-control approach.
+* UI placement and user flow.
+* How actual totals should update.
+* How to handle editing/deleting linked expenses.
+* How to avoid double-counting.
+* Exact files likely to be touched.
+* Whether db:push will be required.
+* Risks.
+* Test plan.
+* Clear done criteria.
+
+Done for the future build should look like:
+
+* Expenses can be linked to project budget line items safely.
+* Project Budget Manager can show actual cost data based on linked expenses.
+* Actual totals do not double-count expenses.
+* Existing estimates, invoices, PDFs, branding, and estimator behavior remain unchanged.
+* Company/project scoping is enforced server-side.
+* npm run check passes.

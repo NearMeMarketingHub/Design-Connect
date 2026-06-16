@@ -1,0 +1,85 @@
+Please revise the Phase 15C plan before build approval.
+
+The overall direction is good, but because this phase starts writing actual cost totals, the plan needs a few guardrail fixes before approval.
+
+1. Require projectId when linking an expense to a budget item
+
+If `budgetItemId` is provided on POST or PATCH, the expense must have a `projectId`, and that `projectId` must match the selected budget item’s `projectId`.
+
+Do not allow:
+
+* `projectId: null` with a non-null `budgetItemId`
+* an expense linked to Project A being assigned to a budget item from Project B
+* an expense linked to a budget item based on companyId alone
+
+If a user changes an expense’s `projectId` to null or to a different project while it has a `budgetItemId`, the server should either:
+
+* auto-clear `budgetItemId` and recalculate the old item/budget actual totals, or
+* reject the request with a clear 400 message.
+
+The plan currently recommends auto-clear. That is acceptable, but please make it explicit.
+
+2. Recalculate actual totals on all relevant expense changes
+
+The plan must explicitly recalculate affected budget actual totals when any of these fields change:
+
+* `amount`
+* `status`
+* `budgetItemId`
+* `projectId`, if changing project causes `budgetItemId` to be cleared
+* DELETE expense
+
+Changing status to `rejected` should remove that expense from actual totals.
+Changing status from `rejected` back to pending/approved/reimbursed/paid should add it back.
+
+Do not recalculate only when `budgetItemId` changes.
+
+3. Recalculate project_budgets.totalActual when a budget item is deleted
+
+Because `expenses.budgetItemId` will use `ON DELETE SET NULL`, deleting a project budget item can unlink expenses and remove that item’s `totalActual` from the budget.
+
+Update the plan so deleting a project budget item also recalculates `project_budgets.totalActual`.
+
+Do not mix this with the existing `recalculateBudgetTotal()` method that recalculates estimated totals. Keep actual-total recalculation separate.
+
+4. Keep Super Admin without companyId blocked from linked expense data
+
+The proposed route:
+
+`GET /api/projects/:projectId/budget/items/:itemId/expenses`
+
+returns expense data, so it should not rely only on `requireEstimateAccess` if that allows platform admin behavior.
+
+This route must explicitly verify:
+
+* user is authenticated
+* user has companyId
+* user is company_owner, isCompanyAdmin contractor, or regular internal contractor
+* user is not client
+* user is not subcontractor
+* user is not notary
+* `budgetItem.companyId === user.companyId`
+* `budgetItem.projectId === req.params.projectId`
+
+Super Admin users without companyId should receive 403.
+
+If this route is only for an optional linked-expenses chip/popover, it may also be deferred to a later phase to keep Phase 15C smaller.
+
+5. Keep scope unchanged
+
+Do not change:
+
+* estimator calculations
+* invoice calculations
+* estimate PDF behavior
+* company branding
+* overhead formulas
+* commission or payout logic
+* Stripe or billing logic
+* production sheet/daily log features
+* receipt upload
+* approved estimate behavior
+* project budget estimated totals
+* historical estimates or invoices
+
+Please return the revised Phase 15C implementation plan with these fixes included.
