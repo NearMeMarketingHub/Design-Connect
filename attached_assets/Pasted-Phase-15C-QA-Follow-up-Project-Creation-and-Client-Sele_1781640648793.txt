@@ -1,0 +1,119 @@
+Phase 15C QA Follow-up — Project Creation and Client Selection Fixes
+
+During live QA, we found several issues around project creation, client selection, and price book refresh behavior.
+
+This should be a focused QA fix. Do not build new large features yet.
+
+Issues to fix:
+
+1. Client selection tab order/default
+
+In the project creation flow, the Client section currently defaults to “Existing” and shows Existing on the left.
+
+Change this so:
+
+* “Invite New” is the default selected option.
+* “Invite New” appears on the left.
+* “Existing” appears on the right.
+
+Reason:
+Creating/inviting a new client will usually be the more common flow.
+
+2. Existing client dropdown must only show clients
+
+The existing client dropdown currently appears to list users who are not clients.
+
+Fix this so the Existing Client dropdown only lists users with the client role/type.
+
+Do not show:
+
+* company owners
+* contractors
+* company admins
+* subcontractors
+* notaries
+* super admins
+* unrelated users
+
+3. Existing client dropdown must be company-scoped
+
+The Existing Client dropdown should only show clients that have previously worked with the current company or are already connected to the current company through a project/client relationship.
+
+Example:
+
+* Company A worked with Client A.
+* Company B worked with Client B.
+* Company A should not see Client B.
+* Company B should not see Client A.
+* Company C worked with Client A and Client C, so Company C should see Client A and Client C, but not Client B.
+
+Please inspect the existing client/project relationship model and use the safest existing company-scoped relationship available.
+
+If there is not currently a clean company-client relationship table, do not create a large new invite/account-linking system in this patch. Instead:
+
+* scope the dropdown by clients already attached to projects for the current company, or another existing safe relationship if available.
+* note what additional data model would be needed later for a full company-client association system.
+
+4. Project creation loading state and redirect
+
+When creating a project, the button greys out but there is no clear loading indicator, and after the project is created the user is not taken to the new project.
+
+Fix this so:
+
+* The submit/create button shows a spinner or clear loading state while the request is in progress.
+* The button text changes to something like “Creating Project...”
+* On successful creation, redirect the user to the newly created project detail page.
+* Show an error toast/message if creation fails.
+* Do not leave the user sitting on the create form after a successful create.
+
+5. Price book / calculator refresh issue
+
+During QA, newly added budget/price book items did not show up in the Calculator until a hard refresh.
+
+Fix the query invalidation/refetch behavior so that when company price book/budget items are added, edited, deleted, or bulk imported, the calculator-related item queries update without requiring a browser hard refresh.
+
+Inspect the relevant query keys for:
+
+* company price book categories/items
+* calculator items
+* estimator calculator item list
+* floor calculator item list if it uses the same source
+
+Make sure mutations invalidate/refetch all affected query keys consistently.
+
+Guardrails:
+
+* Do not change schema unless absolutely required for the client scoping fix.
+* Do not run db:push unless a schema change is explicitly required and approved.
+* Do not change estimator math.
+* Do not change invoice math.
+* Do not change project budget actual/estimated calculations.
+* Do not change expense-to-budget linkage.
+* Do not change company branding.
+* Do not change estimate PDF behavior.
+* Do not add project cover image upload in this patch.
+* Do not build the full existing-account invite/key association flow in this patch.
+* Do not add subcontractor invite association logic in this patch.
+
+Plan should include:
+
+* Exact files likely to be touched.
+* How the current project client selector gets its data.
+* How the client dropdown will be restricted to client users only.
+* How the dropdown will be company-scoped.
+* Whether any schema change is needed.
+* How project create redirect will identify the new project ID.
+* Which query keys will be invalidated for the price book/calculator refresh fix.
+* Risks.
+* Test plan.
+
+Done looks like:
+
+* Project creation defaults to Invite New on the left.
+* Existing Client dropdown only shows client users.
+* Existing Client dropdown only shows clients connected to the current company.
+* Project creation shows a clear loading spinner/state.
+* Successful project creation redirects to the new project detail page.
+* Adding/editing/deleting price book items updates the calculator without hard refresh.
+* Existing estimates, invoices, expenses, project budget calculations, branding, and PDFs remain unchanged.
+* npm run check passes.
