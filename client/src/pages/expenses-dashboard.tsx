@@ -48,6 +48,7 @@ interface Expense {
   id: string;
   companyId: string;
   projectId: string | null;
+  budgetItemId: string | null;
   vendorName: string | null;
   category: string;
   description: string;
@@ -65,6 +66,13 @@ interface Expense {
 interface Project {
   id: string;
   name: string;
+}
+
+interface BudgetItem {
+  id: string;
+  category: string;
+  description: string;
+  budgetId: string;
 }
 
 const EXPENSE_STATUSES = ["pending", "approved", "reimbursed", "rejected", "paid"] as const;
@@ -108,6 +116,7 @@ const emptyForm = {
   expenseDate: today(),
   vendorName: "",
   projectId: "",
+  budgetItemId: "",
   paymentMethod: "",
   status: "pending",
   notes: "",
@@ -169,6 +178,18 @@ export default function ExpensesDashboard() {
     },
   });
 
+  const { data: budgetResult } = useQuery<{ budget: { id: string }; items: BudgetItem[] } | null>({
+    queryKey: ["/api/projects", form.projectId || null, "budget"],
+    queryFn: async () => {
+      if (!form.projectId) return null;
+      const res = await fetch(`/api/projects/${form.projectId}/budget`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: dialogOpen && !!form.projectId && isWriter,
+  });
+  const budgetItems: BudgetItem[] = budgetResult?.items ?? [];
+
   const total = useMemo(
     () => expenses.reduce((sum, e) => sum + parseFloat(e.amount ?? "0"), 0),
     [expenses]
@@ -183,6 +204,7 @@ export default function ExpensesDashboard() {
         body: JSON.stringify({
           ...data,
           projectId: data.projectId || null,
+          budgetItemId: data.budgetItemId || null,
           vendorName: data.vendorName || null,
           paymentMethod: data.paymentMethod || null,
           notes: data.notes || null,
@@ -196,6 +218,7 @@ export default function ExpensesDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/company/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
       toast({ title: "Expense added" });
     },
@@ -211,6 +234,7 @@ export default function ExpensesDashboard() {
         body: JSON.stringify({
           ...data,
           projectId: data.projectId || null,
+          budgetItemId: data.budgetItemId || null,
           vendorName: data.vendorName || null,
           paymentMethod: data.paymentMethod || null,
           notes: data.notes || null,
@@ -224,6 +248,7 @@ export default function ExpensesDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/company/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
       toast({ title: "Expense updated" });
     },
@@ -240,6 +265,7 @@ export default function ExpensesDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/company/expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       toast({ title: "Expense deleted" });
       setDeleteTarget(null);
     },
@@ -262,6 +288,7 @@ export default function ExpensesDashboard() {
       expenseDate: expense.expenseDate,
       vendorName: expense.vendorName ?? "",
       projectId: expense.projectId ?? "",
+      budgetItemId: expense.budgetItemId ?? "",
       paymentMethod: expense.paymentMethod ?? "",
       status: expense.status,
       notes: expense.notes ?? "",
@@ -613,7 +640,13 @@ export default function ExpensesDashboard() {
                 <Label htmlFor="expense-project">Project</Label>
                 <Select
                   value={form.projectId || "none"}
-                  onValueChange={(v) => setForm((f) => ({ ...f, projectId: v === "none" ? "" : v }))}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      projectId: v === "none" ? "" : v,
+                      budgetItemId: "",
+                    }))
+                  }
                 >
                   <SelectTrigger id="expense-project" data-testid="select-expense-project">
                     <SelectValue placeholder="No project" />
@@ -645,6 +678,31 @@ export default function ExpensesDashboard() {
                 </Select>
               </div>
             </div>
+
+            {isWriter && form.projectId && (
+              <div className="space-y-1.5">
+                <Label htmlFor="expense-budget-item">Budget Line Item</Label>
+                <Select
+                  value={form.budgetItemId || "none"}
+                  onValueChange={(v) => setForm((f) => ({ ...f, budgetItemId: v === "none" ? "" : v }))}
+                >
+                  <SelectTrigger id="expense-budget-item" data-testid="select-expense-budget-item">
+                    <SelectValue placeholder="Not linked to budget" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not linked to budget</SelectItem>
+                    {budgetItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.category} — {item.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.projectId && budgetItems.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No budget line items for this project yet.</p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="expense-status">Status</Label>

@@ -803,6 +803,7 @@ export async function registerRoutes(
       expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
       vendorName: z.string().optional().nullable(),
       projectId: z.string().optional().nullable(),
+      budgetItemId: z.string().optional().nullable(),
       paymentMethod: z.string().optional().nullable(),
       status: z.string().optional(),
       notes: z.string().optional().nullable(),
@@ -839,10 +840,26 @@ export async function registerRoutes(
       return res.status(400).json({ message: `Invalid status: ${statusVal}` });
     }
 
+    // Validate budgetItemId — requires projectId, same company, same project
+    if (data.budgetItemId) {
+      if (!data.projectId) {
+        return res.status(400).json({ message: "projectId is required when budgetItemId is set" });
+      }
+      const budgetItem = await storage.getProjectBudgetItemById(data.budgetItemId);
+      if (!budgetItem) return res.status(404).json({ message: "Budget item not found" });
+      if (budgetItem.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Budget item belongs to another company" });
+      }
+      if (budgetItem.projectId !== data.projectId) {
+        return res.status(400).json({ message: "Budget item does not belong to the selected project" });
+      }
+    }
+
     try {
       const expense = await storage.createExpense({
         companyId: user.companyId,
         projectId: data.projectId ?? null,
+        budgetItemId: data.budgetItemId ?? null,
         vendorName: data.vendorName ?? null,
         category: data.category,
         description: data.description,
@@ -855,6 +872,16 @@ export async function registerRoutes(
         createdById: user.id,
         createdByName: user.name ?? user.username,
       });
+
+      // Recalculate actual totals if expense is linked to a budget item
+      if (expense.budgetItemId) {
+        await storage.recalculateItemActualTotal(expense.budgetItemId);
+        const linkedItem = await storage.getProjectBudgetItemById(expense.budgetItemId);
+        if (linkedItem?.budgetId) {
+          await storage.recalculateBudgetActualTotal(linkedItem.budgetId);
+        }
+      }
+
       return res.status(201).json(expense);
     } catch (err) {
       console.error("[expenses:POST]", err);
@@ -877,6 +904,7 @@ export async function registerRoutes(
       expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       vendorName: z.string().nullable().optional(),
       projectId: z.string().nullable().optional(),
+      budgetItemId: z.string().nullable().optional(),
       paymentMethod: z.string().nullable().optional(),
       status: z.string().optional(),
       notes: z.string().nullable().optional(),
@@ -918,8 +946,70 @@ export async function registerRoutes(
       }
     }
 
+    // Determine the projectId this expense will have after saving
+    const incomingProjectId = data.projectId !== undefined ? data.projectId : existing.projectId;
+
+    // Auto-clear: if projectId is being changed while a budgetItemId is set,
+    // clear budgetItemId so the link doesn't cross projects
+    const oldBudgetItemId = existing.budgetItemId ?? null;
+    let finalBudgetItemId: string | null;
+    const projectIdChanging = data.projectId !== undefined && data.projectId !== existing.projectId;
+    if (projectIdChanging && oldBudgetItemId && data.budgetItemId === undefined) {
+      // Auto-clear the link
+      finalBudgetItemId = null;
+    } else if (data.budgetItemId !== undefined) {
+      finalBudgetItemId = data.budgetItemId;
+    } else {
+      finalBudgetItemId = oldBudgetItemId;
+    }
+
+    // Validate newly set budgetItemId
+    if (finalBudgetItemId && finalBudgetItemId !== oldBudgetItemId) {
+      if (!incomingProjectId) {
+        return res.status(400).json({ message: "projectId is required when budgetItemId is set" });
+      }
+      const budgetItem = await storage.getProjectBudgetItemById(finalBudgetItemId);
+      if (!budgetItem) return res.status(404).json({ message: "Budget item not found" });
+      if (budgetItem.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Budget item belongs to another company" });
+      }
+      if (budgetItem.projectId !== incomingProjectId) {
+        return res.status(400).json({ message: "Budget item does not belong to the selected project" });
+      }
+    }
+
     try {
-      const updated = await storage.updateExpense(req.params.id, data as any);
+      // Build explicit update payload so auto-cleared budgetItemId is always persisted
+      const updatePayload: Record<string, any> = { ...data };
+      updatePayload.budgetItemId = finalBudgetItemId;
+
+      const updated = await storage.updateExpense(req.params.id, updatePayload as any);
+
+      // Determine which budget items need recalculation
+      const amountChanged = data.amount !== undefined && data.amount !== existing.amount;
+      const statusChanged = data.status !== undefined && data.status !== existing.status;
+      const budgetItemIdChanged = finalBudgetItemId !== oldBudgetItemId;
+
+      const affectedItemIds: string[] = [];
+      if (oldBudgetItemId && budgetItemIdChanged) {
+        affectedItemIds.push(oldBudgetItemId);
+      }
+      if (finalBudgetItemId && (budgetItemIdChanged || amountChanged || statusChanged)) {
+        if (!affectedItemIds.includes(finalBudgetItemId)) {
+          affectedItemIds.push(finalBudgetItemId);
+        }
+      }
+
+      const affectedBudgetIds = new Set<string>();
+      for (const itemId of affectedItemIds) {
+        await storage.recalculateItemActualTotal(itemId);
+        const item = await storage.getProjectBudgetItemById(itemId);
+        if (item?.budgetId) affectedBudgetIds.add(item.budgetId);
+      }
+      for (const budgetId of affectedBudgetIds) {
+        await storage.recalculateBudgetActualTotal(budgetId);
+      }
+
       return res.json(updated);
     } catch (err) {
       console.error("[expenses:PATCH]", err);
@@ -8208,6 +8298,7 @@ export async function registerRoutes(
 
       await storage.deleteProjectBudgetItem(req.params.itemId);
       await storage.recalculateBudgetTotal(budget.id);
+      await storage.recalculateBudgetActualTotal(budget.id);
       const updatedBudget = await storage.getProjectBudgetById(budget.id);
 
       logAuditEvent(req, user, {

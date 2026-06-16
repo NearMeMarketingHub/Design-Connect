@@ -407,10 +407,13 @@ export interface IStorage {
 
   // Project budget item methods
   getProjectBudgetItems(budgetId: string): Promise<ProjectBudgetItem[]>;
+  getProjectBudgetItemById(id: string): Promise<ProjectBudgetItem | undefined>;
   createProjectBudgetItem(data: InsertProjectBudgetItem): Promise<ProjectBudgetItem>;
   updateProjectBudgetItem(id: string, data: Partial<InsertProjectBudgetItem>): Promise<ProjectBudgetItem | undefined>;
   deleteProjectBudgetItem(id: string): Promise<void>;
   recalculateBudgetTotal(budgetId: string): Promise<void>;
+  recalculateItemActualTotal(itemId: string): Promise<void>;
+  recalculateBudgetActualTotal(budgetId: string): Promise<void>;
 
   // Expense methods
   getExpenses(
@@ -2750,6 +2753,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(schema.projectBudgetItems.displayOrder, schema.projectBudgetItems.createdAt);
   }
 
+  async getProjectBudgetItemById(id: string): Promise<ProjectBudgetItem | undefined> {
+    const [row] = await db.select().from(schema.projectBudgetItems)
+      .where(eq(schema.projectBudgetItems.id, id));
+    return row;
+  }
+
   async createProjectBudgetItem(data: InsertProjectBudgetItem): Promise<ProjectBudgetItem> {
     const [row] = await db.insert(schema.projectBudgetItems).values(data).returning();
     return row;
@@ -2784,6 +2793,40 @@ export class DatabaseStorage implements IStorage {
         .set({ budget: totalStr })
         .where(eq(schema.projects.id, budget.projectId));
     }
+  }
+
+  // Sums non-rejected expenses linked to a budget item and writes the result
+  // to project_budget_items.totalActual. Separate from recalculateBudgetTotal
+  // which only handles estimated totals.
+  async recalculateItemActualTotal(itemId: string): Promise<void> {
+    const [result] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${schema.expenses.amount}), 0)` })
+      .from(schema.expenses)
+      .where(
+        and(
+          eq(schema.expenses.budgetItemId, itemId),
+          not(eq(schema.expenses.status, "rejected"))
+        )
+      );
+    const total = String(parseFloat(result?.total ?? "0"));
+    await db
+      .update(schema.projectBudgetItems)
+      .set({ totalActual: total, updatedAt: new Date() })
+      .where(eq(schema.projectBudgetItems.id, itemId));
+  }
+
+  // Sums all item-level totalActual values for a budget and writes to
+  // project_budgets.totalActual. Separate from recalculateBudgetTotal.
+  async recalculateBudgetActualTotal(budgetId: string): Promise<void> {
+    const [result] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${schema.projectBudgetItems.totalActual}), 0)` })
+      .from(schema.projectBudgetItems)
+      .where(eq(schema.projectBudgetItems.budgetId, budgetId));
+    const total = String(parseFloat(result?.total ?? "0"));
+    await db
+      .update(schema.projectBudgets)
+      .set({ totalActual: total, updatedAt: new Date() })
+      .where(eq(schema.projectBudgets.id, budgetId));
   }
 
   // ── Expense Methods ─────────────────────────────────────────────────────────
@@ -2835,7 +2878,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteExpense(id: string): Promise<void> {
+    const expense = await this.getExpense(id);
     await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
+    if (expense?.budgetItemId) {
+      await this.recalculateItemActualTotal(expense.budgetItemId);
+      const item = await this.getProjectBudgetItemById(expense.budgetItemId);
+      if (item?.budgetId) {
+        await this.recalculateBudgetActualTotal(item.budgetId);
+      }
+    }
   }
 }
 

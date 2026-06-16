@@ -924,6 +924,7 @@ export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id),
   projectId: varchar("project_id").references(() => projects.id),
+  budgetItemId: varchar("budget_item_id").references(() => projectBudgetItems.id, { onDelete: "set null" }),
   vendorName: text("vendor_name"),
   category: text("category").notNull(),
   description: text("description").notNull(),
