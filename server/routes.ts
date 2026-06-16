@@ -4968,18 +4968,34 @@ export async function registerRoutes(
     }
   });
 
-  // Get clients and admins for project assignment (contractors can also use this)
-  // Excludes sandbox clients by default
+  // Returns clients for the caller's company, scoped by projects they are attached to.
+  // Only role==="client" users are returned — admins, contractors, etc. are excluded.
+  // Company scoping: derived from projects.clientId for the caller's company (no dedicated
+  // company-client association table exists; a full client-company join table would be needed
+  // for a complete solution in a future task).
+  // Admins see all clients system-wide (unchanged behaviour for super-admin tooling).
   app.get("/api/users/clients", requireAuth, async (req, res, next) => {
     try {
+      const caller = req.user as User;
       const includeSandbox = req.query.includeSandbox === "true";
-      const clients = await storage.getUsersByRole("client");
-      const admins = await storage.getUsersByRole("admin");
-      const allUsers = [...clients, ...admins];
-      const filteredUsers = includeSandbox 
-        ? allUsers 
-        : allUsers.filter(u => !u.isSandbox);
-      res.json(filteredUsers.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role })));
+      const allClients = await storage.getUsersByRole("client");
+      const filtered = includeSandbox ? allClients : allClients.filter(u => !u.isSandbox);
+
+      if (caller.role === "admin") {
+        // Super-admins see every client
+        return res.json(filtered.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role })));
+      }
+
+      // Company users: scope to clients already attached to their company's projects
+      if (!caller.companyId) {
+        return res.json([]);
+      }
+      const companyProjects = await storage.getProjectsByCompanyId(caller.companyId);
+      const linkedClientIds = new Set(
+        companyProjects.map(p => p.clientId).filter(Boolean)
+      );
+      const companyClients = filtered.filter(u => linkedClientIds.has(u.id));
+      res.json(companyClients.map(u => ({ id: u.id, name: u.name, username: u.username, role: u.role })));
     } catch (error) {
       next(error);
     }

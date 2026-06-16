@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText, Mail, UserPlus, Plus, Trash2, GripVertical, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, FolderOpen, MapPin, Calendar, DollarSign, User, FileText, Mail, UserPlus, Plus, Trash2, GripVertical, Users, X, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
@@ -102,7 +102,7 @@ export default function NewProject() {
     dueDate: "",
   });
 
-  const [clientMode, setClientMode] = useState<"existing" | "invite">("existing");
+  const [clientMode, setClientMode] = useState<"existing" | "invite">("invite");
   const [inviteData, setInviteData] = useState({
     email: "",
     clientName: "",
@@ -248,7 +248,7 @@ export default function NewProject() {
         });
       }
       
-      setLocation("/contractor/dashboard");
+      setLocation(`/projects/${project.id}`);
     },
     onError: (error: Error) => {
       toast({
@@ -517,35 +517,15 @@ export default function NewProject() {
                 <CardContent className="space-y-4">
                   <Tabs value={clientMode} onValueChange={(v) => setClientMode(v as "existing" | "invite")}>
                     <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="existing" data-testid="tab-existing-client">
-                        <User className="w-4 h-4 mr-2" />
-                        Existing
-                      </TabsTrigger>
                       <TabsTrigger value="invite" data-testid="tab-invite-client">
                         <UserPlus className="w-4 h-4 mr-2" />
                         Invite New
                       </TabsTrigger>
+                      <TabsTrigger value="existing" data-testid="tab-existing-client">
+                        <User className="w-4 h-4 mr-2" />
+                        Existing
+                      </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="existing" className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="client">Select Client</Label>
-                        <Select value={formData.clientId} onValueChange={(v) => handleChange("clientId", v)}>
-                          <SelectTrigger data-testid="select-client">
-                            <SelectValue placeholder="Choose a client (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clients.map((client: { id: string; name: string; username: string }) => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name || client.username}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          You can assign a client later if needed
-                        </p>
-                      </div>
-                    </TabsContent>
                     <TabsContent value="invite" className="space-y-4 mt-4">
                       <div className="space-y-2">
                         <Label htmlFor="clientName">Client Name</Label>
@@ -573,6 +553,26 @@ export default function NewProject() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           An invitation will be sent after the project is created
+                        </p>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="existing" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="client">Select Client</Label>
+                        <Select value={formData.clientId} onValueChange={(v) => handleChange("clientId", v)}>
+                          <SelectTrigger data-testid="select-client">
+                            <SelectValue placeholder="Choose a client (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clients.map((client: { id: string; name: string; username: string }) => (
+                              <SelectItem key={client.id} value={client.id}>
+                                {client.name || client.username}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          You can assign a client later if needed
                         </p>
                       </div>
                     </TabsContent>
@@ -869,8 +869,17 @@ export default function NewProject() {
                 disabled={createProjectMutation.isPending}
                 data-testid="button-create-project"
               >
-                <Save className="w-4 h-4 mr-2" />
-                {createProjectMutation.isPending ? "Creating..." : "Create Project"}
+                {createProjectMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating Project...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Create Project
+                  </>
+                )}
               </Button>
             </div>
           </div>

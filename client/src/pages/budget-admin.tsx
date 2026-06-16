@@ -104,6 +104,8 @@ export default function BudgetAdmin() {
       apiRequest("PATCH", `${itemApiBase}/items/${item.id}`, item).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`${itemApiBase}/items`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/categories"] });
       toast({ title: "Item Updated", description: "The pricing has been saved." });
       setEditDialogOpen(false);
       setEditingItem(null);
@@ -122,6 +124,8 @@ export default function BudgetAdmin() {
       apiRequest("POST", `${itemApiBase}/items`, item).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`${itemApiBase}/items`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/categories"] });
       toast({ title: "Item Created", description: "New line item has been added." });
       setAddItemDialogOpen(false);
       setNewItem({
@@ -151,6 +155,8 @@ export default function BudgetAdmin() {
       apiRequest("POST", `${categoryApiBase}/categories`, { ...data, displayOrder: categories.length, isActive: true }).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`${categoryApiBase}/categories`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/categories"] });
       toast({ title: "Category Created", description: "New category has been added." });
       setAddCategoryDialogOpen(false);
       setNewCategory({ name: "", notes: "" });
@@ -164,6 +170,8 @@ export default function BudgetAdmin() {
     mutationFn: (id: string) => apiRequest("DELETE", `${itemApiBase}/items/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`${itemApiBase}/items`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calculator/categories"] });
       toast({ title: "Item Deleted", description: "The line item has been removed." });
     },
     onError: (error: Error) => {
