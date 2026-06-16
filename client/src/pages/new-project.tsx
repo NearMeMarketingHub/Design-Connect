@@ -88,20 +88,33 @@ export default function NewProject() {
   const [currentStep, setCurrentStep] = useState(1);
   const [fromEstimateId, setFromEstimateId] = useState<string | null>(null);
 
-  // Read ?fromEstimate query param on mount and pre-fill name + budget
+  // Read ?fromEstimate query param on mount and pre-fill name, budget, and clientId
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const estimateId = params.get("fromEstimate");
     if (!estimateId) return;
     setFromEstimateId(estimateId);
-    fetch(`/api/estimates/${estimateId}`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(est => {
+
+    Promise.all([
+      fetch(`/api/estimates/${estimateId}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null),
+      fetch("/api/users/clients", { credentials: "include" })
+        .then(r => r.ok ? r.json() : []),
+    ])
+      .then(([est, clients]) => {
         if (!est) return;
+        // Match client by name (case-insensitive)
+        const normalizedEstClient = (est.clientName ?? "").toLowerCase().trim();
+        const matchedClient = Array.isArray(clients)
+          ? clients.find((c: { id: string; name: string }) =>
+              (c.name ?? "").toLowerCase().trim() === normalizedEstClient
+            )
+          : null;
         setFormData(prev => ({
           ...prev,
           name: est.projectName ?? prev.name,
           budget: est.amount ? String(parseFloat(est.amount).toFixed(2)) : prev.budget,
+          clientId: matchedClient ? matchedClient.id : prev.clientId,
         }));
       })
       .catch(() => {});
@@ -271,7 +284,7 @@ export default function NewProject() {
       // If launched from the Estimator, link the estimate to the new project
       if (fromEstimateId) {
         try {
-          await fetch(`/api/estimates/${fromEstimateId}/link-project`, {
+          await fetch(`/api/estimates/${fromEstimateId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",

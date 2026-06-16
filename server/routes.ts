@@ -3017,15 +3017,21 @@ export async function registerRoutes(
     }
   });
 
-  // PATCH /api/estimates/:id/link-project — link an approved, unlinked estimate to a project.
-  // Owner/admin only. Returns 409 if already linked. Rejects null (no detach in this version).
-  app.patch("/api/estimates/:id/link-project", requireAuth, async (req, res, next) => {
+  // PATCH /api/estimates/:id — update linkable fields on a saved estimate.
+  // Currently supports: { projectId } to link an approved, unlinked estimate to a project.
+  // Owner/admin only. Returns 409 if already linked. Rejects null projectId (no detach in this version).
+  app.patch("/api/estimates/:id", requireAuth, async (req, res, next) => {
     try {
       const caller = req.user as User;
       const { projectId } = req.body;
 
-      // Reject null / missing — detach is not supported yet
-      if (projectId === null || projectId === undefined) {
+      // Currently the only supported field is projectId; reject unexpected payloads
+      if (projectId === undefined) {
+        return res.status(400).json({ message: "No updatable fields provided. Supported: projectId." });
+      }
+
+      // Reject null — detach is not supported yet
+      if (projectId === null) {
         return res.status(400).json({ message: "Detaching an estimate from a project is not supported in this version." });
       }
       if (typeof projectId !== "string" || !projectId.trim()) {
@@ -3048,6 +3054,11 @@ export async function registerRoutes(
       if (!estimate) return res.status(404).json({ message: "Estimate not found." });
       if (estimate.companyId !== caller.companyId) {
         return res.status(403).json({ message: "Access denied: estimate belongs to another company." });
+      }
+
+      // Estimate must be approved to be linked to a project
+      if (estimate.status !== "approved") {
+        return res.status(422).json({ message: "Only approved estimates can be linked to a project." });
       }
 
       // 409 if already linked — no silent overwrite

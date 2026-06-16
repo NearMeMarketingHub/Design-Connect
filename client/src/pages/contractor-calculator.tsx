@@ -489,7 +489,7 @@ export default function ContractorCalculator() {
 
   const linkEstimateMutation = useMutation({
     mutationFn: async ({ estimateId, projectId }: { estimateId: string; projectId: string }) => {
-      const res = await fetch(`/api/estimates/${estimateId}/link-project`, {
+      const res = await fetch(`/api/estimates/${estimateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -1237,27 +1237,33 @@ export default function ContractorCalculator() {
                           <div className="flex flex-col items-end gap-1">
                             {/* Project action area (approved estimates only, owners/admins only) */}
                             {est.status === "approved" && isOwnerOrAdmin && (
-                              est.projectId ? (
-                                <div className="flex items-center gap-1">
-                                  <span
-                                    className="inline-flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 rounded-full px-2 py-0.5 border border-green-200"
-                                    data-testid={`badge-linked-${est.id}`}
-                                  >
-                                    <Link2 className="w-3 h-3" />
-                                    Linked
-                                  </span>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    title="View linked project"
-                                    onClick={() => navigate(`/projects/${est.projectId}`)}
-                                    data-testid={`button-view-project-${est.id}`}
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </Button>
-                                </div>
-                              ) : (
+                              est.projectId ? (() => {
+                                const linkedName = projects.find(p => p.id === est.projectId)?.name;
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <span
+                                      className="inline-flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 rounded-full px-2 py-0.5 border border-green-200 max-w-[140px]"
+                                      title={linkedName ? `Linked: ${linkedName}` : "Linked to project"}
+                                      data-testid={`badge-linked-${est.id}`}
+                                    >
+                                      <Link2 className="w-3 h-3 flex-shrink-0" />
+                                      <span className="truncate">
+                                        {linkedName ? `Linked: ${linkedName}` : "Linked"}
+                                      </span>
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      title="View linked project"
+                                      onClick={() => navigate(`/projects/${est.projectId}`)}
+                                      data-testid={`button-view-project-${est.id}`}
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                );
+                              })() : (
                                 <div className="flex items-center gap-1">
                                   <Button
                                     variant="outline"
