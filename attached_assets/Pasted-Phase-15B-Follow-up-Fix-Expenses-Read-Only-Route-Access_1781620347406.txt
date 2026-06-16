@@ -1,0 +1,55 @@
+Phase 15B Follow-up — Fix Expenses Read-Only Route Access
+
+The Phase 15B expense tracking build mostly looks correct, but there is one mismatch between the approved access plan and the frontend route guard.
+
+Problem:
+The server allows regular internal contractors/team members to GET `/api/company/expenses` as read-only users, but the frontend route guard in `client/src/App.tsx` blocks regular internal contractors from accessing `/company/expenses`.
+
+Current behavior:
+
+* Backend GET `/api/company/expenses`: regular internal contractor can read.
+* Frontend `/company/expenses`: regular internal contractor is redirected because only `/company/estimates` is using the broader internal contractor access rule.
+
+Please fix this so `/company/expenses` uses the same read-only internal contractor access pattern intended by Phase 15B.
+
+Required behavior:
+
+* Company Owner: can access `/company/expenses`, can add/edit/delete.
+* Company Admin: can access `/company/expenses`, can add/edit/delete.
+* Regular internal contractor/team member with companyId and no contractorType: can access `/company/expenses` read-only.
+* Client: blocked.
+* Subcontractor: blocked.
+* Notary: blocked.
+* Super Admin without companyId: blocked.
+
+Keep the existing Expenses page behavior:
+
+* Regular internal contractors should not see Add Expense.
+* Regular internal contractors should not see Edit/Delete actions.
+* Write actions must remain blocked server-side.
+
+Optional backend cleanup:
+
+* Validate `paymentMethod` against `EXPENSE_PAYMENT_METHODS` if provided.
+* Validate `expenseDate` as a real valid date, not just YYYY-MM-DD format.
+
+Do not change:
+
+* schema, unless needed for the optional validation cleanup.
+* db:push.
+* estimator calculations.
+* invoice calculations.
+* project budget calculations.
+* company branding.
+* estimate PDF behavior.
+* receipt upload behavior.
+* overhead, commission, payout, Stripe, or production sheet logic.
+
+Done looks like:
+
+* `/company/expenses` is reachable by regular internal contractors in read-only mode.
+* Add/Edit/Delete remain hidden for regular internal contractors.
+* Server write routes still block regular internal contractors.
+* Company Owner and Company Admin expense CRUD still works.
+* Clients, subcontractors, notaries, and Super Admins without companyId remain blocked.
+* npm run check passes.
