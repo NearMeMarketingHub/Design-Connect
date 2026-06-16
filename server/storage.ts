@@ -99,6 +99,7 @@ export interface IStorage {
   getEstimate(id: string): Promise<Estimate | undefined>;
   createEstimate(estimate: InsertEstimate): Promise<Estimate>;
   updateEstimateStatus(id: string, status: string): Promise<Estimate>;
+  updateEstimateProjectId(id: string, projectId: string): Promise<Estimate>;
   getEstimateLineItems(estimateId: string): Promise<EstimateLineItem[]>;
   createEstimateLineItem(lineItem: InsertEstimateLineItem): Promise<EstimateLineItem>;
   
@@ -594,6 +595,16 @@ export class DatabaseStorage implements IStorage {
       .set({ status })
       .where(eq(schema.estimates.id, id))
       .returning();
+    return updated;
+  }
+
+  async updateEstimateProjectId(id: string, projectId: string): Promise<Estimate> {
+    const [updated] = await db
+      .update(schema.estimates)
+      .set({ projectId })
+      .where(eq(schema.estimates.id, id))
+      .returning();
+    if (!updated) throw new Error("Estimate not found");
     return updated;
   }
 

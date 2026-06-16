@@ -3017,6 +3017,58 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/estimates/:id/link-project — link an approved, unlinked estimate to a project.
+  // Owner/admin only. Returns 409 if already linked. Rejects null (no detach in this version).
+  app.patch("/api/estimates/:id/link-project", requireAuth, async (req, res, next) => {
+    try {
+      const caller = req.user as User;
+      const { projectId } = req.body;
+
+      // Reject null / missing — detach is not supported yet
+      if (projectId === null || projectId === undefined) {
+        return res.status(400).json({ message: "Detaching an estimate from a project is not supported in this version." });
+      }
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return res.status(400).json({ message: "projectId must be a non-empty string." });
+      }
+
+      // Must belong to a company
+      if (!caller.companyId) {
+        return res.status(403).json({ message: "Access denied: no company associated with your account." });
+      }
+
+      // Owner or company admin only
+      const isOwnerOrAdmin = caller.role === "company_owner" || caller.isCompanyAdmin === true;
+      if (!isOwnerOrAdmin) {
+        return res.status(403).json({ message: "Access denied: only company owners and admins can link estimates to projects." });
+      }
+
+      // Estimate must exist and belong to caller's company
+      const estimate = await storage.getEstimate(req.params.id);
+      if (!estimate) return res.status(404).json({ message: "Estimate not found." });
+      if (estimate.companyId !== caller.companyId) {
+        return res.status(403).json({ message: "Access denied: estimate belongs to another company." });
+      }
+
+      // 409 if already linked — no silent overwrite
+      if (estimate.projectId) {
+        return res.status(409).json({ message: "Estimate is already linked to a project." });
+      }
+
+      // Target project must belong to caller's company (via getProjectsByCompanyId for consistency)
+      const companyProjects = await storage.getProjectsByCompanyId(caller.companyId);
+      const projectBelongsToCompany = companyProjects.some(p => p.id === projectId);
+      if (!projectBelongsToCompany) {
+        return res.status(403).json({ message: "Access denied: project belongs to another company." });
+      }
+
+      const updated = await storage.updateEstimateProjectId(req.params.id, projectId);
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/estimates", requireAuth, requireEstimateAccess, requireActiveSubscription, async (req, res, next) => {
     try {
       // Strip companyId from request body — always derived server-side

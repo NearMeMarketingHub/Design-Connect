@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useConfirm } from "@/hooks/use-confirm";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -46,6 +48,9 @@ import {
   Loader2,
   Download,
   Info,
+  Link2,
+  FolderOpen,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
@@ -404,6 +409,10 @@ function renderEstimatePdf(
 export default function ContractorCalculator() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+  const { user } = useAuth();
+
+  const isOwnerOrAdmin = user?.role === "company_owner" || user?.isCompanyAdmin === true;
 
   const [activeTab, setActiveTab] = useState<"calculator" | "estimates">("calculator");
   const [searchQuery, setSearchQuery] = useState("");
@@ -422,6 +431,11 @@ export default function ContractorCalculator() {
   // Track when an estimate is loaded from the Estimates tab
   // savedCustomId stays null until user explicitly saves a new copy
   const [loadedFromId, setLoadedFromId] = useState<string | null>(null);
+
+  // Attach-to-project dialog state
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [attachingEstimateId, setAttachingEstimateId] = useState<string | null>(null);
+  const [projectSearch, setProjectSearch] = useState("");
 
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -461,6 +475,49 @@ export default function ContractorCalculator() {
     },
     staleTime: 1000 * 60 * 5,
   });
+
+  const { data: projects = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/projects"],
+    queryFn: async () => {
+      const res = await fetch("/api/projects", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isOwnerOrAdmin,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const linkEstimateMutation = useMutation({
+    mutationFn: async ({ estimateId, projectId }: { estimateId: string; projectId: string }) => {
+      const res = await fetch(`/api/estimates/${estimateId}/link-project`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Link failed" }));
+        throw new Error(err.message || "Link failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      setAttachDialogOpen(false);
+      setAttachingEstimateId(null);
+      setProjectSearch("");
+      toast({ title: "Estimate linked", description: "The estimate has been linked to the project." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Link failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenAttachDialog = (estimateId: string) => {
+    setAttachingEstimateId(estimateId);
+    setProjectSearch("");
+    setAttachDialogOpen(true);
+  };
 
   const activeCategories = categories.filter(c => c.isActive).sort((a, b) => a.displayOrder - b.displayOrder);
   const activeItems = allItems.filter(i => i.isActive);
@@ -1177,25 +1234,75 @@ export default function ContractorCalculator() {
                           </Select>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleLoadEstimate(est.id, est.customId)}
-                              data-testid={`button-load-estimate-${est.id}`}
-                            >
-                              Load
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleExportPdfFromEstimate(est.id)}
-                              data-testid={`button-export-estimate-${est.id}`}
-                              title="Export PDF"
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
+                          <div className="flex flex-col items-end gap-1">
+                            {/* Project action area (approved estimates only, owners/admins only) */}
+                            {est.status === "approved" && isOwnerOrAdmin && (
+                              est.projectId ? (
+                                <div className="flex items-center gap-1">
+                                  <span
+                                    className="inline-flex items-center gap-1 text-xs font-medium bg-green-100 text-green-700 rounded-full px-2 py-0.5 border border-green-200"
+                                    data-testid={`badge-linked-${est.id}`}
+                                  >
+                                    <Link2 className="w-3 h-3" />
+                                    Linked
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    title="View linked project"
+                                    onClick={() => navigate(`/projects/${est.projectId}`)}
+                                    data-testid={`button-view-project-${est.id}`}
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs px-2"
+                                    onClick={() => navigate(`/new-project?fromEstimate=${est.id}`)}
+                                    data-testid={`button-create-project-${est.id}`}
+                                  >
+                                    <FolderOpen className="w-3 h-3 mr-1" />
+                                    Create Project
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs px-2"
+                                    onClick={() => handleOpenAttachDialog(est.id)}
+                                    data-testid={`button-attach-project-${est.id}`}
+                                  >
+                                    <Link2 className="w-3 h-3 mr-1" />
+                                    Attach
+                                  </Button>
+                                </div>
+                              )
+                            )}
+                            {/* Standard actions: Load + Export PDF */}
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleLoadEstimate(est.id, est.customId)}
+                                data-testid={`button-load-estimate-${est.id}`}
+                              >
+                                Load
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleExportPdfFromEstimate(est.id)}
+                                data-testid={`button-export-estimate-${est.id}`}
+                                title="Export PDF"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1272,6 +1379,59 @@ export default function ContractorCalculator() {
                 ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
                 : saveButtonLabel
               }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Attach-to-Project dialog */}
+      <Dialog open={attachDialogOpen} onOpenChange={(open) => {
+        setAttachDialogOpen(open);
+        if (!open) { setAttachingEstimateId(null); setProjectSearch(""); }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Attach Estimate to Project</DialogTitle>
+            <DialogDescription>
+              Select an existing project to link this estimate to. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search projects…"
+                value={projectSearch}
+                onChange={e => setProjectSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-attach-search"
+              />
+            </div>
+            <div className="border rounded-md max-h-60 overflow-y-auto">
+              {projects.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No projects found.</p>
+              ) : (
+                projects
+                  .filter(p => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+                  .map(p => (
+                    <button
+                      key={p.id}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted/50 border-b last:border-0 transition-colors"
+                      onClick={() => {
+                        if (!attachingEstimateId) return;
+                        linkEstimateMutation.mutate({ estimateId: attachingEstimateId, projectId: p.id });
+                      }}
+                      data-testid={`button-select-project-${p.id}`}
+                    >
+                      {p.name}
+                    </button>
+                  ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAttachDialogOpen(false)} data-testid="button-cancel-attach">
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

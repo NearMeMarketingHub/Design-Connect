@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,6 +86,26 @@ export default function NewProject() {
   const queryClient = useQueryClient();
 
   const [currentStep, setCurrentStep] = useState(1);
+  const [fromEstimateId, setFromEstimateId] = useState<string | null>(null);
+
+  // Read ?fromEstimate query param on mount and pre-fill name + budget
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const estimateId = params.get("fromEstimate");
+    if (!estimateId) return;
+    setFromEstimateId(estimateId);
+    fetch(`/api/estimates/${estimateId}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(est => {
+        if (!est) return;
+        setFormData(prev => ({
+          ...prev,
+          name: est.projectName ?? prev.name,
+          budget: est.amount ? String(parseFloat(est.amount).toFixed(2)) : prev.budget,
+        }));
+      })
+      .catch(() => {});
+  }, []);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -248,6 +268,20 @@ export default function NewProject() {
         });
       }
       
+      // If launched from the Estimator, link the estimate to the new project
+      if (fromEstimateId) {
+        try {
+          await fetch(`/api/estimates/${fromEstimateId}/link-project`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ projectId: project.id }),
+          });
+        } catch (linkError) {
+          console.error("Failed to link estimate to project:", linkError);
+        }
+      }
+
       setLocation(`/projects/${project.id}`);
     },
     onError: (error: Error) => {
