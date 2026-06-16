@@ -817,8 +817,8 @@ export async function registerRoutes(
     const data = parsed.data;
 
     if (data.projectId) {
-      const project = await storage.getProject(data.projectId);
-      if (!project || project.companyId !== user.companyId) {
+      const companyProjects = await storage.getProjectsByCompanyId(user.companyId);
+      if (!companyProjects.some((p) => p.id === data.projectId)) {
         return res.status(403).json({ message: "Project not found or does not belong to your company" });
       }
     }
@@ -881,8 +881,8 @@ export async function registerRoutes(
     const data = parsed.data;
 
     if (data.projectId) {
-      const project = await storage.getProject(data.projectId);
-      if (!project || project.companyId !== user.companyId) {
+      const companyProjects = await storage.getProjectsByCompanyId(user.companyId);
+      if (!companyProjects.some((p) => p.id === data.projectId)) {
         return res.status(403).json({ message: "Project not found or does not belong to your company" });
       }
     }
