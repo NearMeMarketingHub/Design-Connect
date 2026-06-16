@@ -7884,6 +7884,27 @@ export async function registerRoutes(
     return user.companyId;
   };
 
+  // GET /api/projects/:projectId/expenses
+  // Returns expenses scoped to a specific project. Same access rules as /api/company/expenses.
+  // Blocked: clients, subcontractors, notaries, and users without a companyId.
+  app.get("/api/projects/:projectId/expenses", requireAuth, async (req: any, res: any) => {
+    const { user, allowed } = expenseReadAccess(req, res);
+    if (!allowed) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      const contractor = project.contractorId ? await storage.getUser(project.contractorId) : null;
+      if (!contractor || contractor.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const rows = await storage.getExpenses(user.companyId, { projectId: req.params.projectId });
+      return res.json(rows);
+    } catch (err) {
+      console.error("[project-expenses:GET]", err);
+      return res.status(500).json({ message: "Failed to load project expenses" });
+    }
+  });
+
   // GET /api/projects/:projectId/budget
   // Returns { budget, items } or null. Allowed: admin, company_owner, company admin, internal contractor.
   // Blocked: clients, subcontractors, notaries (requireEstimateAccess). Suspended companies blocked (requireActiveSubscription).

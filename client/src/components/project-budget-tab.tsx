@@ -33,6 +33,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -153,6 +159,11 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
   const queryClient = useQueryClient();
 
   const [selectedEstimateId, setSelectedEstimateId] = useState<string>("");
+  const [showEstimateFlow, setShowEstimateFlow] = useState(false);
+
+  const [createEmptyDialogOpen, setCreateEmptyDialogOpen] = useState(false);
+  const [emptyBudgetTitle, setEmptyBudgetTitle] = useState("");
+  const [emptyBudgetNotes, setEmptyBudgetNotes] = useState("");
 
   const [editBudgetOpen, setEditBudgetOpen] = useState(false);
   const [editBudgetTitle, setEditBudgetTitle] = useState("");
@@ -199,6 +210,8 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
       return 0;
     });
 
+  const approvedEstimates = projectEstimates.filter((e) => e.status === "approved");
+
   const invalidateBudget = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget"] });
     queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
@@ -217,7 +230,28 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
     onSuccess: () => {
       invalidateBudget();
       setSelectedEstimateId("");
+      setShowEstimateFlow(false);
       toast({ title: "Budget created", description: "Project budget created from estimate." });
+    },
+    onError: (err: unknown) => {
+      toast({ title: "Could not create budget", description: parseErrorMessage(err), variant: "destructive" });
+    },
+  });
+
+  const createEmptyBudgetMutation = useMutation({
+    mutationFn: async ({ title, notes }: { title: string; notes: string }) => {
+      const res = await apiRequest("POST", `/api/projects/${projectId}/budget`, {
+        title: title.trim(),
+        notes: notes.trim() || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateBudget();
+      setCreateEmptyDialogOpen(false);
+      setEmptyBudgetTitle("");
+      setEmptyBudgetNotes("");
+      toast({ title: "Budget created", description: "Empty project budget created." });
     },
     onError: (err: unknown) => {
       toast({ title: "Could not create budget", description: parseErrorMessage(err), variant: "destructive" });
@@ -396,65 +430,163 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
 
   if (!budgetResult) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="p-4 bg-muted rounded-full">
-              <DollarSign className="h-8 w-8 text-muted-foreground" />
+      <>
+        <Card>
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="p-4 bg-muted rounded-full">
+                <DollarSign className="h-8 w-8 text-muted-foreground" />
+              </div>
             </div>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold">No project budget yet.</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Create a budget from an approved estimate to start tracking planned project costs.
-            </p>
-          </div>
+            <div>
+              <h3 className="text-lg font-semibold">No project budget yet.</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                Start tracking project costs by creating a budget from an approved estimate, or create an empty budget and add line items manually.
+              </p>
+            </div>
 
-          {canWrite && (
-            <div className="pt-2 max-w-sm mx-auto space-y-3">
-              {estimatesLoading ? (
-                <div className="h-9 bg-muted rounded animate-pulse" />
-              ) : projectEstimates.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">
-                  No estimates available for this project yet.
+            {canWrite && (
+              <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center items-center max-w-md mx-auto">
+                {estimatesLoading ? (
+                  <div className="h-9 bg-muted rounded animate-pulse w-48" />
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            variant="outline"
+                            disabled={approvedEstimates.length === 0 || createBudgetMutation.isPending}
+                            onClick={() => setShowEstimateFlow((v) => !v)}
+                            data-testid="button-create-budget-from-estimate"
+                          >
+                            <FileText className="h-4 w-4 mr-1.5" />
+                            Create from Estimate
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {approvedEstimates.length === 0 && (
+                        <TooltipContent>
+                          No approved estimates linked to this project yet.
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                <Button
+                  onClick={() => {
+                    setEmptyBudgetTitle("");
+                    setEmptyBudgetNotes("");
+                    setCreateEmptyDialogOpen(true);
+                  }}
+                  disabled={createEmptyBudgetMutation.isPending}
+                  data-testid="button-create-empty-budget"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Create Empty Budget
+                </Button>
+              </div>
+            )}
+
+            {canWrite && showEstimateFlow && approvedEstimates.length > 0 && (
+              <div className="pt-2 max-w-sm mx-auto space-y-3">
+                <Select
+                  value={selectedEstimateId}
+                  onValueChange={setSelectedEstimateId}
+                >
+                  <SelectTrigger data-testid="select-source-estimate">
+                    <SelectValue placeholder="Select an approved estimate…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {approvedEstimates.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        <span className="flex items-center gap-2">
+                          {e.projectName || e.customId}
+                          <span className="text-xs text-muted-foreground">({e.status})</span>
+                          <span className="text-xs font-medium">{formatCurrency(e.amount)}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  className="w-full"
+                  disabled={!selectedEstimateId || createBudgetMutation.isPending}
+                  onClick={() => {
+                    if (selectedEstimateId) createBudgetMutation.mutate(selectedEstimateId);
+                  }}
+                  data-testid="button-confirm-create-from-estimate"
+                >
+                  {createBudgetMutation.isPending ? "Creating…" : "Create Budget from Estimate"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Create Empty Budget Dialog */}
+        <Dialog open={createEmptyDialogOpen} onOpenChange={setCreateEmptyDialogOpen}>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-create-empty-budget">
+            <DialogHeader>
+              <DialogTitle>Create Empty Budget</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="empty-budget-title">
+                  Title <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="empty-budget-title"
+                  value={emptyBudgetTitle}
+                  onChange={(e) => setEmptyBudgetTitle(e.target.value.slice(0, 120))}
+                  placeholder="e.g. Kitchen Renovation Budget"
+                  maxLength={120}
+                  data-testid="input-empty-budget-title"
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {emptyBudgetTitle.length}/120
                 </p>
-              ) : (
-                <>
-                  <Select
-                    value={selectedEstimateId}
-                    onValueChange={setSelectedEstimateId}
-                  >
-                    <SelectTrigger data-testid="select-source-estimate">
-                      <SelectValue placeholder="Select an estimate…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projectEstimates.map((e) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          <span className="flex items-center gap-2">
-                            {e.projectName || e.customId}
-                            <span className="text-xs text-muted-foreground">({e.status})</span>
-                            <span className="text-xs font-medium">{formatCurrency(e.amount)}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    className="w-full"
-                    disabled={!selectedEstimateId || createBudgetMutation.isPending}
-                    onClick={() => {
-                      if (selectedEstimateId) createBudgetMutation.mutate(selectedEstimateId);
-                    }}
-                    data-testid="button-create-budget"
-                  >
-                    {createBudgetMutation.isPending ? "Creating…" : "Create Budget from Estimate"}
-                  </Button>
-                </>
-              )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="empty-budget-notes">
+                  Notes <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <Textarea
+                  id="empty-budget-notes"
+                  value={emptyBudgetNotes}
+                  onChange={(e) => setEmptyBudgetNotes(e.target.value)}
+                  placeholder="Optional notes about this budget…"
+                  rows={3}
+                  data-testid="textarea-empty-budget-notes"
+                />
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCreateEmptyDialogOpen(false)}
+                disabled={createEmptyBudgetMutation.isPending}
+                data-testid="button-cancel-empty-budget"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() =>
+                  createEmptyBudgetMutation.mutate({
+                    title: emptyBudgetTitle,
+                    notes: emptyBudgetNotes,
+                  })
+                }
+                disabled={createEmptyBudgetMutation.isPending || !emptyBudgetTitle.trim()}
+                data-testid="button-confirm-empty-budget"
+              >
+                {createEmptyBudgetMutation.isPending ? "Creating…" : "Create Budget"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 

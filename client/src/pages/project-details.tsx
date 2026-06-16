@@ -18,6 +18,7 @@ import ImageViewerModal from "@/components/image-viewer-modal";
 import DocumentViewerModal from "@/components/document-viewer-modal";
 import SendForSignatureDialog from "@/components/send-for-signature-dialog";
 import ProjectBudgetTab from "@/components/project-budget-tab";
+import ProjectExpensesTab from "@/components/project-expenses-tab";
 import { 
   ArrowLeft,
   Calendar,
@@ -3109,6 +3110,15 @@ export default function ProjectDetails() {
               Budget
             </TabsTrigger>
           )}
+          {canViewBudget && (
+            <TabsTrigger
+              value="expenses"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-expenses"
+            >
+              Expenses
+            </TabsTrigger>
+          )}
           <TabsTrigger 
             value="action-center"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 pr-6 whitespace-nowrap transition-colors relative overflow-visible"
@@ -5597,6 +5607,13 @@ export default function ProjectDetails() {
           {canViewBudget && (
             <TabsContent value="budget" className="mt-6">
               <ProjectBudgetTab projectId={projectId} canWrite={canBudgetWrite} />
+            </TabsContent>
+          )}
+
+          {/* EXPENSES TAB */}
+          {canViewBudget && (
+            <TabsContent value="expenses" className="mt-6">
+              <ProjectExpensesTab projectId={projectId} canWrite={canBudgetWrite} />
             </TabsContent>
           )}
 
