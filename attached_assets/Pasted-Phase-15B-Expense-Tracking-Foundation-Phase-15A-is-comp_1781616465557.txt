@@ -1,0 +1,99 @@
+Phase 15B — Expense Tracking Foundation
+
+Phase 15A is complete and accepted as an audit-only phase. Do not build anything from Phase 15A. Do not continue or implement the Phase 15A audit response.
+
+We are now starting a new planning step for Phase 15B.
+
+Important:
+This is Plan Mode first. Do not make code changes yet. Return a detailed implementation plan only.
+
+Goal:
+Add a company-scoped and project-aware expense tracking foundation so contractors can record real job expenses against projects. This should be an additive feature that does not change existing estimator, invoice, project budget, payment, overhead, commission, payout, or reporting calculations yet.
+
+Core feature:
+Company Owners and Company Admins should be able to create, view, edit, and delete expense records for their company. Expenses may optionally be linked to a project.
+
+Expense records should support fields like:
+
+* companyId
+* projectId, nullable
+* vendorName
+* category
+* description
+* amount
+* expenseDate
+* paymentMethod, optional
+* receiptUrl or receiptFile, optional if the app already has an upload/document pattern
+* status, such as pending, approved, reimbursed, rejected, or paid
+* notes
+* createdBy
+* createdAt
+* updatedAt
+
+Access rules:
+
+* Super Admin should not be mixed into company expense workflows unless existing patterns require it.
+* Company Owner and Company Admin can manage expenses for their own company.
+* Regular internal contractors/team members may view or create expenses only if this matches existing company member permissions; if unsure, propose the safest role split before building.
+* Clients must not see internal company expense records.
+* Subcontractors, notaries, and unrelated users must not access company expenses.
+* All routes must enforce company/project scoping server-side.
+
+UI:
+Add an Expenses area in the company-side financial tools, likely linked from the Financial Management Hub.
+
+Include:
+
+* Expense list/table
+* Create expense form
+* Edit expense form/dialog
+* Delete confirmation
+* Filters for project, category, status, date range if reasonable
+* Basic totals, such as total expenses in the current filtered view
+* Empty state
+
+Backend:
+Plan the schema/table needed for expenses.
+
+Plan routes for:
+
+* GET company expenses
+* POST create expense
+* PATCH update expense
+* DELETE expense
+* Optional project-specific expense list if useful
+
+Important guardrails:
+
+* Do not modify existing estimate calculations.
+* Do not modify invoice calculations.
+* Do not modify project budget calculations yet.
+* Do not populate unitCostActual yet.
+* Do not link expenses to project_budget_items yet.
+* Do not add overhead formulas.
+* Do not add commission or payout logic.
+* Do not add Stripe/billing logic.
+* Do not change company branding.
+* Do not change estimate PDF behavior.
+* Do not change existing access control except as needed for the new expense routes.
+* Do not create production sheet/daily log features yet.
+
+Plan should include:
+
+* Exact files likely to be touched.
+* Exact schema additions proposed.
+* Exact API routes proposed.
+* Access-control approach.
+* UI placement.
+* Migration/db push requirement.
+* Any risks.
+* How to test.
+* Whether npm run check and db:push will be needed after approval.
+
+Done for the future build should look like:
+
+* Company-side users can record expenses.
+* Expenses are company-scoped and optionally project-scoped.
+* Clients and unrelated users cannot see expenses.
+* Existing estimator, invoice, budget, branding, and PDF behavior remains unchanged.
+* No overhead/profitability formulas are introduced yet.

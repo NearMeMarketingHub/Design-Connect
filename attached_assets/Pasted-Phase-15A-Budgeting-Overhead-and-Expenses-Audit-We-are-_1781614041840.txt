@@ -1,0 +1,80 @@
+Phase 15A — Budgeting, Overhead, and Expenses Audit
+
+We are skipping Stripe/Billing work for now because Stripe access is not ready yet.
+
+Do not build new budgeting or financial formulas yet. This phase is an audit/planning phase only.
+
+Goal:
+Audit the current company-side financial, budgeting, invoice, estimator, and expense-related structure so we can safely plan the next budgeting/overhead/expenses phase without guessing formulas or breaking existing company-scoped financial tools.
+
+Important:
+This phase should not implement new budget formulas, commission logic, overhead calculations, payout rules, or production sheet behavior yet. We need to understand what already exists first.
+
+Inspect current code/data flow for:
+
+* Budget Manager
+* Financial Management
+* Sales Dashboard
+* Estimator Calculator
+* Saved estimates
+* Invoices
+* Company dashboard financial sections
+* Project-level financial fields
+* Any expense-related fields, tables, routes, or UI
+* Any existing profit, margin, cost, labor, materials, markup, subtotal, or total calculations
+
+Audit questions:
+
+1. What financial/budgeting features already exist?
+2. What tables/fields currently store estimate, invoice, budget, expense, labor, material, markup, margin, or payment data?
+3. Which calculations are already being performed?
+4. Which pages/components display financial data?
+5. Which backend routes create/update/read financial data?
+6. Which financial data is company-scoped?
+7. Which financial data is project-scoped?
+8. Are there any unsafe cross-company access risks?
+9. Are there duplicate or overlapping financial concepts that should be consolidated later?
+10. What gaps exist before building proper budgeting, overhead, expenses, and production sheet features?
+
+Guardrails:
+
+* Do not change schema.
+* Do not run db:push.
+* Do not change calculations.
+* Do not add new formulas.
+* Do not add commission/payout/overhead logic.
+* Do not add Stripe or billing logic.
+* Do not modify access control.
+* Do not change invoice behavior.
+* Do not change estimator save/load behavior.
+* Do not change company branding or estimate PDF behavior.
+* Do not remove existing financial features.
+* Do not guess business rules.
+
+Output needed:
+
+* List all relevant files/components/routes/tables inspected.
+* Summarize the current financial/budgeting system.
+* Identify what already works.
+* Identify duplicated or confusing financial concepts.
+* Identify missing data needed for future budgeting/overhead/expense tracking.
+* Recommend the safest next implementation phases after this audit.
+
+Future phases should likely be split into smaller pieces, such as:
+
+* Expense tracking foundation
+* Project budget structure
+* Overhead settings
+* Estimate-to-budget connection
+* Invoice/payment tracking connection
+* Production sheet planning
+* Reports/profitability planning
+
+Done looks like:
+
+* No app behavior changes.
+* No schema changes.
+* No db push.
+* A clear written audit of the current financial/budgeting system.
+* A recommended next-phase plan for budgeting, overhead, and expenses.
+* npm run check passes if any files were touched, but ideally this phase should not require code changes.

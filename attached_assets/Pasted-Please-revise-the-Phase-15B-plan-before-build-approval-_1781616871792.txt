@@ -1,0 +1,76 @@
+Please revise the Phase 15B plan before build approval.
+
+The overall direction is good, but do not build it yet. Please revise the plan with these changes:
+
+1. Receipt upload should be deferred or handled safely
+
+The plan says `/api/uploads/file` currently has no authentication check and is open. Do not build expense receipt upload on top of an unauthenticated upload route.
+
+For Phase 15B, either:
+
+* defer receipt upload entirely and keep `receiptUrl` nullable for later,
+* or support only a manually entered optional receipt URL/path with no file upload UI,
+* or propose a separate future security phase to add authenticated upload handling before receipts are enabled.
+
+Do not modify the existing upload route in this phase unless explicitly approved separately.
+
+2. Clarify Super Admin access
+
+Do not mix Super Admin into normal company expense workflows.
+
+Expense routes should be scoped to the signed-in user’s company. If a Super Admin does not have a companyId in the normal company workflow, they should not access `/api/company/expenses`.
+
+Allowed company-side access should be:
+
+* Company Owner: read/write
+* Company Admin: read/write
+* Regular internal contractor/team member: read-only only if this matches the existing company financial read pattern
+* Client: no access
+* Subcontractor: no access
+* Notary: no access
+* Unrelated user: no access
+
+3. Keep project-specific expense route out of scope unless needed
+
+Do not add `GET /api/projects/:projectId/expenses` in Phase 15B unless the new UI actually uses it.
+
+For this first build, prefer:
+
+* `GET /api/company/expenses?projectId=...`
+
+That keeps the API smaller and avoids extra project-route access-control complexity.
+
+4. Keep Phase 15B additive
+
+Do not change:
+
+* estimator calculations
+* invoice calculations
+* project budget calculations
+* `project_budget_items.unitCostActual`
+* overhead formulas
+* commission or payout logic
+* production sheet/daily log features
+* Stripe/billing logic
+* company branding
+* estimate PDF behavior
+
+5. Update test account wording
+
+Use the current Near Me Construct demo accounts/test roles in the testing instructions. Do not rely on old buildvision-specific test usernames unless those are still the actual active test accounts.
+
+6. Plan Mode reminder
+
+This is still Plan Mode. Do not make code changes or run db:push until the revised plan is approved and Build Mode starts.
+
+Please return the revised Phase 15B implementation plan with:
+
+* exact files to touch
+* exact schema addition
+* exact API routes
+* access-control approach
+* UI placement
+* whether receipt upload is deferred
+* db:push requirement after approval
+* risks
+* test plan
