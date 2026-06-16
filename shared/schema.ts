@@ -913,3 +913,34 @@ export const projectBudgetItems = pgTable("project_budget_items", {
 export const insertProjectBudgetItemSchema = createInsertSchema(projectBudgetItems).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertProjectBudgetItem = z.infer<typeof insertProjectBudgetItemSchema>;
 export type ProjectBudgetItem = typeof projectBudgetItems.$inferSelect;
+
+// Expenses — company-scoped job cost tracking
+export const EXPENSE_STATUSES = ["pending", "approved", "reimbursed", "rejected", "paid"] as const;
+export type ExpenseStatus = typeof EXPENSE_STATUSES[number];
+
+export const EXPENSE_PAYMENT_METHODS = ["cash", "check", "card", "transfer", "other"] as const;
+
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  vendorName: text("vendor_name"),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  amount: numeric("amount").notNull(),
+  expenseDate: text("expense_date").notNull(),
+  paymentMethod: text("payment_method"),
+  receiptUrl: text("receipt_url"),
+  status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdByName: text("created_by_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;

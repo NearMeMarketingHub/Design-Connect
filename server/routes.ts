@@ -744,6 +744,182 @@ export async function registerRoutes(
     }
   });
 
+  // ── Expense Routes ────────────────────────────────────────────────────────────
+  // Access control:
+  //   READ  — company_owner, isCompanyAdmin contractor, regular internal contractor
+  //           (contractorType=null, companyId set)
+  //   WRITE — company_owner, isCompanyAdmin contractor only
+  //   BLOCKED always — client, subcontractor, notary, any user with no companyId
+  //                    (includes Super Admin whose role='admin' but has no companyId)
+
+  function expenseReadAccess(req: any, res: any): { user: any; allowed: boolean } {
+    const user = req.user as any;
+    if (!user.companyId) return { user, allowed: false };
+    if (user.role === "client") return { user, allowed: false };
+    if (user.contractorType === "subcontractor" || user.contractorType === "notary") return { user, allowed: false };
+    const isOwner = user.role === "company_owner";
+    const isAdmin = user.isCompanyAdmin === true && user.role === "contractor";
+    const isInternalMember = user.role === "contractor" && !user.contractorType && !!user.companyId;
+    return { user, allowed: isOwner || isAdmin || isInternalMember };
+  }
+
+  function expenseWriteAccess(req: any, res: any): { user: any; allowed: boolean } {
+    const user = req.user as any;
+    if (!user.companyId) return { user, allowed: false };
+    if (user.role === "client") return { user, allowed: false };
+    if (user.contractorType === "subcontractor" || user.contractorType === "notary") return { user, allowed: false };
+    const isOwner = user.role === "company_owner";
+    const isAdmin = user.isCompanyAdmin === true && user.role === "contractor";
+    return { user, allowed: isOwner || isAdmin };
+  }
+
+  app.get("/api/company/expenses", requireAuth, async (req: any, res: any) => {
+    const { user, allowed } = expenseReadAccess(req, res);
+    if (!allowed) return res.status(403).json({ message: "Forbidden" });
+    const { projectId, category, status, dateFrom, dateTo } = req.query as Record<string, string | undefined>;
+    try {
+      const rows = await storage.getExpenses(user.companyId, {
+        projectId: projectId || undefined,
+        category: category || undefined,
+        status: status || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      return res.json(rows);
+    } catch (err) {
+      console.error("[expenses:GET]", err);
+      return res.status(500).json({ message: "Failed to load expenses" });
+    }
+  });
+
+  app.post("/api/company/expenses", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const { user, allowed } = expenseWriteAccess(req, res);
+    if (!allowed) return res.status(403).json({ message: "Forbidden" });
+
+    const bodySchema = z.object({
+      category: z.string().min(1, "Category is required"),
+      description: z.string().min(1, "Description is required"),
+      amount: z.string().refine((v) => isFinite(parseFloat(v)) && parseFloat(v) > 0, "Amount must be a positive number"),
+      expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+      vendorName: z.string().optional().nullable(),
+      projectId: z.string().optional().nullable(),
+      paymentMethod: z.string().optional().nullable(),
+      status: z.string().optional(),
+      notes: z.string().optional().nullable(),
+      receiptUrl: z.string().optional().nullable(),
+    });
+
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+
+    const data = parsed.data;
+
+    if (data.projectId) {
+      const project = await storage.getProject(data.projectId);
+      if (!project || project.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Project not found or does not belong to your company" });
+      }
+    }
+
+    const { EXPENSE_STATUSES } = await import("@shared/schema");
+    const statusVal = data.status ?? "pending";
+    if (!EXPENSE_STATUSES.includes(statusVal as any)) {
+      return res.status(400).json({ message: `Invalid status: ${statusVal}` });
+    }
+
+    try {
+      const expense = await storage.createExpense({
+        companyId: user.companyId,
+        projectId: data.projectId ?? null,
+        vendorName: data.vendorName ?? null,
+        category: data.category,
+        description: data.description,
+        amount: data.amount,
+        expenseDate: data.expenseDate,
+        paymentMethod: data.paymentMethod ?? null,
+        receiptUrl: data.receiptUrl ?? null,
+        status: statusVal,
+        notes: data.notes ?? null,
+        createdById: user.id,
+        createdByName: user.name ?? user.username,
+      });
+      return res.status(201).json(expense);
+    } catch (err) {
+      console.error("[expenses:POST]", err);
+      return res.status(500).json({ message: "Failed to create expense" });
+    }
+  });
+
+  app.patch("/api/company/expenses/:id", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const { user, allowed } = expenseWriteAccess(req, res);
+    if (!allowed) return res.status(403).json({ message: "Forbidden" });
+
+    const existing = await storage.getExpense(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Expense not found" });
+    if (existing.companyId !== user.companyId) return res.status(403).json({ message: "Forbidden" });
+
+    const bodySchema = z.object({
+      category: z.string().min(1).optional(),
+      description: z.string().min(1).optional(),
+      amount: z.string().refine((v) => isFinite(parseFloat(v)) && parseFloat(v) > 0, "Amount must be a positive number").optional(),
+      expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      vendorName: z.string().nullable().optional(),
+      projectId: z.string().nullable().optional(),
+      paymentMethod: z.string().nullable().optional(),
+      status: z.string().optional(),
+      notes: z.string().nullable().optional(),
+      receiptUrl: z.string().nullable().optional(),
+    });
+
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+
+    const data = parsed.data;
+
+    if (data.projectId) {
+      const project = await storage.getProject(data.projectId);
+      if (!project || project.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Project not found or does not belong to your company" });
+      }
+    }
+
+    if (data.status) {
+      const { EXPENSE_STATUSES } = await import("@shared/schema");
+      if (!EXPENSE_STATUSES.includes(data.status as any)) {
+        return res.status(400).json({ message: `Invalid status: ${data.status}` });
+      }
+    }
+
+    try {
+      const updated = await storage.updateExpense(req.params.id, data as any);
+      return res.json(updated);
+    } catch (err) {
+      console.error("[expenses:PATCH]", err);
+      return res.status(500).json({ message: "Failed to update expense" });
+    }
+  });
+
+  app.delete("/api/company/expenses/:id", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const { user, allowed } = expenseWriteAccess(req, res);
+    if (!allowed) return res.status(403).json({ message: "Forbidden" });
+
+    const existing = await storage.getExpense(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Expense not found" });
+    if (existing.companyId !== user.companyId) return res.status(403).json({ message: "Forbidden" });
+
+    try {
+      await storage.deleteExpense(req.params.id);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("[expenses:DELETE]", err);
+      return res.status(500).json({ message: "Failed to delete expense" });
+    }
+  });
+
   const requireAdmin = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });

@@ -67,7 +67,8 @@ import type {
   PlatformSettings, InsertPlatformSettings,
   AuditLog, InsertAuditLog,
   ProjectBudget, InsertProjectBudget,
-  ProjectBudgetItem, InsertProjectBudgetItem
+  ProjectBudgetItem, InsertProjectBudgetItem,
+  Expense, InsertExpense
 } from "@shared/schema";
 
 export interface IStorage {
@@ -410,6 +411,16 @@ export interface IStorage {
   updateProjectBudgetItem(id: string, data: Partial<InsertProjectBudgetItem>): Promise<ProjectBudgetItem | undefined>;
   deleteProjectBudgetItem(id: string): Promise<void>;
   recalculateBudgetTotal(budgetId: string): Promise<void>;
+
+  // Expense methods
+  getExpenses(
+    companyId: string,
+    filters?: { projectId?: string; category?: string; status?: string; dateFrom?: string; dateTo?: string }
+  ): Promise<Expense[]>;
+  getExpense(id: string): Promise<Expense | undefined>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense | undefined>;
+  deleteExpense(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2773,6 +2784,58 @@ export class DatabaseStorage implements IStorage {
         .set({ budget: totalStr })
         .where(eq(schema.projects.id, budget.projectId));
     }
+  }
+
+  // ── Expense Methods ─────────────────────────────────────────────────────────
+
+  async getExpenses(
+    companyId: string,
+    filters?: { projectId?: string; category?: string; status?: string; dateFrom?: string; dateTo?: string }
+  ): Promise<Expense[]> {
+    const conditions = [eq(schema.expenses.companyId, companyId)];
+    if (filters?.projectId) {
+      conditions.push(eq(schema.expenses.projectId, filters.projectId));
+    }
+    if (filters?.category) {
+      conditions.push(eq(schema.expenses.category, filters.category));
+    }
+    if (filters?.status) {
+      conditions.push(eq(schema.expenses.status, filters.status));
+    }
+    if (filters?.dateFrom) {
+      conditions.push(gte(schema.expenses.expenseDate, filters.dateFrom));
+    }
+    if (filters?.dateTo) {
+      conditions.push(lte(schema.expenses.expenseDate, filters.dateTo));
+    }
+    return db
+      .select()
+      .from(schema.expenses)
+      .where(and(...conditions))
+      .orderBy(desc(schema.expenses.expenseDate), desc(schema.expenses.createdAt));
+  }
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [row] = await db.select().from(schema.expenses).where(eq(schema.expenses.id, id));
+    return row;
+  }
+
+  async createExpense(expense: InsertExpense): Promise<Expense> {
+    const [row] = await db.insert(schema.expenses).values(expense).returning();
+    return row;
+  }
+
+  async updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const [row] = await db
+      .update(schema.expenses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.expenses.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
   }
 }
 

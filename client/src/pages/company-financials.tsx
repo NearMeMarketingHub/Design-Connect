@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Receipt, Plus, Activity, AlertCircle, User } from "lucide-react";
+import { TrendingUp, Receipt, Plus, Activity, AlertCircle, User, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface FinancialActivityItem {
@@ -111,6 +111,23 @@ export default function CompanyFinancials() {
           <CardContent>
             <Link href="/company/accounting">
               <Button className="w-full" variant="outline" size="sm" data-testid="button-company-accounting">
+                Open
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-orange-600" />
+              Expenses
+            </CardTitle>
+            <CardDescription className="text-xs">Track job costs and receipts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/company/expenses">
+              <Button className="w-full" variant="outline" size="sm" data-testid="button-company-expenses">
                 Open
               </Button>
             </Link>

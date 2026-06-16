@@ -49,6 +49,7 @@ import SignatureSetup from "@/pages/signature-setup";
 import NotaryPortal from "@/pages/notary-portal";
 import CompanyDashboard from "@/pages/company-dashboard";
 import CompanyFinancials from "@/pages/company-financials";
+import ExpensesDashboard from "@/pages/expenses-dashboard";
 import SubcontractorDashboard from "@/pages/subcontractor-dashboard";
 import AcceptSubcontractorInvite from "@/pages/accept-subcontractor-invite";
 import DemoPage from "@/pages/demo";
@@ -181,6 +182,7 @@ function Router() {
           <Route path="/company/team" component={CompanyDashboard} />
           <Route path="/company/budget" component={BudgetAdmin} />
           <Route path="/company/financials" component={CompanyFinancials} />
+          <Route path="/company/expenses">{() => <ExpensesDashboard />}</Route>
           <Route path="/company/sales">{() => <SalesDashboard />}</Route>
           <Route path="/company/estimates">{() => <Estimator />}</Route>
           <Route path="/company/accounting">{() => <AccountingDashboard />}</Route>
