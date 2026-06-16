@@ -1,0 +1,53 @@
+Please revise Phase 15D-1 one more time before build approval.
+
+The plan is close, but the estimate/project linking backend needs one more safety guard.
+
+1. Do not silently overwrite an existing estimate.projectId
+
+When PATCH `/api/estimates/:id` receives a `projectId`, the backend should first check whether the estimate already has a non-null `projectId`.
+
+If the estimate already has a projectId and the incoming projectId is different, return 409 with a clear message such as:
+“Estimate is already linked to a project.”
+
+Do not allow the “last request wins” behavior described in the risk section.
+
+Reason:
+If two admins both click Create Project from the same estimate, we do not want two projects created and then the estimate silently linked to the last one. The frontend linked-chip guard is good, but the backend also needs to prevent accidental overwrite.
+
+2. Do not allow detaching in this phase
+
+The plan currently says `projectId: null` can clear the link.
+
+Please remove detach/unlink behavior from Phase 15D-1 unless there is a visible, deliberate unlink UI and safeguards.
+
+For this phase:
+
+* allow linking an unlinked approved estimate to a project
+* allow viewing the linked project
+* do not add detach/unlink behavior yet
+
+A future “Unlink Estimate from Project” phase can handle that separately if needed, especially because budgets may later reference the estimate as `sourceEstimateId`.
+
+3. Keep the rest of the plan the same
+
+Keep:
+
+* Create Project from approved unlinked estimate
+* Attach approved unlinked estimate to existing project
+* Linked chip + View Project when projectId is already set
+* Company-scoped client prefill only
+* Owner/Admin-only project linking actions
+* No project_budgets or project_budget_items creation in Phase 15D-1
+* No schema changes
+
+Do not change:
+
+* estimator calculations
+* invoice calculations
+* estimate PDFs
+* company branding
+* project budget creation
+* expense/budget actuals
+* overhead, Stripe, commission, payout, or production sheet logic
+
+Please return the revised Phase 15D-1 plan.

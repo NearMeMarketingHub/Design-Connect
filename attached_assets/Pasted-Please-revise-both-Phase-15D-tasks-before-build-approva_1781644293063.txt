@@ -1,0 +1,118 @@
+Please revise both Phase 15D tasks before build approval.
+
+The split into two tasks is good:
+
+* Phase 15D-1 — Estimate → Project Workflow
+* Phase 15D-2 — Manual Budget Creation + Project Expenses Tab
+
+But both plans need a few guardrail fixes before approval.
+
+For Phase 15D-1 — Estimate → Project Workflow:
+
+1. Do not show Create Project / Attach to Project for estimates that already have `projectId`.
+
+If an approved estimate is already linked to a project, show a “View Project” or “Linked to Project” state instead.
+
+Avoid duplicate project creation from the same estimate.
+
+2. Backend must validate both sides before updating estimate.projectId.
+
+When PATCHing an estimate with `projectId`, validate:
+
+* the estimate exists
+* the estimate belongs to the caller’s company
+* the target project belongs to the caller’s company
+* the caller is allowed to perform estimate/project linking
+
+3. Restrict estimate-to-project linking to Company Owner / Company Admin.
+
+Regular internal contractors should not be able to link/unlink estimates to projects unless there is already an explicit existing permission pattern for that. For now, keep this owner/admin only.
+
+4. Client prefill must be company-scoped.
+
+When creating a project from an estimate, do not globally match clients by name/email across the whole app.
+
+If matching a client user, only match from clients already available to the current company under the existing safe client-scoping logic.
+
+If no safe company-scoped match exists, leave client blank.
+
+5. Do not auto-create a formal project budget in Phase 15D-1.
+
+Creating a project from an estimate may prefill normal project form fields, but it should not create `project_budgets` or `project_budget_items`.
+
+Budget creation remains a separate action in the project Budget tab.
+
+For Phase 15D-2 — Manual Budget Creation + Project Expenses Tab:
+
+1. Project Expenses should support full project-level expense management.
+
+The Project Expenses tab should support:
+
+* list project expenses
+* add expense
+* edit expense
+* delete expense
+* optionally assign/unassign budget line item if the project has budget lines
+
+Company Owner and Company Admin can write.
+Regular internal contractors can view read-only if they can view the project budget/financial tab.
+Clients, subcontractors, notaries, unrelated users, and Super Admins without companyId remain blocked.
+
+2. Project-level expense creation should lock projectId to the current project.
+
+When adding an expense from inside a project:
+
+* automatically set projectId to the current project
+* do not show a project dropdown
+* allow budget line assignment only from that same project’s budget items
+
+3. Reuse the existing expense form carefully.
+
+If possible, extract a reusable expense form/dialog component from `expenses-dashboard.tsx` so both:
+
+* company-wide Expenses page
+* project-level Expenses tab
+
+use the same create/edit logic.
+
+If extraction is too risky, keep changes minimal but do not break the company-wide Expenses page.
+
+4. GET `/api/projects/:projectId/expenses` must enforce strict company/project scoping.
+
+The route must:
+
+* require authentication
+* require user.companyId
+* verify the project belongs to user.companyId
+* block clients
+* block subcontractors
+* block notaries
+* block Super Admins without companyId
+* return only expenses for that project and company
+
+5. Manual budget creation must not allow duplicate project budgets.
+
+If a project already has a `project_budgets` record, do not show Create Empty Budget or create another budget.
+
+Use the existing one-budget-per-project model.
+
+6. Keep scope unchanged.
+
+Do not change:
+
+* schema unless absolutely required
+* db/push unless schema changes are explicitly required and approved
+* estimator calculations
+* invoice calculations
+* expense-to-budget actual calculation logic, except invalidating/refetching as needed
+* branding
+* PDFs
+* receipt upload
+* overhead formulas
+* commission/payout logic
+* Stripe/billing
+* production sheets/daily logs
+
+Please return revised plans for both tasks.
+
+After revision, we should build Phase 15D-1 first, then Phase 15D-2.

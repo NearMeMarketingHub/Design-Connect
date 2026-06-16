@@ -1,0 +1,115 @@
+Phase 15D — Estimate-to-Project and Budget Workflow Alignment
+
+We need to align the full workflow between Estimator Calculator, Saved Estimates, Projects, Project Budgets, and Expenses.
+
+Important:
+This is Plan Mode first. Do not make code changes yet. Return a detailed implementation plan only.
+
+Problem:
+The app currently has the individual pieces:
+
+* Estimator Calculator
+* Saved Estimates
+* Projects
+* Project Budget tab
+* Expenses
+* Expense-to-budget actual cost linkage
+
+But the user flow is not clear yet.
+
+The intended real-world workflow should support:
+
+Path A — Estimate-based job:
+Estimator Calculator → Save Estimate → Estimate Approved → Create Project from Estimate → Create Project Budget from Estimate → Track Project Expenses against Budget
+
+Path B — Existing/transferred job:
+Create Project manually → Create Budget Manually inside Project → Add Project Expenses → Track Actuals against Budget
+
+Goal:
+Plan the safest way to connect estimates, projects, budgets, and expenses into a clear workflow without breaking existing estimator, invoice, budget, expense, branding, or PDF behavior.
+
+Please inspect:
+
+* Estimator Calculator
+* Saved Estimates page
+* Estimate status update flow
+* Project creation flow
+* Project detail page
+* Project Budget tab
+* Project Expenses / Expenses Dashboard
+* Project budget routes
+* Estimate routes
+* Expense routes
+* Existing access-control rules
+
+Questions the plan must answer:
+
+1. After an estimate is saved, where does the contractor go next?
+2. How does an estimate get marked as sent/approved/declined?
+3. When an estimate is approved, what action should appear?
+4. Should the app support “Create Project from Estimate”?
+5. Should the app support “Attach Estimate to Existing Project”?
+6. When creating a project from an estimate, should the client, project name, amount, and line items prefill automatically?
+7. Should creating a project from an estimate also create the project budget immediately, or should that be a separate button?
+8. How should “Create Budget from Estimate” work if the project already exists?
+9. How should “Create Budget Manually” work when there is no estimate?
+10. Where should project-level expenses live: a project Expenses tab, inside the Budget tab, or both?
+11. What access rules should apply for company owners, company admins, regular contractors, clients, subcontractors, notaries, and Super Admins?
+12. What schema already exists to support this?
+13. Are schema changes required, or can this be done with current tables?
+14. What should be built first to avoid creating duplicate workflow paths?
+
+Preferred future behavior:
+
+* Saved estimate can become approved.
+* Approved estimate can create a new project.
+* Approved estimate can optionally attach to an existing project.
+* Project Budget tab can create budget from approved estimate if one exists.
+* Project Budget tab can also create a manual budget if no estimate exists.
+* Project-level expenses should be accessible from inside the project.
+* Expenses created inside a project should automatically use that projectId.
+* Expenses can still optionally link to budget line items.
+* Company-wide Expenses page remains as the all-project ledger.
+
+Guardrails:
+
+* Do not change estimator calculations.
+* Do not change invoice calculations.
+* Do not change estimate PDF behavior.
+* Do not change company branding.
+* Do not add overhead formulas.
+* Do not add commission or payout logic.
+* Do not add Stripe or billing logic.
+* Do not add production sheet or daily log features.
+* Do not add receipt upload.
+* Do not create duplicate budget systems.
+* Do not create duplicate project systems.
+* Use the existing estimates, projects, project_budgets, project_budget_items, and expenses structures wherever possible.
+* Do not silently recalculate historical estimates or invoices.
+* Do not change client portal behavior unless explicitly needed and explained.
+
+Plan should include:
+
+* Recommended end-to-end workflow.
+* Recommended phase split for implementation.
+* Exact files likely to be touched.
+* Whether schema changes are needed.
+* API routes to add or modify.
+* UI pages/components to add or modify.
+* Access-control approach.
+* Risks.
+* Test plan.
+* Done criteria.
+
+Output needed:
+Return a clear implementation plan only. Do not build yet.
+
+Done for the future build should look like:
+
+* Estimate-based projects have a clear flow.
+* Manual/transferred projects have a clear budget flow.
+* Project Budget tab no longer dead-ends when no estimate exists.
+* Project expenses are manageable from inside the project.
+* Expenses still link to budget actuals safely.
+* Existing estimates, invoices, expenses, budgets, branding, and PDFs remain stable.
+* npm run check passes after the eventual build.
