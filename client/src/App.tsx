@@ -157,7 +157,10 @@ function Router() {
     const canAccessCompany =
       user?.role === "company_owner" ||
       (user?.role === "contractor" && !!user?.isCompanyAdmin);
-    const canAccess = pathname === "/company/estimates" ? canAccessEstimator : canAccessCompany;
+    const canAccess =
+      (pathname === "/company/estimates" || pathname === "/company/expenses")
+        ? canAccessEstimator
+        : canAccessCompany;
     if (!authLoading && !canAccess) {
       if (!user) {
         setLocation("/auth");

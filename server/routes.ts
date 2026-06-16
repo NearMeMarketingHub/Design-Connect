@@ -816,14 +816,24 @@ export async function registerRoutes(
 
     const data = parsed.data;
 
+    // Validate expenseDate is a real calendar date (not just format)
+    const parsedDatePost = new Date(data.expenseDate + "T00:00:00");
+    if (isNaN(parsedDatePost.getTime()) || parsedDatePost.toISOString().slice(0, 10) !== data.expenseDate) {
+      return res.status(400).json({ message: "expenseDate is not a valid calendar date" });
+    }
+
+    // Validate paymentMethod against allowed values
+    const { EXPENSE_PAYMENT_METHODS: PM_POST, EXPENSE_STATUSES } = await import("@shared/schema");
+    if (data.paymentMethod && !PM_POST.includes(data.paymentMethod as any)) {
+      return res.status(400).json({ message: `Invalid payment method: ${data.paymentMethod}` });
+    }
+
     if (data.projectId) {
       const companyProjects = await storage.getProjectsByCompanyId(user.companyId);
       if (!companyProjects.some((p) => p.id === data.projectId)) {
         return res.status(403).json({ message: "Project not found or does not belong to your company" });
       }
     }
-
-    const { EXPENSE_STATUSES } = await import("@shared/schema");
     const statusVal = data.status ?? "pending";
     if (!EXPENSE_STATUSES.includes(statusVal as any)) {
       return res.status(400).json({ message: `Invalid status: ${statusVal}` });
@@ -880,6 +890,21 @@ export async function registerRoutes(
 
     const data = parsed.data;
 
+    // Validate expenseDate is a real calendar date when provided
+    if (data.expenseDate) {
+      const parsedDatePatch = new Date(data.expenseDate + "T00:00:00");
+      if (isNaN(parsedDatePatch.getTime()) || parsedDatePatch.toISOString().slice(0, 10) !== data.expenseDate) {
+        return res.status(400).json({ message: "expenseDate is not a valid calendar date" });
+      }
+    }
+
+    const { EXPENSE_PAYMENT_METHODS: PM_PATCH, EXPENSE_STATUSES } = await import("@shared/schema");
+
+    // Validate paymentMethod against allowed values when provided
+    if (data.paymentMethod && !PM_PATCH.includes(data.paymentMethod as any)) {
+      return res.status(400).json({ message: `Invalid payment method: ${data.paymentMethod}` });
+    }
+
     if (data.projectId) {
       const companyProjects = await storage.getProjectsByCompanyId(user.companyId);
       if (!companyProjects.some((p) => p.id === data.projectId)) {
@@ -888,7 +913,6 @@ export async function registerRoutes(
     }
 
     if (data.status) {
-      const { EXPENSE_STATUSES } = await import("@shared/schema");
       if (!EXPENSE_STATUSES.includes(data.status as any)) {
         return res.status(400).json({ message: `Invalid status: ${data.status}` });
       }
