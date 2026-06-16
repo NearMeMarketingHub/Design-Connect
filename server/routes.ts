@@ -949,22 +949,29 @@ export async function registerRoutes(
     // Determine the projectId this expense will have after saving
     const incomingProjectId = data.projectId !== undefined ? data.projectId : existing.projectId;
 
-    // Auto-clear: if projectId is being changed while a budgetItemId is set,
-    // clear budgetItemId so the link doesn't cross projects
     const oldBudgetItemId = existing.budgetItemId ?? null;
     let finalBudgetItemId: string | null;
     const projectIdChanging = data.projectId !== undefined && data.projectId !== existing.projectId;
-    if (projectIdChanging && oldBudgetItemId && data.budgetItemId === undefined) {
-      // Auto-clear the link
-      finalBudgetItemId = null;
+
+    if (projectIdChanging) {
+      // Project is changing — any existing link to a budget item is now stale.
+      // Force-clear UNLESS the caller explicitly provides a DIFFERENT budgetItemId
+      // (i.e. they are relinking to an item in the new project in the same request).
+      const explicitNewItem =
+        data.budgetItemId !== undefined &&
+        data.budgetItemId !== null &&
+        data.budgetItemId !== oldBudgetItemId;
+      finalBudgetItemId = explicitNewItem ? data.budgetItemId! : null;
     } else if (data.budgetItemId !== undefined) {
       finalBudgetItemId = data.budgetItemId;
     } else {
       finalBudgetItemId = oldBudgetItemId;
     }
 
-    // Validate newly set budgetItemId
-    if (finalBudgetItemId && finalBudgetItemId !== oldBudgetItemId) {
+    // Validate finalBudgetItemId whenever it is non-null AND:
+    //   - it differs from the old value, OR
+    //   - the projectId is changing (re-verify item still belongs to the resolved project)
+    if (finalBudgetItemId && (finalBudgetItemId !== oldBudgetItemId || projectIdChanging)) {
       if (!incomingProjectId) {
         return res.status(400).json({ message: "projectId is required when budgetItemId is set" });
       }
