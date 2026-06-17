@@ -284,14 +284,33 @@ export default function NewProject() {
       // If launched from the Estimator, link the estimate to the new project
       if (fromEstimateId) {
         try {
-          await fetch(`/api/estimates/${fromEstimateId}`, {
+          const linkRes = await fetch(`/api/estimates/${fromEstimateId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({ projectId: project.id }),
           });
+          if (!linkRes.ok) {
+            let linkErrMsg = "The estimate could not be linked to this project.";
+            try {
+              const linkErr = await linkRes.json();
+              if (linkErr?.message) linkErrMsg = linkErr.message;
+            } catch {
+              // ignore parse failure
+            }
+            toast({
+              title: "Project created — estimate not linked",
+              description: linkErrMsg,
+              variant: "destructive",
+            });
+          }
         } catch (linkError) {
           console.error("Failed to link estimate to project:", linkError);
+          toast({
+            title: "Project created — estimate not linked",
+            description: "A network error prevented the estimate from being linked.",
+            variant: "destructive",
+          });
         }
       }
 

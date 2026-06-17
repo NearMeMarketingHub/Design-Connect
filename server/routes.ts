@@ -1013,7 +1013,7 @@ export async function registerRoutes(
         const item = await storage.getProjectBudgetItemById(itemId);
         if (item?.budgetId) affectedBudgetIds.add(item.budgetId);
       }
-      for (const budgetId of affectedBudgetIds) {
+      for (const budgetId of Array.from(affectedBudgetIds)) {
         await storage.recalculateBudgetActualTotal(budgetId);
       }
 
