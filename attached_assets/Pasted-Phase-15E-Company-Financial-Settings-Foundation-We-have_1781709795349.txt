@@ -1,0 +1,105 @@
+Phase 15E — Company Financial Settings Foundation
+
+We have completed the expense foundation, expense-to-budget actual linkage, estimate-to-project workflow, manual project budgets, and project-level expenses.
+
+Now we need a plan for company-controlled financial settings.
+
+Important:
+This is Plan Mode first. Do not make code changes yet. Return a detailed implementation plan only.
+
+Goal:
+Add a company-side financial settings area where each company can define its own default financial settings, such as overhead and markup defaults, without automatically changing existing estimates, invoices, budgets, expenses, or reports yet.
+
+Important distinction:
+This phase is for storing and managing company settings only. Do not apply these settings to calculations yet unless explicitly approved in a later phase.
+
+Settings to consider:
+
+* Default overhead percentage
+* Default markup percentage
+* Default labor burden percentage
+* Default material markup percentage
+* Default subcontractor markup percentage
+* Default equipment/operating cost percentage
+* Notes/description field for how the company uses overhead
+* Optional toggle fields for future calculation behavior, but do not apply them yet
+
+Please inspect:
+
+* existing company settings/profile pages
+* company dashboard
+* Financial Management Hub
+* company schema/table
+* existing company branding settings
+* existing price book / budget admin areas
+* estimator calculator
+* project budgets
+* expenses
+* access-control patterns for Company Owner and Company Admin
+
+Plan questions:
+
+1. Where should these settings live in the UI?
+
+   * Company Dashboard?
+   * Financial Management Hub?
+   * Budget/Price Book admin?
+   * A new Financial Settings page?
+2. Should these fields be added directly to the companies table, or should there be a new company_financial_settings table?
+3. What fields should be stored now?
+4. What validation should be used for percentage fields?
+5. Who can view these settings?
+6. Who can edit these settings?
+7. Should regular internal contractors be able to view them, or only Company Owner/Admin?
+8. How should these settings be kept separate from platform billing/Stripe settings?
+9. How should these settings be kept separate from company branding settings?
+10. What future phases would apply these settings to estimator/budget/report calculations?
+
+Preferred behavior:
+
+* Company Owner and Company Admin can view and edit financial settings.
+* Regular internal contractors should not edit financial settings.
+* Clients, subcontractors, notaries, and unrelated users must not access these internal company financial settings.
+* Super Admin should not be mixed into normal company-side financial settings unless there is already a safe platform admin pattern.
+* Settings should be company-scoped.
+* Defaults should be optional and safe if blank.
+* Existing calculations should remain unchanged.
+
+Guardrails:
+
+* Do not change estimator calculations.
+* Do not change invoice calculations.
+* Do not change project budget calculations.
+* Do not change expense-to-budget actual calculation logic.
+* Do not change estimate PDFs.
+* Do not change company branding.
+* Do not add Stripe or billing logic.
+* Do not add commission or payout logic.
+* Do not add production sheet/daily log features.
+* Do not retroactively update saved estimates, invoices, projects, budgets, or expenses.
+* Do not guess overhead formulas.
+* Do not apply overhead/markup settings to any totals yet.
+
+Plan should include:
+
+* Recommended data model.
+* Whether schema changes are required.
+* Exact schema additions proposed.
+* Exact API routes proposed.
+* Access-control approach.
+* UI placement and user flow.
+* Exact files likely to be touched.
+* Whether db:push will be required.
+* Risks.
+* Test plan.
+* Done criteria.
+* Recommended future phase for applying these settings to estimator/budget/report calculations.
+
+Done for the future build should look like:
+
+* Company Owner/Admin can set company financial defaults.
+* Settings are saved and loaded correctly.
+* Settings are company-scoped.
+* Existing estimator, invoice, budget, expense, branding, and PDF behavior remains unchanged.
+* No financial totals are changed by this phase.
+* npm run check passes.
