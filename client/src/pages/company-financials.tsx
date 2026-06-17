@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Receipt, Plus, Activity, AlertCircle, User, Wallet } from "lucide-react";
+import { TrendingUp, Receipt, Activity, AlertCircle, User, Wallet, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface FinancialActivityItem {
@@ -133,6 +133,25 @@ export default function CompanyFinancials() {
             </Link>
           </CardContent>
         </Card>
+
+        {isOwnerOrAdmin && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+                Financial Settings
+              </CardTitle>
+              <CardDescription className="text-xs">Default overhead, markup &amp; burden rates</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/company/financial-settings">
+                <Button className="w-full" variant="outline" size="sm" data-testid="button-company-financial-settings">
+                  Open
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
       </div>
 

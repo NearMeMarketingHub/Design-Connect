@@ -1347,6 +1347,79 @@ export async function registerRoutes(
     }
   });
 
+  // ── Company Financial Settings (Phase 15E) ─────────────────────────────────
+  // Stores default percentage values as WHOLE NUMBERS (15 = 15%, not 0.15).
+  // Access: company_owner or isCompanyAdmin contractors only.
+  // Platform admins (role === "admin") are intentionally blocked — these are
+  // company-internal defaults and should not be edited via admin tools.
+  // Note: if a Super Admin uses "View As User" to impersonate a company_owner,
+  // they would pass this check via the impersonated user's role/companyId.
+  // That is acceptable behaviour — they are acting as the company at that point.
+
+  // Null-safe percentage preprocessor: "" / null / undefined → null before number validation.
+  // Using z.preprocess prevents z.coerce.number() from silently converting "" → 0.
+  const pctField = z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+    z.number().min(0).max(999.99).nullable()
+  ).optional();
+
+  const companyFinancialSettingsSchema = z.object({
+    defaultOverheadPct:            pctField,
+    defaultMarkupPct:              pctField,
+    defaultLaborBurdenPct:         pctField,
+    defaultMaterialMarkupPct:      pctField,
+    defaultSubcontractorMarkupPct: pctField,
+    defaultEquipmentCostPct:       pctField,
+    overheadNotes: z.string().max(2000).nullable().optional(),
+    // companyId is intentionally excluded — always taken from user session
+  });
+
+  function financialSettingsAccess(req: any, res: any): { user: any; allowed: boolean } {
+    const user = req.user as User;
+    if (!user) return { user: null, allowed: false };
+    if (!user.companyId) return { user, allowed: false };
+    if (user.role === "admin") return { user, allowed: false }; // platform admin blocked
+    if (user.role === "client") return { user, allowed: false };
+    if (user.contractorType === "subcontractor" || user.contractorType === "notary") return { user, allowed: false };
+    const isOwner = user.role === "company_owner";
+    const isAdmin = user.isCompanyAdmin === true && user.role === "contractor";
+    return { user, allowed: isOwner || isAdmin };
+  }
+
+  app.get("/api/company/financial-settings", requireAuth, async (req, res, next) => {
+    try {
+      const { user, allowed } = financialSettingsAccess(req, res);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!allowed) return res.status(403).json({ message: "Access denied: company owners and admins only" });
+      const settings = await storage.getCompanyFinancialSettings(user.companyId);
+      res.json(settings ?? null);
+    } catch (error) { next(error); }
+  });
+
+  app.put("/api/company/financial-settings", requireAuth, async (req, res, next) => {
+    try {
+      const { user, allowed } = financialSettingsAccess(req, res);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!allowed) return res.status(403).json({ message: "Access denied: company owners and admins only" });
+      const parseResult = companyFinancialSettingsSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid financial settings", errors: parseResult.error.issues });
+      }
+      // companyId is always taken from the session — body value is ignored even if present.
+      // Drizzle numeric() columns expect string values; convert validated numbers back to strings.
+      const { overheadNotes, ...pctFields } = parseResult.data;
+      const storageData = {
+        overheadNotes: overheadNotes ?? null,
+        ...Object.fromEntries(
+          Object.entries(pctFields).map(([k, v]) => [k, v != null ? String(v) : null])
+        ),
+      };
+      const saved = await storage.upsertCompanyFinancialSettings(user.companyId, storageData as any);
+      res.json(saved);
+    } catch (error) { next(error); }
+  });
+  // ── End Company Financial Settings ─────────────────────────────────────────
+
   // Get company members (only owner, company admin, or platform admin)
   app.get("/api/company/:companyId/members", requireAuth, async (req, res, next) => {
     try {

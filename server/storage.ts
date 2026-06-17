@@ -68,7 +68,8 @@ import type {
   AuditLog, InsertAuditLog,
   ProjectBudget, InsertProjectBudget,
   ProjectBudgetItem, InsertProjectBudgetItem,
-  Expense, InsertExpense
+  Expense, InsertExpense,
+  CompanyFinancialSettings, InsertCompanyFinancialSettings
 } from "@shared/schema";
 
 export interface IStorage {
@@ -341,6 +342,11 @@ export interface IStorage {
   createCompanyWithOwner(companyData: InsertCompany, ownerData: InsertUser): Promise<{ company: Company; user: User }>;
   updateCompany(id: string, data: Partial<InsertCompany>): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<void>;
+
+  // Company financial settings methods (Phase 15E)
+  // companyId always comes from the caller (route layer), never from request body
+  getCompanyFinancialSettings(companyId: string): Promise<CompanyFinancialSettings | undefined>;
+  upsertCompanyFinancialSettings(companyId: string, data: Omit<InsertCompanyFinancialSettings, "companyId">): Promise<CompanyFinancialSettings>;
 
   // Company member methods
   getCompanyMembers(companyId: string): Promise<(CompanyMember & { user?: User })[]>;
@@ -2374,6 +2380,32 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCompany(id: string): Promise<void> {
     await db.delete(schema.companies).where(eq(schema.companies.id, id));
+  }
+
+  // Company financial settings (Phase 15E)
+  // Percentages are stored as whole numbers: 15 = 15%, not 0.15.
+  // companyId always comes from the authenticated session (route layer), never from request body.
+  async getCompanyFinancialSettings(companyId: string): Promise<CompanyFinancialSettings | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.companyFinancialSettings)
+      .where(eq(schema.companyFinancialSettings.companyId, companyId));
+    return row;
+  }
+
+  async upsertCompanyFinancialSettings(
+    companyId: string,
+    data: Omit<InsertCompanyFinancialSettings, "companyId">
+  ): Promise<CompanyFinancialSettings> {
+    const [row] = await db
+      .insert(schema.companyFinancialSettings)
+      .values({ ...data, companyId, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: schema.companyFinancialSettings.companyId,
+        set: { ...data, updatedAt: new Date() },
+      })
+      .returning();
+    return row;
   }
 
   // Company member methods

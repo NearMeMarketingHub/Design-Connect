@@ -50,6 +50,28 @@ export const insertCompanySchema = createInsertSchema(companies).omit({ id: true
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
 
+// Company financial settings — 1:1 with companies.
+// Stores default percentage values as WHOLE NUMBERS: 15 means 15%, not 0.15.
+// All percentage columns are nullable; null = "not set" (never coerced to 0).
+// companyId is always taken from the authenticated session — never from request body.
+export const companyFinancialSettings = pgTable("company_financial_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().unique().references(() => companies.id, { onDelete: "cascade" }),
+  // Percentages stored as whole numbers (e.g. 15.0000 = 15%). Future code must apply value/100 at point of use.
+  defaultOverheadPct:            numeric("default_overhead_pct",             { precision: 7, scale: 4 }),
+  defaultMarkupPct:              numeric("default_markup_pct",               { precision: 7, scale: 4 }),
+  defaultLaborBurdenPct:         numeric("default_labor_burden_pct",         { precision: 7, scale: 4 }),
+  defaultMaterialMarkupPct:      numeric("default_material_markup_pct",      { precision: 7, scale: 4 }),
+  defaultSubcontractorMarkupPct: numeric("default_subcontractor_markup_pct", { precision: 7, scale: 4 }),
+  defaultEquipmentCostPct:       numeric("default_equipment_cost_pct",       { precision: 7, scale: 4 }),
+  overheadNotes: text("overhead_notes"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCompanyFinancialSettingsSchema = createInsertSchema(companyFinancialSettings).omit({ id: true });
+export type InsertCompanyFinancialSettings = z.infer<typeof insertCompanyFinancialSettingsSchema>;
+export type CompanyFinancialSettings = typeof companyFinancialSettings.$inferSelect;
+
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
