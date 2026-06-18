@@ -1,0 +1,164 @@
+Phase 15F — Financial Settings Application Planning, Remaining Scope Only
+
+Important:
+Keep this as ONE single task plan. Do not split this into multiple separate Replit plans/tasks. Return one complete written plan only.
+
+Do not build yet. This is Plan Mode only.
+
+Context:
+Phase 15E is already complete:
+
+* Company financial settings table exists.
+* Company Owner/Admin can configure defaults.
+* Percentages are stored as whole-number percentages, where 15 means 15%, not 0.15.
+* Blank values save as null, not 0.
+* Settings are company-scoped.
+* Settings are not yet applied to calculations.
+
+Phase 15F-1 may already be partially or fully complete:
+
+* A read-only Company Financial Defaults reference panel may already exist in the Estimator Calculator and/or Contractor Calculator.
+* Do not duplicate that work.
+* Inspect the current code first and account for what already exists.
+
+Goal:
+Create one complete remaining Phase 15F plan for how company financial settings should eventually be applied to new estimator, budget, and reporting workflows.
+
+This phase should plan the remaining application logic only. Do not repeat Phase 15E. Do not duplicate an existing reference panel.
+
+Critical rule:
+Do not change any code yet. Return a plan only.
+
+Financial settings available:
+
+* defaultOverheadPct
+* defaultMarkupPct
+* defaultLaborBurdenPct
+* defaultMaterialMarkupPct
+* defaultSubcontractorMarkupPct
+* defaultEquipmentCostPct
+* overheadNotes
+
+Percentage format:
+
+* 15 means 15%
+* 25.5 means 25.5%
+* null means not set
+* Future calculations should use value / 100 at the point of calculation
+
+Please inspect:
+
+* Company Financial Settings implementation
+* Estimator Calculator
+* Contractor Calculator
+* Price Book / Budget Admin
+* saved estimate creation
+* saved estimate detail/list views
+* estimate schema
+* Project Budget tab
+* project budget schema
+* expense-to-budget actual linkage
+* Sales Dashboard / reporting pages
+* any existing Phase 15F-1 reference panel work
+
+The plan must answer these business-rule questions before any build happens:
+
+1. Which settings should affect estimator totals?
+2. Should overhead apply to subtotal only, or subtotal plus category adjustments?
+3. Should markup/profit apply to subtotal only, subtotal plus overhead, or final cost after adjustments?
+4. Should labor burden apply only to labor line items?
+5. Should material markup apply only to material line items?
+6. Should subcontractor markup apply only to subcontractor line items?
+7. Should equipment/operating cost percentage be a markup, an added overhead line, or only a reference field?
+8. How do we avoid double-counting price book items that already include burdens, material fees, labor rates, subcontractor rates, or retail prices?
+9. Should these settings be automatic, optional toggles, or prefilled editable fields?
+10. What happens when settings are null?
+11. What happens when settings change after an estimate or budget already exists?
+12. Should saved estimates store a snapshot of the percentages used at save time?
+13. Should project budgets store a snapshot of the percentages used at creation time?
+14. Which old records should remain unchanged?
+15. What should be shown to users so they understand these are defaults, not guaranteed final margins?
+
+Preferred direction unless there is a strong reason otherwise:
+
+* Settings should apply to new work only.
+* Existing estimates, invoices, budgets, expenses, and projects must not change.
+* Defaults should prefill editable fields before they automatically affect totals.
+* Any automatic adjustment should be visible as a named line item or named summary line.
+* Users should be able to override applied percentages per estimate/project.
+* Saved estimates should probably snapshot the applied percentages so future company setting changes do not rewrite history.
+* Project budgets created from estimates should probably inherit the estimate snapshot.
+* Empty/manual budgets should only apply company defaults if the user explicitly enables them.
+* Price book items need special care because their retail price may already include markup/burden.
+
+Guardrails:
+
+* Do not build in this planning phase.
+* Do not change schema in this planning phase.
+* Do not run db:push.
+* Do not change estimator calculations yet.
+* Do not change contractor calculator calculations yet.
+* Do not change saved estimate payloads yet.
+* Do not change project budget calculations yet.
+* Do not change invoices.
+* Do not change expenses or actual cost linkage.
+* Do not change price book item values.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add production sheets or daily logs.
+* Do not retroactively update saved records.
+* Do not guess formulas without flagging them for approval.
+
+Important:
+The Estimator Calculator may currently have hardcoded overhead/profit percentages. Identify and document those if found, but do not replace them yet. Replacing those formulas requires explicit business-rule approval after this plan is reviewed.
+
+Output needed:
+Return ONE single task plan with the following sections:
+
+1. Current code findings
+
+   * What already exists from Phase 15E
+   * Whether Phase 15F-1 reference panels already exist
+   * Where hardcoded overhead/profit logic exists, if any
+
+2. Recommended application model
+
+   * Which settings should become editable defaults
+   * Which settings should be optional toggles
+   * Which settings should stay reference-only for now
+
+3. Formula decisions needed before build
+
+   * List every formula decision that needs approval
+   * Clearly state any proposed default formula, but mark it as needing approval
+
+4. Snapshot recommendation
+
+   * Whether estimates need snapshot fields
+   * Whether budgets need snapshot fields
+   * Proposed schema additions for a future build, if needed
+
+5. Recommended implementation order
+
+   * Keep this as one plan, but list the safest order of implementation inside the plan
+   * Do not split into separate Replit task plans
+
+6. Exact future files likely to be touched
+
+7. Access-control approach
+
+   * Owner/Admin visibility for sensitive margin/profit settings
+   * What regular internal contractors should or should not see
+
+8. Double-counting risks
+
+   * Especially with price book retailPrice, laborRate, subRate, materialFee, burdens, and existing calculator totals
+
+9. Test plan for the future build
+
+10. Done criteria for the first build after this planning phase
+
+Remember:
+Return the plan only. Do not build.
+Keep it as one task plan.

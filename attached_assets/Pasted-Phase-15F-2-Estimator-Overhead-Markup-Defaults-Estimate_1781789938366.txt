@@ -1,0 +1,195 @@
+Phase 15F-2 — Estimator Overhead/Markup Defaults + Estimate Snapshot
+
+Important:
+Keep this as ONE single Replit task/build.
+
+Do not split this into multiple smaller Replit plans.
+Do not create separate follow-up task plans for the later Phase 15F items.
+We will build future smaller steps separately later.
+
+Use the prior Phase 15F planning work as background, but build only the scoped Phase 15F-2 work below.
+
+Goal:
+Replace the Estimator Calculator’s invisible hardcoded 10% overhead and 15% profit logic with visible, editable per-estimate Overhead % and Markup % fields.
+
+These fields should prefill from company financial settings when configured. If company settings are blank, preserve existing behavior by using platform fallback values.
+
+Approved business rules for this build:
+
+1. Overhead formula:
+   `overhead = subtotal * (overheadPct / 100)`
+
+2. Markup/profit formula:
+   `markup = (subtotal + overhead) * (markupPct / 100)`
+
+3. Grand total formula:
+   `grandTotal = subtotal + overhead + markup`
+
+4. Null company settings fallback:
+   If `defaultOverheadPct` is null, prefill Overhead % with platform fallback `10`.
+   If `defaultMarkupPct` is null, prefill Markup % with platform fallback `15`.
+
+Do not use 0% as the fallback.
+
+5. Labels:
+
+* If value comes from company financial settings, label it as “Company default.”
+* If value comes from platform fallback, label it as “Platform default.”
+* If user edits it, label it as “Custom.”
+
+6. Percentage format:
+   All percentages are whole-number percentages.
+   Examples:
+
+* 10 means 10%
+* 15 means 15%
+* 25.5 means 25.5%
+
+At calculation time, use `value / 100`.
+
+7. Existing records:
+   Do not retroactively change existing estimates, budgets, invoices, expenses, projects, or price book items.
+
+Build scope:
+
+A. Schema changes
+
+Add nullable snapshot columns to `estimates`:
+
+* `appliedOverheadPct` numeric(7,4), nullable
+* `appliedMarkupPct` numeric(7,4), nullable
+* `appliedLaborBurdenPct` numeric(7,4), nullable
+* `appliedMaterialMarkupPct` numeric(7,4), nullable
+* `appliedSubcontractorMarkupPct` numeric(7,4), nullable
+* `appliedEquipmentCostPct` numeric(7,4), nullable
+* `settingsAppliedAt` timestamp, nullable
+
+For this phase, only these should be populated by the Estimator Calculator:
+
+* `appliedOverheadPct`
+* `appliedMarkupPct`
+* `settingsAppliedAt`
+
+The other four applied percentage fields should remain null for now.
+
+Add nullable snapshot columns to `project_budgets`:
+
+* `appliedOverheadPct` numeric(7,4), nullable
+* `appliedMarkupPct` numeric(7,4), nullable
+* `settingsAppliedAt` timestamp, nullable
+
+B. Estimator Calculator changes
+
+In `client/src/pages/estimator.tsx`:
+
+* Replace the hardcoded 10% overhead and 15% profit constants with editable state-driven fields.
+* Add editable inputs for:
+
+  * Overhead %
+  * Markup %
+* Prefill from company financial settings when configured.
+* If company setting is null, use platform fallback:
+
+  * Overhead: 10
+  * Markup: 15
+* Show source labels:
+
+  * Company default
+  * Platform default
+  * Custom
+* Recalculate grand total live as the user edits either field.
+* Save the applied values with the estimate:
+
+  * `appliedOverheadPct`
+  * `appliedMarkupPct`
+  * `settingsAppliedAt`
+* Send the other four applied percentage fields as null.
+
+C. Backend estimate save changes
+
+Update the estimate creation route and storage insert path so saved estimates persist:
+
+* `appliedOverheadPct`
+* `appliedMarkupPct`
+* `appliedLaborBurdenPct`
+* `appliedMaterialMarkupPct`
+* `appliedSubcontractorMarkupPct`
+* `appliedEquipmentCostPct`
+* `settingsAppliedAt`
+
+Do not change estimate line item creation logic.
+
+D. Project budget inheritance
+
+When creating a project budget from a source estimate:
+
+* If the source estimate has `appliedOverheadPct`, copy it to the project budget.
+* If the source estimate has `appliedMarkupPct`, copy it to the project budget.
+* If the source estimate has `settingsAppliedAt`, copy it to the project budget.
+* If source values are null, leave budget snapshot fields null.
+
+For empty/manual budgets:
+
+* Do not apply company defaults yet.
+* Leave applied snapshot fields null.
+
+E. Display
+
+Estimate detail/list:
+
+* Show a small read-only note when an estimate snapshot exists:
+  “Applied rates: Overhead X%, Markup Y%”
+* If snapshot is null, do not show a warning. Either omit the note or show “Rates not recorded” only where it naturally fits.
+
+Project Budget tab:
+
+* If budget snapshot exists, show a small read-only note:
+  “Inherited estimate rates: Overhead X%, Markup Y%”
+* If snapshot is null, omit the note.
+
+Out of scope for this build:
+
+* Do not change Contractor Calculator calculations.
+* Do not apply labor burden.
+* Do not apply material markup.
+* Do not apply subcontractor markup.
+* Do not apply equipment cost.
+* Do not add category toggles.
+* Do not apply defaults to empty/manual budgets.
+* Do not change Sales Dashboard or reporting.
+* Do not change invoices.
+* Do not change expenses.
+* Do not change price book values.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add production sheets or daily logs.
+* Do not retroactively update existing records.
+* Do not create additional Phase 15F task plans.
+
+Files likely touched:
+
+* `shared/schema.ts`
+* `server/routes.ts`
+* `server/storage.ts`
+* `client/src/pages/estimator.tsx`
+* `client/src/pages/company-estimates.tsx` or the existing estimate list/detail display file
+* `client/src/components/project-budget-tab.tsx`
+
+After build:
+
+* Run `npm run db:push`
+* Run `npm run check`
+
+Done:
+
+* Estimator no longer hides the 10% overhead and 15% markup/profit logic.
+* Overhead and Markup are visible and editable.
+* Company settings prefill values when configured.
+* Blank company settings preserve existing behavior using platform fallback 10% overhead and 15% markup.
+* Saved estimates snapshot the applied rates.
+* Budgets created from estimates inherit the saved estimate’s applied rates.
+* Contractor Calculator is unchanged.
+* Sales Dashboard is unchanged.
+* No old records are changed.
+* npm run check passes.

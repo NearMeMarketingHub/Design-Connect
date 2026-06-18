@@ -1,0 +1,80 @@
+Please revise #260 slightly before build approval.
+
+The plan is approved in scope, but update these implementation details first:
+
+1. Do not cap estimator percentage inputs at 100%
+
+In `client/src/pages/estimator.tsx`, the Overhead % and Markup % inputs should allow the same range as Company Financial Settings.
+
+Use:
+
+* min: 0
+* max: 999.99
+* step: 0.01
+
+Do not use max 100.
+
+Reason:
+Company financial settings allow values up to 999.99, and estimator overrides should not be more restrictive than company defaults.
+
+2. Make `settingsAppliedAt` backend-safe
+
+Do not blindly pass an ISO string into a timestamp column if the schema/storage expects a Date.
+
+Preferred behavior:
+
+* Frontend may omit `settingsAppliedAt`
+* Backend sets `settingsAppliedAt` to the current server time when `appliedOverheadPct` or `appliedMarkupPct` is present
+
+Acceptable alternative:
+
+* Frontend sends ISO string
+* Backend validates/coerces it into a Date before inserting
+
+Either way, make sure TypeScript passes cleanly and the database receives a valid timestamp.
+
+3. Keep snapshot fields optional and nullable
+
+The new applied percentage fields must be optional and nullable in the route validation so older save flows and legacy estimates do not break.
+
+Fields:
+
+* `appliedOverheadPct`
+* `appliedMarkupPct`
+* `appliedLaborBurdenPct`
+* `appliedMaterialMarkupPct`
+* `appliedSubcontractorMarkupPct`
+* `appliedEquipmentCostPct`
+* `settingsAppliedAt`
+
+4. Keep this as one single Replit task/build
+
+Do not split into additional smaller Replit task plans.
+
+Build only the #260 Phase 15F-2 scope:
+
+* Estimator overhead/markup editable fields
+* Estimate snapshot fields
+* Budget inheritance from source estimate
+* Small display notes for estimate/budget snapshots
+
+Do not add:
+
+* Contractor Calculator calculation changes
+* labor burden calculations
+* material markup calculations
+* subcontractor markup calculations
+* equipment cost calculations
+* category toggles
+* manual budget default application
+* Sales Dashboard/reporting
+* invoice changes
+* expense changes
+* price book changes
+* PDF changes
+* Stripe/billing
+* commission/payout logic
+* production sheets/daily logs
+* retroactive record updates
+
+After revision, return the updated #260 plan.
