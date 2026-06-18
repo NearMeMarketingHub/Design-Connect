@@ -19,6 +19,7 @@ import DocumentViewerModal from "@/components/document-viewer-modal";
 import SendForSignatureDialog from "@/components/send-for-signature-dialog";
 import ProjectBudgetTab from "@/components/project-budget-tab";
 import ProjectExpensesTab from "@/components/project-expenses-tab";
+import ProjectTimelineTab from "@/components/project-timeline-tab";
 import { 
   ArrowLeft,
   Calendar,
@@ -3817,11 +3818,6 @@ export default function ProjectDetails() {
 
           {/* TIMELINE TAB */}
           <TabsContent value="timeline" className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Project Timeline</h3>
-              <p className="text-sm text-muted-foreground">Track milestones and project phases</p>
-            </div>
-
             {/* Project Overview - Only visible to contractors/admins */}
             {canEdit && !staticProject && (
               <Card data-testid="card-project-overview">
@@ -3884,6 +3880,17 @@ export default function ProjectDetails() {
               </Card>
             )}
 
+            {/* New timeline items section */}
+            {!staticProject && (
+              <ProjectTimelineTab
+                projectId={projectId}
+                canWrite={canEdit}
+                isClient={user?.role === "client"}
+              />
+            )}
+
+            {/* Legacy phases section (collapsible, only shows for non-static projects with phases) */}
+            {!staticProject && apiPhases.length > 0 && (
             <Card>
               <CardContent className="p-6">
                 <div className="relative">
@@ -4238,6 +4245,7 @@ export default function ProjectDetails() {
                 </div>
               </CardContent>
             </Card>
+            )}
           </TabsContent>
 
           {/* MESSAGES TAB */}

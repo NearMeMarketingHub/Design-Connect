@@ -977,3 +977,36 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({
 });
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
+
+// Project Timeline Items — planning layer separate from project_phases
+export const TIMELINE_ITEM_TYPES = ["phase", "task", "milestone"] as const;
+export type TimelineItemType = typeof TIMELINE_ITEM_TYPES[number];
+
+export const TIMELINE_ITEM_STATUSES = ["not_started", "in_progress", "blocked", "completed", "cancelled"] as const;
+export type TimelineItemStatus = typeof TIMELINE_ITEM_STATUSES[number];
+
+export const projectTimelineItems = pgTable("project_timeline_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  itemType: text("item_type").notNull().default("task"),
+  status: text("status").notNull().default("not_started"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  completedAt: timestamp("completed_at"),
+  progressPercent: integer("progress_percent").notNull().default(0),
+  displayOrder: integer("display_order").notNull().default(0),
+  clientVisible: boolean("client_visible").notNull().default(false),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectTimelineItemSchema = createInsertSchema(projectTimelineItems).omit({
+  id: true, createdAt: true, updatedAt: true, completedAt: true,
+});
+export type InsertProjectTimelineItem = z.infer<typeof insertProjectTimelineItemSchema>;
+export type ProjectTimelineItem = typeof projectTimelineItems.$inferSelect;

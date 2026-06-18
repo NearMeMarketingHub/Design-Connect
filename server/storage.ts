@@ -69,7 +69,8 @@ import type {
   ProjectBudget, InsertProjectBudget,
   ProjectBudgetItem, InsertProjectBudgetItem,
   Expense, InsertExpense,
-  CompanyFinancialSettings, InsertCompanyFinancialSettings
+  CompanyFinancialSettings, InsertCompanyFinancialSettings,
+  ProjectTimelineItem, InsertProjectTimelineItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -431,6 +432,13 @@ export interface IStorage {
   createExpense(expense: InsertExpense): Promise<Expense>;
   updateExpense(id: string, data: Partial<InsertExpense>): Promise<Expense | undefined>;
   deleteExpense(id: string): Promise<void>;
+
+  // Project timeline item methods
+  getProjectTimelineItems(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectTimelineItem[]>;
+  getProjectTimelineItem(id: string): Promise<ProjectTimelineItem | undefined>;
+  createProjectTimelineItem(item: InsertProjectTimelineItem): Promise<ProjectTimelineItem>;
+  updateProjectTimelineItem(id: string, data: Partial<InsertProjectTimelineItem>): Promise<ProjectTimelineItem | undefined>;
+  deleteProjectTimelineItem(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2930,6 +2938,52 @@ export class DatabaseStorage implements IStorage {
         await this.recalculateBudgetActualTotal(item.budgetId);
       }
     }
+  }
+
+  // Project timeline item methods
+  async getProjectTimelineItems(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectTimelineItem[]> {
+    const conditions = [eq(schema.projectTimelineItems.projectId, projectId)];
+    if (clientVisibleOnly) {
+      conditions.push(eq(schema.projectTimelineItems.clientVisible, true));
+    }
+    return db
+      .select()
+      .from(schema.projectTimelineItems)
+      .where(and(...conditions))
+      .orderBy(schema.projectTimelineItems.displayOrder, schema.projectTimelineItems.createdAt);
+  }
+
+  async getProjectTimelineItem(id: string): Promise<ProjectTimelineItem | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.projectTimelineItems)
+      .where(eq(schema.projectTimelineItems.id, id));
+    return row;
+  }
+
+  async createProjectTimelineItem(item: InsertProjectTimelineItem): Promise<ProjectTimelineItem> {
+    const [row] = await db.insert(schema.projectTimelineItems).values(item).returning();
+    return row;
+  }
+
+  async updateProjectTimelineItem(id: string, data: Partial<InsertProjectTimelineItem>): Promise<ProjectTimelineItem | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    // Auto-set completedAt when status transitions to completed
+    if (data.status === "completed") {
+      updateData.completedAt = new Date();
+    } else if (data.status && data.status !== "completed") {
+      updateData.completedAt = null;
+    }
+    const [row] = await db
+      .update(schema.projectTimelineItems)
+      .set(updateData)
+      .where(eq(schema.projectTimelineItems.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteProjectTimelineItem(id: string): Promise<void> {
+    await db.delete(schema.projectTimelineItems).where(eq(schema.projectTimelineItems.id, id));
   }
 }
 

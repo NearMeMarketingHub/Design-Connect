@@ -8538,5 +8538,124 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Project Timeline Items ───────────────────────────────────────────────
+  // GET /api/projects/:projectId/timeline
+  // Returns all items (contractor/admin) or only clientVisible=true (client).
+  // Subcontractors/notaries receive an empty array (deferred).
+  app.get("/api/projects/:projectId/timeline", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    try {
+      const isClient = user.role === "client";
+      const isSubOrNotary =
+        user.role === "contractor" &&
+        (user.contractorType === "subcontractor" || user.contractorType === "notary");
+      if (isSubOrNotary) return res.json([]);
+      const items = await storage.getProjectTimelineItems(projectId, isClient);
+      return res.json(items);
+    } catch (err) {
+      console.error("[timeline:GET]", err);
+      return res.status(500).json({ message: "Failed to load timeline items" });
+    }
+  });
+
+  // POST /api/projects/:projectId/timeline
+  // Create a new timeline item. Write access: company_owner, isCompanyAdmin, admin.
+  app.post("/api/projects/:projectId/timeline", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    const canWrite =
+      user.role === "admin" ||
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      const companyId = user.companyId ?? project.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company context" });
+      const bodySchema = z.object({
+        title: z.string().min(1),
+        description: z.string().optional(),
+        itemType: z.enum(["phase", "task", "milestone"]).default("task"),
+        status: z.enum(["not_started", "in_progress", "blocked", "completed", "cancelled"]).default("not_started"),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        progressPercent: z.number().int().min(0).max(100).default(0),
+        displayOrder: z.number().int().default(0),
+        clientVisible: z.boolean().default(false),
+        assignedToUserId: z.string().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const item = await storage.createProjectTimelineItem({
+        ...parsed.data,
+        projectId,
+        companyId,
+        createdById: user.id,
+      });
+      return res.status(201).json(item);
+    } catch (err) {
+      console.error("[timeline:POST]", err);
+      return res.status(500).json({ message: "Failed to create timeline item" });
+    }
+  });
+
+  // PATCH /api/projects/:projectId/timeline/:itemId
+  // Update a timeline item. Same write guard as POST.
+  app.patch("/api/projects/:projectId/timeline/:itemId", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { itemId } = req.params;
+    const canWrite =
+      user.role === "admin" ||
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const existing = await storage.getProjectTimelineItem(itemId);
+      if (!existing) return res.status(404).json({ message: "Timeline item not found" });
+      const bodySchema = z.object({
+        title: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        itemType: z.enum(["phase", "task", "milestone"]).optional(),
+        status: z.enum(["not_started", "in_progress", "blocked", "completed", "cancelled"]).optional(),
+        startDate: z.string().nullable().optional(),
+        endDate: z.string().nullable().optional(),
+        progressPercent: z.number().int().min(0).max(100).optional(),
+        displayOrder: z.number().int().optional(),
+        clientVisible: z.boolean().optional(),
+        assignedToUserId: z.string().nullable().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+      const updated = await storage.updateProjectTimelineItem(itemId, parsed.data);
+      return res.json(updated);
+    } catch (err) {
+      console.error("[timeline:PATCH]", err);
+      return res.status(500).json({ message: "Failed to update timeline item" });
+    }
+  });
+
+  // DELETE /api/projects/:projectId/timeline/:itemId
+  // Delete a timeline item. Same write guard as POST.
+  app.delete("/api/projects/:projectId/timeline/:itemId", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { itemId } = req.params;
+    const canWrite =
+      user.role === "admin" ||
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const existing = await storage.getProjectTimelineItem(itemId);
+      if (!existing) return res.status(404).json({ message: "Timeline item not found" });
+      await storage.deleteProjectTimelineItem(itemId);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("[timeline:DELETE]", err);
+      return res.status(500).json({ message: "Failed to delete timeline item" });
+    }
+  });
+
   return httpServer;
 }
