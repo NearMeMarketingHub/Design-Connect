@@ -8744,12 +8744,25 @@ export async function registerRoutes(
 
   // ─── Project Selections ────────────────────────────────────────────────────
 
-  // Helper: validate an optional date string (YYYY-MM-DD).
+  // Helper: strictly validate an optional date string (YYYY-MM-DD).
   // Returns an error message if invalid, or null if OK.
+  // Uses UTC construction + round-trip check to reject impossible calendar dates
+  // like 2026-02-31 (which JavaScript Date would silently roll over into March).
   const validateSelectionDate = (date: string | null | undefined): string | null => {
     if (!date) return null;
-    const parsed = new Date(date);
-    return isNaN(parsed.getTime()) ? "dueDate is not a valid date" : null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return "dueDate must be in YYYY-MM-DD format";
+    }
+    const [year, month, day] = date.split("-").map(Number);
+    const utc = new Date(Date.UTC(year, month - 1, day));
+    if (
+      utc.getUTCFullYear() !== year ||
+      utc.getUTCMonth() + 1 !== month ||
+      utc.getUTCDate() !== day
+    ) {
+      return "dueDate is not a valid calendar date";
+    }
+    return null;
   };
 
   // Client-safe field projection — strips internal fields before sending to clients.
