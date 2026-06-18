@@ -1,0 +1,58 @@
+Please revise Phase 15F-1 slightly before build approval.
+
+The scope is good, but there is one access-control contradiction.
+
+The plan currently says regular internal contractors should see the financial default values, but it also says `GET /api/company/financial-settings` returns 403 for regular internal contractors and should be treated as "no settings."
+
+Both cannot be true.
+
+Please revise the behavior to match the existing Phase 15E access-control decision:
+
+* Company Owner and Company Admin can fetch and view the financial defaults.
+* Company Owner and Company Admin can see the link to `/company/financial-settings`.
+* Regular internal contractors should not see the actual overhead/markup/margin values.
+* Regular internal contractors should not see the settings link.
+* For regular internal contractors, either do not render the card at all, or show a generic message like: “Financial defaults are managed by your company admin.”
+* Do not change backend API access in this phase.
+* Do not modify `server/routes.ts` unless absolutely necessary for a bug fix.
+* Treat 403 from `GET /api/company/financial-settings` as expected for non-owner/admin users, not as an error toast.
+
+Keep the rest of the scope the same:
+
+Build only:
+
+* Add a “Company Financial Defaults” info card near the top of the Estimator Calculator for owner/admin users.
+* Add the same card near the top of the Contractor Calculator / Calculator tab for owner/admin users.
+* Fetch `GET /api/company/financial-settings`.
+* Show each non-null setting in plain language.
+* Show “No financial defaults configured” if owner/admin has no settings configured.
+* Show the settings link only for Company Owner/Admin.
+
+Do not change:
+
+* estimator calculations
+* contractor calculator calculations
+* price book calculations
+* saved estimate payloads
+* saved estimate totals
+* project budget calculations
+* project budget records
+* invoice calculations
+* expense actual calculations
+* sales dashboard/reporting
+* estimate PDFs
+* schema
+* db/push
+* Stripe/billing
+* commission/payout logic
+* production sheets/daily logs
+* historical records
+
+Done for Phase 15F-1:
+
+* Financial defaults are visible only to Company Owner/Admin in the calculator areas.
+* Regular internal contractors do not see sensitive margin/markup values.
+* No totals change anywhere.
+* No schema changes.
+* No db:push.
+* npm run check passes.

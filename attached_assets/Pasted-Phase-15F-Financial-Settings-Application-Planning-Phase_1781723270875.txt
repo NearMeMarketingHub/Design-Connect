@@ -1,0 +1,117 @@
+Phase 15F — Financial Settings Application Planning
+
+Phase 15E is complete. Company Financial Settings now exist and can store company-controlled defaults such as overhead %, markup %, labor burden %, material markup %, subcontractor markup %, equipment cost %, and notes.
+
+Now we need a planning phase for how these settings should eventually be used.
+
+Important:
+This is Plan Mode first. Do not make code changes yet. Return a detailed implementation plan only.
+
+Goal:
+Plan the safest way to apply company financial settings to future estimator, budget, and reporting workflows without changing existing saved estimates, invoices, budgets, expenses, or project records unexpectedly.
+
+Important distinction:
+The settings should act as company defaults for future work. They should not retroactively change historical records.
+
+Current rule:
+Percentages are stored as whole-number percentages:
+
+* 15 means 15%
+* 25.5 means 25.5%
+* blank/null means not set
+  At the point of calculation, future code would use value / 100.
+
+Please inspect:
+
+* Company Financial Settings page/API
+* Estimator Calculator
+* Price Book / Budget Admin
+* Budget item fields such as cost, burdens, materialFee, laborRate, subRate, retailPrice
+* Saved estimate creation
+* Estimate line items
+* Project Budget tab
+* Project budget item fields
+* Expenses and actual cost linkage
+* Sales Dashboard / financial reporting pages if relevant
+
+Questions the plan must answer:
+
+1. Where should company financial defaults first appear?
+2. Should defaults be used only to prefill editable fields, or should they automatically calculate values?
+3. Should these settings apply to the Estimator Calculator, Price Book, Project Budgets, Reports, or all of them eventually?
+4. Which setting should apply to which cost type?
+5. How should overhead be treated?
+6. How should default markup be treated?
+7. How should labor burden be treated?
+8. How should material markup be treated?
+9. How should subcontractor markup be treated?
+10. How should equipment/operating cost percentage be treated?
+11. How do we avoid double-counting existing price book fields like burdens, materialFee, laborRate, subRate, and retailPrice?
+12. Should saved estimates store a snapshot of the settings used at the time of creation?
+13. Should project budgets store a snapshot of the settings used at the time of creation?
+14. What schema changes would be needed if snapshots are required?
+15. What UI warnings or labels are needed so companies understand these are defaults?
+16. What should happen if settings are blank/null?
+17. What should happen if company settings change after estimates or budgets already exist?
+
+Preferred direction unless a better reason is found:
+
+* Financial settings should act as defaults for new work only.
+* Existing saved estimates should not change.
+* Existing project budgets should not change.
+* Existing invoices should not change.
+* Existing expenses should not change.
+* Defaults should prefill editable fields before they directly affect totals.
+* Any automatic calculation behavior should be explicit, visible, and reversible.
+* Avoid double-counting costs already included in price book items.
+* Do not apply settings globally to every existing price book item without a separate approval.
+
+Possible future approach:
+
+* Phase 15F-1: show company financial settings as read-only/default reference inside Estimator Calculator.
+* Phase 15F-2: allow new estimate calculations to optionally use defaults, with visible toggles/overrides.
+* Phase 15F-3: persist a snapshot of applied settings on saved estimates.
+* Phase 15F-4: apply settings to new manual project budgets if explicitly enabled.
+* Phase 15F-5: use stored snapshots for profitability reports.
+
+Guardrails:
+
+* Do not change code in this planning phase.
+* Do not change schema in this planning phase.
+* Do not run db:push.
+* Do not change estimator calculations yet.
+* Do not change price book calculations yet.
+* Do not change invoice calculations.
+* Do not change project budget calculations.
+* Do not change expense-to-budget actuals.
+* Do not change reports.
+* Do not change PDFs.
+* Do not change company branding.
+* Do not add Stripe/billing.
+* Do not add commission/payout logic.
+* Do not add production sheet/daily logs.
+* Do not retroactively update saved estimates, invoices, projects, budgets, expenses, or price book items.
+* Do not guess formulas.
+
+Plan should include:
+
+* Recommended financial settings usage model.
+* Recommended order of implementation phases.
+* Whether snapshot fields are needed.
+* Exact schema changes likely needed later, if any.
+* Exact files likely to be touched later.
+* UI placement recommendations.
+* Access-control approach.
+* Risks, especially double-counting risk.
+* Test plan for the future build.
+* Clear done criteria for the first implementation step after planning.
+
+Output needed:
+Return a clear written plan only. Do not build yet.
+
+Done for this planning phase looks like:
+
+* We understand how company financial settings should be used.
+* We know what formulas still need user/business-rule approval.
+* We know which implementation step should come first.
+* No code changes are made.

@@ -1,0 +1,85 @@
+Please revise Phase 15F before build approval.
+
+The current plan is too large for one build and includes calculation/schema/reporting changes that need business-rule approval first.
+
+Do not build the full #256 plan as written.
+
+Please split Phase 15F into smaller phases.
+
+Approved scope for the next build should be only:
+
+Phase 15F-1 — Financial Settings Reference Panel
+
+Goal:
+Display the company financial settings inside the Estimator Calculator and Contractor Calculator as reference/default information only.
+
+Build only:
+
+* Add a “Company Financial Defaults” info card near the top of the Estimator Calculator.
+* Add a “Company Financial Defaults” info card near the top of the Contractor Calculator / Calculator tab.
+* Fetch `GET /api/company/financial-settings`.
+* Show each non-null setting in plain language, such as:
+
+  * Overhead: 12%
+  * Markup: 15%
+  * Labor Burden: 22%
+  * Material Markup: 10%
+  * Subcontractor Markup: 8%
+  * Equipment Cost: 5%
+* If no settings are configured, show “No financial defaults configured.”
+* Show a link to `/company/financial-settings` only for Company Owner and Company Admin.
+* Regular internal contractors may see the values if they already have access to the calculator, but they should not see an edit/settings link.
+
+Do not change:
+
+* estimator calculations
+* contractor calculator calculations
+* price book calculations
+* saved estimate payloads
+* saved estimate totals
+* project budget calculations
+* project budget records
+* invoice calculations
+* expense actual calculations
+* sales dashboard/reporting
+* estimate PDFs
+* schema
+* db/push
+* Stripe/billing
+* commission/payout logic
+* production sheets/daily logs
+* historical records
+
+Do not add:
+
+* estimate snapshot columns
+* project budget snapshot columns
+* profitability reporting
+* category markup toggles
+* automatic overhead/markup calculations
+
+Important:
+The discovery that the Estimator Calculator has hardcoded 10% overhead and 15% profit is important, but do not replace those calculations yet.
+
+Before changing those formulas, we need a separate formula/spec phase to answer:
+
+* Does markup apply to subtotal only or subtotal + overhead?
+* Does overhead apply before or after category markups?
+* Should labor burden apply to labor only?
+* Should material markup apply to materials only?
+* Should subcontractor markup apply to subcontractor costs only?
+* Should equipment cost be an added cost, markup, or separate line?
+* How do we avoid double-counting price book items that already include burdens/markup/retail pricing?
+* Should saved estimates store snapshots of applied settings?
+* Which settings should be automatic versus optional toggles?
+
+Please return a revised plan for Phase 15F-1 only.
+
+Done for Phase 15F-1:
+
+* Financial defaults are visible in the calculator areas.
+* Settings link appears only for Company Owner/Admin.
+* No totals change anywhere.
+* No schema changes.
+* No db:push.
+* npm run check passes.
