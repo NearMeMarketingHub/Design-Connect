@@ -8776,6 +8776,8 @@ export async function registerRoutes(
     const { projectId } = req.params;
     try {
       const isClient = user.role === "client";
+      // Platform admins do not have access to project-scoped selection data
+      if (user.role === "admin") return res.status(403).json({ message: "Access denied" });
       // Subcontractors, notaries, and legacy notary role get nothing
       const isExternal =
         user.role === "notary" ||
@@ -8809,21 +8811,21 @@ export async function registerRoutes(
     try {
       const bodySchema = z.object({
         category: z.string().min(1),
-        room: z.string().optional(),
+        room: z.string().nullable().optional(),
         title: z.string().min(1),
-        description: z.string().optional(),
+        description: z.string().nullable().optional(),
         status: z.enum(["needed","options_sent","client_review","selected","approved","ordered","received","installed","cancelled"]).default("needed"),
         dueDate: z.string().nullable().optional(),
-        selectedOptionName: z.string().optional(),
-        selectedOptionDetails: z.string().optional(),
-        vendorName: z.string().optional(),
-        productUrl: z.string().optional(),
+        selectedOptionName: z.string().nullable().optional(),
+        selectedOptionDetails: z.string().nullable().optional(),
+        vendorName: z.string().nullable().optional(),
+        productUrl: z.string().nullable().optional(),
         allowanceAmount: z.string().nullable().optional(),
         estimatedCost: z.string().nullable().optional(),
         actualCost: z.string().nullable().optional(),
         clientVisible: z.boolean().default(false),
-        notes: z.string().optional(),
-        internalNotes: z.string().optional(),
+        notes: z.string().nullable().optional(),
+        internalNotes: z.string().nullable().optional(),
         displayOrder: z.number().int().default(0),
         assignedToUserId: z.string().nullable().optional(),
       });
