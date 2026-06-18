@@ -1,0 +1,81 @@
+Please revise #268 before build approval.
+
+The overall Phase 16 direction is good, but tighten these points first:
+
+1. Project access must be verified on every timeline route
+
+For `GET /api/projects/:projectId/timeline-items`:
+
+* Company Owner/Admin/Internal Contractor may view only if the project belongs to their company.
+* Client may view only if the project is assigned/linked to that client AND only items where `clientVisible = true`.
+* Subcontractor/notary should receive an empty array or 403 based on the existing project access pattern, but they must not see internal timeline data.
+* Do not allow users to enumerate timeline items by guessing project IDs.
+
+For `POST/PATCH/DELETE`:
+
+* Only Company Owner and Company Admin can write.
+* The project must belong to the user’s company.
+* The timeline item being patched/deleted must belong to the same `projectId` and `companyId`.
+* `companyId`, `createdBy`, and `completedAt` must be server-controlled.
+* Do not trust `companyId`, `createdBy`, or `completedAt` from the request body.
+
+2. Keep the legacy Phases & Milestones section low-risk
+
+Do not fully extract the existing inline phases/milestone-tasks logic into the new `ProjectTimelineTab` if that requires moving a large amount of existing state, mutations, handlers, or UI logic.
+
+Preferred safer approach:
+
+* Create the new `ProjectTimelineTab` component for the new `project_timeline_items` table, list view, Gantt view, and create/edit dialog.
+* In `project-details.tsx`, render the new component in the Timeline tab.
+* Preserve the existing phases/milestone-tasks UI below it as a collapsible “Phases & Milestones” section in `project-details.tsx`.
+* Do not duplicate or rewrite the old phase/milestone logic unless absolutely necessary.
+
+3. Assignee validation
+
+If `assignedToUserId` is included:
+
+* Validate that the assigned user belongs to the same company.
+* Prefer assigning only company owner/admin/internal contractor users for now.
+* Do not assign clients, subcontractors, or notaries unless explicitly approved later.
+* `assignedToUserId` should be nullable.
+
+4. Keep scope away from Phase 15 financial areas
+
+Do not touch:
+
+* estimator
+* budgets
+* expenses
+* invoices
+* price book
+* PDFs
+* Stripe/billing
+* commission/payout logic
+* production sheets
+* daily logs
+* selections
+* permitting
+* notifications
+
+5. Relevant files
+
+Expected likely files:
+
+* `shared/schema.ts`
+* `server/storage.ts`
+* `server/routes.ts`
+* `client/src/pages/project-details.tsx`
+* `client/src/components/project-timeline-tab.tsx`
+
+Do not include `project-budget-tab.tsx` or `project-expenses-tab.tsx` unless a real issue is discovered.
+
+6. After build requirements
+
+Because this adds a table:
+
+* Run `npm run db:push`
+* Run `npm run check`
+
+Please return the revised task plan.
+
+propose the task plan

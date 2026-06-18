@@ -1,0 +1,154 @@
+Phase 16 — Project Timeline / Gantt / Board View
+
+Important:
+This is Plan Mode only. Do not build yet.
+
+Keep this as ONE single Replit plan. Do not split this into multiple separate Replit task plans.
+
+Context:
+Phase 15 is complete. The app now has a strong financial foundation:
+
+* Estimates
+* Estimate-to-project workflow
+* Project budgets
+* Project expenses
+* Expense-to-budget actuals
+* Company financial settings
+* Estimator overhead/markup/category adjustment snapshots
+
+Now we are moving into the project-management side.
+
+Goal:
+Add a project timeline / Gantt / board-view foundation so contractors can plan, track, and manage work phases/tasks inside each project.
+
+This should become the backbone for later features like:
+
+* Client portal progress visibility
+* Selections / Job Book
+* Permitting
+* Production sheets
+* Daily logs
+* Notifications
+
+Primary user story:
+A company owner/admin or internal contractor opens a project and can create timeline items such as phases, tasks, or milestones with start/end dates, status, progress, and notes. They can view those items in a timeline/Gantt-style view and optionally a board/status view.
+
+Client-facing visibility should be planned carefully, but do not overbuild the final client portal in this phase.
+
+Please inspect:
+
+* Existing project schema
+* Existing project detail page/tabs
+* Project status/progress fields
+* Project Budget tab
+* Project Expenses tab
+* Client portal project view
+* Contractor/company project routes
+* Access-control patterns for company owner, company admin, internal contractor, client, subcontractor, notary
+* Existing UI components/tabs/cards/tables
+* Existing date formatting utilities
+* Existing drag/drop or board UI patterns, if any
+* Existing project chat/documents/progress components, if any
+
+Plan questions:
+
+1. What project timeline data model should be added?
+2. Should timeline items be stored in a new table, such as `project_timeline_items`?
+3. What fields should timeline items include?
+   Consider:
+
+   * id
+   * projectId
+   * companyId
+   * title
+   * description/notes
+   * itemType: phase/task/milestone
+   * status: not_started/in_progress/blocked/completed/cancelled
+   * startDate
+   * endDate
+   * completedAt
+   * progressPercent
+   * displayOrder
+   * clientVisible
+   * assignedToUserId, if safe
+   * dependency fields, if not too much for first version
+   * createdAt / updatedAt
+4. Should dependencies be included in Phase 16, or deferred?
+5. Should drag-and-drop/reordering be included in Phase 16, or deferred?
+6. Should this phase include a true visual Gantt chart, or a simpler timeline/table foundation first?
+7. Should there be both Timeline/Gantt and Board views in the same tab, or should Board be deferred?
+8. Should clients see timeline items now, or should client visibility be stored now and exposed later in Phase 21?
+9. Who can create/edit/delete timeline items?
+10. Who can view timeline items?
+11. Should regular internal contractors be able to edit timeline items, or only owner/admin?
+12. Should subcontractors/notaries ever see assigned tasks, or defer that?
+13. Should timeline items affect project status/progress automatically, or should that be manual for now?
+14. How should this interact with existing project progress/status?
+15. What cache invalidations are needed after create/edit/delete/reorder?
+16. What files/routes/schema are likely involved?
+17. Is db:push required?
+18. What is the safest first build scope?
+
+Preferred direction unless the code suggests otherwise:
+
+* Add a dedicated project timeline items table.
+* Keep project timeline company-scoped and project-scoped.
+* Company Owner and Company Admin can create/edit/delete.
+* Regular internal contractors can view; editing can be allowed only if existing app permissions already support internal contractor editing safely, otherwise keep edit to owner/admin.
+* Clients should not see internal-only timeline data.
+* Add `clientVisible` now if useful, but client-facing display can be deferred to Phase 21 unless there is already a safe client project page to show read-only visible items.
+* Keep subcontractor/notary timeline access deferred.
+* Do not auto-change project status or progress from timeline items yet.
+* Do not connect timeline to budgets, expenses, invoices, permits, selections, daily logs, or notifications yet.
+* Keep dependencies simple or defer them.
+* Avoid complicated drag-and-drop unless the app already has a safe pattern for it.
+* First version should prioritize clean data model, CRUD, and a useful project tab.
+
+Possible first version:
+
+* New Project Timeline tab on project detail page.
+* Timeline item list/table grouped by status or date.
+* Basic Gantt-style horizontal date visualization if straightforward.
+* Optional board/status grouping if low-risk.
+* Create/edit/delete dialog for timeline items.
+* Status, dates, progress percent, item type, clientVisible flag.
+* No auto-progress calculations.
+* No financial changes.
+* No client portal final buildout.
+
+Guardrails:
+
+* Do not build in this planning phase.
+* Do not change financial calculations.
+* Do not change estimator, budget, expense, invoice, price book, PDF, Stripe/billing, commission, payout, production sheet, or daily log logic.
+* Do not change Phase 15 financial behavior.
+* Do not expose internal financial data to clients.
+* Do not create notifications/emails yet.
+* Do not add selections/job book yet.
+* Do not add permitting yet.
+* Do not add production sheets yet.
+* Do not add daily logs yet.
+* Do not retroactively modify existing projects except adding related timeline records when users create them.
+* Do not create seeded/demo timeline records unless explicitly asked.
+
+Output needed:
+Return ONE written plan only with these sections:
+
+1. Current project-management code findings
+2. Recommended Phase 16 data model
+3. Recommended timeline item fields
+4. Recommended API routes
+5. Recommended access-control model
+6. Recommended UI placement and user flow
+7. Timeline/Gantt view recommendation
+8. Board view recommendation
+9. Client visibility recommendation
+10. What should be deferred
+11. Files likely to be touched
+12. Whether db:push is required
+13. Risks
+14. Test plan
+15. Done criteria for Phase 16
+
+Do not build yet.
+Return the plan only.
