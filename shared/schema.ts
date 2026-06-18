@@ -164,6 +164,13 @@ export const estimates = pgTable("estimates", {
   date: text("date").notNull(),
   projectId: varchar("project_id").references(() => projects.id),
   companyId: varchar("company_id").references(() => companies.id),
+  appliedOverheadPct: numeric("applied_overhead_pct", { precision: 7, scale: 4 }),
+  appliedMarkupPct: numeric("applied_markup_pct", { precision: 7, scale: 4 }),
+  appliedLaborBurdenPct: numeric("applied_labor_burden_pct", { precision: 7, scale: 4 }),
+  appliedMaterialMarkupPct: numeric("applied_material_markup_pct", { precision: 7, scale: 4 }),
+  appliedSubcontractorMarkupPct: numeric("applied_subcontractor_markup_pct", { precision: 7, scale: 4 }),
+  appliedEquipmentCostPct: numeric("applied_equipment_cost_pct", { precision: 7, scale: 4 }),
+  settingsAppliedAt: timestamp("settings_applied_at"),
 });
 
 export const insertEstimateSchema = createInsertSchema(estimates).omit({ id: true });
@@ -902,6 +909,9 @@ export const projectBudgets = pgTable("project_budgets", {
   totalEstimated: numeric("total_estimated").notNull().default("0"),
   totalActual: numeric("total_actual").notNull().default("0"),
   notes: text("notes"),
+  appliedOverheadPct: numeric("applied_overhead_pct", { precision: 7, scale: 4 }),
+  appliedMarkupPct: numeric("applied_markup_pct", { precision: 7, scale: 4 }),
+  settingsAppliedAt: timestamp("settings_applied_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -58,6 +58,9 @@ type ProjectBudget = {
   totalEstimated: string;
   totalActual: string;
   notes: string | null;
+  appliedOverheadPct: string | null;
+  appliedMarkupPct: string | null;
+  settingsAppliedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -664,6 +667,11 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
           {budget.notes && (
             <p className="mt-4 text-sm text-muted-foreground border-t pt-3" data-testid="text-budget-notes">
               {budget.notes}
+            </p>
+          )}
+          {budget.appliedOverheadPct != null && budget.appliedMarkupPct != null && (
+            <p className="mt-3 text-xs text-muted-foreground border-t pt-3" data-testid="text-budget-inherited-rates">
+              Inherited estimate rates: Overhead {parseFloat(budget.appliedOverheadPct)}%, Markup {parseFloat(budget.appliedMarkupPct)}%
             </p>
           )}
         </CardContent>

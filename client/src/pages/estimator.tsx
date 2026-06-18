@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
@@ -83,6 +83,12 @@ export default function Estimator() {
   const [lineItemCounter, setLineItemCounter] = useState(0);
   const [loadedEstimateId, setLoadedEstimateId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [overheadPct, setOverheadPct] = useState<number>(10);
+  const [markupPct, setMarkupPct] = useState<number>(15);
+  const [overheadSource, setOverheadSource] = useState<"company" | "platform" | "custom">("platform");
+  const [markupSource, setMarkupSource] = useState<"company" | "platform" | "custom">("platform");
+  const settingsPrefilledRef = useRef(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
   // "manual" = existing entry form; "pricebook" = price book picker
@@ -207,6 +213,32 @@ export default function Estimator() {
     return () => { cancelled = true; };
   }, [selectedProjectId]);
 
+  // Prefill overhead/markup from company financial settings (owner/admin only)
+  // Runs once when financialSettings resolves; ref guard prevents re-run after user edits
+  useEffect(() => {
+    if (settingsPrefilledRef.current) return;
+    if (!isOwnerOrAdmin) {
+      settingsPrefilledRef.current = true;
+      return;
+    }
+    if (financialSettings === undefined) return;
+    settingsPrefilledRef.current = true;
+    if (financialSettings?.defaultOverheadPct != null) {
+      setOverheadPct(parseFloat(String(financialSettings.defaultOverheadPct)));
+      setOverheadSource("company");
+    } else {
+      setOverheadPct(10);
+      setOverheadSource("platform");
+    }
+    if (financialSettings?.defaultMarkupPct != null) {
+      setMarkupPct(parseFloat(String(financialSettings.defaultMarkupPct)));
+      setMarkupSource("company");
+    } else {
+      setMarkupPct(15);
+      setMarkupSource("platform");
+    }
+  }, [financialSettings, isOwnerOrAdmin]);
+
   // Auto-load estimate from ?load= URL param on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -244,8 +276,8 @@ export default function Estimator() {
   }, []);
 
   const subtotal = lineItems.reduce((acc, i) => acc + i.total, 0);
-  const overhead = subtotal * 0.1;
-  const profit = subtotal * 0.15;
+  const overhead = subtotal * (overheadPct / 100);
+  const profit = (subtotal + overhead) * (markupPct / 100);
   const grandTotal = subtotal + overhead + profit;
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
@@ -340,6 +372,12 @@ export default function Estimator() {
         status: "draft",
         date: new Date().toISOString().split("T")[0],
         projectId: selectedProjectId,
+        appliedOverheadPct: overheadPct,
+        appliedMarkupPct: markupPct,
+        appliedLaborBurdenPct: null,
+        appliedMaterialMarkupPct: null,
+        appliedSubcontractorMarkupPct: null,
+        appliedEquipmentCostPct: null,
         lineItems: lineItems.map((li) => ({
           category: li.category,
           item: li.item,
@@ -860,13 +898,73 @@ export default function Estimator() {
                   {formatCurrency(subtotal)}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Overhead (10%)</span>
-                <span data-testid="text-overhead">{formatCurrency(overhead)}</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">Overhead %</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      overheadSource === "company"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                        : overheadSource === "custom"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {overheadSource === "company" ? "Company default" : overheadSource === "custom" ? "Custom" : "Platform default"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="999.99"
+                      step="0.01"
+                      value={overheadPct}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v)) { setOverheadPct(v); setOverheadSource("custom"); }
+                      }}
+                      className="h-7 w-20 text-sm text-right"
+                      data-testid="input-overhead-pct"
+                    />
+                    <span className="text-sm text-muted-foreground w-[80px] text-right" data-testid="text-overhead">
+                      {formatCurrency(overhead)}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Profit (15%)</span>
-                <span data-testid="text-profit">{formatCurrency(profit)}</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">Markup %</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                      markupSource === "company"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                        : markupSource === "custom"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {markupSource === "company" ? "Company default" : markupSource === "custom" ? "Custom" : "Platform default"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="999.99"
+                      step="0.01"
+                      value={markupPct}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v)) { setMarkupPct(v); setMarkupSource("custom"); }
+                      }}
+                      className="h-7 w-20 text-sm text-right"
+                      data-testid="input-markup-pct"
+                    />
+                    <span className="text-sm text-muted-foreground w-[80px] text-right" data-testid="text-profit">
+                      {formatCurrency(profit)}
+                    </span>
+                  </div>
+                </div>
               </div>
               <div className="pt-4 border-t border-border flex justify-between items-center">
                 <span className="font-heading font-bold text-lg">Grand Total</span>
@@ -963,7 +1061,12 @@ export default function Estimator() {
                     <TableCell>{est.projectName}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{est.date}</TableCell>
                     <TableCell className="font-medium">
-                      {formatCurrency(parseFloat(est.amount ?? "0"))}
+                      <div>{formatCurrency(parseFloat(est.amount ?? "0"))}</div>
+                      {est.appliedOverheadPct != null && est.appliedMarkupPct != null && (
+                        <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-applied-rates-${est.id}`}>
+                          Applied: Overhead {parseFloat(String(est.appliedOverheadPct))}%, Markup {parseFloat(String(est.appliedMarkupPct))}%
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant(est.status)}>

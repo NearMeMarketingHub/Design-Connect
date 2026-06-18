@@ -2705,6 +2705,12 @@ export async function registerRoutes(
     date: z.string().min(1, "date is required"),
     projectId: z.string().optional().nullable(),
     lineItems: z.array(z.any()).optional(),
+    appliedOverheadPct: z.number().nullable().optional(),
+    appliedMarkupPct: z.number().nullable().optional(),
+    appliedLaborBurdenPct: z.number().nullable().optional(),
+    appliedMaterialMarkupPct: z.number().nullable().optional(),
+    appliedSubcontractorMarkupPct: z.number().nullable().optional(),
+    appliedEquipmentCostPct: z.number().nullable().optional(),
   });
 
   const createInvoiceSchema = z.object({
@@ -3311,7 +3317,25 @@ export async function registerRoutes(
       }
 
       // All validations passed — safe to create records
-      const estimate = await storage.createEstimate({ ...estimateData, companyId: derivedCompanyId });
+      // Derive settingsAppliedAt server-side — set when either applied pct is non-null
+      const settingsAppliedAt =
+        (estimateData.appliedOverheadPct != null || estimateData.appliedMarkupPct != null)
+          ? new Date()
+          : null;
+      // Drizzle numeric columns require string values — convert number pcts to strings
+      const toNumericStr = (v: number | null | undefined): string | null | undefined =>
+        v == null ? v : String(v);
+      const estimate = await storage.createEstimate({
+        ...estimateData,
+        companyId: derivedCompanyId,
+        settingsAppliedAt,
+        appliedOverheadPct: toNumericStr(estimateData.appliedOverheadPct),
+        appliedMarkupPct: toNumericStr(estimateData.appliedMarkupPct),
+        appliedLaborBurdenPct: toNumericStr(estimateData.appliedLaborBurdenPct),
+        appliedMaterialMarkupPct: toNumericStr(estimateData.appliedMaterialMarkupPct),
+        appliedSubcontractorMarkupPct: toNumericStr(estimateData.appliedSubcontractorMarkupPct),
+        appliedEquipmentCostPct: toNumericStr(estimateData.appliedEquipmentCostPct),
+      });
 
       for (const item of sanitizedLineItems) {
         await storage.createEstimateLineItem({
@@ -8103,7 +8127,9 @@ export async function registerRoutes(
         }));
 
         // 5. Build budget header — default status to "active" for estimate-sourced budgets
+        // Inherit snapshot applied pct fields from the source estimate when present
         const resolvedStatus = isValidBudgetStatus(status) ? status : "active";
+        const sourceEstimateForSnapshot = sourceEstimateId ? await storage.getEstimate(sourceEstimateId) : null;
         const budgetData = {
           projectId: req.params.projectId,
           companyId,
@@ -8113,6 +8139,9 @@ export async function registerRoutes(
           totalEstimated,
           totalActual: "0",
           notes: (notes && typeof notes === "string" && notes.trim()) ? notes.trim() : null,
+          appliedOverheadPct: sourceEstimateForSnapshot?.appliedOverheadPct ?? null,
+          appliedMarkupPct: sourceEstimateForSnapshot?.appliedMarkupPct ?? null,
+          settingsAppliedAt: sourceEstimateForSnapshot?.settingsAppliedAt ?? null,
         };
 
         // 6. Atomic transaction: insert header + items + update projects.budget
