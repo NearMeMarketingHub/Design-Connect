@@ -122,6 +122,13 @@ export default function Estimator() {
 
   const isOwnerOrAdmin = user?.role === "company_owner" || user?.isCompanyAdmin === true;
 
+  // Price book read access: company_owner, isCompanyAdmin contractors, and regular internal
+  // contractors with a companyId. Platform admins are deliberately excluded — they have no
+  // reliable companyId in the Estimator context and the backend returns 400 when companyId
+  // is null. Subcontractors and notaries are excluded by the isInternalContractor check.
+  const canAccessPriceBook =
+    user?.role === "company_owner" || user?.isCompanyAdmin === true || isInternalContractor;
+
   const { data: financialSettings } = useQuery<CompanyFinancialSettings | null>({
     queryKey: ["/api/company/financial-settings"],
     queryFn: async () => {
@@ -129,7 +136,7 @@ export default function Estimator() {
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: isOwnerOrAdmin,
+    enabled: canAccessPriceBook,
     retry: false,
   });
 
@@ -138,13 +145,6 @@ export default function Estimator() {
     queryFn: () => apiRequest("GET", "/api/company/branding").then((r) => r.json()),
     enabled: user?.role === "company_owner" || user?.isCompanyAdmin === true || isInternalContractor,
   });
-
-  // Price book read access: company_owner, isCompanyAdmin contractors, and regular internal
-  // contractors with a companyId. Platform admins are deliberately excluded — they have no
-  // reliable companyId in the Estimator context and the backend returns 400 when companyId
-  // is null. Subcontractors and notaries are excluded by the isInternalContractor check.
-  const canAccessPriceBook =
-    user?.role === "company_owner" || user?.isCompanyAdmin === true || isInternalContractor;
 
   const {
     data: pbCategories = [],
@@ -213,14 +213,12 @@ export default function Estimator() {
     return () => { cancelled = true; };
   }, [selectedProjectId]);
 
-  // Prefill overhead/markup from company financial settings (owner/admin only)
-  // Runs once when financialSettings resolves; ref guard prevents re-run after user edits
+  // Prefill overhead/markup from company financial settings for all internal company users.
+  // Runs once when financialSettings resolves; ref guard prevents re-run after user edits.
+  // Non-company users (canAccessPriceBook=false) never trigger this query so financialSettings
+  // stays undefined and the guard never fires — platform defaults remain in place.
   useEffect(() => {
     if (settingsPrefilledRef.current) return;
-    if (!isOwnerOrAdmin) {
-      settingsPrefilledRef.current = true;
-      return;
-    }
     if (financialSettings === undefined) return;
     settingsPrefilledRef.current = true;
     if (financialSettings?.defaultOverheadPct != null) {
@@ -237,7 +235,7 @@ export default function Estimator() {
       setMarkupPct(15);
       setMarkupSource("platform");
     }
-  }, [financialSettings, isOwnerOrAdmin]);
+  }, [financialSettings]);
 
   // Auto-load estimate from ?load= URL param on mount
   useEffect(() => {
@@ -1064,7 +1062,7 @@ export default function Estimator() {
                       <div>{formatCurrency(parseFloat(est.amount ?? "0"))}</div>
                       {est.appliedOverheadPct != null && est.appliedMarkupPct != null && (
                         <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-applied-rates-${est.id}`}>
-                          Applied: Overhead {parseFloat(String(est.appliedOverheadPct))}%, Markup {parseFloat(String(est.appliedMarkupPct))}%
+                          Applied rates: Overhead {parseFloat(String(est.appliedOverheadPct))}%, Markup {parseFloat(String(est.appliedMarkupPct))}%
                         </div>
                       )}
                     </TableCell>

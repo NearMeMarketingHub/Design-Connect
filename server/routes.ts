@@ -1388,9 +1388,17 @@ export async function registerRoutes(
 
   app.get("/api/company/financial-settings", requireAuth, async (req, res, next) => {
     try {
-      const { user, allowed } = financialSettingsAccess(req, res);
+      const user = req.user as User;
       if (!user) return res.status(401).json({ message: "Unauthorized" });
-      if (!allowed) return res.status(403).json({ message: "Access denied: company owners and admins only" });
+      if (!user.companyId) return res.status(403).json({ message: "Access denied" });
+      // Read access: company_owner, company admin, and regular internal contractors
+      // (same group who can use the Estimator). Subcontractors, notaries, clients,
+      // and platform admins are excluded.
+      const isInternalCompanyUser =
+        user.role === "company_owner" ||
+        (user.role === "contractor" && user.isCompanyAdmin === true) ||
+        (user.role === "contractor" && !user.contractorType);
+      if (!isInternalCompanyUser) return res.status(403).json({ message: "Access denied" });
       const settings = await storage.getCompanyFinancialSettings(user.companyId);
       res.json(settings ?? null);
     } catch (error) { next(error); }
