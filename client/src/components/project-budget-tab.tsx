@@ -670,9 +670,16 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
             </p>
           )}
           {budget.appliedOverheadPct != null && budget.appliedMarkupPct != null && (
-            <p className="mt-3 text-xs text-muted-foreground border-t pt-3" data-testid="text-budget-inherited-rates">
-              Inherited estimate rates: Overhead {parseFloat(budget.appliedOverheadPct)}%, Markup {parseFloat(budget.appliedMarkupPct)}%
-            </p>
+            <div className="mt-3 border-t pt-3 space-y-1">
+              <p className="text-xs text-muted-foreground" data-testid="text-budget-inherited-rates">
+                Inherited estimate rates: Overhead {parseFloat(budget.appliedOverheadPct)}%, Markup {parseFloat(budget.appliedMarkupPct)}%
+              </p>
+              {budget.sourceEstimateId && (
+                <p className="text-xs text-muted-foreground" data-testid="text-budget-category-adjustment-note">
+                  Category adjustments (Labor Burden, Material Markup, Sub Markup) are captured in line item totals. View on source estimate for details.
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -729,6 +736,7 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
                     <TableHead>Unit</TableHead>
                     <TableHead className="text-right">Unit Cost Est.</TableHead>
                     <TableHead className="text-right">Total Est.</TableHead>
+                    <TableHead className="text-right">Total Actual</TableHead>
                     <TableHead>Notes</TableHead>
                     {canWrite && <TableHead className="w-20">Actions</TableHead>}
                   </TableRow>
@@ -747,6 +755,20 @@ export default function ProjectBudgetTab({ projectId, canWrite }: ProjectBudgetT
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(item.totalEstimated)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium" data-testid={`text-item-total-actual-${item.id}`}>
+                        {(() => {
+                          const actual = parseFloat(item.totalActual ?? "0");
+                          const estimated = parseFloat(item.totalEstimated ?? "0");
+                          if (actual === 0) {
+                            return <span className="text-muted-foreground">—</span>;
+                          }
+                          return (
+                            <span className={actual > estimated ? "text-amber-600" : "text-green-600"}>
+                              {formatCurrency(actual)}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {item.notes ?? "—"}

@@ -2700,7 +2700,7 @@ export async function registerRoutes(
     customId: z.string().min(1, "customId is required"),
     clientName: z.string().min(1, "clientName is required"),
     projectName: z.string().min(1, "projectName is required"),
-    amount: z.string().min(1, "amount is required"),
+    amount: z.union([z.string().min(1, "amount is required"), z.number()]),
     status: z.string().min(1, "status is required"),
     date: z.string().min(1, "date is required"),
     projectId: z.string().optional().nullable(),
@@ -3332,6 +3332,7 @@ export async function registerRoutes(
         v == null ? v : String(v);
       const estimate = await storage.createEstimate({
         ...estimateData,
+        amount: String(estimateData.amount),
         companyId: derivedCompanyId,
         settingsAppliedAt,
         appliedOverheadPct: toNumericStr(estimateData.appliedOverheadPct),
