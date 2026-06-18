@@ -1,0 +1,111 @@
+Phase 15G — Phase 15 Completion Audit & Punch List
+
+Important:
+This is Plan Mode only. Do not build yet.
+
+Keep this as ONE single Replit plan. Do not split it into multiple separate Replit task plans.
+
+Goal:
+Audit the current app after Phase 15A–15F and identify anything remaining before we call Phase 15 complete.
+
+Context:
+Phase 15 has included:
+
+* Financial/budgeting audit
+* Expense tracking foundation
+* Expense-to-budget actual cost linkage
+* Estimate-to-project workflow
+* Manual project budgets
+* Project-level expenses
+* Company Financial Settings
+* Financial defaults reference panels
+* Estimator Overhead % and Markup % editable defaults
+* Estimate applied-rate snapshots
+* Project budget snapshot inheritance
+* Estimator Labor Burden / Material Markup / Subcontractor Markup toggles
+* Type cleanup for applied-rates display
+
+Phase 15F is now considered complete.
+
+Deferred out of 15F unless separately approved later:
+
+* Equipment Cost % application
+* Manual/empty budget default application
+* Sales Dashboard profitability reporting
+* Contractor Calculator markup/overhead changes
+* PDF display of applied rates
+
+Guardrails:
+
+* Do not build in this planning phase.
+* Do not change schema.
+* Do not run db:push.
+* Do not change estimator calculations.
+* Do not change Contractor Calculator calculations.
+* Do not change Sales Dashboard/reporting.
+* Do not change invoices.
+* Do not change expenses or actual-cost linkage.
+* Do not change price book values.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add production sheets/daily logs.
+* Do not retroactively update existing records.
+
+Please inspect:
+
+* Financial Management Hub
+* Company Financial Settings
+* Estimator Calculator
+* Contractor Calculator
+* Estimate save/list/detail flows
+* Estimate-to-project flow
+* Project Budget tab
+* Manual budget creation
+* Budget-from-estimate creation
+* Project Expenses tab
+* Company-wide Expenses page
+* Expense-to-budget actual linkage
+* Price Book / Budget Admin
+* Sales Dashboard only to confirm it was not accidentally changed
+* schema/storage/routes for estimates, estimate_line_items, project_budgets, project_budget_items, expenses, company_financial_settings
+
+Audit questions:
+
+1. What Phase 15 features are complete?
+2. What Phase 15 features are partially complete?
+3. What bugs or mismatches remain from Phase 15?
+4. Did any prior build accidentally change out-of-scope areas?
+5. Are schema fields, storage methods, and API routes aligned?
+6. Are owner/admin vs regular contractor permissions consistent?
+7. Are clients, subcontractors, notaries, and unrelated users blocked from internal financial data?
+8. Are existing estimates, budgets, expenses, invoices, and projects preserved without retroactive changes?
+9. Does estimator overhead/markup fallback preserve previous 10% / 15% behavior when company settings are blank?
+10. Are saved estimate snapshots persisted and displayed correctly?
+11. Are budget snapshot fields inherited correctly from source estimates?
+12. Are manual budgets still created without automatically applying defaults?
+13. Are category adjustment toggles off by default and manual-line-item-only?
+14. Are price book items excluded from category adjustment bases?
+15. Are expense actuals still recalculating linked budget totals correctly?
+16. Are project expenses and company-wide expenses consistent?
+17. Is the Project Budget tab showing estimated vs actual cleanly?
+18. Are there any TypeScript risks, stale query invalidations, or missing cache invalidations?
+19. Are there any small UI polish issues that should be fixed before calling Phase 15 complete?
+20. What should be deferred to a future phase instead of included in Phase 15?
+
+Output needed:
+Return one written audit and punch-list plan with these sections:
+
+1. Current Phase 15 completion status
+2. Confirmed completed features
+3. Issues or gaps found
+4. Recommended final Phase 15 cleanup tasks
+5. What should be deferred out of Phase 15
+6. Files likely involved if cleanup is needed
+7. Risk level for each cleanup item
+8. Recommended order to finish Phase 15
+9. Done criteria for calling Phase 15 complete
+10. Test plan for final Phase 15 QA
+
+Do not build yet.
+Return the audit/punch-list plan only.
