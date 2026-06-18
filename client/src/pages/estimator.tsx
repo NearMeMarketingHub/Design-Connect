@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, parseErrorMessage } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
@@ -12,8 +12,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Plus, Trash2, Save, FileText, AlertTriangle, FolderOpen, Search, BookOpen } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, FileText, AlertTriangle, FolderOpen, Search, BookOpen, Settings } from "lucide-react";
 import type { Project, Estimate, EstimateLineItem, BudgetCategory, BudgetItem } from "@shared/schema";
+
+interface CompanyFinancialSettings {
+  defaultOverheadPct: string | null;
+  defaultMarkupPct: string | null;
+  defaultLaborBurdenPct: string | null;
+  defaultMaterialMarkupPct: string | null;
+  defaultSubcontractorMarkupPct: string | null;
+  defaultEquipmentCostPct: string | null;
+  overheadNotes: string | null;
+}
 
 type LineItem = {
   _id: number;
@@ -103,6 +113,19 @@ export default function Estimator() {
   // Internal contractor: regular company team member (not a subcontractor or notary)
   const isInternalContractor =
     user?.role === "contractor" && !!user?.companyId && !user?.contractorType;
+
+  const isOwnerOrAdmin = user?.role === "company_owner" || user?.isCompanyAdmin === true;
+
+  const { data: financialSettings } = useQuery<CompanyFinancialSettings | null>({
+    queryKey: ["/api/company/financial-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/company/financial-settings", { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: isOwnerOrAdmin,
+    retry: false,
+  });
 
   const { data: company } = useQuery({
     queryKey: ["/api/company/branding"],
@@ -384,6 +407,53 @@ export default function Estimator() {
       {selectedProjectId && lineItems.length === 0 && (
         <p className="text-sm text-muted-foreground" data-testid="hint-no-line-items">
           Add at least one line item before saving.
+        </p>
+      )}
+
+      {/* Financial Defaults reference card — owner/admin only */}
+      {isOwnerOrAdmin && (
+        <Card className="border-muted" data-testid="card-financial-defaults">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-start gap-2">
+                <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium leading-tight">Company Financial Defaults</p>
+                  {(() => {
+                    if (!financialSettings) return (
+                      <p className="text-xs text-muted-foreground mt-0.5">No financial defaults configured.</p>
+                    );
+                    const entries = [
+                      { label: "Overhead", value: financialSettings.defaultOverheadPct },
+                      { label: "Markup", value: financialSettings.defaultMarkupPct },
+                      { label: "Labor Burden", value: financialSettings.defaultLaborBurdenPct },
+                      { label: "Material Markup", value: financialSettings.defaultMaterialMarkupPct },
+                      { label: "Subcontractor Markup", value: financialSettings.defaultSubcontractorMarkupPct },
+                      { label: "Equipment Cost", value: financialSettings.defaultEquipmentCostPct },
+                    ].filter((e) => e.value !== null && e.value !== undefined && e.value !== "");
+                    if (entries.length === 0) return (
+                      <p className="text-xs text-muted-foreground mt-0.5">No financial defaults configured.</p>
+                    );
+                    return (
+                      <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-financial-defaults-values">
+                        {entries.map((e) => `${e.label}: ${e.value}%`).join("  ·  ")}
+                      </p>
+                    );
+                  })()}
+                </div>
+              </div>
+              <Link href="/company/financial-settings">
+                <Button variant="ghost" size="sm" className="text-xs h-7 px-2 shrink-0" data-testid="link-configure-financial-settings">
+                  Configure in Financial Settings →
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {!isOwnerOrAdmin && isInternalContractor && (
+        <p className="text-xs text-muted-foreground" data-testid="text-financial-defaults-restricted">
+          Financial defaults are managed by your company admin.
         </p>
       )}
 
