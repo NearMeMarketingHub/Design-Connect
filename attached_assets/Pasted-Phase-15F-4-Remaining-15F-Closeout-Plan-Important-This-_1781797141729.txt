@@ -1,0 +1,113 @@
+Phase 15F-4 — Remaining 15F Closeout Plan
+
+Important:
+This is Plan Mode only. Do not build yet.
+
+Keep this as ONE single Replit plan. Do not split this into multiple separate Replit task plans.
+
+Context:
+Phase 15F work so far:
+
+* 15F-1: Company Financial Defaults reference panels were added.
+* 15F-2: Estimator Overhead % and Markup % were made visible/editable, with estimate snapshots and budget inheritance.
+* 15F-3: Estimator category adjustment toggles were added for Labor Burden %, Material Markup %, and Subcontractor Markup %, using manual-only line items and excluding price book items.
+* Equipment Cost % has not been applied yet.
+* Contractor Calculator calculations should remain unchanged.
+* Sales Dashboard/reporting has not been changed.
+* Invoices, expenses, price book values, PDFs, Stripe/billing, commissions, production sheets, and daily logs are out of scope.
+
+Goal:
+Inspect the current code after 15F-3 and return a plan for the remaining work needed to call Phase 15F complete.
+
+Please inspect:
+
+* `client/src/pages/estimator.tsx`
+* `client/src/pages/contractor-calculator.tsx`
+* `client/src/components/project-budget-tab.tsx`
+* `client/src/pages/company-estimates.tsx`
+* `client/src/pages/company-financial-settings.tsx`
+* `client/src/pages/sales-dashboard.tsx`
+* `shared/schema.ts`
+* `server/routes.ts`
+* `server/storage.ts`
+
+Questions to answer:
+
+1. Did 15F-3 land cleanly?
+
+   * Category toggles off by default?
+   * Category adjustments named and visible?
+   * Category adjustments limited to manual line items only?
+   * Price book items excluded?
+   * Off toggles save null?
+   * On toggles save the applied percentage, including 0 if entered?
+   * `settingsAppliedAt` checks all six applied percentage fields?
+   * Contractor Calculator unchanged?
+   * Sales Dashboard unchanged?
+   * No schema/db changes from 15F-3?
+
+2. Equipment Cost %
+
+   * Should Equipment Cost % be applied in Phase 15F or deferred?
+   * If applied, what is the safest formula?
+   * Is it a percent of subtotal?
+   * Is it a percent of adjusted cost?
+   * Is it a separate named summary line?
+   * Should it apply only to manual line items?
+   * Is there enough information in the current data model to apply it safely?
+   * Recommendation: defer unless the formula is unambiguous.
+
+3. Manual/empty project budgets
+
+   * Should manual project budgets have an optional “Record company overhead/markup defaults” toggle?
+   * Should that toggle only snapshot the rates, or should it affect budget totals?
+   * If it affects totals, where are those totals displayed?
+   * Should it use company defaults only, platform fallback, or editable custom values?
+   * Recommendation: do not change budget totals unless there is a visible, explicit budget-level calculation model.
+
+4. Sales Dashboard / profitability
+
+   * Should snapshot-based reporting be part of 15F, or deferred to a reporting phase?
+   * Recommendation: defer reporting until estimator/budget snapshot data is tested and stable.
+
+5. Contractor Calculator
+
+   * Confirm it should remain unchanged because it uses price book `retailPrice`.
+   * Do not propose applying overhead/markup on top of `retailPrice` unless explicitly marking it as deferred/future.
+
+Guardrails:
+
+* Do not build in this planning phase.
+* Do not change schema.
+* Do not run db:push.
+* Do not change estimator calculations in this plan.
+* Do not change Contractor Calculator calculations.
+* Do not change Sales Dashboard.
+* Do not change invoices.
+* Do not change expenses or actual-cost linkage.
+* Do not change price book values.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add production sheets/daily logs.
+* Do not retroactively update existing records.
+
+Output needed:
+Return ONE written plan with these sections:
+
+1. Current 15F status
+2. 15F-3 verification findings
+3. Remaining 15F items
+4. Equipment Cost recommendation
+5. Manual budget defaults recommendation
+6. Sales Dashboard/reporting recommendation
+7. Contractor Calculator recommendation
+8. Recommended final 15F build, if any
+9. What should be deferred out of 15F
+10. Files likely involved
+11. Risk level
+12. Test plan
+13. Done criteria for calling 15F complete
+
+Important:
+Do not build yet. Return the plan only.
