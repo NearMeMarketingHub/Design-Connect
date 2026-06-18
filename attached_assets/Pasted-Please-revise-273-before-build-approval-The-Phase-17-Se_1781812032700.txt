@@ -1,0 +1,129 @@
+Please revise #273 before build approval.
+
+The Phase 17 Selections / Job Book plan is good overall, but tighten the client-facing data exposure rules.
+
+Main issue:
+For client users, `GET /api/projects/:projectId/selections` should not return the full project_selections row just because `clientVisible = true`.
+
+Client-visible should mean the client can see a safe client-facing version of the selection, not internal company fields.
+
+Required revision:
+
+1. Client response shaping
+
+For `GET /api/projects/:projectId/selections`:
+
+Company Owner/Admin/Internal Contractor:
+
+* Can receive full selection rows for their company project.
+
+Client:
+
+* Must only receive selections where `clientVisible = true`.
+* Must only receive safe client-facing fields.
+
+Client-safe fields should include:
+
+* id
+* projectId
+* category
+* room
+* title
+* description
+* status
+* dueDate
+* selectedOptionName
+* selectedOptionDetails
+* vendorName
+* productUrl
+* notes
+* updatedAt
+
+Do not include these fields in client responses:
+
+* internalNotes
+* actualCost
+* estimatedCost
+* allowanceAmount, unless explicitly approved as client-facing later
+* assignedToUserId
+* createdById
+* companyId
+* displayOrder if not needed
+* any other internal-only fields
+
+2. Client UI
+
+Client read-only Selections view should use only the safe client-facing fields.
+
+Do not display:
+
+* internalNotes
+* actualCost
+* estimatedCost
+* allowanceAmount
+* assigned user
+* createdBy/internal fields
+
+3. Company-side UI
+
+Company Owner/Admin/Internal Contractor views can show the full internal selection data, including:
+
+* allowanceAmount
+* estimatedCost
+* actualCost
+* internalNotes
+* assigned team member
+
+4. Server-controlled fields
+
+On POST/PATCH:
+
+* `companyId` must be server-derived.
+* `createdById` must be server-derived.
+* `createdAt` / `updatedAt` must be server-controlled.
+* Do not trust these from the request body.
+
+5. PATCH validation
+
+For PATCH:
+
+* Verify the selection belongs to the requested `projectId`.
+* Verify the selection belongs to the authenticated user’s `companyId`.
+* Validate `dueDate` if provided.
+* Update `updatedAt`.
+
+6. Keep the rest of the scope the same
+
+Do not change:
+
+* Phase 15 financial behavior
+* estimator calculations
+* budgets
+* expenses or actual-cost linkage
+* invoices
+* price book
+* PDFs
+* Stripe/billing
+* commission/payout logic
+* production sheets
+* daily logs
+* permitting
+* notifications/emails
+* existing records retroactively
+
+Keep:
+
+* new `project_selections` table
+* Project Selections tab
+* manual create/edit/delete
+* status badges
+* grouped list
+* clientVisible flag
+* product/vendor URL fields
+* no file uploads in Phase 17
+* no import in Phase 17
+* no budget/expense/invoice integration in Phase 17
+
+Please return the revised task plan.
+
+propose the task plan

@@ -1,0 +1,203 @@
+Phase 17 — Selections / Job Book Import & Create
+
+Important:
+This is Replit Plan Mode.
+
+Keep this as ONE single Replit plan. Do not split it into multiple separate Replit task plans.
+
+Context:
+Phase 15 is complete:
+
+* Estimates
+* Estimate-to-project workflow
+* Project budgets
+* Project expenses
+* Expense-to-budget actuals
+* Company financial settings
+* Estimator overhead/markup/category adjustment snapshots
+
+Phase 16 is complete:
+
+* Project Timeline / Gantt View
+* project_timeline_items table
+* Timeline tab with list/Gantt view
+* Owner/Admin timeline CRUD
+* Internal contractor view access
+* Client-visible timeline item support
+* Legacy phases/milestones preserved
+
+Now we are moving into selections / job book functionality.
+
+Goal:
+Add a Selections / Job Book foundation so contractors can create, organize, track, and optionally expose project selections to clients.
+
+Selections are project-specific choices such as:
+
+* Flooring
+* Cabinets
+* Countertops
+* Paint colors
+* Fixtures
+* Appliances
+* Tile
+* Doors/windows
+* Hardware
+* Lighting
+* Plumbing fixtures
+* Other finish/material selections
+
+Primary contractor story:
+A company owner/admin or permitted internal team member opens a project and creates selection items grouped by category or room. Each selection can track requested option, selected option, vendor, allowance/budget amount, actual cost if known, status, due date, notes, files/links, and whether it is visible to the client.
+
+Primary client story:
+A client can view client-visible selections, see what is pending/approved, and possibly provide a choice or approval if that is safe for this first version.
+
+Please inspect:
+
+* Existing project detail page and tab structure
+* Existing client project portal/view
+* Existing document/file upload patterns, if any
+* Existing project budget tab
+* Existing project expenses tab
+* Existing estimate/project schemas
+* Existing route access-control patterns
+* Existing company owner/admin/internal contractor permissions
+* Existing client project access checks
+* Existing UI components for tables, cards, dialogs, badges, status selectors, and file/link fields
+
+Plan questions:
+
+1. What data model should selections use?
+2. Should selections be stored in a new table, such as `project_selections`?
+3. Should there also be a `project_selection_options` table, or should first version keep one selected option on the main selection row?
+4. What fields should a selection include?
+   Consider:
+
+   * id
+   * projectId
+   * companyId
+   * category
+   * room/area
+   * title
+   * description
+   * status
+   * requestedBy
+   * assignedToUserId
+   * dueDate
+   * selectedOptionName
+   * selectedOptionDetails
+   * vendorName
+   * vendorUrl
+   * productUrl
+   * allowanceAmount
+   * estimatedCost
+   * actualCost
+   * clientVisible
+   * clientCanRespond
+   * clientResponse
+   * approvedByClientAt
+   * approvedByCompanyAt
+   * displayOrder
+   * notes/internalNotes
+   * createdBy
+   * createdAt / updatedAt
+5. What statuses should be used?
+   Consider:
+
+   * needed
+   * options_sent
+   * client_review
+   * selected
+   * approved
+   * ordered
+   * received
+   * installed
+   * cancelled
+6. Should file uploads/images be included now, or deferred?
+7. Should external product/vendor links be included now?
+8. Should selections affect budgets or expenses in Phase 17, or stay informational only?
+9. Should clients be able to make selections/approvals now, or only view client-visible selections?
+10. Who can create/edit/delete selections?
+11. Who can view internal vs client-visible selections?
+12. Should regular internal contractors be able to create/edit selections?
+13. Should subcontractors/notaries see selections?
+14. Should selections appear as a new Project Detail tab?
+15. Should selections appear in the client portal now, or should client exposure be deferred to Phase 21?
+16. Should there be import support in first version?
+17. If import is included, should it be CSV upload, copy/paste table, or manual bulk add?
+18. Is a “Job Book” page needed, or is a Project Selections tab enough for Phase 17?
+19. What cache invalidations are needed after create/edit/delete?
+20. What files/routes/schema are likely involved?
+21. Is db:push required?
+22. What is the safest first build scope?
+
+Preferred direction unless the code suggests otherwise:
+
+* Add a dedicated `project_selections` table.
+* Keep selections project-scoped and company-scoped.
+* First version should prioritize manual create/edit/delete and clear tracking.
+* Add a Project Detail tab called “Selections” or “Job Book.”
+* Company Owner and Company Admin can create/edit/delete selections.
+* Regular internal contractors can view; editing can be allowed only if existing app permissions already support similar internal editing safely.
+* Clients should only see selections where `clientVisible = true`.
+* Client response/approval can be planned, but keep it simple for first version.
+* Do not connect selections to budgets, expenses, invoices, or financial totals yet.
+* Do not add automatic budget changes based on selections.
+* Do not add purchase orders yet.
+* Do not add notifications/emails yet.
+* Do not add permitting, production sheets, daily logs, or payouts.
+* File/image upload should be included only if the app already has a safe upload pattern; otherwise defer.
+* Product/vendor URL fields are safe to include now.
+* Import can be deferred unless there is a very simple low-risk CSV/copy-paste approach.
+
+Possible first version:
+
+* New Selections tab on project detail page.
+* Selection list grouped by category/status.
+* Create/edit/delete dialog.
+* Fields: category, room/area, title, description, status, dueDate, selectedOptionName, selectedOptionDetails, vendorName, productUrl, allowanceAmount, estimatedCost, actualCost, clientVisible, notes/internalNotes.
+* Simple status badges.
+* Optional summary cards: Pending, Client Review, Approved, Ordered/Received.
+* Client-visible flag stored now.
+* Client portal read-only display can be planned but not overbuilt unless there is already a safe place to add it.
+* No budget/expense/invoice integration yet.
+
+Guardrails:
+
+* Do not change Phase 15 financial behavior.
+* Do not change estimator calculations.
+* Do not change budgets.
+* Do not change expenses or actual-cost linkage.
+* Do not change invoices.
+* Do not change price book.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add production sheets.
+* Do not add daily logs.
+* Do not add permitting.
+* Do not add notifications/emails.
+* Do not retroactively modify existing projects except adding selection records when users create them.
+* Do not create seeded/demo selection records unless explicitly asked.
+
+Output needed:
+Return ONE written plan with these sections:
+
+1. Current project/client code findings
+2. Recommended Phase 17 data model
+3. Recommended selection fields
+4. Recommended statuses
+5. Recommended API routes
+6. Recommended access-control model
+7. Recommended UI placement and user flow
+8. Client visibility/client response recommendation
+9. Import recommendation
+10. File/image/link handling recommendation
+11. What should be deferred
+12. Files likely to be touched
+13. Whether db:push is required
+14. Risks
+15. Test plan
+16. Done criteria for Phase 17
+
+propose the task plan
