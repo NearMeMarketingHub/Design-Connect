@@ -8561,26 +8561,40 @@ export async function registerRoutes(
     }
   });
 
+  // Helper: validate optional timeline date strings.
+  // Returns an error message if invalid, or null if OK.
+  // Allows null/undefined/empty. Rejects unparseable strings.
+  // When both dates are provided and valid, rejects endDate < startDate.
+  const validateTimelineDates = (
+    startDate: string | null | undefined,
+    endDate: string | null | undefined
+  ): string | null => {
+    const parseDate = (d: string | null | undefined): Date | null | "invalid" => {
+      if (!d) return null;
+      const parsed = new Date(d);
+      return isNaN(parsed.getTime()) ? "invalid" : parsed;
+    };
+    const start = parseDate(startDate);
+    const end = parseDate(endDate);
+    if (start === "invalid") return "startDate is not a valid date";
+    if (end === "invalid") return "endDate is not a valid date";
+    if (start && end && (end as Date) < (start as Date)) return "endDate must not be before startDate";
+    return null;
+  };
+
   // POST /api/projects/:projectId/timeline-items
-  // Create a new timeline item. Write access: company_owner, isCompanyAdmin, admin.
+  // Create a new timeline item. Write access: company_owner and company admin only.
   app.post("/api/projects/:projectId/timeline-items", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
     const user = req.user as User;
     const { projectId } = req.params;
     const canWrite =
-      user.role === "admin" ||
       user.role === "company_owner" ||
       (user.role === "contractor" && user.isCompanyAdmin === true);
     if (!canWrite) return res.status(403).json({ message: "Access denied" });
     try {
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
-      // Resolve company context: prefer user's own companyId; for admins derive from the
-      // project's assigned contractor since admins don't have their own company record.
-      let companyId = user.companyId ?? null;
-      if (!companyId && project.contractorId) {
-        const contractor = await storage.getUser(project.contractorId);
-        companyId = contractor?.companyId ?? null;
-      }
+      const companyId = user.companyId ?? null;
       if (!companyId) return res.status(400).json({ message: "No company context" });
       const bodySchema = z.object({
         title: z.string().min(1),
@@ -8596,6 +8610,10 @@ export async function registerRoutes(
       });
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate dates
+      const dateError = validateTimelineDates(parsed.data.startDate, parsed.data.endDate);
+      if (dateError) return res.status(400).json({ message: dateError });
 
       // Validate assignedToUserId: must be same-company owner/admin/internal contractor only
       if (parsed.data.assignedToUserId) {
@@ -8633,7 +8651,6 @@ export async function registerRoutes(
     const user = req.user as User;
     const { projectId, itemId } = req.params;
     const canWrite =
-      user.role === "admin" ||
       user.role === "company_owner" ||
       (user.role === "contractor" && user.isCompanyAdmin === true);
     if (!canWrite) return res.status(403).json({ message: "Access denied" });
@@ -8645,7 +8662,7 @@ export async function registerRoutes(
       if (existing.projectId !== projectId) {
         return res.status(403).json({ message: "Item does not belong to this project" });
       }
-      if (user.role !== "admin" && existing.companyId !== user.companyId) {
+      if (existing.companyId !== user.companyId) {
         return res.status(403).json({ message: "Item does not belong to your company" });
       }
 
@@ -8663,6 +8680,12 @@ export async function registerRoutes(
       });
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate dates against the final merged state (incoming overrides existing)
+      const finalStartDate = "startDate" in parsed.data ? parsed.data.startDate : existing.startDate;
+      const finalEndDate = "endDate" in parsed.data ? parsed.data.endDate : existing.endDate;
+      const dateError = validateTimelineDates(finalStartDate, finalEndDate);
+      if (dateError) return res.status(400).json({ message: dateError });
 
       // Validate assignedToUserId: must be same-company owner/admin/internal contractor only
       if (parsed.data.assignedToUserId) {
@@ -8696,7 +8719,6 @@ export async function registerRoutes(
     const user = req.user as User;
     const { projectId, itemId } = req.params;
     const canWrite =
-      user.role === "admin" ||
       user.role === "company_owner" ||
       (user.role === "contractor" && user.isCompanyAdmin === true);
     if (!canWrite) return res.status(403).json({ message: "Access denied" });
@@ -8708,7 +8730,7 @@ export async function registerRoutes(
       if (existing.projectId !== projectId) {
         return res.status(403).json({ message: "Item does not belong to this project" });
       }
-      if (user.role !== "admin" && existing.companyId !== user.companyId) {
+      if (existing.companyId !== user.companyId) {
         return res.status(403).json({ message: "Item does not belong to your company" });
       }
 

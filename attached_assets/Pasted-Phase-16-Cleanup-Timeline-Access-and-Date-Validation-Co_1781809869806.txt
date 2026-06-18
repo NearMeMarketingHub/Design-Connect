@@ -1,0 +1,84 @@
+Phase 16 Cleanup — Timeline Access and Date Validation
+
+Context:
+Phase 16 Project Timeline / Gantt View has been built and db:push/npm check came back clean.
+
+The build mostly looks good, but two cleanup items need to be fixed before Phase 16 is considered complete.
+
+Issue 1:
+Timeline item write access currently allows `user.role === "admin"`.
+
+That is outside the approved Phase 16 scope.
+
+Expected behavior:
+
+* Company Owner can create/edit/delete timeline items.
+* Company Admin contractor can create/edit/delete timeline items.
+* Regular internal contractor can view but not create/edit/delete.
+* Client can view only clientVisible items for their assigned project.
+* Subcontractor/notary should not see internal timeline data.
+* Platform Super Admin should not create/edit/delete company timeline items through these company-side routes.
+
+Required fix:
+In both backend routes and frontend `canWrite` logic, remove platform admin write access for timeline items.
+
+Backend:
+
+* In POST `/api/projects/:projectId/timeline-items`, remove `user.role === "admin"` from the write guard.
+* In PATCH `/api/projects/:projectId/timeline-items/:itemId`, remove `user.role === "admin"` from the write guard.
+* In DELETE `/api/projects/:projectId/timeline-items/:itemId`, remove `user.role === "admin"` from the write guard.
+* Keep Company Owner and Company Admin write access.
+* PATCH/DELETE should still verify the item belongs to the requested projectId and authenticated companyId.
+* Since platform admin no longer writes timeline items, do not derive companyId from project.contractorId for admin writes.
+
+Frontend:
+
+* In `client/src/pages/project-details.tsx`, remove `user?.role === "admin"` from the `canWrite` prop passed to `ProjectTimelineTab`.
+* Keep Company Owner / Company Admin write access.
+
+Issue 2:
+Timeline item date validation is too loose.
+
+Required behavior:
+
+* `startDate` and `endDate` may be null/blank.
+* If provided, each must be a valid date.
+* If both are provided, `endDate` must not be before `startDate`.
+* Validation should happen in POST and PATCH routes.
+* Return a clear 400 error message if dates are invalid.
+
+Suggested helper:
+Create a small route-local helper that validates optional date strings:
+
+* allow null/undefined/empty
+* parse valid YYYY-MM-DD style date strings
+* reject invalid date strings
+* compare start/end when both exist
+
+Do not change:
+
+* schema
+* db/push
+* storage methods unless required for the validation fix
+* Gantt UI behavior
+* existing Phases/Milestones behavior
+* estimator
+* budgets
+* expenses
+* invoices
+* price book
+* PDFs
+* Stripe/billing
+* commission/payout logic
+* production sheets
+* daily logs
+* selections
+* permitting
+* notifications
+* Phase 15 financial behavior
+
+After cleanup:
+
+* Run `npm run check`.
+
+propose the task plan
