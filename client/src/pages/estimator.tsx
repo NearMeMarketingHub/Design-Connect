@@ -1176,9 +1176,9 @@ export default function Estimator() {
                         const rateParts: string[] = [];
                         if (est.appliedOverheadPct != null) rateParts.push(`Overhead ${parseFloat(String(est.appliedOverheadPct))}%`);
                         if (est.appliedMarkupPct != null) rateParts.push(`Markup ${parseFloat(String(est.appliedMarkupPct))}%`);
-                        if ((est as any).appliedLaborBurdenPct != null) rateParts.push(`Labor Burden ${parseFloat(String((est as any).appliedLaborBurdenPct))}%`);
-                        if ((est as any).appliedMaterialMarkupPct != null) rateParts.push(`Material Markup ${parseFloat(String((est as any).appliedMaterialMarkupPct))}%`);
-                        if ((est as any).appliedSubcontractorMarkupPct != null) rateParts.push(`Sub Markup ${parseFloat(String((est as any).appliedSubcontractorMarkupPct))}%`);
+                        if (est.appliedLaborBurdenPct != null) rateParts.push(`Labor Burden ${parseFloat(String(est.appliedLaborBurdenPct))}%`);
+                        if (est.appliedMaterialMarkupPct != null) rateParts.push(`Material Markup ${parseFloat(String(est.appliedMaterialMarkupPct))}%`);
+                        if (est.appliedSubcontractorMarkupPct != null) rateParts.push(`Sub Markup ${parseFloat(String(est.appliedSubcontractorMarkupPct))}%`);
                         if (rateParts.length === 0) return null;
                         return (
                           <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-applied-rates-${est.id}`}>
