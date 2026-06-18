@@ -1,0 +1,88 @@
+Phase 17 Cleanup — Strict Calendar Date Validation for Selections
+
+This is Replit Plan Mode.
+
+Goal:
+Tighten selection dueDate validation so impossible calendar dates are rejected, not just obviously invalid strings.
+
+Context:
+Phase 17 Selections / Job Book is complete and working.
+Current dueDate validation catches obvious bad strings like `not-a-date`, but may still allow impossible calendar dates depending on JavaScript Date parsing behavior.
+
+Problem examples that should be rejected:
+
+* `2026-02-31`
+* `2026-04-31`
+* `2026-13-01`
+* `2026-00-10`
+* `2026-01-00`
+* `2026-1-5` if the app expects strict `YYYY-MM-DD`
+
+Required behavior:
+
+* Blank, null, or undefined dueDate should still be allowed.
+* If dueDate is provided, it must be a real calendar date in strict `YYYY-MM-DD` format.
+* Reject invalid format.
+* Reject impossible dates.
+* Return a clear 400 error message.
+* Apply this validation to both POST and PATCH selection routes.
+* For PATCH, validate the incoming dueDate if it is provided.
+* Do not change schema.
+* Do not run db:push.
+
+Suggested implementation:
+Use a small route-local helper in `server/routes.ts`, or reuse an existing helper if one already exists.
+
+Recommended strict approach:
+
+* Check the string matches `/^\d{4}-\d{2}-\d{2}$/`
+* Split year/month/day into numbers
+* Create a Date using UTC or local-safe construction
+* Confirm the resulting year/month/day exactly match the parsed values
+* Reject if they do not match
+
+Example:
+`2026-02-31` should not roll over into March. It should return 400.
+
+Scope:
+
+* Tighten `dueDate` validation for `project_selections`
+* Keep existing successful valid dates working
+* No UI changes unless needed for error display
+* No changes to timeline/Gantt unless there is already a shared validator and the change is extremely low-risk
+
+Do not change:
+
+* selections schema
+* db/push
+* selections access control
+* client response shaping
+* budgets
+* expenses
+* invoices
+* estimator
+* price book
+* PDFs
+* Stripe/billing
+* timeline/Gantt behavior unless using a shared helper safely
+* permitting
+* production sheets
+* daily logs
+* notifications
+* existing records
+
+After build:
+
+* Run `npm run check`
+
+Done:
+
+* Valid dates like `2026-02-28` pass
+* Leap-day valid date `2028-02-29` passes
+* Non-leap invalid date `2027-02-29` fails
+* Impossible dates like `2026-02-31` fail
+* Bad format dates fail
+* Blank/null dates still pass
+* npm run check passes
+
+propose the task plan
