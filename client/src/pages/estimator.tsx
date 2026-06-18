@@ -90,6 +90,18 @@ export default function Estimator() {
   const [markupSource, setMarkupSource] = useState<"company" | "platform" | "custom">("platform");
   const settingsPrefilledRef = useRef(false);
 
+  const [applyLaborBurden, setApplyLaborBurden] = useState(false);
+  const [laborBurdenPct, setLaborBurdenPct] = useState<number>(0);
+  const [laborBurdenSource, setLaborBurdenSource] = useState<"company" | "platform" | "custom">("platform");
+
+  const [applyMaterialMarkup, setApplyMaterialMarkup] = useState(false);
+  const [materialMarkupPct, setMaterialMarkupPct] = useState<number>(0);
+  const [materialMarkupSource, setMaterialMarkupSource] = useState<"company" | "platform" | "custom">("platform");
+
+  const [applySubMarkup, setApplySubMarkup] = useState(false);
+  const [subMarkupPct, setSubMarkupPct] = useState<number>(0);
+  const [subMarkupSource, setSubMarkupSource] = useState<"company" | "platform" | "custom">("platform");
+
   const [showAddForm, setShowAddForm] = useState(false);
   // "manual" = existing entry form; "pricebook" = price book picker
   const [addFormTab, setAddFormTab] = useState<"manual" | "pricebook">("manual");
@@ -235,6 +247,27 @@ export default function Estimator() {
       setMarkupPct(15);
       setMarkupSource("platform");
     }
+    if (financialSettings?.defaultLaborBurdenPct != null) {
+      setLaborBurdenPct(parseFloat(String(financialSettings.defaultLaborBurdenPct)));
+      setLaborBurdenSource("company");
+    } else {
+      setLaborBurdenPct(0);
+      setLaborBurdenSource("platform");
+    }
+    if (financialSettings?.defaultMaterialMarkupPct != null) {
+      setMaterialMarkupPct(parseFloat(String(financialSettings.defaultMaterialMarkupPct)));
+      setMaterialMarkupSource("company");
+    } else {
+      setMaterialMarkupPct(0);
+      setMaterialMarkupSource("platform");
+    }
+    if (financialSettings?.defaultSubcontractorMarkupPct != null) {
+      setSubMarkupPct(parseFloat(String(financialSettings.defaultSubcontractorMarkupPct)));
+      setSubMarkupSource("company");
+    } else {
+      setSubMarkupPct(0);
+      setSubMarkupSource("platform");
+    }
   }, [financialSettings]);
 
   // Auto-load estimate from ?load= URL param on mount
@@ -274,9 +307,19 @@ export default function Estimator() {
   }, []);
 
   const subtotal = lineItems.reduce((acc, i) => acc + i.total, 0);
-  const overhead = subtotal * (overheadPct / 100);
-  const profit = (subtotal + overhead) * (markupPct / 100);
-  const grandTotal = subtotal + overhead + profit;
+
+  const laborBurdenBase = lineItems.filter(i => i.category === "Labor" && !i.priceBookItemId).reduce((acc, i) => acc + i.total, 0);
+  const materialMarkupBase = lineItems.filter(i => i.category === "Materials" && !i.priceBookItemId).reduce((acc, i) => acc + i.total, 0);
+  const subMarkupBase = lineItems.filter(i => i.category === "Subcontractor" && !i.priceBookItemId).reduce((acc, i) => acc + i.total, 0);
+
+  const laborBurdenAmount = applyLaborBurden ? laborBurdenBase * (laborBurdenPct / 100) : 0;
+  const materialMarkupAmount = applyMaterialMarkup ? materialMarkupBase * (materialMarkupPct / 100) : 0;
+  const subMarkupAmount = applySubMarkup ? subMarkupBase * (subMarkupPct / 100) : 0;
+
+  const adjustedCost = subtotal + laborBurdenAmount + materialMarkupAmount + subMarkupAmount;
+  const overhead = adjustedCost * (overheadPct / 100);
+  const profit = (adjustedCost + overhead) * (markupPct / 100);
+  const grandTotal = adjustedCost + overhead + profit;
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
@@ -372,9 +415,9 @@ export default function Estimator() {
         projectId: selectedProjectId,
         appliedOverheadPct: overheadPct,
         appliedMarkupPct: markupPct,
-        appliedLaborBurdenPct: null,
-        appliedMaterialMarkupPct: null,
-        appliedSubcontractorMarkupPct: null,
+        appliedLaborBurdenPct: applyLaborBurden ? laborBurdenPct : null,
+        appliedMaterialMarkupPct: applyMaterialMarkup ? materialMarkupPct : null,
+        appliedSubcontractorMarkupPct: applySubMarkup ? subMarkupPct : null,
         appliedEquipmentCostPct: null,
         lineItems: lineItems.map((li) => ({
           category: li.category,
@@ -896,6 +939,75 @@ export default function Estimator() {
                   {formatCurrency(subtotal)}
                 </span>
               </div>
+
+              {/* ── Category adjustment toggles ── */}
+              {(["Labor Burden", "Material Markup", "Subcontractor Markup"] as const).map((label) => {
+                const isLabor = label === "Labor Burden";
+                const isMaterial = label === "Material Markup";
+                const applied = isLabor ? applyLaborBurden : isMaterial ? applyMaterialMarkup : applySubMarkup;
+                const setApplied = isLabor ? setApplyLaborBurden : isMaterial ? setApplyMaterialMarkup : setApplySubMarkup;
+                const pct = isLabor ? laborBurdenPct : isMaterial ? materialMarkupPct : subMarkupPct;
+                const setPct = isLabor ? setLaborBurdenPct : isMaterial ? setMaterialMarkupPct : setSubMarkupPct;
+                const source = isLabor ? laborBurdenSource : isMaterial ? materialMarkupSource : subMarkupSource;
+                const setSource = isLabor ? setLaborBurdenSource : isMaterial ? setMaterialMarkupSource : setSubMarkupSource;
+                const amount = isLabor ? laborBurdenAmount : isMaterial ? materialMarkupAmount : subMarkupAmount;
+                const testId = isLabor ? "labor-burden" : isMaterial ? "material-markup" : "sub-markup";
+                return (
+                  <div key={label} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={applied}
+                          onClick={() => setApplied((v) => !v)}
+                          className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none ${
+                            applied ? "bg-primary" : "bg-input border border-border"
+                          }`}
+                          data-testid={`toggle-${testId}`}
+                        >
+                          <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform ${
+                            applied ? "translate-x-3.5" : "translate-x-0.5"
+                          }`} />
+                        </button>
+                        <span className={`text-sm ${applied ? "" : "text-muted-foreground"}`}>{label} %</span>
+                        {applied && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            source === "company"
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                              : source === "custom"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {source === "company" ? "Company default" : source === "custom" ? "Custom" : "Platform default"}
+                          </span>
+                        )}
+                      </div>
+                      {applied && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="999.99"
+                            step="0.01"
+                            value={pct}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              if (!isNaN(v)) { setPct(v); setSource("custom"); }
+                            }}
+                            className="h-7 w-20 text-sm text-right"
+                            data-testid={`input-${testId}-pct`}
+                          />
+                          <span className="text-sm text-muted-foreground w-[80px] text-right" data-testid={`text-${testId}-amount`}>
+                            {formatCurrency(amount)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
@@ -1060,11 +1172,20 @@ export default function Estimator() {
                     <TableCell className="text-sm text-muted-foreground">{est.date}</TableCell>
                     <TableCell className="font-medium">
                       <div>{formatCurrency(parseFloat(est.amount ?? "0"))}</div>
-                      {est.appliedOverheadPct != null && est.appliedMarkupPct != null && (
-                        <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-applied-rates-${est.id}`}>
-                          Applied rates: Overhead {parseFloat(String(est.appliedOverheadPct))}%, Markup {parseFloat(String(est.appliedMarkupPct))}%
-                        </div>
-                      )}
+                      {(() => {
+                        const rateParts: string[] = [];
+                        if (est.appliedOverheadPct != null) rateParts.push(`Overhead ${parseFloat(String(est.appliedOverheadPct))}%`);
+                        if (est.appliedMarkupPct != null) rateParts.push(`Markup ${parseFloat(String(est.appliedMarkupPct))}%`);
+                        if ((est as any).appliedLaborBurdenPct != null) rateParts.push(`Labor Burden ${parseFloat(String((est as any).appliedLaborBurdenPct))}%`);
+                        if ((est as any).appliedMaterialMarkupPct != null) rateParts.push(`Material Markup ${parseFloat(String((est as any).appliedMaterialMarkupPct))}%`);
+                        if ((est as any).appliedSubcontractorMarkupPct != null) rateParts.push(`Sub Markup ${parseFloat(String((est as any).appliedSubcontractorMarkupPct))}%`);
+                        if (rateParts.length === 0) return null;
+                        return (
+                          <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-applied-rates-${est.id}`}>
+                            Applied rates: {rateParts.join(", ")}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant(est.status)}>

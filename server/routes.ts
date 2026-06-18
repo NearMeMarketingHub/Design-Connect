@@ -3317,9 +3317,14 @@ export async function registerRoutes(
       }
 
       // All validations passed — safe to create records
-      // Derive settingsAppliedAt server-side — set when either applied pct is non-null
+      // Derive settingsAppliedAt server-side — set when any applied pct field is non-null
       const settingsAppliedAt =
-        (estimateData.appliedOverheadPct != null || estimateData.appliedMarkupPct != null)
+        (estimateData.appliedOverheadPct != null ||
+         estimateData.appliedMarkupPct != null ||
+         estimateData.appliedLaborBurdenPct != null ||
+         estimateData.appliedMaterialMarkupPct != null ||
+         estimateData.appliedSubcontractorMarkupPct != null ||
+         estimateData.appliedEquipmentCostPct != null)
           ? new Date()
           : null;
       // Drizzle numeric columns require string values — convert number pcts to strings
