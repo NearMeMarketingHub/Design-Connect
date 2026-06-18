@@ -1,0 +1,159 @@
+Phase 15F-3 — Remaining Financial Settings Application Plan
+
+Important:
+This is Plan Mode only. Do not build yet.
+
+Keep this as ONE single Replit plan. Do not split it into multiple separate task plans.
+
+Context:
+Phase 15F-1 is complete:
+
+* Company Financial Defaults reference cards exist in the calculator areas.
+
+Phase 15F-2 is complete:
+
+* Estimator Calculator now has editable Overhead % and Markup % fields.
+* Overhead/Markup prefill from company settings when configured.
+* Blank company settings fall back to platform defaults: 10% overhead and 15% markup.
+* Saved estimates snapshot applied overhead/markup.
+* Budgets created from source estimates inherit overhead/markup snapshots.
+* Contractor Calculator calculations remain unchanged.
+* Sales Dashboard remains unchanged.
+
+Now we need to plan the remaining 15F work.
+
+Remaining settings not yet applied:
+
+* defaultLaborBurdenPct
+* defaultMaterialMarkupPct
+* defaultSubcontractorMarkupPct
+* defaultEquipmentCostPct
+
+Potential remaining 15F areas:
+
+* Whether category-specific settings should affect Estimator line items
+* Whether they should apply only to manual line items where priceBookItemId is null
+* Whether price book line items should be excluded to avoid double-counting
+* Whether equipment cost should be a separate summary line, overhead line, or reference-only
+* Whether manual/empty project budgets should optionally apply overhead/markup defaults
+* Whether project budgets need editable applied overhead/markup fields
+* Whether Sales Dashboard should show snapshot-based margin/profitability later
+* Whether Contractor Calculator should remain reference-only because it uses retailPrice
+
+Critical guardrails:
+
+* Do not build yet.
+* Do not change schema yet.
+* Do not run db:push.
+* Do not change calculations yet.
+* Do not change Contractor Calculator calculations unless explicitly recommended as safe and separately approved.
+* Do not change invoices.
+* Do not change expenses or actual-cost linkage.
+* Do not change price book values.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission/payout logic.
+* Do not add production sheets/daily logs.
+* Do not retroactively update existing records.
+
+Please inspect:
+
+* client/src/pages/estimator.tsx
+* client/src/pages/contractor-calculator.tsx
+* client/src/components/project-budget-tab.tsx
+* client/src/pages/company-financial-settings.tsx
+* client/src/pages/company-estimates.tsx
+* client/src/pages/sales-dashboard.tsx
+* shared/schema.ts
+* server/routes.ts
+* server/storage.ts
+* budget_items / price book fields:
+
+  * cost
+  * burdens
+  * materialFee
+  * laborRate
+  * subRate
+  * retailPrice
+* estimate_line_items:
+
+  * category
+  * priceBookItemId
+  * rate
+  * total
+* project_budget_items:
+
+  * category
+  * priceBookItemId
+  * unitCostEstimated
+  * totalEstimated
+
+Questions the plan must answer:
+
+1. Should labor burden be applied in Phase 15F, or deferred?
+2. If applied, should labor burden apply only to line items categorized as labor?
+3. Should labor burden apply only to manual line items where priceBookItemId is null?
+4. Should material markup be applied in Phase 15F, or deferred?
+5. If applied, should material markup apply only to material line items?
+6. Should material markup apply only to manual line items where priceBookItemId is null?
+7. Should subcontractor markup be applied in Phase 15F, or deferred?
+8. If applied, should subcontractor markup apply only to subcontractor line items?
+9. Should subcontractor markup apply only to manual line items where priceBookItemId is null?
+10. Should equipment cost be applied, or remain reference-only?
+11. If equipment cost is applied, should it be:
+
+    * a percent of subtotal,
+    * a percent of subtotal + overhead,
+    * a separate summary line,
+    * or a per-line/category adjustment?
+12. How do we avoid double-counting price book retailPrice?
+13. Should category-specific adjustments be:
+
+    * automatic,
+    * off-by-default toggles,
+    * editable per-estimate fields,
+    * or reference-only?
+14. Should the existing estimate snapshot columns for labor/material/sub/equipment remain null until these are actually applied?
+15. Should manual project budgets get an optional “Apply company overhead/markup defaults” toggle?
+16. If manual budgets apply defaults, should budget snapshots be populated?
+17. Should manual budgets ever apply labor/material/sub/equipment settings, or should that remain estimator-only?
+18. Should Sales Dashboard profitability reporting be part of 15F or deferred to a later reporting phase?
+19. Should Contractor Calculator remain unchanged because it uses price book retailPrice?
+20. What is the safest next build after this plan?
+
+Preferred direction unless the code shows a strong reason otherwise:
+
+* Keep Contractor Calculator calculations unchanged.
+* Keep Sales Dashboard profitability reporting deferred.
+* Keep category-specific labor/material/sub/equipment settings off by default.
+* Apply category-specific settings only to manual estimate line items where priceBookItemId is null, if they are applied at all.
+* Show every applied adjustment as a visible named line in the estimator summary.
+* Do not silently apply hidden calculations.
+* Do not apply category-specific settings to price book line items because retailPrice may already include burden/markup.
+* Manual budget defaults should be optional and explicit, not automatic.
+* Existing estimates and budgets should remain unchanged.
+* Saved estimates should snapshot only settings actually applied.
+* Null snapshot fields should not be treated as 0.
+
+Output needed:
+Return ONE written plan only with these sections:
+
+1. Current 15F status
+2. What remains in 15F
+3. Recommended treatment for labor burden
+4. Recommended treatment for material markup
+5. Recommended treatment for subcontractor markup
+6. Recommended treatment for equipment cost
+7. Recommended treatment for manual project budgets
+8. Contractor Calculator recommendation
+9. Sales Dashboard/reporting recommendation
+10. Schema changes needed, if any
+11. Exact future files likely touched
+12. Double-counting risks and how to avoid them
+13. Recommended next single build scope
+14. What should be deferred out of 15F
+15. Test plan
+16. Done criteria
+
+Do not build yet.
+Return the plan only.
