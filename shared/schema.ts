@@ -1007,6 +1007,13 @@ export const projectTimelineItems = pgTable("project_timeline_items", {
 
 export const insertProjectTimelineItemSchema = createInsertSchema(projectTimelineItems).omit({
   id: true, createdAt: true, updatedAt: true, completedAt: true,
+  projectId: true, companyId: true, createdById: true,
 });
 export type InsertProjectTimelineItem = z.infer<typeof insertProjectTimelineItemSchema>;
+// Server-controlled fields injected by the API layer — not exposed to clients
+export type CreateProjectTimelineItem = InsertProjectTimelineItem & {
+  projectId: string;
+  companyId: string;
+  createdById: string;
+};
 export type ProjectTimelineItem = typeof projectTimelineItems.$inferSelect;

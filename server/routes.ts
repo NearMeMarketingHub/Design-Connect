@@ -8539,10 +8539,10 @@ export async function registerRoutes(
   });
 
   // ─── Project Timeline Items ───────────────────────────────────────────────
-  // GET /api/projects/:projectId/timeline
+  // GET /api/projects/:projectId/timeline-items
   // Returns all items (contractor/admin) or only clientVisible=true (client).
-  // Subcontractors/notaries receive an empty array (deferred).
-  app.get("/api/projects/:projectId/timeline", requireAuth, async (req: any, res: any) => {
+  // Subcontractors/notaries receive an empty array.
+  app.get("/api/projects/:projectId/timeline-items", requireAuth, async (req: any, res: any) => {
     const user = req.user as User;
     const { projectId } = req.params;
     try {
@@ -8559,9 +8559,9 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/projects/:projectId/timeline
+  // POST /api/projects/:projectId/timeline-items
   // Create a new timeline item. Write access: company_owner, isCompanyAdmin, admin.
-  app.post("/api/projects/:projectId/timeline", requireAuth, async (req: any, res: any) => {
+  app.post("/api/projects/:projectId/timeline-items", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
     const user = req.user as User;
     const { projectId } = req.params;
     const canWrite =
@@ -8584,10 +8584,22 @@ export async function registerRoutes(
         progressPercent: z.number().int().min(0).max(100).default(0),
         displayOrder: z.number().int().default(0),
         clientVisible: z.boolean().default(false),
-        assignedToUserId: z.string().optional(),
+        assignedToUserId: z.string().nullable().optional(),
       });
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate assignedToUserId belongs to the same company with an appropriate role
+      if (parsed.data.assignedToUserId) {
+        const assignee = await storage.getUser(parsed.data.assignedToUserId);
+        if (!assignee || assignee.companyId !== companyId) {
+          return res.status(400).json({ message: "Assignee must be a member of this company" });
+        }
+        if (assignee.role === "client") {
+          return res.status(400).json({ message: "Assignee must be a contractor or admin" });
+        }
+      }
+
       const item = await storage.createProjectTimelineItem({
         ...parsed.data,
         projectId,
@@ -8601,11 +8613,11 @@ export async function registerRoutes(
     }
   });
 
-  // PATCH /api/projects/:projectId/timeline/:itemId
-  // Update a timeline item. Same write guard as POST.
-  app.patch("/api/projects/:projectId/timeline/:itemId", requireAuth, async (req: any, res: any) => {
+  // PATCH /api/projects/:projectId/timeline-items/:itemId
+  // Update a timeline item. Same write guard as POST. Enforces projectId + companyId ownership.
+  app.patch("/api/projects/:projectId/timeline-items/:itemId", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
     const user = req.user as User;
-    const { itemId } = req.params;
+    const { projectId, itemId } = req.params;
     const canWrite =
       user.role === "admin" ||
       user.role === "company_owner" ||
@@ -8614,6 +8626,15 @@ export async function registerRoutes(
     try {
       const existing = await storage.getProjectTimelineItem(itemId);
       if (!existing) return res.status(404).json({ message: "Timeline item not found" });
+
+      // Ownership check: item must belong to this project and the user's company
+      if (existing.projectId !== projectId) {
+        return res.status(403).json({ message: "Item does not belong to this project" });
+      }
+      if (user.role !== "admin" && existing.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Item does not belong to your company" });
+      }
+
       const bodySchema = z.object({
         title: z.string().min(1).optional(),
         description: z.string().nullable().optional(),
@@ -8628,6 +8649,19 @@ export async function registerRoutes(
       });
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate assignedToUserId belongs to the same company
+      if (parsed.data.assignedToUserId) {
+        const companyId = existing.companyId;
+        const assignee = await storage.getUser(parsed.data.assignedToUserId);
+        if (!assignee || assignee.companyId !== companyId) {
+          return res.status(400).json({ message: "Assignee must be a member of this company" });
+        }
+        if (assignee.role === "client") {
+          return res.status(400).json({ message: "Assignee must be a contractor or admin" });
+        }
+      }
+
       const updated = await storage.updateProjectTimelineItem(itemId, parsed.data);
       return res.json(updated);
     } catch (err) {
@@ -8636,11 +8670,11 @@ export async function registerRoutes(
     }
   });
 
-  // DELETE /api/projects/:projectId/timeline/:itemId
-  // Delete a timeline item. Same write guard as POST.
-  app.delete("/api/projects/:projectId/timeline/:itemId", requireAuth, async (req: any, res: any) => {
+  // DELETE /api/projects/:projectId/timeline-items/:itemId
+  // Delete a timeline item. Same write guard as POST. Enforces projectId + companyId ownership.
+  app.delete("/api/projects/:projectId/timeline-items/:itemId", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
     const user = req.user as User;
-    const { itemId } = req.params;
+    const { projectId, itemId } = req.params;
     const canWrite =
       user.role === "admin" ||
       user.role === "company_owner" ||
@@ -8649,6 +8683,15 @@ export async function registerRoutes(
     try {
       const existing = await storage.getProjectTimelineItem(itemId);
       if (!existing) return res.status(404).json({ message: "Timeline item not found" });
+
+      // Ownership check: item must belong to this project and the user's company
+      if (existing.projectId !== projectId) {
+        return res.status(403).json({ message: "Item does not belong to this project" });
+      }
+      if (user.role !== "admin" && existing.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Item does not belong to your company" });
+      }
+
       await storage.deleteProjectTimelineItem(itemId);
       return res.status(204).send();
     } catch (err) {

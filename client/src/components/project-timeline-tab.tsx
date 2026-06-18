@@ -48,7 +48,9 @@ import {
   EyeOff,
   ChevronDown,
   ChevronRight,
+  User2,
 } from "lucide-react";
+import { eachMonthOfInterval, endOfMonth, format } from "date-fns";
 
 type TimelineItemType = "phase" | "task" | "milestone";
 type TimelineItemStatus = "not_started" | "in_progress" | "blocked" | "completed" | "cancelled";
@@ -71,6 +73,12 @@ interface TimelineItem {
   createdById: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface TeamMember {
+  id: string;
+  userId: string;
+  contractor?: { id: string; fullName: string; email: string; role: string } | null;
 }
 
 interface Props {
@@ -115,6 +123,14 @@ const STATUS_DOT: Record<TimelineItemStatus, string> = {
   cancelled: "bg-gray-400",
 };
 
+const GANTT_BAR_COLORS: Record<TimelineItemStatus, string> = {
+  not_started: "bg-slate-300",
+  in_progress: "bg-blue-500",
+  blocked: "bg-red-400",
+  completed: "bg-green-500",
+  cancelled: "bg-gray-300",
+};
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
   try {
@@ -136,15 +152,37 @@ function daysBetween(start: string | null, end: string | null): number | null {
   }
 }
 
-function computeGanttLayout(items: TimelineItem[]) {
+interface GanttLayout {
+  minDate: Date | null;
+  maxDate: Date | null;
+  totalDays: number;
+  months: { label: string; widthPct: number }[];
+}
+
+function computeGanttLayout(items: TimelineItem[]): GanttLayout {
   const dated = items.filter(i => i.startDate && i.endDate);
-  if (dated.length === 0) return { minDate: null, maxDate: null, totalDays: 0 };
+  if (dated.length === 0) return { minDate: null, maxDate: null, totalDays: 0, months: [] };
   const starts = dated.map(i => new Date(i.startDate! + "T00:00:00").getTime());
   const ends = dated.map(i => new Date(i.endDate! + "T00:00:00").getTime());
   const minTs = Math.min(...starts);
   const maxTs = Math.max(...ends);
   const totalDays = Math.max(1, Math.ceil((maxTs - minTs) / 86400000));
-  return { minDate: new Date(minTs), maxDate: new Date(maxTs), totalDays };
+  const minDate = new Date(minTs);
+  const maxDate = new Date(maxTs);
+
+  // Compute month columns with date-fns
+  const monthStarts = eachMonthOfInterval({ start: minDate, end: maxDate });
+  const months = monthStarts.map(monthStart => {
+    const clipStart = Math.max(monthStart.getTime(), minTs);
+    const clipEnd = Math.min(endOfMonth(monthStart).getTime(), maxTs);
+    const visibleDays = Math.max(0, (clipEnd - clipStart) / 86400000);
+    return {
+      label: format(monthStart, "MMM yyyy"),
+      widthPct: (visibleDays / totalDays) * 100,
+    };
+  });
+
+  return { minDate, maxDate, totalDays, months };
 }
 
 function GanttBar({ item, minDate, totalDays }: { item: TimelineItem; minDate: Date; totalDays: number }) {
@@ -162,18 +200,10 @@ function GanttBar({ item, minDate, totalDays }: { item: TimelineItem; minDate: D
   const leftPct = (offsetDays / totalDays) * 100;
   const widthPct = Math.min((durationDays / totalDays) * 100, 100 - leftPct);
 
-  const barColors: Record<TimelineItemStatus, string> = {
-    not_started: "bg-slate-300",
-    in_progress: "bg-blue-500",
-    blocked: "bg-red-400",
-    completed: "bg-green-500",
-    cancelled: "bg-gray-300",
-  };
-
   return (
-    <div className="relative h-6 w-full">
+    <div className="relative h-5 w-full">
       <div
-        className={`absolute h-full rounded ${barColors[item.status]} flex items-center px-1`}
+        className={`absolute h-full rounded ${GANTT_BAR_COLORS[item.status]} flex items-center px-1`}
         style={{ left: `${leftPct}%`, width: `${widthPct}%`, minWidth: "4px" }}
         title={`${item.title}: ${formatDate(item.startDate)} → ${formatDate(item.endDate)}`}
       >
@@ -195,7 +225,9 @@ const EMPTY_FORM = {
   startDate: "",
   endDate: "",
   progressPercent: 0,
+  displayOrder: 0,
   clientVisible: false,
+  assignedToUserId: "" as string,
 };
 
 export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Props) {
@@ -210,21 +242,44 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({ ...EMPTY_FORM });
 
-  const queryKey = [`/api/projects/${projectId}/timeline`];
+  const queryKey = [`/api/projects/${projectId}/timeline-items`];
+  const API_BASE = `/api/projects/${projectId}/timeline-items`;
 
   const { data: items = [], isLoading } = useQuery<TimelineItem[]>({
     queryKey,
     queryFn: async () => {
-      const res = await fetch(`/api/projects/${projectId}/timeline`, { credentials: "include" });
+      const res = await fetch(API_BASE, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load timeline");
       return res.json();
     },
     enabled: !!projectId,
   });
 
+  // Fetch project team members to populate assignee select
+  const { data: teamMembers = [] } = useQuery<TeamMember[]>({
+    queryKey: [`/api/projects/${projectId}/team`],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/team`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId && canWrite,
+  });
+
+  // Build userId → name map for display
+  const userNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    teamMembers.forEach(m => {
+      if (m.contractor) {
+        map[m.contractor.id] = m.contractor.fullName || m.contractor.email;
+      }
+    });
+    return map;
+  }, [teamMembers]);
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
-      const res = await fetch(`/api/projects/${projectId}/timeline`, {
+      const res = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -233,6 +288,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
           startDate: data.startDate || undefined,
           endDate: data.endDate || undefined,
           description: data.description || undefined,
+          assignedToUserId: data.assignedToUserId || null,
         }),
       });
       if (!res.ok) {
@@ -252,7 +308,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<typeof EMPTY_FORM> }) => {
-      const res = await fetch(`/api/projects/${projectId}/timeline/${id}`, {
+      const res = await fetch(`${API_BASE}/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -261,6 +317,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
           startDate: data.startDate || null,
           endDate: data.endDate || null,
           description: data.description || null,
+          assignedToUserId: data.assignedToUserId || null,
         }),
       });
       if (!res.ok) {
@@ -281,7 +338,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/projects/${projectId}/timeline/${id}`, {
+      const res = await fetch(`${API_BASE}/${id}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -297,7 +354,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
 
   const quickStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: TimelineItemStatus }) => {
-      const res = await fetch(`/api/projects/${projectId}/timeline/${id}`, {
+      const res = await fetch(`${API_BASE}/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -314,7 +371,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
 
   const openCreateDialog = () => {
     setEditingItem(null);
-    setForm({ ...EMPTY_FORM });
+    setForm({ ...EMPTY_FORM, displayOrder: items.length });
     setDialogOpen(true);
   };
 
@@ -328,7 +385,9 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
       startDate: item.startDate ?? "",
       endDate: item.endDate ?? "",
       progressPercent: item.progressPercent,
+      displayOrder: item.displayOrder,
       clientVisible: item.clientVisible,
+      assignedToUserId: item.assignedToUserId ?? "",
     });
     setDialogOpen(true);
   };
@@ -463,6 +522,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
               {items.map((item) => {
                 const isExpanded = expandedItems.has(item.id);
                 const duration = daysBetween(item.startDate, item.endDate);
+                const assigneeName = item.assignedToUserId ? (userNameMap[item.assignedToUserId] || null) : null;
                 return (
                   <div key={item.id} className="group" data-testid={`timeline-item-${item.id}`}>
                     <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
@@ -487,7 +547,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
                         {TYPE_ICONS[item.itemType]}
                       </span>
 
-                      {/* Title */}
+                      {/* Title + meta */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
@@ -513,12 +573,20 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
                             <EyeOff className="h-3 w-3 text-muted-foreground" title="Hidden from client" />
                           )}
                         </div>
-                        {item.startDate || item.endDate ? (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatDate(item.startDate)} → {formatDate(item.endDate)}
-                            {duration !== null && ` (${duration} days)`}
-                          </p>
-                        ) : null}
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          {(item.startDate || item.endDate) && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(item.startDate)} → {formatDate(item.endDate)}
+                              {duration !== null && ` (${duration}d)`}
+                            </p>
+                          )}
+                          {assigneeName && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-timeline-assignee-${item.id}`}>
+                              <User2 className="h-3 w-3" />
+                              {assigneeName}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Progress */}
@@ -610,6 +678,26 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
             {ganttLayout.minDate && ganttLayout.totalDays > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[600px]">
+                  {/* Month header row */}
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="w-56 min-w-[14rem]" />
+                      <th className="px-2 py-1.5">
+                        <div className="flex w-full">
+                          {ganttLayout.months.map((m, i) => (
+                            <div
+                              key={i}
+                              style={{ width: `${m.widthPct}%` }}
+                              className="text-[10px] font-normal text-muted-foreground border-r last:border-0 pr-1 text-center truncate"
+                            >
+                              {m.label}
+                            </div>
+                          ))}
+                        </div>
+                      </th>
+                      <th className="w-44" />
+                    </tr>
+                  </thead>
                   <tbody>
                     {items.map((item) => (
                       <tr key={item.id} className="border-b last:border-0 hover:bg-muted/30" data-testid={`gantt-row-${item.id}`}>
@@ -620,7 +708,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
                             <span className="text-muted-foreground flex-shrink-0">
                               {TYPE_ICONS[item.itemType]}
                             </span>
-                            <span className={`truncate font-medium ${item.status === "cancelled" ? "line-through text-muted-foreground" : ""}`}>
+                            <span className={`truncate font-medium text-xs ${item.status === "cancelled" ? "line-through text-muted-foreground" : ""}`}>
                               {item.title}
                             </span>
                           </div>
@@ -630,7 +718,7 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
                           <GanttBar item={item} minDate={ganttLayout.minDate!} totalDays={ganttLayout.totalDays} />
                         </td>
                         {/* Date range column */}
-                        <td className="px-4 py-2 w-40 text-xs text-muted-foreground text-right whitespace-nowrap align-middle">
+                        <td className="px-4 py-2 w-44 text-xs text-muted-foreground text-right whitespace-nowrap align-middle">
                           {item.startDate && item.endDate
                             ? `${formatDate(item.startDate)} → ${formatDate(item.endDate)}`
                             : "—"}
@@ -719,19 +807,53 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tl-progress">Progress ({form.progressPercent}%)</Label>
-              <Input
-                id="tl-progress"
-                type="range"
-                min={0}
-                max={100}
-                value={form.progressPercent}
-                onChange={e => setForm(f => ({ ...f, progressPercent: Number(e.target.value) }))}
-                className="h-2 cursor-pointer"
-                data-testid="input-timeline-progress"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="tl-progress">Progress ({form.progressPercent}%)</Label>
+                <Input
+                  id="tl-progress"
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={form.progressPercent}
+                  onChange={e => setForm(f => ({ ...f, progressPercent: Number(e.target.value) }))}
+                  className="h-2 cursor-pointer"
+                  data-testid="input-timeline-progress"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tl-order">Display Order</Label>
+                <Input
+                  id="tl-order"
+                  type="number"
+                  min={0}
+                  value={form.displayOrder}
+                  onChange={e => setForm(f => ({ ...f, displayOrder: Number(e.target.value) }))}
+                  data-testid="input-timeline-order"
+                />
+              </div>
             </div>
+            {canWrite && teamMembers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="tl-assignee">Assignee</Label>
+                <Select
+                  value={form.assignedToUserId || "__none__"}
+                  onValueChange={v => setForm(f => ({ ...f, assignedToUserId: v === "__none__" ? "" : v }))}
+                >
+                  <SelectTrigger id="tl-assignee" data-testid="select-timeline-assignee">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {teamMembers.map(m => m.contractor && (
+                      <SelectItem key={m.contractor.id} value={m.contractor.id}>
+                        {m.contractor.fullName || m.contractor.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="tl-description">Description</Label>
               <Textarea

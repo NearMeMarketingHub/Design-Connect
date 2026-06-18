@@ -952,6 +952,7 @@ export default function ProjectDetails() {
   const [replyingToImage, setReplyingToImage] = useState<{ src: string; title: string; category: string } | null>(null);
   const [inspirationImages, setInspirationImages] = useState(INITIAL_INSPIRATION_IMAGES);
   const [expandedMilestones, setExpandedMilestones] = useState<number[]>([]);
+  const [showLegacyPhases, setShowLegacyPhases] = useState(false);
   const [replyingToMessage, setReplyingToMessage] = useState<{ id: string; sender: string; message: string } | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{ type: 'image' | 'file'; src: string; name: string } | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<{ type: 'image' | 'file'; src: string; name: string }[]>([
@@ -3889,10 +3890,25 @@ export default function ProjectDetails() {
               />
             )}
 
-            {/* Legacy phases section (collapsible, only shows for non-static projects with phases) */}
+            {/* Legacy phases section — collapsible, only for non-static projects with phases */}
             {!staticProject && apiPhases.length > 0 && (
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-0">
+                {/* Collapsible header */}
+                <button
+                  className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-muted/40 transition-colors"
+                  onClick={() => setShowLegacyPhases(v => !v)}
+                  data-testid="btn-toggle-legacy-phases"
+                >
+                  <div>
+                    <span className="font-semibold text-sm">Project Phases</span>
+                    <span className="ml-2 text-xs text-muted-foreground"> (Legacy system)</span>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showLegacyPhases ? "rotate-180" : ""}`} />
+                </button>
+              </CardContent>
+              {showLegacyPhases && (
+              <CardContent className="p-6 pt-0">
                 <div className="relative">
                   {displayMilestones.map((milestone: any, index: number) => {
                     const isExpanded = expandedMilestones.includes(milestone.id);
@@ -4244,6 +4260,7 @@ export default function ProjectDetails() {
                   })}
                 </div>
               </CardContent>
+              )}
             </Card>
             )}
           </TabsContent>

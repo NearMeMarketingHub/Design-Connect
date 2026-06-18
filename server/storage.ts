@@ -70,7 +70,7 @@ import type {
   ProjectBudgetItem, InsertProjectBudgetItem,
   Expense, InsertExpense,
   CompanyFinancialSettings, InsertCompanyFinancialSettings,
-  ProjectTimelineItem, InsertProjectTimelineItem,
+  ProjectTimelineItem, InsertProjectTimelineItem, CreateProjectTimelineItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -436,7 +436,7 @@ export interface IStorage {
   // Project timeline item methods
   getProjectTimelineItems(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectTimelineItem[]>;
   getProjectTimelineItem(id: string): Promise<ProjectTimelineItem | undefined>;
-  createProjectTimelineItem(item: InsertProjectTimelineItem): Promise<ProjectTimelineItem>;
+  createProjectTimelineItem(item: CreateProjectTimelineItem): Promise<ProjectTimelineItem>;
   updateProjectTimelineItem(id: string, data: Partial<InsertProjectTimelineItem>): Promise<ProjectTimelineItem | undefined>;
   deleteProjectTimelineItem(id: string): Promise<void>;
 }
@@ -2950,7 +2950,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(schema.projectTimelineItems)
       .where(and(...conditions))
-      .orderBy(schema.projectTimelineItems.displayOrder, schema.projectTimelineItems.createdAt);
+      .orderBy(schema.projectTimelineItems.displayOrder, schema.projectTimelineItems.startDate);
   }
 
   async getProjectTimelineItem(id: string): Promise<ProjectTimelineItem | undefined> {
@@ -2961,14 +2961,19 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async createProjectTimelineItem(item: InsertProjectTimelineItem): Promise<ProjectTimelineItem> {
-    const [row] = await db.insert(schema.projectTimelineItems).values(item).returning();
+  async createProjectTimelineItem(item: CreateProjectTimelineItem): Promise<ProjectTimelineItem> {
+    const insertData: any = { ...item };
+    // Auto-set completedAt if item is created in completed state
+    if (item.status === "completed") {
+      insertData.completedAt = new Date();
+    }
+    const [row] = await db.insert(schema.projectTimelineItems).values(insertData).returning();
     return row;
   }
 
   async updateProjectTimelineItem(id: string, data: Partial<InsertProjectTimelineItem>): Promise<ProjectTimelineItem | undefined> {
     const updateData: any = { ...data, updatedAt: new Date() };
-    // Auto-set completedAt when status transitions to completed
+    // Auto-set completedAt when status transitions to completed, clear otherwise
     if (data.status === "completed") {
       updateData.completedAt = new Date();
     } else if (data.status && data.status !== "completed") {
