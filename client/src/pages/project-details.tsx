@@ -20,6 +20,7 @@ import SendForSignatureDialog from "@/components/send-for-signature-dialog";
 import ProjectBudgetTab from "@/components/project-budget-tab";
 import ProjectExpensesTab from "@/components/project-expenses-tab";
 import ProjectTimelineTab from "@/components/project-timeline-tab";
+import ProjectSelectionsTab from "@/components/project-selections-tab";
 import { 
   ArrowLeft,
   Calendar,
@@ -344,6 +345,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/messages')) return 'messages';
     if (path.endsWith('/budget')) return 'budget';
     if (path.endsWith('/timeline')) return 'timeline';
+    if (path.endsWith('/selections')) return 'selections';
     if (path.endsWith('/inspiration')) return 'inspiration';
     if (path.endsWith('/contractor-photos')) return 'contractor-photos';
     if (path.endsWith('/materials')) return 'materials';
@@ -3044,7 +3046,7 @@ export default function ProjectDetails() {
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
             data-testid="tab-inspiration"
           >
-            Inspiration & Selections
+            Inspiration Board
           </TabsTrigger>
           <TabsTrigger 
             value="timeline"
@@ -3052,6 +3054,13 @@ export default function ProjectDetails() {
             data-testid="tab-timeline"
           >
             Timeline
+          </TabsTrigger>
+          <TabsTrigger
+            value="selections"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+            data-testid="tab-selections"
+          >
+            Selections
           </TabsTrigger>
           {hasProjectPerm('canViewMessages') && (
             <TabsTrigger 
@@ -4266,6 +4275,18 @@ export default function ProjectDetails() {
               )}
             </Card>
             )}
+          </TabsContent>
+
+          {/* SELECTIONS TAB */}
+          <TabsContent value="selections" className="mt-6">
+            <ProjectSelectionsTab
+              projectId={projectId}
+              canWrite={
+                user?.role === "company_owner" ||
+                (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
+              }
+              isClient={user?.role === "client"}
+            />
           </TabsContent>
 
           {/* MESSAGES TAB */}

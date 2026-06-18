@@ -71,6 +71,7 @@ import type {
   Expense, InsertExpense,
   CompanyFinancialSettings, InsertCompanyFinancialSettings,
   ProjectTimelineItem, InsertProjectTimelineItem, CreateProjectTimelineItem,
+  ProjectSelection, InsertProjectSelection, CreateProjectSelection,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -439,6 +440,13 @@ export interface IStorage {
   createProjectTimelineItem(item: CreateProjectTimelineItem): Promise<ProjectTimelineItem>;
   updateProjectTimelineItem(id: string, data: Partial<InsertProjectTimelineItem>): Promise<ProjectTimelineItem | undefined>;
   deleteProjectTimelineItem(id: string): Promise<void>;
+
+  // Project selection methods
+  getProjectSelections(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectSelection[]>;
+  getProjectSelection(id: string): Promise<ProjectSelection | undefined>;
+  createProjectSelection(item: CreateProjectSelection): Promise<ProjectSelection>;
+  updateProjectSelection(id: string, data: Partial<InsertProjectSelection>): Promise<ProjectSelection | undefined>;
+  deleteProjectSelection(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2999,6 +3007,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectTimelineItem(id: string): Promise<void> {
     await db.delete(schema.projectTimelineItems).where(eq(schema.projectTimelineItems.id, id));
+  }
+
+  // Project selection methods
+  async getProjectSelections(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectSelection[]> {
+    const conditions = [eq(schema.projectSelections.projectId, projectId)];
+    if (clientVisibleOnly) {
+      conditions.push(eq(schema.projectSelections.clientVisible, true));
+    }
+    return db
+      .select()
+      .from(schema.projectSelections)
+      .where(and(...conditions))
+      .orderBy(schema.projectSelections.displayOrder, schema.projectSelections.category, schema.projectSelections.createdAt);
+  }
+
+  async getProjectSelection(id: string): Promise<ProjectSelection | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.projectSelections)
+      .where(eq(schema.projectSelections.id, id));
+    return row;
+  }
+
+  async createProjectSelection(item: CreateProjectSelection): Promise<ProjectSelection> {
+    const [row] = await db.insert(schema.projectSelections).values(item).returning();
+    return row;
+  }
+
+  async updateProjectSelection(id: string, data: Partial<InsertProjectSelection>): Promise<ProjectSelection | undefined> {
+    const [row] = await db
+      .update(schema.projectSelections)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.projectSelections.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteProjectSelection(id: string): Promise<void> {
+    await db.delete(schema.projectSelections).where(eq(schema.projectSelections.id, id));
   }
 }
 

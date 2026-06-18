@@ -8742,5 +8742,222 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Project Selections ────────────────────────────────────────────────────
+
+  // Helper: validate an optional date string (YYYY-MM-DD).
+  // Returns an error message if invalid, or null if OK.
+  const validateSelectionDate = (date: string | null | undefined): string | null => {
+    if (!date) return null;
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? "dueDate is not a valid date" : null;
+  };
+
+  // Client-safe field projection — strips internal fields before sending to clients.
+  const shapeSelectionForClient = (sel: any) => ({
+    id: sel.id,
+    projectId: sel.projectId,
+    category: sel.category,
+    room: sel.room,
+    title: sel.title,
+    description: sel.description,
+    status: sel.status,
+    dueDate: sel.dueDate,
+    selectedOptionName: sel.selectedOptionName,
+    selectedOptionDetails: sel.selectedOptionDetails,
+    vendorName: sel.vendorName,
+    productUrl: sel.productUrl,
+    notes: sel.notes,
+    updatedAt: sel.updatedAt,
+  });
+
+  // GET /api/projects/:projectId/selections
+  app.get("/api/projects/:projectId/selections", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    try {
+      const isClient = user.role === "client";
+      // Subcontractors, notaries, and legacy notary role get nothing
+      const isExternal =
+        user.role === "notary" ||
+        (user.role === "contractor" &&
+          (user.contractorType === "subcontractor" || user.contractorType === "notary"));
+      if (isExternal) return res.json([]);
+
+      if (isClient) {
+        const items = await storage.getProjectSelections(projectId, true);
+        return res.json(items.map(shapeSelectionForClient));
+      }
+      const items = await storage.getProjectSelections(projectId, false);
+      return res.json(items);
+    } catch (err) {
+      console.error("[selections:GET]", err);
+      return res.status(500).json({ message: "Failed to load selections" });
+    }
+  });
+
+  // POST /api/projects/:projectId/selections
+  // Write access: company_owner and company admin only.
+  app.post("/api/projects/:projectId/selections", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    const companyId = user.companyId ?? null;
+    if (!companyId) return res.status(400).json({ message: "No company context" });
+    try {
+      const bodySchema = z.object({
+        category: z.string().min(1),
+        room: z.string().optional(),
+        title: z.string().min(1),
+        description: z.string().optional(),
+        status: z.enum(["needed","options_sent","client_review","selected","approved","ordered","received","installed","cancelled"]).default("needed"),
+        dueDate: z.string().nullable().optional(),
+        selectedOptionName: z.string().optional(),
+        selectedOptionDetails: z.string().optional(),
+        vendorName: z.string().optional(),
+        productUrl: z.string().optional(),
+        allowanceAmount: z.string().nullable().optional(),
+        estimatedCost: z.string().nullable().optional(),
+        actualCost: z.string().nullable().optional(),
+        clientVisible: z.boolean().default(false),
+        notes: z.string().optional(),
+        internalNotes: z.string().optional(),
+        displayOrder: z.number().int().default(0),
+        assignedToUserId: z.string().nullable().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate dueDate
+      const dateErr = validateSelectionDate(parsed.data.dueDate);
+      if (dateErr) return res.status(400).json({ message: dateErr });
+
+      // Validate assignedToUserId
+      if (parsed.data.assignedToUserId) {
+        const assignee = await storage.getUser(parsed.data.assignedToUserId);
+        if (!assignee || assignee.companyId !== companyId) {
+          return res.status(400).json({ message: "Assignee must be a member of this company" });
+        }
+        if (
+          assignee.role === "client" ||
+          assignee.role === "notary" ||
+          assignee.contractorType === "subcontractor" ||
+          assignee.contractorType === "notary"
+        ) {
+          return res.status(400).json({ message: "Assignee must be an internal team member" });
+        }
+      }
+
+      const item = await storage.createProjectSelection({
+        ...parsed.data,
+        projectId,
+        companyId,
+        createdById: user.id,
+      });
+      return res.status(201).json(item);
+    } catch (err) {
+      console.error("[selections:POST]", err);
+      return res.status(500).json({ message: "Failed to create selection" });
+    }
+  });
+
+  // PATCH /api/projects/:projectId/selections/:selectionId
+  app.patch("/api/projects/:projectId/selections/:selectionId", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId, selectionId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const existing = await storage.getProjectSelection(selectionId);
+      if (!existing) return res.status(404).json({ message: "Selection not found" });
+      if (existing.projectId !== projectId) {
+        return res.status(403).json({ message: "Selection does not belong to this project" });
+      }
+      if (existing.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Selection does not belong to your company" });
+      }
+
+      const bodySchema = z.object({
+        category: z.string().min(1).optional(),
+        room: z.string().nullable().optional(),
+        title: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        status: z.enum(["needed","options_sent","client_review","selected","approved","ordered","received","installed","cancelled"]).optional(),
+        dueDate: z.string().nullable().optional(),
+        selectedOptionName: z.string().nullable().optional(),
+        selectedOptionDetails: z.string().nullable().optional(),
+        vendorName: z.string().nullable().optional(),
+        productUrl: z.string().nullable().optional(),
+        allowanceAmount: z.string().nullable().optional(),
+        estimatedCost: z.string().nullable().optional(),
+        actualCost: z.string().nullable().optional(),
+        clientVisible: z.boolean().optional(),
+        notes: z.string().nullable().optional(),
+        internalNotes: z.string().nullable().optional(),
+        displayOrder: z.number().int().optional(),
+        assignedToUserId: z.string().nullable().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate dueDate if provided
+      if ("dueDate" in parsed.data) {
+        const dateErr = validateSelectionDate(parsed.data.dueDate);
+        if (dateErr) return res.status(400).json({ message: dateErr });
+      }
+
+      // Validate assignedToUserId
+      if (parsed.data.assignedToUserId) {
+        const assignee = await storage.getUser(parsed.data.assignedToUserId);
+        if (!assignee || assignee.companyId !== existing.companyId) {
+          return res.status(400).json({ message: "Assignee must be a member of this company" });
+        }
+        if (
+          assignee.role === "client" ||
+          assignee.role === "notary" ||
+          assignee.contractorType === "subcontractor" ||
+          assignee.contractorType === "notary"
+        ) {
+          return res.status(400).json({ message: "Assignee must be an internal team member" });
+        }
+      }
+
+      const updated = await storage.updateProjectSelection(selectionId, parsed.data);
+      return res.json(updated);
+    } catch (err) {
+      console.error("[selections:PATCH]", err);
+      return res.status(500).json({ message: "Failed to update selection" });
+    }
+  });
+
+  // DELETE /api/projects/:projectId/selections/:selectionId
+  app.delete("/api/projects/:projectId/selections/:selectionId", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId, selectionId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const existing = await storage.getProjectSelection(selectionId);
+      if (!existing) return res.status(404).json({ message: "Selection not found" });
+      if (existing.projectId !== projectId) {
+        return res.status(403).json({ message: "Selection does not belong to this project" });
+      }
+      if (existing.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Selection does not belong to your company" });
+      }
+      await storage.deleteProjectSelection(selectionId);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("[selections:DELETE]", err);
+      return res.status(500).json({ message: "Failed to delete selection" });
+    }
+  });
+
   return httpServer;
 }

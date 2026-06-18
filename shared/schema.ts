@@ -1017,3 +1017,48 @@ export type CreateProjectTimelineItem = InsertProjectTimelineItem & {
   createdById: string;
 };
 export type ProjectTimelineItem = typeof projectTimelineItems.$inferSelect;
+
+// Project Selections — job book / material/finish selections per project
+export const SELECTION_STATUSES = [
+  "needed", "options_sent", "client_review", "selected",
+  "approved", "ordered", "received", "installed", "cancelled",
+] as const;
+export type SelectionStatus = typeof SELECTION_STATUSES[number];
+
+export const projectSelections = pgTable("project_selections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  category: text("category").notNull(),
+  room: text("room"),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("needed"),
+  dueDate: text("due_date"),
+  selectedOptionName: text("selected_option_name"),
+  selectedOptionDetails: text("selected_option_details"),
+  vendorName: text("vendor_name"),
+  productUrl: text("product_url"),
+  allowanceAmount: numeric("allowance_amount"),
+  estimatedCost: numeric("estimated_cost"),
+  actualCost: numeric("actual_cost"),
+  clientVisible: boolean("client_visible").notNull().default(false),
+  notes: text("notes"),
+  internalNotes: text("internal_notes"),
+  displayOrder: integer("display_order").notNull().default(0),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectSelectionSchema = createInsertSchema(projectSelections).omit({
+  id: true, projectId: true, companyId: true, createdById: true, createdAt: true, updatedAt: true,
+});
+export type InsertProjectSelection = z.infer<typeof insertProjectSelectionSchema>;
+export type CreateProjectSelection = InsertProjectSelection & {
+  projectId: string;
+  companyId: string;
+  createdById: string;
+};
+export type ProjectSelection = typeof projectSelections.$inferSelect;
