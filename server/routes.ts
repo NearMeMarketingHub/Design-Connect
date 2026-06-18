@@ -8547,9 +8547,11 @@ export async function registerRoutes(
     const { projectId } = req.params;
     try {
       const isClient = user.role === "client";
+      // Block subcontractors, notaries (contractorType), and legacy top-level notary role
       const isSubOrNotary =
-        user.role === "contractor" &&
-        (user.contractorType === "subcontractor" || user.contractorType === "notary");
+        user.role === "notary" ||
+        (user.role === "contractor" &&
+          (user.contractorType === "subcontractor" || user.contractorType === "notary"));
       if (isSubOrNotary) return res.json([]);
       const items = await storage.getProjectTimelineItems(projectId, isClient);
       return res.json(items);
@@ -8601,12 +8603,14 @@ export async function registerRoutes(
         if (!assignee || assignee.companyId !== companyId) {
           return res.status(400).json({ message: "Assignee must be a member of this company" });
         }
-        if (assignee.role === "client") {
-          return res.status(400).json({ message: "Assignee must be a contractor or admin" });
-        }
-        // External workers (subcontractors/notaries) cannot be assigned timeline items
-        if (assignee.contractorType === "subcontractor" || assignee.contractorType === "notary") {
-          return res.status(400).json({ message: "Assignee must be an internal team member (not a subcontractor or notary)" });
+        // Reject clients, legacy notary role, and external contractor subtypes
+        if (
+          assignee.role === "client" ||
+          assignee.role === "notary" ||
+          assignee.contractorType === "subcontractor" ||
+          assignee.contractorType === "notary"
+        ) {
+          return res.status(400).json({ message: "Assignee must be an internal team member (not a client, subcontractor, or notary)" });
         }
       }
 
@@ -8667,12 +8671,14 @@ export async function registerRoutes(
         if (!assignee || assignee.companyId !== existingCompanyId) {
           return res.status(400).json({ message: "Assignee must be a member of this company" });
         }
-        if (assignee.role === "client") {
-          return res.status(400).json({ message: "Assignee must be a contractor or admin" });
-        }
-        // External workers (subcontractors/notaries) cannot be assigned timeline items
-        if (assignee.contractorType === "subcontractor" || assignee.contractorType === "notary") {
-          return res.status(400).json({ message: "Assignee must be an internal team member (not a subcontractor or notary)" });
+        // Reject clients, legacy notary role, and external contractor subtypes
+        if (
+          assignee.role === "client" ||
+          assignee.role === "notary" ||
+          assignee.contractorType === "subcontractor" ||
+          assignee.contractorType === "notary"
+        ) {
+          return res.status(400).json({ message: "Assignee must be an internal team member (not a client, subcontractor, or notary)" });
         }
       }
 
