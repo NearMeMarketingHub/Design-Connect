@@ -3885,7 +3885,11 @@ export default function ProjectDetails() {
             {!staticProject && (
               <ProjectTimelineTab
                 projectId={projectId}
-                canWrite={canEdit}
+                canWrite={
+                  user?.role === "admin" ||
+                  user?.role === "company_owner" ||
+                  (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
+                }
                 isClient={user?.role === "client"}
               />
             )}

@@ -8589,7 +8589,7 @@ export async function registerRoutes(
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
 
-      // Validate assignedToUserId belongs to the same company with an appropriate role
+      // Validate assignedToUserId: must be same-company owner/admin/internal contractor only
       if (parsed.data.assignedToUserId) {
         const assignee = await storage.getUser(parsed.data.assignedToUserId);
         if (!assignee || assignee.companyId !== companyId) {
@@ -8597,6 +8597,10 @@ export async function registerRoutes(
         }
         if (assignee.role === "client") {
           return res.status(400).json({ message: "Assignee must be a contractor or admin" });
+        }
+        // External workers (subcontractors/notaries) cannot be assigned timeline items
+        if (assignee.contractorType === "subcontractor" || assignee.contractorType === "notary") {
+          return res.status(400).json({ message: "Assignee must be an internal team member (not a subcontractor or notary)" });
         }
       }
 
@@ -8650,15 +8654,19 @@ export async function registerRoutes(
       const parsed = bodySchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
 
-      // Validate assignedToUserId belongs to the same company
+      // Validate assignedToUserId: must be same-company owner/admin/internal contractor only
       if (parsed.data.assignedToUserId) {
-        const companyId = existing.companyId;
+        const existingCompanyId = existing.companyId;
         const assignee = await storage.getUser(parsed.data.assignedToUserId);
-        if (!assignee || assignee.companyId !== companyId) {
+        if (!assignee || assignee.companyId !== existingCompanyId) {
           return res.status(400).json({ message: "Assignee must be a member of this company" });
         }
         if (assignee.role === "client") {
           return res.status(400).json({ message: "Assignee must be a contractor or admin" });
+        }
+        // External workers (subcontractors/notaries) cannot be assigned timeline items
+        if (assignee.contractorType === "subcontractor" || assignee.contractorType === "notary") {
+          return res.status(400).json({ message: "Assignee must be an internal team member (not a subcontractor or notary)" });
         }
       }
 
