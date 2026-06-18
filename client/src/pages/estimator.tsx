@@ -136,7 +136,7 @@ export default function Estimator() {
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: canAccessPriceBook,
+    enabled: user?.role === "company_owner" || (user?.role === "contractor" && user?.isCompanyAdmin === true),
     retry: false,
   });
 

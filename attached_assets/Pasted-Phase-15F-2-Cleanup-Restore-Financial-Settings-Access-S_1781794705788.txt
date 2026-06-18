@@ -1,0 +1,76 @@
+Phase 15F-2 Cleanup — Restore Financial Settings Access Scope
+
+v73 mostly landed #260 correctly, but one access-control change went beyond the approved scope.
+
+Problem:
+`GET /api/company/financial-settings` was broadened to allow regular internal contractors.
+
+That exposes the full company financial settings row, including:
+
+* defaultLaborBurdenPct
+* defaultMaterialMarkupPct
+* defaultSubcontractorMarkupPct
+* defaultEquipmentCostPct
+* overheadNotes
+
+This conflicts with the Phase 15E access-control decision that company financial settings are visible/editable only to Company Owner and Company Admin.
+
+Fix only this access-control issue.
+
+Required changes:
+
+1. Restore `GET /api/company/financial-settings` to owner/admin-only
+
+Use the existing `financialSettingsAccess` helper for GET, the same way PUT uses it.
+
+Expected behavior:
+
+* Company Owner: allowed
+* Company Admin: allowed
+* Regular internal contractor: 403
+* Subcontractor: 403
+* Notary: 403
+* Client: 403
+* Platform admin: 403
+
+2. Update the Estimator financial settings query
+
+In `client/src/pages/estimator.tsx`, do not enable the financial settings query for regular internal contractors.
+
+Use the stricter check:
+`user?.role === "company_owner" || (user?.role === "contractor" && user?.isCompanyAdmin === true)`
+
+Regular internal contractors should still see and edit the Overhead % and Markup % fields, but they should use the platform fallback values of 10% and 15% unless they are editing an existing estimate snapshot.
+
+3. Do not change the rest of #260
+
+Keep:
+
+* editable Overhead % and Markup %
+* platform fallback 10% / 15%
+* estimate snapshot fields
+* budget snapshot inheritance
+* estimate/budget display notes
+
+Do not change:
+
+* schema
+* db/push
+* estimator formulas
+* Contractor Calculator calculations
+* Sales Dashboard
+* invoices
+* expenses
+* price book values
+* PDFs
+* Stripe/billing
+* commission/payout logic
+* production sheets/daily logs
+
+4. Optional cleanup
+
+Remove the Phase 15F pasted plan files from `attached_assets` if they are still present, but do not touch source code for anything else.
+
+After fix:
+
+* Run `npm run check`.
