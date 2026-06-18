@@ -8572,7 +8572,13 @@ export async function registerRoutes(
     try {
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
-      const companyId = user.companyId ?? project.companyId;
+      // Resolve company context: prefer user's own companyId; for admins derive from the
+      // project's assigned contractor since admins don't have their own company record.
+      let companyId = user.companyId ?? null;
+      if (!companyId && project.contractorId) {
+        const contractor = await storage.getUser(project.contractorId);
+        companyId = contractor?.companyId ?? null;
+      }
       if (!companyId) return res.status(400).json({ message: "No company context" });
       const bodySchema = z.object({
         title: z.string().min(1),

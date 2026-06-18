@@ -567,10 +567,10 @@ export default function ProjectTimelineTab({ projectId, canWrite, isClient }: Pr
                             {TYPE_LABELS[item.itemType]}
                           </Badge>
                           {!isClient && item.clientVisible && (
-                            <Eye className="h-3 w-3 text-muted-foreground" title="Visible to client" />
+                            <span title="Visible to client"><Eye className="h-3 w-3 text-muted-foreground" /></span>
                           )}
                           {!isClient && !item.clientVisible && (
-                            <EyeOff className="h-3 w-3 text-muted-foreground" title="Hidden from client" />
+                            <span title="Hidden from client"><EyeOff className="h-3 w-3 text-muted-foreground" /></span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-0.5 flex-wrap">

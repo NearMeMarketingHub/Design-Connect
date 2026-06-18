@@ -2973,9 +2973,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateProjectTimelineItem(id: string, data: Partial<InsertProjectTimelineItem>): Promise<ProjectTimelineItem | undefined> {
     const updateData: any = { ...data, updatedAt: new Date() };
-    // Auto-set completedAt when status transitions to completed, clear otherwise
+    // Only set completedAt on true transition INTO completed; preserve existing timestamp
+    // if already completed; clear it when transitioning away from completed.
     if (data.status === "completed") {
-      updateData.completedAt = new Date();
+      const [existing] = await db
+        .select({ completedAt: schema.projectTimelineItems.completedAt, status: schema.projectTimelineItems.status })
+        .from(schema.projectTimelineItems)
+        .where(eq(schema.projectTimelineItems.id, id))
+        .limit(1);
+      // Only stamp completedAt if not already completed (true status transition)
+      if (!existing || existing.status !== "completed") {
+        updateData.completedAt = new Date();
+      }
+      // If already completed, leave completedAt untouched (do not include it in updateData)
     } else if (data.status && data.status !== "completed") {
       updateData.completedAt = null;
     }
