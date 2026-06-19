@@ -1,0 +1,223 @@
+Phase 19 — Production Sheet / Job Control Center
+
+This is Replit Plan Mode.
+
+Keep this as ONE single Replit plan. Do not split it into multiple separate Replit task plans.
+
+Context:
+Phase 15 is complete:
+
+* Estimates
+* Estimate-to-project workflow
+* Project budgets
+* Project expenses
+* Expense-to-budget actuals
+* Company financial settings
+* Estimator financial snapshots and category adjustments
+
+Phase 16 is complete:
+
+* Project Timeline / Gantt View
+
+Phase 17 is complete:
+
+* Selections / Job Book
+
+Phase 18 is complete:
+
+* Permitting Tracker
+
+Now we are moving into the Production Sheet / Job Control Center.
+
+Goal:
+Add a project-level Production Sheet / Job Control Center foundation that gives contractors one operational overview of the job.
+
+This should help company owners/admins and internal contractors quickly see and manage the key job-control details for a project:
+
+* project identity/details
+* client/contact info
+* project status
+* schedule/timeline highlights
+* permitting highlights
+* selections highlights
+* budget/expense summary
+* important internal notes
+* production/job-control checklist items
+* key job dates
+* internal job readiness/status indicators
+
+Important:
+This phase should NOT guess payout, commission, Near Me 1%, revenue-recognition, or payment formulas.
+
+Those need separate approval later.
+
+Please inspect:
+
+* Project Details page and existing tabs
+* Project Timeline / Gantt tab
+* Project Selections tab
+* Project Permits tab
+* Project Budget tab
+* Project Expenses tab
+* Estimate-to-project workflow
+* Existing project schema
+* Existing project status/progress fields
+* Existing client info available on project
+* Existing company owner/admin/internal contractor access patterns
+* Existing client portal access patterns
+* Existing UI components for cards, tabs, tables, forms, dialogs, status badges, and notes
+* Existing financial summary data available from Phase 15
+
+Plan questions:
+
+1. What should the Production Sheet / Job Control Center include in the first version?
+2. Should it be a new Project Detail tab called “Production” or “Job Control”?
+3. Should it use a new table, such as `project_production_sheets`, or mostly aggregate existing project data?
+4. Should there be a one-to-one production sheet record per project?
+5. What editable fields should be stored?
+   Consider:
+
+   * projectId
+   * companyId
+   * productionStatus
+   * internalPriority
+   * jobStartTarget
+   * jobCompletionTarget
+   * siteContactName
+   * siteContactPhone
+   * siteAccessNotes
+   * parkingNotes
+   * materialStagingNotes
+   * dumpsterNotes
+   * utilityNotes
+   * safetyNotes
+   * inspectionNotes
+   * productionNotes
+   * internalNotes
+   * readinessChecklist fields
+   * createdById
+   * createdAt / updatedAt
+6. Should checklist items be fixed boolean columns, JSON, or a child table?
+7. Should this phase include custom checklist items, or defer those?
+8. Should this phase show summaries from timeline, permits, selections, budget, and expenses?
+9. Should the summaries be read-only cards that link to the existing tabs?
+10. Should production sheet edits affect project status/progress automatically, or remain manual?
+11. Should clients see this tab at all?
+12. Who can view the Production Sheet?
+13. Who can edit the Production Sheet?
+14. Should regular internal contractors be allowed to edit production notes/checklists, or only owner/admin?
+15. Should subcontractors/notaries see anything from Production Sheet?
+16. Should this phase include production financials, or only reference existing budget/expense summaries?
+17. Should invoice/payment/payout/commission/Near Me 1% logic be included now?
+18. What cache invalidations are needed after save?
+19. What files/routes/schema are likely involved?
+20. Is db:push required?
+21. What is the safest first build scope?
+
+Preferred direction unless the code suggests otherwise:
+
+* Add a new Project Detail tab called “Production” or “Job Control.”
+* Keep this project-scoped and company-scoped.
+* Use a one-to-one production sheet record per project if editable production-specific fields are needed.
+* Use existing data for read-only summaries:
+
+  * budget totals
+  * expense actuals
+  * timeline item counts/status
+  * permit status/blocking count
+  * selections pending/approved counts
+* Do not duplicate data already stored in timeline, permits, selections, budgets, or expenses.
+* Company Owner and Company Admin can edit.
+* Regular internal contractors can view; editing can be recommended only if it matches existing safe patterns.
+* Clients should not see internal production sheet data in this phase.
+* Subcontractors/notaries should not see production sheet data in this phase.
+* Do not auto-update project status/progress from production sheet yet.
+* Do not create financial formulas.
+* Do not calculate payout, commission, Near Me 1%, margin, or profitability in this phase.
+* Do not connect to Stripe/billing.
+* Do not change invoices.
+* Do not change estimate, budget, expense, selection, permit, or timeline behavior.
+* Do not add notifications/emails yet.
+
+Possible first version:
+
+* New “Production” tab on Project Details.
+* Top summary cards:
+
+  * Project Status
+  * Timeline items open/blocked/completed
+  * Permits blocking/under review/approved
+  * Selections pending/client review/approved
+  * Budget estimated vs actual
+  * Expenses total
+* Editable production sheet card:
+
+  * productionStatus
+  * internalPriority
+  * target start/completion dates
+  * site access notes
+  * parking/material staging/dumpster/utility/safety notes
+  * inspection notes
+  * production notes
+  * internal notes
+* Simple readiness checklist:
+
+  * Contract/estimate confirmed
+  * Budget created
+  * Permits reviewed
+  * Selections reviewed
+  * Timeline reviewed
+  * Site access confirmed
+  * Materials/staging plan confirmed
+  * Safety notes reviewed
+* Links/buttons to related tabs:
+
+  * Timeline
+  * Selections
+  * Permits
+  * Budget
+  * Expenses
+* No client view yet.
+* No payments/payouts/commissions yet.
+
+Guardrails:
+
+* Do not change Phase 15 financial behavior.
+* Do not change estimator calculations.
+* Do not change budgets.
+* Do not change expenses or actual-cost linkage.
+* Do not change invoices.
+* Do not change price book.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add Near Me 1% logic.
+* Do not add daily logs.
+* Do not change selections.
+* Do not change permitting.
+* Do not change timeline/Gantt behavior.
+* Do not add notifications/emails.
+* Do not retroactively modify existing projects except creating a production sheet record when users save one.
+* Do not create seeded/demo production sheet records unless explicitly asked.
+
+Output needed:
+Return ONE written plan with these sections:
+
+1. Current project/job-management code findings
+2. Recommended Phase 19 data model
+3. Recommended production sheet fields
+4. Recommended readiness checklist model
+5. Recommended API routes
+6. Recommended access-control model
+7. Recommended UI placement and user flow
+8. Recommended summary cards and source data
+9. Financial/job-control recommendation
+10. Client/subcontractor visibility recommendation
+11. What should be deferred
+12. Files likely to be touched
+13. Whether db:push is required
+14. Risks
+15. Test plan
+16. Done criteria for Phase 19
+
+propose the task plan

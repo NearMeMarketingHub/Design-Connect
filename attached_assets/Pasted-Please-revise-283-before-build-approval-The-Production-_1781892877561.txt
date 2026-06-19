@@ -1,0 +1,109 @@
+Please revise #283 before build approval.
+
+The Production Sheet / Job Control Center plan is good overall, but tighten the access-control and financial-summary visibility rules before building.
+
+Main issue:
+The plan says regular internal contractors can view the Production tab, but the Production tab includes Budget and Expenses summary cards.
+
+That creates a financial-data visibility mismatch.
+
+Required revision:
+
+1. Keep Production tab visible to regular internal contractors
+
+Regular internal contractors may view the Production tab because it contains operational job-control information:
+
+* production status
+* target dates
+* site access notes
+* parking notes
+* staging notes
+* dumpster notes
+* utility notes
+* safety notes
+* inspection notes
+* production notes
+* readiness checklist
+
+They should remain read-only unless separately approved later.
+
+2. Restrict financial summary cards
+
+Budget and Expenses summary cards should only be visible to:
+
+* Company Owner
+* Company Admin
+
+Do not show Budget or Expenses cards to regular internal contractors if they do not already have permission to view those financial tabs/data.
+
+For regular internal contractors:
+
+* Show non-financial summary cards only:
+
+  * Project Status
+  * Timeline
+  * Permits
+  * Selections
+* Hide Budget and Expenses summary cards, or show a non-financial placeholder like “Financial summary available to company admins.”
+
+3. API access stays simple
+
+GET /api/projects/:projectId/production-sheet:
+
+* Company Owner: allowed
+* Company Admin: allowed
+* Regular internal contractor: allowed read-only
+* Client: 403
+* Subcontractor/notary: 403
+* Platform admin: 403
+
+PUT /api/projects/:projectId/production-sheet:
+
+* Company Owner: allowed
+* Company Admin: allowed
+* Regular internal contractor: 403
+* Client/sub/notary/platform admin: 403
+
+4. Upsert/partial save safety
+
+The PUT upsert should safely handle first-time saves from either:
+
+* the full Production Details form
+* a readiness checklist toggle
+
+If the user toggles a checklist item before a production sheet exists, the backend should create the record with safe defaults:
+
+* productionStatus defaults to `planning`
+* booleans default false except the toggled value
+* missing text/date fields default null
+
+Do not accidentally require the frontend to submit every field for a checklist-only update.
+
+5. Use Near Me Construct naming
+
+The plan text says “inside BuildVision.” Update wording to Near Me Construct or avoid platform-name wording.
+
+6. Keep all existing guardrails
+
+Do not change:
+
+* Phase 15 financial behavior
+* estimator calculations
+* budgets
+* expenses or actual-cost linkage
+* invoices
+* price book
+* PDFs
+* Stripe/billing
+* commission/payout logic
+* Near Me 1% logic
+* daily logs
+* selections
+* permitting
+* timeline/Gantt behavior
+* notifications/emails
+* existing records retroactively
+
+Please return the revised task plan.
+
+propose the task plan
