@@ -1062,3 +1062,53 @@ export type CreateProjectSelection = InsertProjectSelection & {
   createdById: string;
 };
 export type ProjectSelection = typeof projectSelections.$inferSelect;
+
+// Project Permits — permitting tracker per project
+export const PERMIT_STATUSES = [
+  "not_started", "preparing", "submitted", "under_review",
+  "revisions_requested", "approved", "issued",
+  "inspection_scheduled", "inspection_passed", "inspection_failed",
+  "expired", "cancelled",
+] as const;
+export type PermitStatus = typeof PERMIT_STATUSES[number];
+
+export const projectPermits = pgTable("project_permits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  permitType: text("permit_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  jurisdiction: text("jurisdiction"),
+  permitNumber: text("permit_number"),
+  applicationNumber: text("application_number"),
+  status: text("status").notNull().default("not_started"),
+  submittedDate: text("submitted_date"),
+  approvedDate: text("approved_date"),
+  issuedDate: text("issued_date"),
+  expirationDate: text("expiration_date"),
+  inspectionDate: text("inspection_date"),
+  finalInspectionDate: text("final_inspection_date"),
+  nextActionDate: text("next_action_date"),
+  blockingWork: boolean("blocking_work").notNull().default(false),
+  clientVisible: boolean("client_visible").notNull().default(false),
+  notes: text("notes"),
+  internalNotes: text("internal_notes"),
+  permitPortalUrl: text("permit_portal_url"),
+  documentUrl: text("document_url"),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => users.id),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectPermitSchema = createInsertSchema(projectPermits).omit({
+  id: true, projectId: true, companyId: true, createdById: true, createdAt: true, updatedAt: true,
+});
+export type InsertProjectPermit = z.infer<typeof insertProjectPermitSchema>;
+export type CreateProjectPermit = InsertProjectPermit & {
+  projectId: string;
+  companyId: string;
+  createdById: string;
+};
+export type ProjectPermit = typeof projectPermits.$inferSelect;

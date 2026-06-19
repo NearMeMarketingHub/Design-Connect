@@ -72,6 +72,7 @@ import type {
   CompanyFinancialSettings, InsertCompanyFinancialSettings,
   ProjectTimelineItem, InsertProjectTimelineItem, CreateProjectTimelineItem,
   ProjectSelection, InsertProjectSelection, CreateProjectSelection,
+  ProjectPermit, InsertProjectPermit, CreateProjectPermit,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -447,6 +448,13 @@ export interface IStorage {
   createProjectSelection(item: CreateProjectSelection): Promise<ProjectSelection>;
   updateProjectSelection(id: string, data: Partial<InsertProjectSelection>): Promise<ProjectSelection | undefined>;
   deleteProjectSelection(id: string): Promise<void>;
+
+  // Project permit methods
+  getProjectPermits(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectPermit[]>;
+  getProjectPermit(id: string): Promise<ProjectPermit | undefined>;
+  createProjectPermit(item: CreateProjectPermit): Promise<ProjectPermit>;
+  updateProjectPermit(id: string, data: Partial<InsertProjectPermit>): Promise<ProjectPermit | undefined>;
+  deleteProjectPermit(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3046,6 +3054,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectSelection(id: string): Promise<void> {
     await db.delete(schema.projectSelections).where(eq(schema.projectSelections.id, id));
+  }
+
+  // Project permit methods
+  async getProjectPermits(projectId: string, clientVisibleOnly?: boolean): Promise<ProjectPermit[]> {
+    const conditions = [eq(schema.projectPermits.projectId, projectId)];
+    if (clientVisibleOnly) {
+      conditions.push(eq(schema.projectPermits.clientVisible, true));
+    }
+    return db
+      .select()
+      .from(schema.projectPermits)
+      .where(and(...conditions))
+      .orderBy(schema.projectPermits.nextActionDate, schema.projectPermits.expirationDate, schema.projectPermits.createdAt);
+  }
+
+  async getProjectPermit(id: string): Promise<ProjectPermit | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.projectPermits)
+      .where(eq(schema.projectPermits.id, id));
+    return row;
+  }
+
+  async createProjectPermit(item: CreateProjectPermit): Promise<ProjectPermit> {
+    const [row] = await db.insert(schema.projectPermits).values(item).returning();
+    return row;
+  }
+
+  async updateProjectPermit(id: string, data: Partial<InsertProjectPermit>): Promise<ProjectPermit | undefined> {
+    const [row] = await db
+      .update(schema.projectPermits)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.projectPermits.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteProjectPermit(id: string): Promise<void> {
+    await db.delete(schema.projectPermits).where(eq(schema.projectPermits.id, id));
   }
 }
 

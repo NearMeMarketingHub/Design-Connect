@@ -8974,5 +8974,274 @@ export async function registerRoutes(
     }
   });
 
+  // ─── PROJECT PERMITS ───────────────────────────────────────────────────────
+
+  // Validates a YYYY-MM-DD permit date using UTC round-trip to reject impossible
+  // calendar dates (e.g. 2026-02-31). Returns an error message or null if OK.
+  const validatePermitDate = (fieldName: string, date: string | null | undefined): string | null => {
+    if (!date) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return `${fieldName} must be in YYYY-MM-DD format`;
+    }
+    const [year, month, day] = date.split("-").map(Number);
+    const utc = new Date(Date.UTC(year, month - 1, day));
+    if (
+      utc.getUTCFullYear() !== year ||
+      utc.getUTCMonth() + 1 !== month ||
+      utc.getUTCDate() !== day
+    ) {
+      return `${fieldName} is not a valid calendar date`;
+    }
+    return null;
+  };
+
+  // Client-safe field projection for permits — strips internal fields.
+  const shapePermitForClient = (p: any) => ({
+    id: p.id,
+    projectId: p.projectId,
+    permitType: p.permitType,
+    title: p.title,
+    description: p.description,
+    jurisdiction: p.jurisdiction,
+    permitNumber: p.permitNumber,
+    status: p.status,
+    submittedDate: p.submittedDate,
+    approvedDate: p.approvedDate,
+    issuedDate: p.issuedDate,
+    expirationDate: p.expirationDate,
+    inspectionDate: p.inspectionDate,
+    finalInspectionDate: p.finalInspectionDate,
+    nextActionDate: p.nextActionDate,
+    blockingWork: p.blockingWork,
+    notes: p.notes,
+    updatedAt: p.updatedAt,
+  });
+
+  // GET /api/projects/:projectId/permits
+  app.get("/api/projects/:projectId/permits", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    try {
+      if (user.role === "admin") return res.status(403).json({ message: "Access denied" });
+      const isExternal =
+        user.role === "notary" ||
+        (user.role === "contractor" &&
+          (user.contractorType === "subcontractor" || user.contractorType === "notary"));
+      if (isExternal) return res.json([]);
+
+      const isClient = user.role === "client";
+      if (isClient) {
+        const items = await storage.getProjectPermits(projectId, true);
+        return res.json(items.map(shapePermitForClient));
+      }
+      const items = await storage.getProjectPermits(projectId, false);
+      return res.json(items);
+    } catch (err) {
+      console.error("[permits:GET]", err);
+      return res.status(500).json({ message: "Failed to load permits" });
+    }
+  });
+
+  // POST /api/projects/:projectId/permits
+  app.post("/api/projects/:projectId/permits", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    const companyId = user.companyId ?? null;
+    if (!companyId) return res.status(400).json({ message: "No company context" });
+    try {
+      const bodySchema = z.object({
+        permitType: z.string().min(1),
+        title: z.string().min(1),
+        description: z.string().nullable().optional(),
+        jurisdiction: z.string().nullable().optional(),
+        permitNumber: z.string().nullable().optional(),
+        applicationNumber: z.string().nullable().optional(),
+        status: z.enum([
+          "not_started","preparing","submitted","under_review",
+          "revisions_requested","approved","issued",
+          "inspection_scheduled","inspection_passed","inspection_failed",
+          "expired","cancelled",
+        ]).default("not_started"),
+        submittedDate: z.string().nullable().optional(),
+        approvedDate: z.string().nullable().optional(),
+        issuedDate: z.string().nullable().optional(),
+        expirationDate: z.string().nullable().optional(),
+        inspectionDate: z.string().nullable().optional(),
+        finalInspectionDate: z.string().nullable().optional(),
+        nextActionDate: z.string().nullable().optional(),
+        blockingWork: z.boolean().default(false),
+        clientVisible: z.boolean().default(false),
+        notes: z.string().nullable().optional(),
+        internalNotes: z.string().nullable().optional(),
+        permitPortalUrl: z.string().nullable().optional(),
+        documentUrl: z.string().nullable().optional(),
+        assignedToUserId: z.string().nullable().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate all date fields
+      const dateFields: [string, string | null | undefined][] = [
+        ["submittedDate", parsed.data.submittedDate],
+        ["approvedDate", parsed.data.approvedDate],
+        ["issuedDate", parsed.data.issuedDate],
+        ["expirationDate", parsed.data.expirationDate],
+        ["inspectionDate", parsed.data.inspectionDate],
+        ["finalInspectionDate", parsed.data.finalInspectionDate],
+        ["nextActionDate", parsed.data.nextActionDate],
+      ];
+      for (const [field, value] of dateFields) {
+        const err = validatePermitDate(field, value);
+        if (err) return res.status(400).json({ message: err });
+      }
+
+      // Validate assignedToUserId
+      if (parsed.data.assignedToUserId) {
+        const assignee = await storage.getUser(parsed.data.assignedToUserId);
+        if (!assignee || assignee.companyId !== companyId) {
+          return res.status(400).json({ message: "Assignee must be a member of this company" });
+        }
+        if (
+          assignee.role === "client" ||
+          assignee.role === "notary" ||
+          assignee.contractorType === "subcontractor" ||
+          assignee.contractorType === "notary"
+        ) {
+          return res.status(400).json({ message: "Assignee must be an internal team member" });
+        }
+      }
+
+      const item = await storage.createProjectPermit({
+        ...parsed.data,
+        projectId,
+        companyId,
+        createdById: user.id,
+      });
+      return res.status(201).json(item);
+    } catch (err) {
+      console.error("[permits:POST]", err);
+      return res.status(500).json({ message: "Failed to create permit" });
+    }
+  });
+
+  // PATCH /api/projects/:projectId/permits/:permitId
+  app.patch("/api/projects/:projectId/permits/:permitId", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId, permitId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const existing = await storage.getProjectPermit(permitId);
+      if (!existing) return res.status(404).json({ message: "Permit not found" });
+      if (existing.projectId !== projectId) {
+        return res.status(403).json({ message: "Permit does not belong to this project" });
+      }
+      if (existing.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Permit does not belong to your company" });
+      }
+
+      const bodySchema = z.object({
+        permitType: z.string().min(1).optional(),
+        title: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        jurisdiction: z.string().nullable().optional(),
+        permitNumber: z.string().nullable().optional(),
+        applicationNumber: z.string().nullable().optional(),
+        status: z.enum([
+          "not_started","preparing","submitted","under_review",
+          "revisions_requested","approved","issued",
+          "inspection_scheduled","inspection_passed","inspection_failed",
+          "expired","cancelled",
+        ]).optional(),
+        submittedDate: z.string().nullable().optional(),
+        approvedDate: z.string().nullable().optional(),
+        issuedDate: z.string().nullable().optional(),
+        expirationDate: z.string().nullable().optional(),
+        inspectionDate: z.string().nullable().optional(),
+        finalInspectionDate: z.string().nullable().optional(),
+        nextActionDate: z.string().nullable().optional(),
+        blockingWork: z.boolean().optional(),
+        clientVisible: z.boolean().optional(),
+        notes: z.string().nullable().optional(),
+        internalNotes: z.string().nullable().optional(),
+        permitPortalUrl: z.string().nullable().optional(),
+        documentUrl: z.string().nullable().optional(),
+        assignedToUserId: z.string().nullable().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate date fields only when provided
+      const dateFields: [string, string | null | undefined][] = [
+        ["submittedDate", parsed.data.submittedDate],
+        ["approvedDate", parsed.data.approvedDate],
+        ["issuedDate", parsed.data.issuedDate],
+        ["expirationDate", parsed.data.expirationDate],
+        ["inspectionDate", parsed.data.inspectionDate],
+        ["finalInspectionDate", parsed.data.finalInspectionDate],
+        ["nextActionDate", parsed.data.nextActionDate],
+      ];
+      for (const [field, value] of dateFields) {
+        if (field in parsed.data) {
+          const err = validatePermitDate(field, value);
+          if (err) return res.status(400).json({ message: err });
+        }
+      }
+
+      // Validate assignedToUserId if provided
+      if (parsed.data.assignedToUserId) {
+        const assignee = await storage.getUser(parsed.data.assignedToUserId);
+        if (!assignee || assignee.companyId !== existing.companyId) {
+          return res.status(400).json({ message: "Assignee must be a member of this company" });
+        }
+        if (
+          assignee.role === "client" ||
+          assignee.role === "notary" ||
+          assignee.contractorType === "subcontractor" ||
+          assignee.contractorType === "notary"
+        ) {
+          return res.status(400).json({ message: "Assignee must be an internal team member" });
+        }
+      }
+
+      const updated = await storage.updateProjectPermit(permitId, parsed.data);
+      return res.json(updated);
+    } catch (err) {
+      console.error("[permits:PATCH]", err);
+      return res.status(500).json({ message: "Failed to update permit" });
+    }
+  });
+
+  // DELETE /api/projects/:projectId/permits/:permitId
+  app.delete("/api/projects/:projectId/permits/:permitId", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId, permitId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    try {
+      const existing = await storage.getProjectPermit(permitId);
+      if (!existing) return res.status(404).json({ message: "Permit not found" });
+      if (existing.projectId !== projectId) {
+        return res.status(403).json({ message: "Permit does not belong to this project" });
+      }
+      if (existing.companyId !== user.companyId) {
+        return res.status(403).json({ message: "Permit does not belong to your company" });
+      }
+      await storage.deleteProjectPermit(permitId);
+      return res.status(204).send();
+    } catch (err) {
+      console.error("[permits:DELETE]", err);
+      return res.status(500).json({ message: "Failed to delete permit" });
+    }
+  });
+
   return httpServer;
 }

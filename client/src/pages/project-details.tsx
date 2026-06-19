@@ -21,6 +21,7 @@ import ProjectBudgetTab from "@/components/project-budget-tab";
 import ProjectExpensesTab from "@/components/project-expenses-tab";
 import ProjectTimelineTab from "@/components/project-timeline-tab";
 import ProjectSelectionsTab from "@/components/project-selections-tab";
+import ProjectPermitsTab from "@/components/project-permits-tab";
 import { 
   ArrowLeft,
   Calendar,
@@ -346,6 +347,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/budget')) return 'budget';
     if (path.endsWith('/timeline')) return 'timeline';
     if (path.endsWith('/selections')) return 'selections';
+    if (path.endsWith('/permits')) return 'permits';
     if (path.endsWith('/inspiration')) return 'inspiration';
     if (path.endsWith('/contractor-photos')) return 'contractor-photos';
     if (path.endsWith('/materials')) return 'materials';
@@ -3062,6 +3064,14 @@ export default function ProjectDetails() {
           >
             Selections
           </TabsTrigger>
+          <TabsTrigger
+            value="permits"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+            data-testid="tab-permits"
+            onClick={() => handleTabChange("permits")}
+          >
+            Permits
+          </TabsTrigger>
           {hasProjectPerm('canViewMessages') && (
             <TabsTrigger 
               value="messages"
@@ -4280,6 +4290,18 @@ export default function ProjectDetails() {
           {/* SELECTIONS TAB */}
           <TabsContent value="selections" className="mt-6">
             <ProjectSelectionsTab
+              projectId={projectId}
+              canWrite={
+                user?.role === "company_owner" ||
+                (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
+              }
+              isClient={user?.role === "client"}
+            />
+          </TabsContent>
+
+          {/* PERMITS TAB */}
+          <TabsContent value="permits" className="mt-6">
+            <ProjectPermitsTab
               projectId={projectId}
               canWrite={
                 user?.role === "company_owner" ||
