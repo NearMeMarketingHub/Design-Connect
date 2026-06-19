@@ -1,0 +1,227 @@
+Phase 18 — Permitting Tracker
+
+This is Replit Plan Mode.
+
+Keep this as ONE single Replit plan. Do not split it into multiple separate Replit task plans.
+
+Context:
+Phase 15 is complete:
+
+* Estimates
+* Estimate-to-project workflow
+* Project budgets
+* Project expenses
+* Expense-to-budget actuals
+* Company financial settings
+* Estimator financial snapshots and category adjustments
+
+Phase 16 is complete:
+
+* Project Timeline / Gantt View
+* project_timeline_items table
+* Timeline tab with list/Gantt view
+* Owner/Admin timeline CRUD
+* Internal contractor view access
+* Client-visible timeline item support
+
+Phase 17 is complete:
+
+* Selections / Job Book
+* project_selections table
+* Selections tab on Project Details
+* Company Owner/Admin CRUD
+* Internal contractor read-only
+* Client-safe filtered selections
+* Strict dueDate validation
+
+Now we are moving into permitting.
+
+Goal:
+Add a Permitting Tracker foundation so contractors can track project permits, applications, approvals, inspections, expiration dates, jurisdictions, permit numbers, and required documents.
+
+Primary contractor story:
+A company owner/admin opens a project and can create permits tied to that project. Each permit tracks type, jurisdiction, status, submission date, approval date, expiration date, permit number, inspection dates, notes, client visibility, and whether the permit is blocking work.
+
+Primary client story:
+A client may eventually view client-visible permit status updates, but the first version should be careful not to expose internal notes or sensitive company/admin data.
+
+Please inspect:
+
+* Existing Project Details tab structure
+* Project Timeline tab pattern
+* Project Selections tab pattern
+* Existing project/client access checks
+* Existing company owner/admin/internal contractor permissions
+* Existing app.param("projectId") guard behavior
+* Existing date validation helper patterns, especially strict selection date validation
+* Existing UI components for tabs, badges, tables, dialogs, cards, status selectors, and date inputs
+* Existing document/file upload patterns, if any
+
+Plan questions:
+
+1. What data model should permits use?
+2. Should permits be stored in a new table, such as `project_permits`?
+3. What fields should a permit include?
+   Consider:
+
+   * id
+   * projectId
+   * companyId
+   * permitType
+   * title
+   * description
+   * jurisdiction
+   * permitNumber
+   * applicationNumber
+   * status
+   * submittedDate
+   * approvedDate
+   * issuedDate
+   * expirationDate
+   * inspectionDate
+   * finalInspectionDate
+   * nextActionDate
+   * blockingWork
+   * clientVisible
+   * assignedToUserId
+   * notes
+   * internalNotes
+   * documentUrl
+   * createdById
+   * createdAt / updatedAt
+4. What statuses should be used?
+   Consider:
+
+   * not_started
+   * preparing
+   * submitted
+   * under_review
+   * revisions_requested
+   * approved
+   * issued
+   * inspection_scheduled
+   * inspection_passed
+   * inspection_failed
+   * expired
+   * cancelled
+5. Should permit inspections be separate records in a child table, or should first version keep inspection fields on the permit row?
+6. Should permit documents/file uploads be included now, or deferred?
+7. Should external document/link fields be included now?
+8. Should permits affect project timeline/Gantt automatically, or stay informational only?
+9. Should permits affect project status/progress automatically, or stay manual?
+10. Should clients see permits now, or should client visibility be stored now and exposed later?
+11. Who can create/edit/delete permits?
+12. Who can view internal vs client-visible permits?
+13. Should regular internal contractors be able to create/edit permits?
+14. Should subcontractors/notaries see permits?
+15. Should permits appear as a new Project Detail tab?
+16. Should there be summary cards for pending/submitted/approved/expired/blocking?
+17. What date validation is needed for permit dates?
+18. What cache invalidations are needed after create/edit/delete?
+19. What files/routes/schema are likely involved?
+20. Is db:push required?
+21. What is the safest first build scope?
+
+Preferred direction unless the code suggests otherwise:
+
+* Add a dedicated `project_permits` table.
+* Keep permits project-scoped and company-scoped.
+* Add a Project Detail tab called “Permits.”
+* Company Owner and Company Admin can create/edit/delete permits.
+* Regular internal contractors can view permits but should not edit unless there is already a safe internal edit pattern.
+* Clients should only see permits where `clientVisible = true`, and only safe client-facing fields.
+* Subcontractors/notaries should not see permit data in this phase.
+* Do not connect permits to timeline/Gantt automatically yet.
+* Do not auto-change project status/progress from permit statuses.
+* Do not connect permits to budgets, expenses, invoices, selections, daily logs, production sheets, notifications, or emails yet.
+* Keep inspections simple in the first version, using fields on the permit row instead of a child inspection table unless the code strongly suggests otherwise.
+* Include documentUrl or permitPortalUrl as plain text/link fields if useful.
+* Defer file/image uploads unless there is already a very safe upload pattern that can be reused without expanding scope.
+
+Client-safe response rule:
+If clients can view permits in Phase 18, the API must shape the client response separately.
+
+Client-safe permit fields may include:
+
+* id
+* projectId
+* permitType
+* title
+* description
+* jurisdiction
+* permitNumber, if safe
+* status
+* submittedDate
+* approvedDate
+* issuedDate
+* expirationDate
+* inspectionDate
+* finalInspectionDate
+* nextActionDate
+* blockingWork
+* notes
+* updatedAt
+
+Do not include these fields in client responses:
+
+* companyId
+* createdById
+* assignedToUserId
+* internalNotes
+* applicationNumber, unless explicitly considered safe
+* documentUrl if it may expose internal/private files
+* any internal-only fields
+
+Possible first version:
+
+* New Permits tab on project detail page.
+* Permit list/table grouped or filterable by status.
+* Summary cards: Needs Action, Submitted/Under Review, Approved/Issued, Expired, Blocking Work.
+* Create/edit/delete dialog.
+* Fields: permitType, title, description, jurisdiction, permitNumber, applicationNumber, status, submittedDate, approvedDate, issuedDate, expirationDate, inspectionDate, finalInspectionDate, nextActionDate, blockingWork, clientVisible, notes, internalNotes, documentUrl or permitPortalUrl, assignedToUserId.
+* Strict YYYY-MM-DD validation for date fields.
+* Client-visible flag stored now.
+* Client read-only display if safe and low-risk.
+* No automatic project/timeline changes.
+
+Guardrails:
+
+* Do not change Phase 15 financial behavior.
+* Do not change estimator calculations.
+* Do not change budgets.
+* Do not change expenses or actual-cost linkage.
+* Do not change invoices.
+* Do not change price book.
+* Do not change PDFs.
+* Do not change Stripe/billing.
+* Do not add commission or payout logic.
+* Do not add production sheets.
+* Do not add daily logs.
+* Do not change selections.
+* Do not change timeline/Gantt behavior except adding no automatic permit integration.
+* Do not add notifications/emails.
+* Do not retroactively modify existing projects except adding permit records when users create them.
+* Do not create seeded/demo permit records unless explicitly asked.
+
+Output needed:
+Return ONE written plan with these sections:
+
+1. Current project/client code findings
+2. Recommended Phase 18 data model
+3. Recommended permit fields
+4. Recommended permit statuses
+5. Recommended API routes
+6. Recommended access-control model
+7. Recommended UI placement and user flow
+8. Client visibility/client-safe response recommendation
+9. Inspection tracking recommendation
+10. File/document/link handling recommendation
+11. Timeline/project-status integration recommendation
+12. What should be deferred
+13. Files likely to be touched
+14. Whether db:push is required
+15. Risks
+16. Test plan
+17. Done criteria for Phase 18
+
+propose the task plan
