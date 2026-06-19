@@ -22,6 +22,7 @@ import ProjectExpensesTab from "@/components/project-expenses-tab";
 import ProjectTimelineTab from "@/components/project-timeline-tab";
 import ProjectSelectionsTab from "@/components/project-selections-tab";
 import ProjectPermitsTab from "@/components/project-permits-tab";
+import ProjectProductionTab from "@/components/project-production-tab";
 import { 
   ArrowLeft,
   Calendar,
@@ -348,6 +349,7 @@ export default function ProjectDetails() {
     if (path.endsWith('/timeline')) return 'timeline';
     if (path.endsWith('/selections')) return 'selections';
     if (path.endsWith('/permits')) return 'permits';
+    if (path.endsWith('/production')) return 'production';
     if (path.endsWith('/inspiration')) return 'inspiration';
     if (path.endsWith('/contractor-photos')) return 'contractor-photos';
     if (path.endsWith('/materials')) return 'materials';
@@ -3072,6 +3074,16 @@ export default function ProjectDetails() {
           >
             Permits
           </TabsTrigger>
+          {(user?.role === 'company_owner' || (user?.role === 'contractor' && !user?.contractorType && !!user?.companyId)) && (
+            <TabsTrigger
+              value="production"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent hover:bg-muted px-4 py-3 whitespace-nowrap transition-colors"
+              data-testid="tab-production"
+              onClick={() => handleTabChange("production")}
+            >
+              Production
+            </TabsTrigger>
+          )}
           {hasProjectPerm('canViewMessages') && (
             <TabsTrigger 
               value="messages"
@@ -4308,6 +4320,22 @@ export default function ProjectDetails() {
                 (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
               }
               isClient={user?.role === "client"}
+            />
+          </TabsContent>
+
+          {/* PRODUCTION TAB */}
+          <TabsContent value="production" className="mt-6">
+            <ProjectProductionTab
+              projectId={projectId}
+              canWrite={
+                user?.role === "company_owner" ||
+                (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
+              }
+              canViewBudget={
+                user?.role === "company_owner" ||
+                (user as any)?.isCompanyAdmin === true
+              }
+              project={apiProject}
             />
           </TabsContent>
 

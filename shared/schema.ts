@@ -1112,3 +1112,56 @@ export type CreateProjectPermit = InsertProjectPermit & {
   createdById: string;
 };
 export type ProjectPermit = typeof projectPermits.$inferSelect;
+
+// ─── Project Production Sheets ───────────────────────────────────────────────
+
+export const PRODUCTION_STATUSES = [
+  "planning", "mobilizing", "active", "on_hold", "punch_list", "completed",
+] as const;
+export type ProductionStatus = typeof PRODUCTION_STATUSES[number];
+
+export const INTERNAL_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+export type InternalPriority = typeof INTERNAL_PRIORITIES[number];
+
+export const projectProductionSheets = pgTable("project_production_sheets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().unique().references(() => projects.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  productionStatus: text("production_status").notNull().default("planning"),
+  internalPriority: text("internal_priority"),
+  jobStartTarget: text("job_start_target"),
+  jobCompletionTarget: text("job_completion_target"),
+  siteContactName: text("site_contact_name"),
+  siteContactPhone: text("site_contact_phone"),
+  siteAccessNotes: text("site_access_notes"),
+  parkingNotes: text("parking_notes"),
+  materialStagingNotes: text("material_staging_notes"),
+  dumpsterNotes: text("dumpster_notes"),
+  utilityNotes: text("utility_notes"),
+  safetyNotes: text("safety_notes"),
+  inspectionNotes: text("inspection_notes"),
+  productionNotes: text("production_notes"),
+  internalNotes: text("internal_notes"),
+  checklistContractConfirmed: boolean("checklist_contract_confirmed").notNull().default(false),
+  checklistBudgetCreated: boolean("checklist_budget_created").notNull().default(false),
+  checklistPermitsReviewed: boolean("checklist_permits_reviewed").notNull().default(false),
+  checklistSelectionsReviewed: boolean("checklist_selections_reviewed").notNull().default(false),
+  checklistTimelineReviewed: boolean("checklist_timeline_reviewed").notNull().default(false),
+  checklistSiteAccessConfirmed: boolean("checklist_site_access_confirmed").notNull().default(false),
+  checklistMaterialsPlanConfirmed: boolean("checklist_materials_plan_confirmed").notNull().default(false),
+  checklistSafetyNotesReviewed: boolean("checklist_safety_notes_reviewed").notNull().default(false),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectProductionSheetSchema = createInsertSchema(projectProductionSheets).omit({
+  id: true, projectId: true, companyId: true, createdById: true, createdAt: true, updatedAt: true,
+}).partial();
+export type InsertProjectProductionSheet = z.infer<typeof insertProjectProductionSheetSchema>;
+export type CreateProjectProductionSheet = InsertProjectProductionSheet & {
+  projectId: string;
+  companyId: string;
+  createdById: string;
+};
+export type ProjectProductionSheet = typeof projectProductionSheets.$inferSelect;

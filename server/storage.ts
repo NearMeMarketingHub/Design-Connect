@@ -73,6 +73,7 @@ import type {
   ProjectTimelineItem, InsertProjectTimelineItem, CreateProjectTimelineItem,
   ProjectSelection, InsertProjectSelection, CreateProjectSelection,
   ProjectPermit, InsertProjectPermit, CreateProjectPermit,
+  ProjectProductionSheet, InsertProjectProductionSheet, CreateProjectProductionSheet,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -455,6 +456,10 @@ export interface IStorage {
   createProjectPermit(item: CreateProjectPermit): Promise<ProjectPermit>;
   updateProjectPermit(id: string, data: Partial<InsertProjectPermit>): Promise<ProjectPermit | undefined>;
   deleteProjectPermit(id: string): Promise<void>;
+
+  // Project production sheet methods
+  getProjectProductionSheet(projectId: string): Promise<ProjectProductionSheet | null>;
+  upsertProjectProductionSheet(data: CreateProjectProductionSheet): Promise<ProjectProductionSheet>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3093,6 +3098,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProjectPermit(id: string): Promise<void> {
     await db.delete(schema.projectPermits).where(eq(schema.projectPermits.id, id));
+  }
+
+  // ── Project production sheet ────────────────────────────────────────────────
+
+  async getProjectProductionSheet(projectId: string): Promise<ProjectProductionSheet | null> {
+    const [row] = await db
+      .select()
+      .from(schema.projectProductionSheets)
+      .where(eq(schema.projectProductionSheets.projectId, projectId));
+    return row ?? null;
+  }
+
+  async upsertProjectProductionSheet(data: CreateProjectProductionSheet): Promise<ProjectProductionSheet> {
+    const { projectId, companyId, createdById, ...fields } = data;
+    const insertValues = {
+      projectId,
+      companyId,
+      createdById,
+      productionStatus: "planning",
+      checklistContractConfirmed: false,
+      checklistBudgetCreated: false,
+      checklistPermitsReviewed: false,
+      checklistSelectionsReviewed: false,
+      checklistTimelineReviewed: false,
+      checklistSiteAccessConfirmed: false,
+      checklistMaterialsPlanConfirmed: false,
+      checklistSafetyNotesReviewed: false,
+      ...fields,
+    };
+    const updateSet = { ...fields, updatedAt: new Date() };
+    const [row] = await db
+      .insert(schema.projectProductionSheets)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: schema.projectProductionSheets.projectId,
+        set: updateSet,
+      })
+      .returning();
+    return row;
   }
 }
 

@@ -9243,5 +9243,90 @@ export async function registerRoutes(
     }
   });
 
+  // ── Production Sheet Routes ──────────────────────────────────────────────────
+
+  // GET /api/projects/:projectId/production-sheet
+  app.get("/api/projects/:projectId/production-sheet", requireAuth, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    // admin, client, sub, notary → 403
+    if (user.role === "admin" || user.role === "client") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const isExternal =
+      user.role === "notary" ||
+      (user.role === "contractor" &&
+        (user.contractorType === "subcontractor" || user.contractorType === "notary"));
+    if (isExternal) return res.status(403).json({ message: "Access denied" });
+    try {
+      const sheet = await storage.getProjectProductionSheet(projectId);
+      return res.json(sheet); // null if not yet created
+    } catch (err) {
+      console.error("[production-sheet:GET]", err);
+      return res.status(500).json({ message: "Failed to load production sheet" });
+    }
+  });
+
+  // PUT /api/projects/:projectId/production-sheet
+  app.put("/api/projects/:projectId/production-sheet", requireAuth, requireActiveSubscription, async (req: any, res: any) => {
+    const user = req.user as User;
+    const { projectId } = req.params;
+    const canWrite =
+      user.role === "company_owner" ||
+      (user.role === "contractor" && user.isCompanyAdmin === true);
+    if (!canWrite) return res.status(403).json({ message: "Access denied" });
+    const companyId = user.companyId ?? null;
+    if (!companyId) return res.status(400).json({ message: "No company context" });
+    try {
+      const bodySchema = z.object({
+        productionStatus: z.enum(["planning", "mobilizing", "active", "on_hold", "punch_list", "completed"]).optional(),
+        internalPriority: z.enum(["low", "normal", "high", "urgent"]).nullable().optional(),
+        jobStartTarget: z.string().nullable().optional(),
+        jobCompletionTarget: z.string().nullable().optional(),
+        siteContactName: z.string().nullable().optional(),
+        siteContactPhone: z.string().nullable().optional(),
+        siteAccessNotes: z.string().nullable().optional(),
+        parkingNotes: z.string().nullable().optional(),
+        materialStagingNotes: z.string().nullable().optional(),
+        dumpsterNotes: z.string().nullable().optional(),
+        utilityNotes: z.string().nullable().optional(),
+        safetyNotes: z.string().nullable().optional(),
+        inspectionNotes: z.string().nullable().optional(),
+        productionNotes: z.string().nullable().optional(),
+        internalNotes: z.string().nullable().optional(),
+        checklistContractConfirmed: z.boolean().optional(),
+        checklistBudgetCreated: z.boolean().optional(),
+        checklistPermitsReviewed: z.boolean().optional(),
+        checklistSelectionsReviewed: z.boolean().optional(),
+        checklistTimelineReviewed: z.boolean().optional(),
+        checklistSiteAccessConfirmed: z.boolean().optional(),
+        checklistMaterialsPlanConfirmed: z.boolean().optional(),
+        checklistSafetyNotesReviewed: z.boolean().optional(),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0].message });
+
+      // Validate date fields if present
+      for (const [field, value] of [
+        ["jobStartTarget", parsed.data.jobStartTarget],
+        ["jobCompletionTarget", parsed.data.jobCompletionTarget],
+      ] as [string, string | null | undefined][]) {
+        const err = validatePermitDate(field, value);
+        if (err) return res.status(400).json({ message: err });
+      }
+
+      const sheet = await storage.upsertProjectProductionSheet({
+        ...parsed.data,
+        projectId,
+        companyId,
+        createdById: user.id,
+      });
+      return res.json(sheet);
+    } catch (err) {
+      console.error("[production-sheet:PUT]", err);
+      return res.status(500).json({ message: "Failed to save production sheet" });
+    }
+  });
+
   return httpServer;
 }
