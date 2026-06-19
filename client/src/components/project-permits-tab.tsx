@@ -255,6 +255,13 @@ function cleanForm(f: FormState) {
   };
 }
 
+interface TeamMember {
+  id: string;
+  contractorId: string;
+  name?: string;
+  user?: { name?: string; username: string };
+}
+
 interface Props {
   projectId: string;
   canWrite: boolean;
@@ -272,6 +279,16 @@ export default function ProjectPermitsTab({ projectId, canWrite, isClient }: Pro
 
   const { data: permits = [], isLoading } = useQuery<Permit[]>({
     queryKey: [`/api/projects/${projectId}/permits`],
+  });
+
+  const { data: teamMembers = [] } = useQuery<TeamMember[]>({
+    queryKey: ["/api/projects", projectId, "team"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/team`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: canWrite,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/permits`] });
@@ -493,6 +510,13 @@ export default function ProjectPermitsTab({ projectId, canWrite, isClient }: Pro
                       {!p.clientVisible && (
                         <Badge variant="outline" className="text-xs text-muted-foreground">Internal</Badge>
                       )}
+                      {p.assignedToUserId && (() => {
+                        const m = teamMembers.find((tm) => tm.contractorId === p.assignedToUserId);
+                        const name = m?.user?.name || m?.user?.username || null;
+                        return name ? (
+                          <span className="text-xs text-muted-foreground">Assigned: <span className="font-medium text-foreground/80">{name}</span></span>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="text-xs text-muted-foreground mb-1">
                       <span className="font-medium text-foreground/70">{p.permitType}</span>
@@ -779,6 +803,27 @@ export default function ProjectPermitsTab({ projectId, canWrite, isClient }: Pro
                 />
                 <span className="text-sm font-medium">Visible to Client</span>
               </label>
+            </div>
+
+            {/* Assigned To */}
+            <div className="space-y-1.5">
+              <Label htmlFor="permit-assigned">Assigned To</Label>
+              <Select
+                value={form.assignedToUserId || "__none__"}
+                onValueChange={(v) => setField("assignedToUserId", v === "__none__" ? "" : v)}
+              >
+                <SelectTrigger id="permit-assigned" data-testid="select-permit-assignee">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Unassigned</SelectItem>
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.contractorId} value={m.contractorId}>
+                      {m.user?.name || m.user?.username || m.contractorId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
