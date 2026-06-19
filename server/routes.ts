@@ -9258,7 +9258,18 @@ export async function registerRoutes(
       (user.role === "contractor" &&
         (user.contractorType === "subcontractor" || user.contractorType === "notary"));
     if (isExternal) return res.status(403).json({ message: "Access denied" });
+    // Explicit company-isolation check: user must have a company and it must match
+    // the project contractor's company (defense-in-depth on top of app.param middleware).
+    const userCompanyId = user.companyId ?? null;
+    if (!userCompanyId) return res.status(403).json({ message: "Access denied" });
     try {
+      const cachedProject = (req as any).project;
+      if (cachedProject?.contractorId) {
+        const projectContractor = await storage.getUser(cachedProject.contractorId);
+        if (!projectContractor || projectContractor.companyId !== userCompanyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
       const sheet = await storage.getProjectProductionSheet(projectId);
       return res.json(sheet); // null if not yet created
     } catch (err) {
@@ -9277,6 +9288,24 @@ export async function registerRoutes(
     if (!canWrite) return res.status(403).json({ message: "Access denied" });
     const companyId = user.companyId ?? null;
     if (!companyId) return res.status(400).json({ message: "No company context" });
+    // Explicit company-isolation check: project contractor must belong to same company.
+    try {
+      const cachedProject = (req as any).project;
+      if (cachedProject?.contractorId) {
+        const projectContractor = await storage.getUser(cachedProject.contractorId);
+        if (!projectContractor || projectContractor.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      // If a sheet already exists, verify its companyId matches before overwriting.
+      const existingSheet = await storage.getProjectProductionSheet(projectId);
+      if (existingSheet && existingSheet.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+    } catch (err) {
+      console.error("[production-sheet:company-check]", err);
+      return res.status(500).json({ message: "Failed to verify access" });
+    }
     try {
       const bodySchema = z.object({
         productionStatus: z.enum(["planning", "mobilizing", "active", "on_hold", "punch_list", "completed"]).optional(),

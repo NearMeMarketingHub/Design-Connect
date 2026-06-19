@@ -4324,20 +4324,23 @@ export default function ProjectDetails() {
           </TabsContent>
 
           {/* PRODUCTION TAB */}
-          <TabsContent value="production" className="mt-6">
-            <ProjectProductionTab
-              projectId={projectId}
-              canWrite={
-                user?.role === "company_owner" ||
-                (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
-              }
-              canViewBudget={
-                user?.role === "company_owner" ||
-                (user as any)?.isCompanyAdmin === true
-              }
-              project={apiProject}
-            />
-          </TabsContent>
+          {(user?.role === "company_owner" ||
+            (user?.role === "contractor" && !user?.contractorType && !!user?.companyId)) && (
+            <TabsContent value="production" className="mt-6">
+              <ProjectProductionTab
+                projectId={projectId}
+                canWrite={
+                  user?.role === "company_owner" ||
+                  (user?.role === "contractor" && !!(user as any).isCompanyAdmin)
+                }
+                canViewBudget={
+                  user?.role === "company_owner" ||
+                  (user as any)?.isCompanyAdmin === true
+                }
+                project={apiProject}
+              />
+            </TabsContent>
+          )}
 
           {/* MESSAGES TAB */}
           <TabsContent value="messages" className="mt-6">
